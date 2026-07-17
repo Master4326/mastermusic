@@ -450,6 +450,7 @@
     if (!window.PlayerCore) return;
     const tracks = window.PlayerCore.state.tracks;
     const list = document.getElementById('trackList');
+    if (!list) return;   // la lista de biblioteca ya no existe en config
     if (!tracks.length) {
       list.innerHTML = `<li style="text-align:center;color:var(--text-muted);padding:30px;font-style:italic">▒ biblioteca vacía — importa música ▒</li>`;
       return;

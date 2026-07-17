@@ -138,17 +138,14 @@
         <!-- SETTINGS TAB -->
         <div class="tab-content" id="tab-settings">
           <div class="settings-block">
-            <h3>~ música / spotify ~</h3>
+            <h3>~ spotify ~</h3>
             <div class="library-actions">
-              <label class="retro-btn" for="fileInput">
-                <span class="bracket">[</span> importar música <span class="bracket">]</span>
-              </label>
+              <!-- input oculto: el drag&drop de archivos sigue funcionando -->
               <input type="file" id="fileInput" accept="audio/*" multiple hidden />
               <button class="retro-btn" id="spotifyConnectBtn">
                 <span class="bracket">[</span> conectar spotify <span class="bracket">]</span>
               </button>
             </div>
-            <ul class="track-list" id="trackList"></ul>
           </div>
 
           <div class="settings-block">
@@ -215,30 +212,13 @@
           </div>
 
           <div class="settings-block">
-            <h3>~ sincronización de letras ~</h3>
-            <div class="offset-control">
-              <button class="retro-btn small" id="offsetMinus">−0.25s</button>
-              <div class="offset-display">
-                <span id="offsetValue">0.00s</span>
-                <input type="range" id="offsetSlider" min="-5" max="5" step="0.1" value="0" />
-              </div>
-              <button class="retro-btn small" id="offsetPlus">+0.25s</button>
-              <button class="retro-btn small" id="offsetReset">⟲</button>
-            </div>
-            <p style="font-size:13px;color:var(--text-muted);line-height:1.4;margin-top:6px">
-              ajusta si la letra va adelantada o atrasada. positivo = letra se adelanta.
-              el ajuste se guarda por canción.
-            </p>
-          </div>
-
-          <div class="settings-block">
             <button class="retro-btn" id="resetColors">
               <span class="bracket">[</span> restablecer colores <span class="bracket">]</span>
             </button>
           </div>
           <div class="settings-block">
             <h3>~ acerca ~</h3>
-            <p class="about-text">MASTER MUSIC v1.0<br>retro-futuristic music player<br>· · ·</p>
+            <p class="about-text">MASTER MUSIC v1.0</p>
           </div>
         </div>
       </section>
