@@ -1371,6 +1371,106 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* ═══ ESCENA INSTRUMENTAL · cuando la letra es solo "♪" ═══
+   Nota central que late con los graves (JS la escala vía getBands),
+   espectro de barras (scaleY, GPU), anillos sonar y satélites en órbita.
+   Sin señal en vivo, el visualizador entrega su onda idle: siempre fluye. */
+.ed-inst {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: ed-inst-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ed-inst-in {
+  from { opacity: 0; transform: scale(0.6); filter: blur(8px); }
+  to   { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+.ed-inst-centro {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.ed-inst-nota {
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 18px var(--accent-glow), 0 0 50px var(--accent-glow);
+  will-change: transform;
+}
+/* sin motor JS (fallback): la nota late sola */
+.ed-inst:not(.live) .ed-inst-nota { animation: ed-inst-late 1.6s ease-in-out infinite; }
+@keyframes ed-inst-late {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
+}
+.ed-inst-anillo {
+  position: absolute;
+  width: 1.6em;
+  height: 1.6em;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  opacity: 0;
+  animation: ed-inst-anillo 3.3s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes ed-inst-anillo {
+  0%   { transform: scale(0.5); opacity: 0.65; }
+  100% { transform: scale(2.7); opacity: 0; }
+}
+.ed-inst-orbita {
+  position: absolute;
+  width: 0;
+  height: 0;
+  animation: ed-inst-orbita var(--dur, 9s) linear infinite;
+}
+.ed-inst-orbita.rev { animation-direction: reverse; }
+@keyframes ed-inst-orbita {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.ed-inst-sat {
+  position: absolute;
+  left: var(--r, 1.2em);
+  top: 0;
+  translate: -50% -50%;
+  font-size: 0.3em;
+  color: var(--accent);
+  opacity: 0.75;
+  text-shadow: 0 0 10px var(--accent-glow);
+}
+/* espectro circular estilo NCS: rayos alrededor de la nota.
+   El wrapper .ed-inst-rad fija el ángulo; la barra crece hacia afuera
+   con scaleY (origen abajo = borde interior del anillo). Todo GPU. */
+.ed-inst-rad {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.ed-inst-radbar {
+  position: absolute;
+  left: -0.024em;
+  bottom: 0.92em;              /* radio interior del anillo */
+  width: 0.048em;
+  height: 0.3em;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  transform: scaleY(0.15);
+  transform-origin: center bottom;
+  will-change: transform;
+}
+/* sin motor JS: los rayos laten en cascada alrededor del círculo */
+.ed-inst:not(.live) .ed-inst-radbar {
+  animation: ed-inst-eqidle 1.1s ease-in-out infinite alternate;
+}
+@keyframes ed-inst-eqidle {
+  from { transform: scaleY(0.15); }
+  to   { transform: scaleY(1.4); }
+}
+
 /* ═══ ⚗ LABORATORIO DE EFECTOS · panel para probar animaciones sin música ═══ */
 .fx-lab {
   position: absolute;
@@ -1472,6 +1572,8 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
   text-shadow: none;
 }
 #fxLabBtn.on { color: var(--accent); text-shadow: 0 0 6px var(--accent-glow); }
+/* lab desactivado: el atributo hidden SIEMPRE gana, pise lo que pise */
+#fxLabBtn[hidden] { display: none !important; }
 @media (max-width: 440px) {
   .fx-lab { width: 156px; font-size: 13px; }
 }

@@ -682,6 +682,84 @@
     }, 50);
   };
 
+  /* ═══ ESCENA INSTRUMENTAL ═══
+     Cuando la línea es solo "♪" (intro, solo, puente), en vez de un título
+     estático se monta una escena viva: nota central que late con los graves,
+     espectro real debajo (getBands: FFT en vivo u onda idle), anillos sonar
+     y notas satélite orbitando. El RAF muere solo cuando la escena sale. */
+  const renderInstrumental = (stack) => {
+    const H = lyricsEdit.clientHeight;
+    const esc = document.createElement('div');
+    esc.className = 'ed-inst';
+
+    const centro = document.createElement('div');
+    centro.className = 'ed-inst-centro';
+    centro.style.fontSize = Math.max(46, H * 0.2).toFixed(0) + 'px';
+
+    // anillos sonar que se expanden
+    for (let k = 0; k < 3; k++) {
+      const a = document.createElement('span');
+      a.className = 'ed-inst-anillo';
+      a.style.animationDelay = (k * 1.1).toFixed(1) + 's';
+      centro.appendChild(a);
+    }
+    // notas satélite en órbita, por FUERA del anillo de espectro
+    ['♫', '♪', '♩'].forEach((ch, k) => {
+      const o = document.createElement('span');
+      o.className = 'ed-inst-orbita' + (k % 2 ? ' rev' : '');
+      o.style.setProperty('--r', (1.75 + k * 0.35).toFixed(2) + 'em');
+      o.style.setProperty('--dur', (7 + k * 4) + 's');
+      const s = document.createElement('span');
+      s.className = 'ed-inst-sat';
+      s.textContent = ch;
+      o.appendChild(s);
+      centro.appendChild(o);
+    });
+
+    // espectro CIRCULAR estilo NCS: 36 barras radiales alrededor de la nota,
+    // espejadas (graves arriba, agudos abajo, simétrico a ambos lados)
+    const NRAD = 36;
+    const radBars = [];
+    for (let k = 0; k < NRAD; k++) {
+      const w = document.createElement('span');
+      w.className = 'ed-inst-rad';
+      w.style.transform = `rotate(${(k * 360 / NRAD).toFixed(1)}deg)`;
+      const b = document.createElement('span');
+      b.className = 'ed-inst-radbar';
+      b.style.animationDelay = ((k % 9) * 0.13).toFixed(2) + 's';
+      w.appendChild(b);
+      centro.appendChild(w);
+      radBars.push(b);
+    }
+
+    const nota = document.createElement('div');
+    nota.className = 'ed-inst-nota';
+    nota.textContent = '♪';
+    centro.appendChild(nota);
+    esc.appendChild(centro);
+    stack.appendChild(esc);
+
+    const viz = window.VisualizerModule;
+    if (viz && viz.getBands) {
+      esc.classList.add('live');
+      let raf = 0;
+      const paso = () => {
+        if (!esc.isConnected) { cancelAnimationFrame(raf); return; }
+        const bands = viz.getBands(19);
+        radBars.forEach((b, k) => {
+          // distancia circular al punto más alto: graves arriba, espejo a los lados
+          const d = Math.min(k, NRAD - k) / (NRAD / 2);
+          const v = bands[Math.round(d * (bands.length - 1))] || 0;
+          b.style.transform = `scaleY(${(0.15 + v * 1.9).toFixed(3)})`;
+        });
+        const graves = (bands[0] + bands[1] + bands[2]) / 3;
+        nota.style.transform = `scale(${(1 + graves * 0.22).toFixed(3)})`;
+        raf = requestAnimationFrame(paso);
+      };
+      raf = requestAnimationFrame(paso);
+    }
+  };
+
   // salidas variadas: la línea anterior no siempre se va igual (más "edit")
   const ED_SALIDAS = ['colapsa', 'colapsa-sube', 'colapsa-glitch'];
 
@@ -706,6 +784,14 @@
     stack.style.setProperty('--top', ED_TOPS[semilla(i, 7, ED_TOPS.length)] + '%');
     stack.style.setProperty('--tilt', (semilla(i, 11, 7) - 3) + 'deg');
     lyricsEdit.appendChild(stack);
+
+    // ¿línea instrumental? (solo ♪/♫ o puntos): escena viva en vez de título
+    if (/^[♪♫♩♬\s·.…*\-]+$/.test(text)) {
+      stack.style.setProperty('--top', '47%');
+      stack.style.setProperty('--tilt', '0deg');
+      renderInstrumental(stack);
+      return;
+    }
 
     let delay = 100;
     // ¿Sale como TÍTULO GIGANTE? Antes solo con ≤3 palabras (casi nunca en
