@@ -452,18 +452,57 @@
   const ED_TITLE_FX = ['ed-golpe', 'ed-teclea', 'ed-cascada', 'ed-estira',
                        'ed-parpadeo', 'ed-giro3d', 'ed-rebota', 'ed-zoomloco',
                        'ed-glitch', 'ed-neon', 'ed-onda', 'ed-desliza',
-                       'ed-caida3d', 'ed-latido'];
+                       'ed-caida3d', 'ed-latido',
+                       'ed-recorte',  // cortina: el texto se revela con un barrido
+                       'ed-enfoca',   // desenfoque cinematográfico que enfoca
+                       'ed-sello',    // cae como sello/estampa con sacudida
+                       'ed-brillo',   // entra y un destello cromado lo recorre
+                       'ed-chroma',   // aberración cromática RGB que converge
+                       'ed-explota',  // letras vuelan desde fuera y se arman
+                       'ed-descifra', // letras aleatorias que se decodifican
+                       /* portados de los edits de referencia del usuario */
+                       'ed-invertido',// corte seco: fondo acento + texto oscuro
+                       'ed-duo',      // palabra doble: gigante + cursiva encima
+                       'ed-lockup',   // composición: palabra ENORME + mini filas
+                       'ed-cinta',    // marquesinas con la frase repetida
+                       'ed-contorno', // solo contorno neón, el relleno parpadea
+                       'ed-portada']; // la carátula como textura de las letras
   const ED_LETTER_FX = {
-    'ed-teclea': 'edl-teclea',   // tecleo
-    'ed-cascada': 'edl-cae',     // letras que caen
-    'ed-onda': 'edl-onda',       // olita con rebote letra a letra
-    'ed-neon': 'edl-neon',       // letrero de neón encendiéndose
+    'ed-teclea': 'edl-teclea',     // tecleo
+    'ed-cascada': 'edl-cae',       // letras que caen
+    'ed-onda': 'edl-onda',         // olita con rebote letra a letra
+    'ed-neon': 'edl-neon',         // letrero de neón encendiéndose
+    'ed-explota': 'edl-explota',   // letras convergen desde posiciones locas
+    'ed-descifra': 'edl-descifra', // efecto decode/hacker
   };
-  const ED_STRONG = ['ed-golpe', 'ed-zoomloco', 'ed-parpadeo', 'ed-glitch'];
+  const ED_STRONG = ['ed-golpe', 'ed-zoomloco', 'ed-parpadeo', 'ed-glitch',
+                     'ed-sello', 'ed-explota'];
   const ED_PHRASE_FX = ['ed-acumula', 'ed-flotan', 'ed-crece', 'ed-maquina',
-                        'ed-escalera', 'ed-caen', 'ed-giro', 'ed-latigo', 'ed-burbuja'];
+                        'ed-escalera', 'ed-caen', 'ed-giro', 'ed-latigo', 'ed-burbuja',
+                        'ed-resorte',   // salta desde abajo con estirón elástico
+                        'ed-remolino',  // cada palabra entra girando en espiral
+                        'ed-foco',      // palabras borrosas gigantes que enfocan
+                        'ed-poema',     // torre centrada elegante, palabra por renglón
+                        /* tanda 3: presets estilo AE/CapCut para empatar con títulos */
+                        'ed-ola',       // ola: cada palabra sube con rebote encadenado
+                        'ed-corte',     // cortina por palabra: barrido que la revela
+                        'ed-pendulo',   // columpio: cuelga y oscila hasta asentarse
+                        'ed-gravedad',  // cae y rebota dos veces, como pelota
+                        'ed-viento',    // ráfaga: todas llegan volando del mismo lado
+                        'ed-pixelea',   // aparición pixelada a saltos (retro juego)
+                        'ed-vhs',       // jitter VHS con separación RGB por palabra
+                        'ed-cohete',    // despega desde abajo estirada y frena
+                        'ed-carrusel',  // panel que gira como tablero de aeropuerto
+                        'ed-destello',  // cada palabra enciende un flash blanco
+                        'ed-susurro',   // fade lento y suave con tracking (baladas)
+                        'ed-salto',     // brinco cartoon con squash & stretch
+                        'ed-luzneon',   // cada palabra parpadea como letrero neón
+                        'ed-iman'];     // imán: llega disparada y se ajusta al centro
   const ED_CAMS = ['edcam-zin', 'edcam-zout', 'edcam-izq', 'edcam-der',
-                   'edcam-giro', 'edcam-sube', 'edcam-baja', 'edcam-late'];
+                   'edcam-giro', 'edcam-sube', 'edcam-baja', 'edcam-late',
+                   'edcam-dolly',    // acercamiento con leve giro, muy cine
+                   'edcam-tiembla',  // cámara en mano: micro-sacudidas
+                   'edcam-vaiven'];  // balanceo lateral suave
   const ED_TOPS = [42, 47, 55, 36, 58];
 
   const edLargo = (s) => s.replace(/[^\wáéíóúñ' ]/gi, '').length;
@@ -472,13 +511,19 @@
   // dos líneas seguidas con la misma animación matan la sensación de "edit".
   let edPrevFx = '';
   let edPrevCam = '';
+  /* Laboratorio de efectos (⚗): cuando demoFx/demoCam están puestos, el motor
+     usa exactamente ese efecto/cámara en vez del pseudo-azar. */
+  let demoFx = null;
+  let demoCam = '';
   const elegirFx = (lista, i, salt) => {
+    if (demoFx && lista.includes(demoFx)) { edPrevFx = demoFx; return demoFx; }
     let k = semilla(i, salt, lista.length);
     if (lista[k] === edPrevFx) k = (k + 1 + semilla(i, salt + 50, lista.length - 1)) % lista.length;
     edPrevFx = lista[k];
     return lista[k];
   };
   const elegirCam = (i) => {
+    if (demoCam) { edPrevCam = demoCam; return demoCam; }
     let k = semilla(i, 5, ED_CAMS.length);
     if (ED_CAMS[k] === edPrevCam) k = (k + 1) % ED_CAMS.length;
     edPrevCam = ED_CAMS[k];
@@ -526,11 +571,129 @@
     lyricsEdit.classList.add('ed-sacudida');
   };
 
+  // onda de choque: anillo que se expande desde el centro en los golpes
+  const edRing = () => {
+    const r = document.createElement('div');
+    r.className = 'ed-ring';
+    lyricsEdit.appendChild(r);
+    setTimeout(() => r.remove(), 750);
+  };
+
+  // chispas pixel que salen disparadas del centro (estilo retro del player)
+  const edSparks = (n = 12) => {
+    const R = Math.min(lyricsEdit.clientWidth, lyricsEdit.clientHeight) || 300;
+    for (let k = 0; k < n; k++) {
+      const s = document.createElement('div');
+      s.className = 'ed-spark';
+      const ang = (k / n) * Math.PI * 2 + Math.random() * 0.8;
+      const dist = R * 0.18 + Math.random() * R * 0.38;
+      s.style.setProperty('--dx', Math.cos(ang) * dist + 'px');
+      s.style.setProperty('--dy', Math.sin(ang) * dist + 'px');
+      s.style.setProperty('--sz', Math.round(3 + Math.random() * 5) + 'px');
+      s.style.animationDelay = Math.round(Math.random() * 70) + 'ms';
+      lyricsEdit.appendChild(s);
+      setTimeout(() => s.remove(), 950);
+    }
+  };
+
+  // marquesina: banda con la frase repetida en bucle (edit ámbar de referencia)
+  const edBanda = (texto, dir) => {
+    const banda = document.createElement('div');
+    banda.className = 'ed-cinta-banda' + (dir < 0 ? ' rev' : '');
+    banda.style.fontSize = Math.max(12, lyricsEdit.clientHeight * 0.045).toFixed(0) + 'px';
+    const track = document.createElement('span');
+    track.className = 'ed-cinta-track';
+    const uni = (texto.toUpperCase() + ' • ').repeat(6);
+    track.textContent = uni + uni;   // dos mitades idénticas = bucle sin costura
+    banda.appendChild(track);
+    return banda;
+  };
+
+  // carátula actual como textura (el div coverArt guarda url(...) en su estilo)
+  const edCover = () => {
+    const el = document.getElementById('coverArt');
+    const bg = el && el.style.backgroundImage;
+    return (bg && bg !== 'none') ? bg : null;
+  };
+
+  // composición tipo lockup: palabra más larga ENORME, el resto en mini filas
+  // con tracking ancho arriba/abajo (como "you KNOW than this / YOU BETTER")
+  const edLockup = (stack, words) => {
+    let giant, arriba, abajo;
+    if (words.length >= 3) {
+      const L = words.reduce((mx, w, j, a) => (edLargo(w) > edLargo(a[mx]) ? j : mx), 0);
+      giant = words[L];
+      arriba = words.slice(0, L).join(' ');
+      abajo = words.slice(L + 1).join(' ');
+    } else {
+      // 1-2 palabras: la misma palabra hace de eco arriba y abajo
+      giant = words.join(' ');
+      arriba = giant;
+      abajo = giant;
+    }
+    const tam = edTamanos([giant])[0];
+    let delay = 100;
+    const mkMini = (txt) => {
+      if (!txt) return;
+      const m = document.createElement('div');
+      m.className = 'ed-lockup-mini';
+      m.textContent = txt.toUpperCase();
+      m.style.fontSize = Math.max(11, tam * 0.16).toFixed(0) + 'px';
+      m.style.setProperty('--d', delay + 'ms');
+      delay += 150;
+      stack.appendChild(m);
+      return m;
+    };
+    mkMini(arriba);
+    const g = document.createElement('div');
+    g.className = 'ed-titulo ed-lockup-big';
+    g.textContent = giant.toUpperCase();
+    g.style.fontSize = tam.toFixed(1) + 'px';
+    g.style.setProperty('--d', delay + 'ms');
+    delay += 180;
+    stack.appendChild(g);
+    mkMini(abajo);
+  };
+
+  // decode/hacker: las letras muestran caracteres aleatorios hasta asentarse
+  const ED_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&/=+*<>';
+  const edScramble = (stack) => {
+    const spans = [...stack.querySelectorAll('.edl-descifra')];
+    if (!spans.length) return;
+    const t0 = performance.now();
+    spans.forEach(s => {
+      s.dataset.final = s.textContent;
+      s.dataset.settle = (parseFloat(s.style.getPropertyValue('--d')) || 0) + 90;
+    });
+    const iv = setInterval(() => {
+      if (!stack.isConnected || stack.dataset.out) { clearInterval(iv); return; }
+      const t = performance.now() - t0;
+      let vivos = 0;
+      spans.forEach(s => {
+        if (t < parseFloat(s.dataset.settle)) {
+          vivos++;
+          if (s.dataset.final.trim())
+            s.textContent = ED_CHARS[(Math.random() * ED_CHARS.length) | 0];
+        } else if (s.textContent !== s.dataset.final) {
+          s.textContent = s.dataset.final;
+        }
+      });
+      if (!vivos) clearInterval(iv);
+    }, 50);
+  };
+
+  // salidas variadas: la línea anterior no siempre se va igual (más "edit")
+  const ED_SALIDAS = ['colapsa', 'colapsa-sube', 'colapsa-glitch'];
+
   const renderEdit = (i) => {
-    // la línea anterior colapsa (se disuelve con desenfoque)
+    // la línea anterior colapsa con una salida elegida por línea
     lyricsEdit.querySelectorAll('.ed-stack').forEach(v => {
-      if (v.classList.contains('colapsa')) v.remove();
-      else { v.classList.add('colapsa'); setTimeout(() => v.remove(), 500); }
+      if (v.dataset.out) v.remove();
+      else {
+        v.dataset.out = '1';
+        v.classList.add(ED_SALIDAS[semilla(i, 61, ED_SALIDAS.length)]);
+        setTimeout(() => v.remove(), 500);
+      }
     });
     lyricsEdit.querySelectorAll('.lyrics-empty').forEach(v => v.remove());
 
@@ -549,28 +712,58 @@
     // letras reales). Ahora frases medianas también salen gigantes en filas
     // apiladas — la mayoría de las líneas alterna entre gigante y frase.
     const lenTxt = edLargo(text);
-    const caps = words.length <= 3
-      || (words.length <= 5 && lenTxt <= 30 && semilla(i, 41, 10) < 7)
-      || (words.length <= 7 && lenTxt <= 44 && semilla(i, 41, 10) < 4);
+    const caps = demoFx
+      ? ED_TITLE_FX.includes(demoFx)   // en el lab manda el efecto elegido
+      : (words.length <= 3
+        || (words.length <= 5 && lenTxt <= 30 && semilla(i, 41, 10) < 7)
+        || (words.length <= 7 && lenTxt <= 44 && semilla(i, 41, 10) < 4));
 
     if (caps) {
       /* TÍTULO GIGANTE */
       const fx = elegirFx(ED_TITLE_FX, i, 3);
+
+      if (fx === 'ed-lockup') {
+        /* montaje propio: mini fila + palabra ENORME + mini fila */
+        edLockup(stack, words);
+        if (ED_STRONG.includes(fx)) { edFlash(); edShake(); edRing(); edSparks(); }
+        return;
+      }
+
+      /* preparativos de los fx con escenografía extra */
+      if (fx === 'ed-invertido') {
+        stack.classList.add('ed-stack-inv');
+        const fondo = document.createElement('div');
+        fondo.className = 'ed-fondo';
+        stack.appendChild(fondo);
+      }
+      if (fx === 'ed-cinta') stack.appendChild(edBanda(text, 1));
+      const portada = fx === 'ed-portada' ? edCover() : null;
+
       const filas = edFilas(words);
       const tams = edTamanos(filas);
       const letterCls = ED_LETTER_FX[fx];
+      const rows = [];
 
       filas.forEach((fila, r) => {
         const div = document.createElement('div');
         div.className = 'ed-titulo';
         div.style.fontSize = tams[r].toFixed(1) + 'px';
         if (letterCls) {
-          const paso = fx === 'ed-teclea' ? 65 : 45;
+          const paso = fx === 'ed-teclea' ? 65
+                     : fx === 'ed-descifra' ? 70
+                     : fx === 'ed-explota' ? 32 : 45;
           [...fila.toUpperCase()].forEach(ch => {
             const s = document.createElement('span');
             s.className = letterCls;
             s.textContent = ch;
             s.style.setProperty('--d', Math.round(delay) + 'ms');
+            if (fx === 'ed-explota') {
+              // cada letra llega volando desde su propio punto de origen
+              const h = semilla(edLargo(fila) * 7 + Math.round(delay), 13, 4096);
+              s.style.setProperty('--rx', (((h % 13) - 6) * 0.9).toFixed(1) + 'em');
+              s.style.setProperty('--ry', (((Math.floor(h / 13) % 9) - 4) * 0.7).toFixed(1) + 'em');
+              s.style.setProperty('--rr', (((h >> 5) % 360) - 180) + 'deg');
+            }
             delay += paso;
             div.appendChild(s);
           });
@@ -585,10 +778,25 @@
           }
           delay += 150;
         }
+        if (portada) div.style.backgroundImage = portada;
         stack.appendChild(div);
+        rows.push({ div, fila });
         delay += 110;
       });
-      if (ED_STRONG.includes(fx)) { edFlash(); edShake(); }
+
+      if (fx === 'ed-cinta') stack.appendChild(edBanda(text, -1));
+      if (fx === 'ed-duo' && rows.length) {
+        // eco cursivo en minúsculas sobre la fila más larga (edit rosa/vino)
+        const R = rows.reduce((mx, r) => (edLargo(r.fila) > edLargo(mx.fila) ? r : mx), rows[0]);
+        const eco = document.createElement('span');
+        eco.className = 'ed-duo-eco';
+        eco.textContent = R.fila.toLowerCase();
+        eco.style.setProperty('--d', Math.round(delay + 120) + 'ms');
+        R.div.appendChild(eco);
+      }
+
+      if (ED_STRONG.includes(fx)) { edFlash(); edShake(); edRing(); edSparks(); }
+      if (fx === 'ed-descifra') edScramble(stack);
     } else {
       /* FRASE palabra a palabra */
       const fx = elegirFx(ED_PHRASE_FX, i, 19);
@@ -612,7 +820,7 @@
       const fcap = Math.max(36, lyricsEdit.clientHeight * 0.075);
       let fsize = Math.max(18, Math.min(fcap, lyricsEdit.clientWidth / 15));
       const altoEstimado = () => {
-        if (fx === 'ed-escalera') {
+        if (fx === 'ed-escalera' || fx === 'ed-poema') {
           // vertical: una palabra por renglón (renglón ≈ 1.7× por --fs y line-height)
           return words.length * fsize * 1.7;
         }
@@ -633,7 +841,7 @@
       }
 
       let idxGrande = -1, idxCursiva = -1;
-      if (fx !== 'ed-escalera' && fx !== 'ed-maquina' && words.length >= 4) {
+      if (fx !== 'ed-escalera' && fx !== 'ed-maquina' && fx !== 'ed-poema' && words.length >= 4) {
         idxGrande = words.reduce((mx, w, j, a) => (edLargo(w) > edLargo(a[mx]) ? j : mx), 0);
         idxCursiva = semilla(i, 29, words.length);
         if (idxCursiva === idxGrande) idxCursiva = -1;
@@ -715,6 +923,131 @@
     applyMode();
   }
 
+  /* ═══ ⚗ LABORATORIO DE EFECTOS ═══
+     Panel para probar cualquier animación del modo edit sin música:
+     elige efecto + cámara, escribe tu texto, o lanza el desfile automático.
+     Mientras está abierto, tick() no pisa la demo. */
+  let labOpen = false;
+  let labEl = null, labText = null, labBtn = document.getElementById('fxLabBtn');
+  let labLastFx = 'ed-golpe';
+  let labAutoTimer = null;
+  let labPrevEdit = false;
+  let demoSeed = 1;
+
+  const labDemo = (fx) => {
+    labLastFx = fx;
+    const esTitulo = ED_TITLE_FX.includes(fx);
+    const propio = labText && labText.value.trim();
+    const txt = propio || (esTitulo
+      ? 'MASTER MUSIC'
+      : 'y esta frase de prueba baila palabra por palabra contigo');
+    // línea falsa temporal: renderEdit lee parsedLines[i] y la duración
+    const save = parsedLines;
+    demoFx = fx;
+    parsedLines = [];
+    parsedLines[demoSeed] = { time: 0, text: txt };
+    parsedLines[demoSeed + 1] = { time: 6, text: txt };
+    try { renderEdit(demoSeed); } finally {
+      parsedLines = save;
+      demoFx = null;
+      demoSeed += 1;   // posición/inclinación distinta en cada pasada
+    }
+    // marca el chip activo
+    if (labEl) labEl.querySelectorAll('.fx-chip[data-fx]').forEach(c =>
+      c.classList.toggle('on', c.dataset.fx === fx));
+  };
+
+  const labAutoStop = () => {
+    clearInterval(labAutoTimer);
+    labAutoTimer = null;
+    if (labEl) {
+      const b = labEl.querySelector('[data-acc="auto"]');
+      if (b) b.classList.remove('on');
+    }
+  };
+
+  const labBuild = () => {
+    labEl = document.createElement('div');
+    labEl.className = 'fx-lab';
+    const chips = (lista, pref) => lista.map(fx =>
+      `<button class="fx-chip" data-fx="${fx}">${fx.replace(pref, '')}</button>`).join('');
+    labEl.innerHTML =
+      `<div class="fx-lab-head"><span>⚗ LAB DE EFECTOS</span><button class="fx-lab-close" title="Cerrar (Esc)">✕</button></div>` +
+      `<input class="fx-lab-text" type="text" maxlength="90" placeholder="Tu texto de prueba (opcional)">` +
+      `<div class="fx-lab-sec">Títulos gigantes</div><div class="fx-lab-grid">${chips(ED_TITLE_FX, 'ed-')}</div>` +
+      `<div class="fx-lab-sec">Frases</div><div class="fx-lab-grid">${chips(ED_PHRASE_FX, 'ed-')}</div>` +
+      `<div class="fx-lab-sec">Cámara</div><div class="fx-lab-grid">` +
+        `<button class="fx-chip fx-cam on" data-cam="">auto</button>` +
+        ED_CAMS.map(c => `<button class="fx-chip fx-cam" data-cam="${c}">${c.replace('edcam-', '')}</button>`).join('') +
+      `</div>` +
+      `<div class="fx-lab-acciones">` +
+        `<button class="fx-lab-accion" data-acc="otra">▶ otra vez</button>` +
+        `<button class="fx-lab-accion" data-acc="auto">⟳ desfile</button>` +
+      `</div>`;
+    document.getElementById('tab-lyrics').appendChild(labEl);
+    labText = labEl.querySelector('.fx-lab-text');
+
+    labEl.addEventListener('click', (e) => {
+      const chip = e.target.closest('.fx-chip');
+      if (chip && chip.dataset.fx) { labAutoStop(); labDemo(chip.dataset.fx); return; }
+      if (chip && chip.dataset.cam !== undefined) {
+        demoCam = chip.dataset.cam;
+        labEl.querySelectorAll('.fx-cam').forEach(c =>
+          c.classList.toggle('on', c.dataset.cam === demoCam));
+        labDemo(labLastFx);
+        return;
+      }
+      const acc = e.target.closest('[data-acc]');
+      if (acc && acc.dataset.acc === 'otra') { labDemo(labLastFx); return; }
+      if (acc && acc.dataset.acc === 'auto') {
+        if (labAutoTimer) { labAutoStop(); return; }
+        acc.classList.add('on');
+        const todos = [...ED_TITLE_FX, ...ED_PHRASE_FX];
+        let k = Math.max(0, todos.indexOf(labLastFx));
+        labDemo(todos[k]);
+        labAutoTimer = setInterval(() => {
+          k = (k + 1) % todos.length;
+          labDemo(todos[k]);
+        }, 2800);
+        return;
+      }
+      if (e.target.closest('.fx-lab-close')) labToggle(false);
+    });
+    // Enter en el texto = repetir el efecto actual con ese texto
+    labText.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') labDemo(labLastFx);
+    });
+  };
+
+  const labToggle = (on) => {
+    const next = on === undefined ? !labOpen : !!on;
+    if (next === labOpen) return;
+    labOpen = next;
+    if (labOpen) {
+      if (!labEl) labBuild();
+      const tab = document.querySelector('.tab[data-tab="lyrics"]');
+      if (tab) tab.click();
+      labPrevEdit = editMode;
+      if (!editMode) { editMode = true; applyMode(); }   // sin tocar la preferencia
+      lyricsEdit.innerHTML = '';
+      labEl.hidden = false;
+      if (labBtn) labBtn.classList.add('on');
+      labDemo(labLastFx);
+    } else {
+      labAutoStop();
+      demoCam = '';
+      if (labEl) labEl.hidden = true;
+      if (labBtn) labBtn.classList.remove('on');
+      editMode = labPrevEdit;
+      applyMode();   // repinta la letra real (o limpia si no hay canción)
+    }
+  };
+
+  if (labBtn) labBtn.addEventListener('click', () => labToggle());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && labOpen) labToggle(false);
+  });
+
   // al cambiar el tamaño del panel, recalcular la línea del modo edit
   let edResizeTimer = null;
   window.addEventListener('resize', () => {
@@ -725,6 +1058,7 @@
   });
 
   const tick = (currentTime) => {
+    if (labOpen) return;   // el lab manda: la canción no pisa la demo
     if (!parsedLines.length || parsedLines[0].time < 0) return;
     // Apply user-adjustable offset: positive = letras se adelantan
     const t = currentTime + offset;
@@ -741,6 +1075,7 @@
     if (editMode || forceEdit) {
       if (idx >= 0) renderEdit(idx);
       else lyricsEdit.querySelectorAll('.ed-stack').forEach(v => {
+        v.dataset.out = '1';
         v.classList.add('colapsa');
         setTimeout(() => v.remove(), 500);
       });
