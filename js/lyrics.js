@@ -765,7 +765,8 @@
 
   const renderEdit = (i) => {
     // la línea anterior colapsa con una salida elegida por línea
-    lyricsEdit.querySelectorAll('.ed-stack').forEach(v => {
+    // (.ed-fondo del invertido vive fuera del stack: se despide igual)
+    lyricsEdit.querySelectorAll('.ed-stack, .ed-fondo').forEach(v => {
       if (v.dataset.out) v.remove();
       else {
         v.dataset.out = '1';
@@ -818,9 +819,11 @@
       /* preparativos de los fx con escenografía extra */
       if (fx === 'ed-invertido') {
         stack.classList.add('ed-stack-inv');
+        // el fondo va FUERA del stack (la cámara no lo mueve) y detrás de él;
+        // en modo cine se ancla fijo al viewport para cubrir TODA la pantalla
         const fondo = document.createElement('div');
         fondo.className = 'ed-fondo';
-        stack.appendChild(fondo);
+        lyricsEdit.insertBefore(fondo, stack);
       }
       if (fx === 'ed-cinta') stack.appendChild(edBanda(text, 1));
       const portada = fx === 'ed-portada' ? edCover() : null;
@@ -1160,7 +1163,7 @@
        (forceEdit = el modo cine lo activa sin tocar la preferencia) */
     if (editMode || forceEdit) {
       if (idx >= 0) renderEdit(idx);
-      else lyricsEdit.querySelectorAll('.ed-stack').forEach(v => {
+      else lyricsEdit.querySelectorAll('.ed-stack, .ed-fondo').forEach(v => {
         v.dataset.out = '1';
         v.classList.add('colapsa');
         setTimeout(() => v.remove(), 500);

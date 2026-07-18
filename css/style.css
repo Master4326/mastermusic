@@ -1245,17 +1245,34 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
    contorno neón · v18: inversión de color y palabra doble con cursiva ·
    v19: cortes secos elegantes. */
 
-/* ── ed-invertido: corte seco, fondo acento + texto oscuro (v18/v19) ── */
+/* ── ed-invertido: corte seco, fondo acento + texto oscuro (v18/v19) ──
+   El fondo vive como hermano del stack (la cámara no lo arrastra):
+   en el panel llena el cuadro de letras; en modo cine se ancla FIJO
+   al viewport para pintar la pantalla completa, vinilo y onda incluidos. */
 .ed-fondo {
   position: absolute;
-  inset: -150vh -60vw;
-  z-index: -1;
+  inset: 0;
   background: var(--accent);
   animation: ed-fondo-in 0.16s steps(2, end) both;
+  pointer-events: none;
+}
+body.cinema-open .cinema-stage .ed-fondo {
+  position: fixed;
+  inset: 0;
 }
 @keyframes ed-fondo-in {
   from { opacity: 0; }
   to   { opacity: 1; }
+}
+/* el fondo se despide con fundido, sea cual sea la salida del stack */
+.ed-fondo.colapsa,
+.ed-fondo.colapsa-sube,
+.ed-fondo.colapsa-glitch {
+  animation: ed-fondo-out 0.45s ease-out forwards !important;
+}
+@keyframes ed-fondo-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 .ed-stack-inv .ed-titulo {
   color: #10101a;
