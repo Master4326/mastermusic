@@ -1710,6 +1710,267 @@ body.cinema-open .cinema-stage .ed-fondo {
   100% { opacity: 1; transform: translateX(0) scaleX(1); }
 }
 
+/* ═══ TANDA 4 · pedidos del usuario + tendencias caption 2026 ═══ */
+
+/* ── TÍTULOS ── */
+
+/* ed-esquinas: cada letra llega volando desde una esquina */
+.edl-esquina {
+  display: inline-block;
+  animation-fill-mode: both;
+  animation-delay: var(--d, 0ms);
+  white-space: pre;
+  animation-name: edl-esquina;
+  animation-duration: 0.6s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes edl-esquina {
+  0%   { opacity: 0; transform: translate(var(--cx, 5em), var(--cy, -3em)) rotate(25deg) scale(1.5); filter: blur(4px); }
+  70%  { opacity: 1; transform: translate(0, 0) rotate(-3deg) scale(1.04); filter: blur(0); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ed-caja: caja de acento con texto oscuro (highlight de caption) */
+.ed-titulo.ed-caja {
+  display: table;                  /* caja al ancho del texto, centrada */
+  margin: 0.07em auto;
+  padding: 0.04em 0.24em;
+  background: var(--accent);
+  color: #10101a;
+  text-shadow: none;
+  box-shadow: 0 0 16px var(--accent-glow), 0.06em 0.08em 0 rgba(0, 0, 0, 0.45);
+  transform-origin: left center;
+  animation-name: ed-caja;
+}
+@keyframes ed-caja {
+  0%   { opacity: 0; transform: scaleX(0); }
+  60%  { opacity: 1; transform: scaleX(1.05); }
+  100% { opacity: 1; transform: scaleX(1); }
+}
+
+/* ed-deletreo: letras GIGANTES en ráfaga y al final la palabra */
+.ed-letrona {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 20px var(--accent-glow), 0 0 60px var(--accent-glow),
+               0.03em 0.03em 0 rgba(0, 0, 0, 0.6);
+  animation: ed-letrona 0.3s linear var(--d, 0ms) both;
+  pointer-events: none;
+}
+@keyframes ed-letrona {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }
+  18%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80%  { opacity: 1; transform: translate(-50%, -50%) scale(0.96); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+}
+
+/* ed-tetris: letras caen a saltos duros y encajan como bloques */
+.edl-tetris {
+  display: inline-block;
+  animation-fill-mode: both;
+  animation-delay: var(--d, 0ms);
+  white-space: pre;
+  animation-name: edl-tetris;
+  animation-duration: 0.45s;
+  animation-timing-function: steps(5, end);
+}
+@keyframes edl-tetris {
+  0%   { opacity: 0; transform: translateY(-2.8em); }
+  12%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ed-diagonal: filas alineadas de esquina a esquina */
+.ed-titulo.ed-diagonal { animation-name: ed-diagonal; animation-duration: 0.55s; }
+@keyframes ed-diagonal {
+  0%   { opacity: 0; transform: translate(calc(var(--sx, -1) * 1.3em), calc(var(--sx, -1) * -0.4em)); filter: blur(5px); }
+  100% { opacity: 1; transform: translate(0, 0); filter: blur(0); }
+}
+
+/* ed-marco: corchetes de esquina que enmarcan el título */
+.ed-titulo.ed-marco { animation-name: ed-marco-in; animation-duration: 0.6s; }
+@keyframes ed-marco-in {
+  0%   { opacity: 0; transform: scale(0.92); filter: blur(4px); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+.ed-marco-esq {
+  position: absolute;
+  width: 0.9em;
+  height: 0.9em;
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+  animation: ed-marco-esq 0.4s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms) both;
+  pointer-events: none;
+}
+.ed-marco-esq.tl { top: -0.5em;    left: -0.35em;  border-right: 0; border-bottom: 0; }
+.ed-marco-esq.tr { top: -0.5em;    right: -0.35em; border-left: 0;  border-bottom: 0; }
+.ed-marco-esq.bl { bottom: -0.5em; left: -0.35em;  border-right: 0; border-top: 0; }
+.ed-marco-esq.br { bottom: -0.5em; right: -0.35em; border-left: 0;  border-top: 0; }
+@keyframes ed-marco-esq {
+  from { opacity: 0; transform: scale(0); }
+  to   { opacity: 0.9; transform: scale(1); }
+}
+
+/* ed-persiana: letras se abren como persianas, origen alternado */
+.edl-persiana {
+  display: inline-block;
+  animation-fill-mode: both;
+  animation-delay: var(--d, 0ms);
+  white-space: pre;
+  animation-name: edl-persiana;
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: center top;
+}
+.edl-persiana:nth-child(even) { transform-origin: center bottom; }
+@keyframes edl-persiana {
+  0%   { opacity: 0; transform: scaleY(0); }
+  70%  { opacity: 1; transform: scaleY(1.12); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+
+/* ed-tv: televisor CRT encendiéndose (línea brillante que se expande) */
+.ed-titulo.ed-tv { animation-name: ed-tv; animation-duration: 0.6s; }
+@keyframes ed-tv {
+  0%   { opacity: 0; transform: scale(1.4, 0.01); filter: brightness(4); }
+  35%  { opacity: 1; transform: scale(1.15, 0.03); filter: brightness(6); }
+  55%  { transform: scale(1, 1.08); filter: brightness(1.6); }
+  70%  { opacity: 0.6; }
+  80%  { opacity: 1; transform: scale(1); filter: brightness(1); }
+  100% { opacity: 1; transform: scale(1); filter: none; }
+}
+
+/* ── FRASES ── */
+
+/* ed-resalta: karaoke, la caja de color enciende palabra a palabra */
+.ed-resalta .ed-pal {
+  animation-name: edp-resalta;
+  animation-duration: 0.3s;
+  padding: 0.02em 0.14em;
+}
+@keyframes edp-resalta {
+  0%   { opacity: 0.35; background: transparent; color: var(--text); }
+  60%  { opacity: 1; background: var(--accent); color: #10101a; transform: scale(1.08); }
+  100% { opacity: 1; background: var(--accent); color: #10101a; transform: scale(1); }
+}
+
+/* ed-cubo: cada palabra gira como cara de cubo (bisagra izquierda) */
+.ed-cubo .ed-pal {
+  animation-name: edp-cubo;
+  animation-duration: 0.6s;
+  transform-origin: left center;
+}
+@keyframes edp-cubo {
+  0%   { opacity: 0; transform: rotateY(-92deg) translateX(0.2em); filter: blur(2px); }
+  60%  { opacity: 1; transform: rotateY(14deg); filter: blur(0); }
+  100% { opacity: 1; transform: rotateY(0); }
+}
+
+/* ed-vidrio: palabras transparentes de contorno que se rellenan */
+.ed-vidrio .ed-pal {
+  -webkit-text-stroke: 1.5px var(--accent);
+  animation-name: edp-vidrio;
+  animation-duration: 0.8s;
+}
+@keyframes edp-vidrio {
+  0%   { opacity: 0; color: transparent; transform: scale(1.25); }
+  40%  { opacity: 1; color: transparent; transform: scale(1); }
+  75%  { color: transparent; }
+  100% { opacity: 1; color: var(--text); text-shadow: 0 0 10px var(--accent-glow); }
+}
+
+/* ed-subtitulo: píldora de caption estilo TikTok */
+.ed-frase.ed-subtitulo {
+  display: table;
+  margin: 0 auto;
+  background: rgba(0, 0, 0, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.35em;
+  padding: 0.28em 0.55em;
+  box-shadow: 0 0.15em 1em rgba(0, 0, 0, 0.5);
+  animation: edp-subtitulo-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes edp-subtitulo-in {
+  from { opacity: 0; transform: scale(0.75); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.ed-subtitulo .ed-pal {
+  animation-name: edp-subpop;
+  animation-duration: 0.35s;
+  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes edp-subpop {
+  0%   { opacity: 0; transform: scale(0.4); }
+  70%  { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ed-zoombrusco: cada palabra se estampa desde gigante */
+.ed-zoombrusco .ed-pal { animation-name: edp-zoombrusco; animation-duration: 0.45s; }
+@keyframes edp-zoombrusco {
+  0%   { opacity: 0; transform: scale(6); filter: blur(3px); }
+  55%  { opacity: 1; transform: scale(0.94); filter: blur(0); }
+  75%  { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ed-impacto: la frase cae en BLOQUE (todas a la vez) y luego hace onda */
+.ed-impacto .ed-pal {
+  animation-name: edp-impacto-cae, edp-impacto-onda;
+  animation-duration: 0.35s, 0.5s;
+  animation-delay: 0ms, calc(var(--d, 0ms) + 350ms);
+  animation-fill-mode: both, both;
+  animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.36), cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes edp-impacto-cae {
+  0%   { opacity: 0; transform: translateY(-2em); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes edp-impacto-onda {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(-0.28em) scale(1.08); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* ed-sellos: cada palabra se estampa girada */
+.ed-sellos .ed-pal {
+  animation-name: edp-sellos;
+  animation-duration: 0.4s;
+  animation-timing-function: cubic-bezier(0.55, 0, 0.68, 0.53);
+}
+@keyframes edp-sellos {
+  0%   { opacity: 0; transform: scale(2.4) rotate(calc(var(--sx, 1) * 10deg)); filter: blur(3px); }
+  60%  { opacity: 1; transform: scale(0.92) rotate(calc(var(--sx, 1) * -3deg)); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+/* ed-lectura: la palabra aparece y un subrayado corre debajo */
+.ed-lectura .ed-pal {
+  position: relative;
+  animation-name: edp-sube;
+  animation-duration: 0.35s;
+}
+.ed-lectura .ed-pal::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.1em;
+  height: 0.09em;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: edp-lectura-sub 0.3s ease-out calc(var(--d, 0ms) + 120ms) both;
+}
+@keyframes edp-lectura-sub {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
 /* ----- Library tab ----- */
 .library-actions {
   display: flex;

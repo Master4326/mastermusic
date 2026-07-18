@@ -466,7 +466,16 @@
                        'ed-lockup',   // composición: palabra ENORME + mini filas
                        'ed-cinta',    // marquesinas con la frase repetida
                        'ed-contorno', // solo contorno neón, el relleno parpadea
-                       'ed-portada']; // la carátula como textura de las letras
+                       'ed-portada',  // la carátula como textura de las letras
+                       /* tanda 4: pedidos del usuario + tendencias caption */
+                       'ed-esquinas', // letras vuelan desde las 4 esquinas
+                       'ed-caja',     // caja de color con texto oscuro (highlight)
+                       'ed-deletreo', // cada letra GIGANTE en secuencia, luego la palabra
+                       'ed-tetris',   // letras caen a saltos duros y encajan
+                       'ed-diagonal', // filas de esquina a esquina en diagonal
+                       'ed-marco',    // corchetes de esquina que enmarcan el texto
+                       'ed-persiana', // letras se abren como persianas (scaleY)
+                       'ed-tv'];      // TV CRT encendiéndose: línea que se expande
   const ED_LETTER_FX = {
     'ed-teclea': 'edl-teclea',     // tecleo
     'ed-cascada': 'edl-cae',       // letras que caen
@@ -474,15 +483,27 @@
     'ed-neon': 'edl-neon',         // letrero de neón encendiéndose
     'ed-explota': 'edl-explota',   // letras convergen desde posiciones locas
     'ed-descifra': 'edl-descifra', // efecto decode/hacker
+    'ed-esquinas': 'edl-esquina',  // cada letra llega de una esquina
+    'ed-tetris': 'edl-tetris',     // caída a saltos duros, estilo bloque
+    'ed-persiana': 'edl-persiana', // se abren como persianas
   };
   const ED_STRONG = ['ed-golpe', 'ed-zoomloco', 'ed-parpadeo', 'ed-glitch',
-                     'ed-sello', 'ed-explota'];
+                     'ed-sello', 'ed-explota', 'ed-tv'];
   const ED_PHRASE_FX = ['ed-acumula', 'ed-flotan', 'ed-crece', 'ed-maquina',
                         'ed-escalera', 'ed-caen', 'ed-giro', 'ed-latigo', 'ed-burbuja',
                         'ed-resorte',   // salta desde abajo con estirón elástico
                         'ed-remolino',  // cada palabra entra girando en espiral
                         'ed-foco',      // palabras borrosas gigantes que enfocan
                         'ed-poema',     // torre centrada elegante, palabra por renglón
+                        /* tanda 4: tendencias caption 2026, todas distintas */
+                        'ed-resalta',   // karaoke: caja de color enciende palabra a palabra
+                        'ed-cubo',      // cada palabra gira como cara de cubo 3D
+                        'ed-vidrio',    // palabras transparentes (contorno) que se rellenan
+                        'ed-subtitulo', // píldora de subtítulo estilo caption de TikTok
+                        'ed-zoombrusco',// cada palabra se estampa desde tamaño gigante
+                        'ed-impacto',   // la frase cae en bloque y hace onda + sacudida
+                        'ed-sellos',    // cada palabra se estampa girada como sello
+                        'ed-lectura',   // subrayado que corre palabra por palabra
                         /* tanda 3: presets estilo AE/CapCut para empatar con títulos */
                         'ed-ola',       // ola: cada palabra sube con rebote encadenado
                         'ed-corte',     // cortina por palabra: barrido que la revela
@@ -816,6 +837,55 @@
         return;
       }
 
+      if (fx === 'ed-deletreo') {
+        /* cada letra GIGANTE en secuencia rápida, y al final la palabra entera */
+        const H = lyricsEdit.clientHeight;
+        const letras = [...text.replace(/\s+/g, '').toUpperCase()].slice(0, 12);
+        const pasoL = Math.min(170, Math.max(80, 1300 / letras.length));
+        const fsL = Math.min(lyricsEdit.clientWidth * 0.5, H * 0.5);
+        letras.forEach((ch) => {
+          const d = document.createElement('div');
+          d.className = 'ed-letrona';
+          d.textContent = ch;
+          d.style.fontSize = fsL.toFixed(0) + 'px';
+          d.style.setProperty('--d', Math.round(delay) + 'ms');
+          delay += pasoL;
+          stack.appendChild(d);
+        });
+        delay += 120;
+        const filasD = edFilas(words);
+        const tamsD = edTamanos(filasD);
+        filasD.forEach((fila, r) => {
+          const div = document.createElement('div');
+          div.className = 'ed-titulo ed-golpe';
+          div.textContent = fila.toUpperCase();
+          div.style.fontSize = tamsD[r].toFixed(1) + 'px';
+          div.style.setProperty('--d', Math.round(delay) + 'ms');
+          delay += 110;
+          stack.appendChild(div);
+        });
+        return;
+      }
+
+      if (fx === 'ed-diagonal') {
+        /* filas de esquina a esquina: arriba-izquierda → abajo-derecha */
+        const filasD = words.length <= 4 ? words.slice() : edFilas(words);
+        const tamsD = edTamanos(filasD);
+        filasD.forEach((fila, r) => {
+          const div = document.createElement('div');
+          div.className = 'ed-titulo ed-diagonal';
+          div.textContent = fila.toUpperCase();
+          div.style.fontSize = tamsD[r].toFixed(1) + 'px';
+          const t = filasD.length === 1 ? 0.5 : r / (filasD.length - 1);
+          div.style.textAlign = t < 0.34 ? 'left' : t > 0.66 ? 'right' : 'center';
+          div.style.setProperty('--sx', t < 0.5 ? -1 : 1);
+          div.style.setProperty('--d', Math.round(delay) + 'ms');
+          delay += 140;
+          stack.appendChild(div);
+        });
+        return;
+      }
+
       /* preparativos de los fx con escenografía extra */
       if (fx === 'ed-invertido') {
         stack.classList.add('ed-stack-inv');
@@ -853,6 +923,14 @@
               s.style.setProperty('--ry', (((Math.floor(h / 13) % 9) - 4) * 0.7).toFixed(1) + 'em');
               s.style.setProperty('--rr', (((h >> 5) % 360) - 180) + 'deg');
             }
+            if (fx === 'ed-esquinas') {
+              // cada letra llega desde una de las 4 esquinas de la pantalla
+              const h = semilla(edLargo(fila) * 11 + Math.round(delay), 31, 4096);
+              const cx = (h % 2 ? 1 : -1) * (5 + (h % 30) / 10);
+              const cy = ((h >> 1) % 2 ? 1 : -1) * (3 + ((h >> 3) % 20) / 10);
+              s.style.setProperty('--cx', cx.toFixed(1) + 'em');
+              s.style.setProperty('--cy', cy.toFixed(1) + 'em');
+            }
             delay += paso;
             div.appendChild(s);
           });
@@ -874,6 +952,15 @@
       });
 
       if (fx === 'ed-cinta') stack.appendChild(edBanda(text, -1));
+      if (fx === 'ed-marco') {
+        // corchetes de esquina que se dibujan alrededor del título
+        ['tl', 'tr', 'bl', 'br'].forEach((p, k) => {
+          const e = document.createElement('span');
+          e.className = 'ed-marco-esq ' + p;
+          e.style.setProperty('--d', (150 + k * 90) + 'ms');
+          stack.appendChild(e);
+        });
+      }
       if (fx === 'ed-duo' && rows.length) {
         // eco cursivo en minúsculas sobre la fila más larga (edit rosa/vino)
         const R = rows.reduce((mx, r) => (edLargo(r.fila) > edLargo(mx.fila) ? r : mx), rows[0]);
@@ -985,6 +1072,8 @@
         });
       }
       stack.appendChild(p);
+      // la frase-bloque golpea el suelo: flash + sacudida del panel
+      if (fx === 'ed-impacto') { edFlash(); edShake(); }
     }
   };
 
