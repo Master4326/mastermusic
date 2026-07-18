@@ -1294,6 +1294,7 @@
   const startLoop = () => {
     const loop = () => {
       requestAnimationFrame(loop);
+      if (document.hidden) return;
       const audio = window.PlayerCore && window.PlayerCore.audio;
       if (!audio || audio.paused) return;
       tick(audio.currentTime);

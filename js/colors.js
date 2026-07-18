@@ -5,6 +5,8 @@
 (() => {
   'use strict';
 
+  var rgbStr = window.rgbStr, rgbToHex = window.rgbToHex;
+
   const root = document.documentElement;
   const body = document.body;
 
@@ -112,12 +114,6 @@
       b: Math.max(0, Math.min(255, Math.round(c.b * ratio))),
     };
   };
-
-  const rgbStr = (c) => `rgb(${c.r}, ${c.g}, ${c.b})`;
-
-  const rgbToHex = ({ r, g, b }) => '#' + [r, g, b].map(v =>
-    Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
-  ).join('');
 
   // --- HSL helpers (para normalizar el acento sin cambiar su tono) ---
   const rgbToHsl = ({ r, g, b }) => {

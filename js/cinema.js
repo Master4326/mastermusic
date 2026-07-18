@@ -9,7 +9,8 @@
 (() => {
   'use strict';
 
-  const $ = (id) => document.getElementById(id);
+  var $ = window.$, cssVar = window.cssVar;
+
   const root = $('cinema');
   const lyricsEdit = $('lyricsEdit');
   if (!root || !lyricsEdit) return;
@@ -68,8 +69,6 @@
     waveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
   window.addEventListener('resize', () => { if (open) sizeWave(); });
-
-  const cssVar = (n, f) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f;
 
   const drawWave = () => {
     if (!waveCtx || !wW) return;

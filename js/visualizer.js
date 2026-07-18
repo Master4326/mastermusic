@@ -13,6 +13,8 @@
 (() => {
   'use strict';
 
+  var toRgb = window.hexToRgb, rgba = window.rgbaStr, cssVar = window.cssVar;
+
   const canvas = document.getElementById('visualizer');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -43,19 +45,6 @@
   sizeCanvas();
   window.addEventListener('resize', sizeCanvas);
   if (window.ResizeObserver) new ResizeObserver(sizeCanvas).observe(canvas);
-
-  // ---- Color helpers (siguen el acento del tema) ----
-  const cssVar = (n, f) => {
-    const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-    return v || f;
-  };
-  const toRgb = (hex) => {
-    if (hex.startsWith('rgb')) { const m = hex.match(/\d+/g); return { r: +m[0], g: +m[1], b: +m[2] }; }
-    let c = hex.replace('#', '');
-    if (c.length === 3) c = c.split('').map(x => x + x).join('');
-    return { r: parseInt(c.substr(0, 2), 16), g: parseInt(c.substr(2, 2), 16), b: parseInt(c.substr(4, 2), 16) };
-  };
-  const rgba = ({ r, g, b }, a = 1) => `rgba(${r},${g},${b},${a})`;
 
   // ---- Conexión perezosa al grafo de audio ----
   const tryAttach = async () => {
