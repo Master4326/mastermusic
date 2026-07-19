@@ -5,6 +5,8 @@
 (() => {
   'use strict';
 
+  var formatTime = window.formatTime, escapeHtml = window.escapeHtml;
+
   const STORAGE = {
     CID: 'sp_client_id',
     TOKEN: 'sp_access_token',
@@ -359,21 +361,10 @@
     catch (e) { setStatus('✕ no se pudo adelantar en Spotify'); }
   };
 
-  const formatTime = (s) => {
-    if (!isFinite(s) || s < 0) return '0:00';
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
-
   const setStatus = (msg) => {
     if (window.SevenStatus) window.SevenStatus(msg);
     else { const s = document.getElementById('statusText'); if (s) s.textContent = msg; }
   };
-
-  const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[c]));
 
   // -------- Search & play tracks from the app --------
   let searchResults = [];

@@ -6,6 +6,8 @@
 (() => {
   'use strict';
 
+  var $ = window.$, formatTime = window.formatTime;
+
   // ---- State ----
   const state = {
     tracks: [],          // [{id, name, artist, album, duration, url, cover, file}]
@@ -26,7 +28,6 @@
   audio.volume = state.volume;
 
   // ---- DOM ----
-  const $ = (id) => document.getElementById(id);
   const el = {
     fileInput: $('fileInput'),
     npTitle: $('npTitle'),
@@ -51,14 +52,6 @@
     volumeThumb: $('volumeThumb'),
     volBtn: $('volBtn'),
     volPct: $('volPct'),
-  };
-
-  // ---- Utility ----
-  const formatTime = (s) => {
-    if (!isFinite(s) || s < 0) return '0:00';
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
   // ---- Read metadata from a file ----

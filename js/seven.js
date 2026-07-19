@@ -5,6 +5,10 @@
 (() => {
   'use strict';
 
+  var hexToRgb = window.hexToRgb, rgbToHex = window.rgbToHex;
+  var darken = window.darken, lighten = window.lighten;
+  var formatTime = window.formatTime, escapeHtml = window.escapeHtml;
+
   // ---------- Tab switching ----------
   const tabs = document.querySelectorAll('.tab');
   const contents = document.querySelectorAll('.tab-content');
@@ -162,31 +166,6 @@
   // Expose for colors.js to call when auto-extracting from cover
   window.MasterColors = { applyPanelsFromBase, resetPanels, applyAccentFromCover, resetAccentFromCover };
 
-  // Color math helpers
-  const hexToRgb = (hex) => {
-    const c = hex.replace('#', '');
-    return {
-      r: parseInt(c.substr(0, 2), 16),
-      g: parseInt(c.substr(2, 2), 16),
-      b: parseInt(c.substr(4, 2), 16),
-    };
-  };
-  const rgbToHex = ({ r, g, b }) => '#' + [r, g, b].map(v =>
-    Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
-  ).join('');
-  const darken = (hex, factor) => {
-    const { r, g, b } = hexToRgb(hex);
-    return rgbToHex({ r: r * (1 - factor), g: g * (1 - factor), b: b * (1 - factor) });
-  };
-  const lighten = (hex, factor) => {
-    const { r, g, b } = hexToRgb(hex);
-    return rgbToHex({
-      r: r + (255 - r) * factor,
-      g: g + (255 - g) * factor,
-      b: b + (255 - b) * factor,
-    });
-  };
-
   // Preset accent swatches
   const presetSwatches = document.querySelectorAll('.swatch[data-color]');
   const accentAutoBtn = document.getElementById('accentAuto');
@@ -328,9 +307,8 @@
     root.style.removeProperty('--dyn-1');
     root.style.removeProperty('--dyn-2');
     resetPanels();
-    accentMode = 'auto'; // por defecto el acento sigue a la carátula
-    if (lastCoverAccent) applyAccent(lastCoverAccent);
-    else applyTheme('cyan');
+    accentMode = 'auto';
+    applyBgAuto();
     updateActiveSwatch('auto');
     bgAuto.checked = true;
     customAccent.value = '#5ce1e6';
@@ -471,19 +449,11 @@
     }).join('');
   };
 
-  const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[c]));
-
-  const formatTime = (s) => {
-    if (!isFinite(s) || s < 0) return '0:00';
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
-
   // Periodic refresh to catch new tracks added by app.js
-  setInterval(renderRetroTrackList, 500);
+  setInterval(() => {
+    const tab = document.getElementById('tab-settings');
+    if (tab && tab.classList.contains('active')) renderRetroTrackList();
+  }, 500);
 
   // ---------- Cola de reproducción (pestaña "cola") ----------
   const queueList = document.getElementById('queueList');
