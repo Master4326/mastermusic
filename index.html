@@ -20,12 +20,21 @@
   <link rel="stylesheet" href="css/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <!-- Nunito 900 (+cursiva) es la tipografía redondeada gruesa que usan los
+       edits de TikTok; la usa el efecto ed-apila del modo edit -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Share+Tech+Mono&family=Nunito:ital,wght@0,900;1,900&display=swap" rel="stylesheet">
 </head>
 <body>
   <!-- CRT scanlines + vignette -->
   <div class="crt"></div>
   <div class="scanlines"></div>
+
+  <!-- Luces de fondo que laten con la música (js/ambient.js) -->
+  <div class="ambient" id="ambient" aria-hidden="true">
+    <span class="amb-blob b1"></span>
+    <span class="amb-blob b2"></span>
+    <span class="amb-blob b3"></span>
+  </div>
 
   <div class="window">
     <!-- TITLE BAR -->
@@ -76,12 +85,19 @@
 
       <!-- RIGHT: LYRICS -->
       <section class="right-panel">
-        <div class="tab-bar">
+        <div class="tab-bar" role="tablist" aria-label="Secciones">
           <button class="tab active" data-tab="lyrics">lyrics</button>
           <button class="tab icon-tab" data-tab="search" title="Buscar en Spotify (F)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
               <circle cx="10.5" cy="10.5" r="5.5"/>
               <line x1="15" y1="15" x2="20.5" y2="20.5"/>
+            </svg>
+          </button>
+          <button class="tab icon-tab" data-tab="library" title="Tu biblioteca de Spotify: playlists, guardadas, recientes (B)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <rect x="3" y="4" width="3.4" height="16"/>
+              <rect x="9" y="4" width="3.4" height="16"/>
+              <path d="M16.2 5.6l3.3-.9 3.4 12.6-3.3.9z" transform="translate(-2 0)"/>
             </svg>
           </button>
           <button class="tab icon-tab" data-tab="queue" title="Cola — a continuación (Q)">
@@ -106,11 +122,39 @@
         <div class="tab-content active" id="tab-lyrics">
           <!-- Ambiente: esquinas pixel que laten + notas flotantes (decorativo) -->
           <div class="lyrics-ambient" id="lyricsAmbient" aria-hidden="true">
+            <!-- Fondo reactivo (js/ambient.js): carátula difuminada, ecualizador
+                 fantasma, aura tras la línea activa y ondas en cada golpe.
+                 Todo por debajo del texto (z-index) y sin capturar clics. -->
+            <div class="la-cover" id="laCover"></div>
+            <div class="la-suelo" id="laSuelo"></div>
+            <div class="la-eq" id="laEq"></div>
+            <div class="la-circular" id="laCircular"></div>
+            <div class="la-estrobo" id="laEstrobo"></div>
+            <div class="la-ondas" id="laOndas"></div>
+            <div class="la-saltarinas" id="laSaltarinas"></div>
+            <!-- brillos: estrellitas que dispara cada platillo / charles -->
+            <div class="la-destellos" id="laDestellos"></div>
+            <div class="la-marco" id="laMarco"></div>
             <span class="la-corner tl"></span><span class="la-corner tr"></span>
             <span class="la-corner bl"></span><span class="la-corner br"></span>
           </div>
           <div class="lyrics-body" id="lyricsBody">
-            <p class="lyrics-empty">▒ Reproduce una canción para ver la letra ▒</p>
+            <!-- Primer arranque: en vez de un mensaje seco, las dos formas
+                 de meter música. Lo sustituye lyrics.js al sonar algo. -->
+            <div class="first-run">
+              <h4>▒ MASTER MUSIC ▒</h4>
+              <div>aquí saldrá la letra, sincronizada con la canción</div>
+              <div class="fr-ways">
+                <div class="fr-way">
+                  <b>arrastra tus mp3</b>
+                  suéltalos en la ventana
+                </div>
+                <div class="fr-way">
+                  <b>o conecta spotify</b>
+                  en config ⚙ · tecla S
+                </div>
+              </div>
+            </div>
           </div>
           <!-- MODO EDIT: una sola línea gigante con efectos, estilo edit de TikTok -->
           <div class="lyrics-edit" id="lyricsEdit" hidden></div>
@@ -126,6 +170,32 @@
               <input type="text" id="spotifySearchInput" placeholder="canción o artista..." class="retro-input" />
             </div>
             <ul class="track-list sp-results" id="spotifyResults"></ul>
+          </div>
+        </div>
+
+        <!-- LIBRARY TAB (tu biblioteca de spotify) -->
+        <div class="tab-content" id="tab-library">
+          <p class="lyrics-empty" id="libHint">▒ conecta spotify en <b>config ⚙</b> para ver tu biblioteca ▒</p>
+          <div class="lib-block" id="libBlock" hidden>
+            <div class="lib-nav">
+              <button class="lib-chip active" data-col="playlists">playlists</button>
+              <button class="lib-chip" data-col="saved">guardadas</button>
+              <button class="lib-chip" data-col="recent">recientes</button>
+              <button class="lib-chip" data-col="top">top</button>
+              <button class="lib-refresh" id="libRefresh" title="Recargar desde Spotify">⟳</button>
+            </div>
+            <div class="lib-head" id="libHead" hidden>
+              <button class="lib-back" id="libBack" title="Volver">‹</button>
+              <div class="lib-head-cover" id="libHeadCover">♪</div>
+              <div class="lib-head-meta">
+                <div class="lib-head-kind">playlist</div>
+                <div class="lib-head-title"></div>
+                <div class="lib-head-sub"></div>
+              </div>
+              <button class="lib-play-big" id="libPlayAll" title="Reproducir toda la playlist">▶</button>
+            </div>
+            <ul class="track-list sp-results" id="libList"></ul>
+            <button class="retro-btn small lib-more" id="libMore" hidden>[ cargar más ]</button>
           </div>
         </div>
 
@@ -145,6 +215,61 @@
               <button class="retro-btn" id="spotifyConnectBtn">
                 <span class="bracket">[</span> conectar spotify <span class="bracket">]</span>
               </button>
+            </div>
+          </div>
+
+          <div class="settings-block">
+            <h3>~ apariencia ~</h3>
+            <div class="set-row" style="margin-bottom:10px">
+              <span class="set-hint" style="margin:0;min-width:74px">pantalla crt</span>
+              <div class="seg" data-set="crt">
+                <button class="seg-btn" data-val="full">completo</button>
+                <button class="seg-btn" data-val="soft">sutil</button>
+                <button class="seg-btn" data-val="off">apagado</button>
+              </div>
+            </div>
+            <div class="set-row" style="margin-bottom:10px">
+              <span class="set-hint" style="margin:0;min-width:74px">listas</span>
+              <div class="seg" data-set="rows">
+                <button class="seg-btn" data-val="compact">compactas</button>
+                <button class="seg-btn" data-val="normal">normal</button>
+                <button class="seg-btn" data-val="cozy">cómodas</button>
+              </div>
+            </div>
+            <div class="set-row">
+              <span class="set-hint" style="margin:0;min-width:74px">movimiento</span>
+              <div class="seg" data-set="motion">
+                <button class="seg-btn" data-val="auto">automático</button>
+                <button class="seg-btn" data-val="full">completo</button>
+                <button class="seg-btn" data-val="less">menos</button>
+              </div>
+            </div>
+            <p class="set-hint" id="motionHint">
+              «automático» sigue la preferencia de tu sistema. «menos» detiene scanlines,
+              notas flotantes, vinilo y destellos — la letra sigue funcionando igual.
+            </p>
+          </div>
+
+          <div class="settings-block">
+            <h3>~ letras ~</h3>
+            <div class="set-row" style="margin-bottom:10px">
+              <span class="set-hint" style="margin:0;min-width:74px">tamaño</span>
+              <div class="seg" data-set="lyrics">
+                <button class="seg-btn" data-val="s">S</button>
+                <button class="seg-btn" data-val="m">M</button>
+                <button class="seg-btn" data-val="l">L</button>
+                <button class="seg-btn" data-val="xl">XL</button>
+              </div>
+            </div>
+            <span class="set-hint" style="display:block;margin-bottom:4px">
+              desfase de sincronía — se guarda por canción
+            </span>
+            <div class="offset-ctl">
+              <button class="retro-btn small" id="offsetMinus" title="Atrasar 0.25s">−</button>
+              <input type="range" id="offsetSlider" min="-5" max="5" step="0.05" value="0" />
+              <button class="retro-btn small" id="offsetPlus" title="Adelantar 0.25s">+</button>
+              <span class="offset-val" id="offsetValue">+0.00s</span>
+              <button class="retro-btn small" id="offsetReset" title="Volver a cero">0</button>
             </div>
           </div>
 
@@ -216,6 +341,45 @@
               <span class="bracket">[</span> restablecer colores <span class="bracket">]</span>
             </button>
           </div>
+
+          <div class="settings-block">
+            <h3>~ datos ~</h3>
+            <div class="set-row">
+              <button class="retro-btn small" id="clearLyricsCache">
+                <span class="bracket">[</span> limpiar caché de letras <span class="bracket">]</span>
+              </button>
+              <span class="set-hint" style="margin:0" id="cacheSize">—</span>
+            </div>
+            <div class="set-row" style="margin-top:8px">
+              <button class="retro-btn small" id="clearLibrary">
+                <span class="bracket">[</span> borrar música importada <span class="bracket">]</span>
+              </button>
+              <span class="set-hint" style="margin:0" id="librarySize">—</span>
+            </div>
+            <p class="set-hint">
+              la caché de letras evita volver a pedirlas a LRClib (son lentas).
+              borrar la música importada no toca nada de spotify.
+            </p>
+          </div>
+
+          <div class="settings-block">
+            <h3>~ atajos de teclado ~</h3>
+            <div class="keys-grid">
+              <kbd>espacio</kbd><span>reproducir / pausa</span>
+              <kbd>← →</kbd><span>±5 segundos</span>
+              <kbd>shift + ← →</kbd><span>canción anterior / siguiente</span>
+              <kbd>↑ ↓</kbd><span>volumen ±5%</span>
+              <kbd>M</kbd><span>silenciar</span>
+              <kbd>1 … 5</kbd><span>cambiar de pestaña</span>
+              <kbd>L</kbd><span>letras</span>
+              <kbd>F</kbd> <span>buscar en spotify</span>
+              <kbd>B</kbd><span>biblioteca</span>
+              <kbd>Q</kbd><span>cola</span>
+              <kbd>S</kbd><span>configuración</span>
+              <kbd>esc</kbd><span>salir del modo cine</span>
+            </div>
+          </div>
+
           <div class="settings-block">
             <h3>~ acerca ~</h3>
             <p class="about-text">MASTER MUSIC v1.0</p>
@@ -314,7 +478,7 @@
     <div class="status-bar">
       <span class="status-left">
         <span class="mini-eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
-        <span id="statusText">▣ listo</span>
+        <span id="statusText" role="status" aria-live="polite">▣ listo</span>
       </span>
       <span class="filler" aria-hidden="true"></span>
       <span id="clock">--:--</span>
@@ -357,11 +521,17 @@
   <script src="js/db.js"></script>
   <script src="js/lyrics.js"></script>
   <script src="js/spotify.js"></script>
+  <script src="js/library.js"></script>
   <script src="js/app.js"></script>
   <script src="js/visualizer.js"></script>
+  <!-- beat.js va DESPUÉS del visualizador (le pide el analizador crudo) y
+       ANTES de ambient.js, que solo pinta lo que este detecta -->
+  <script src="js/beat.js"></script>
   <script src="js/seven.js"></script>
+  <script src="js/settings.js"></script>
   <script src="js/cinema.js"></script>
   <script src="js/colors.js"></script>
+  <script src="js/ambient.js"></script>
 
   <!-- Registro del Service Worker (solo bajo http/https, no file://) -->
   <script>

@@ -8,12 +8,23 @@
   // ---------- Tab switching ----------
   const tabs = document.querySelectorAll('.tab');
   const contents = document.querySelectorAll('.tab-content');
+  // Semántica para lectores de pantalla: la barra ya es role="tablist"
+  tabs.forEach(t => {
+    t.setAttribute('role', 'tab');
+    t.setAttribute('aria-controls', 'tab-' + t.dataset.tab);
+    t.setAttribute('aria-selected', t.classList.contains('active') ? 'true' : 'false');
+  });
+  contents.forEach(c => c.setAttribute('role', 'tabpanel'));
   tabs.forEach(t => {
     t.addEventListener('click', () => {
       const name = t.dataset.tab;
-      tabs.forEach(x => x.classList.toggle('active', x === t));
+      tabs.forEach(x => {
+        x.classList.toggle('active', x === t);
+        x.setAttribute('aria-selected', x === t ? 'true' : 'false');
+      });
       contents.forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
       if (name === 'queue') renderQueue();   // refresco inmediato al abrir la cola
+      if (name === 'library' && window.LibraryModule) window.LibraryModule.open();
       if (name === 'search') {               // foco directo al buscador
         const inp = document.getElementById('spotifySearchInput');
         if (inp && !inp.closest('[hidden]')) setTimeout(() => inp.focus(), 0);
@@ -490,17 +501,32 @@
   let queueBusy = false;
 
   const queueEmpty = (msg) =>
-    `<li style="text-align:center;color:var(--text-muted);padding:30px;font-style:italic">${msg}</li>`;
+    `<li class="sp-empty" style="line-height:1.6">${msg}</li>`;
 
-  const queueRow = (t, i, clickable) => `
-    <li class="track-row ${clickable ? '' : 'no-click'}" ${clickable ? `data-track-id="${t.id}"` : ''}>
-      <div class="tr-num">${String(i + 1).padStart(2, '0')}</div>
-      <div class="tr-info">
-        <div class="tr-title">${escapeHtml(t.name)}</div>
-        <div class="tr-artist">${escapeHtml(t.artist || 'desconocido')}</div>
+  const queueHead = (txt) => `<li class="q-section">${txt}</li>`;
+
+  // Misma anatomía de fila que la biblioteca: portada + meta + duración
+  const queueRow = (t, i, clickable, now) => `
+    <li class="sp-result ${clickable ? '' : 'sp-static'} ${now ? 'q-now' : ''}"
+        ${clickable ? `data-track-id="${t.id}"` : ''}>
+      <span class="sp-idx">${now ? '▶' : String(i + 1).padStart(2, '0')}</span>
+      <div class="sp-thumb" ${t.cover ? `style="background-image:url('${t.cover}')"` : ''}>${t.cover ? '' : '♪'}</div>
+      <div class="sp-meta">
+        <div class="sp-name">${escapeHtml(t.name)}</div>
+        <div class="sp-artist">${escapeHtml(t.artist || 'desconocido')}</div>
       </div>
-      <div class="tr-duration">${formatTime(t.duration)}</div>
+      <div class="sp-dur">${formatTime(t.duration)}</div>
     </li>`;
+
+  // Pista de Spotify (cruda) → la forma que usan las filas
+  const spTrack = (it) => ({
+    id: it.id ? 'sp:' + it.id : null,
+    name: it.name || '(sin título)',
+    artist: (it.artists || []).map(a => a.name).filter(Boolean).join(', '),
+    duration: (it.duration_ms || 0) / 1000,
+    cover: it.album && it.album.images && it.album.images.length
+      ? it.album.images[it.album.images.length - 1].url : null,
+  });
 
   const renderQueue = async () => {
     if (!queueList || !window.PlayerCore || queueBusy) return;
@@ -512,16 +538,32 @@
       queueBusy = true;
       try {
         const data = await window.SpotifyModule.api('/me/player/queue');
+        const sonando = data && data.currently_playing;
         const items = (data && data.queue) || [];
-        queueList.innerHTML = items.length
-          ? items.slice(0, 15).map((it, i) => queueRow({
-              name: it.name,
-              artist: (it.artists || []).map(a => a.name).join(', '),
-              duration: (it.duration_ms || 0) / 1000,
-            }, i, false)).join('')
-          : queueEmpty('▒ nada en cola en spotify ▒');
+        let html = '';
+        if (sonando) html += queueHead('sonando ahora') + queueRow(spTrack(sonando), 0, false, true);
+        html += queueHead('a continuación');
+        html += items.length
+          ? items.slice(0, 20).map((it, i) => queueRow(spTrack(it), i, false)).join('')
+          : queueEmpty('▒ nada más en la cola ▒');
+        queueList.innerHTML = html;
       } catch (e) {
-        queueList.innerHTML = queueEmpty('▒ no se pudo leer la cola de spotify ▒');
+        // Antes esto decía siempre "no se pudo leer la cola" y escondía el motivo
+        const msg = (e && e.message) || '';
+        const detalle = (window.LibraryModule && window.LibraryModule.detailOf)
+          ? window.LibraryModule.detailOf(msg) : '';
+        let txt;
+        if (/No token/.test(msg) || /Spotify API 401/.test(msg)) {
+          txt = 'tu sesión de spotify caducó — reconecta en <b>config ⚙</b>';
+        } else if (/Spotify API 403/.test(msg)) {
+          txt = 'spotify no deja leer la cola a las apps en <b>modo desarrollo</b>' + detalle;
+        } else if (/Spotify API 404/.test(msg)) {
+          txt = 'no hay ningún dispositivo activo:<br>abre spotify (premium) y dale a reproducir' + detalle;
+        } else {
+          console.warn('[Cola] fallo:', msg);
+          txt = 'no se pudo leer la cola de spotify' + detalle;
+        }
+        queueList.innerHTML = queueEmpty('▒ ' + txt + ' ▒');
       } finally {
         queueBusy = false;
       }
@@ -530,9 +572,11 @@
 
     // Local: lo que queda de la cola del reproductor
     const up = (st.queue || []).slice(st.queueIndex + 1).map(ix => st.tracks[ix]).filter(Boolean);
-    queueList.innerHTML = up.length
-      ? up.map((t, i) => queueRow(t, i, true)).join('')
-      : queueEmpty(cur ? '▒ no hay más canciones en cola ▒' : '▒ reproduce algo para ver la cola ▒');
+    queueList.innerHTML = (cur ? queueHead('sonando ahora') + queueRow(cur, 0, false, true) : '')
+      + queueHead('a continuación')
+      + (up.length
+          ? up.map((t, i) => queueRow(t, i, true)).join('')
+          : queueEmpty(cur ? '▒ no hay más canciones en cola ▒' : '▒ reproduce algo para ver la cola ▒'));
   };
 
   // Refresca solo mientras la pestaña está visible (evita llamadas de sobra)
@@ -600,8 +644,11 @@
       e.preventDefault();
       const sTab = document.querySelector('.tab[data-tab="search"]');
       if (sTab) sTab.click();
-    } else if (['1', '2', '3', '4'].includes(e.key)) {
-      const map = { '1': 'lyrics', '2': 'search', '3': 'queue', '4': 'settings' };
+    } else if (e.key === 'b' || e.key === 'B') {
+      const libTab = document.querySelector('.tab[data-tab="library"]');
+      if (libTab) libTab.click();
+    } else if (['1', '2', '3', '4', '5'].includes(e.key)) {
+      const map = { '1': 'lyrics', '2': 'search', '3': 'library', '4': 'queue', '5': 'settings' };
       const tab = document.querySelector(`.tab[data-tab="${map[e.key]}"]`);
       if (tab) tab.click();
     }
@@ -616,6 +663,8 @@
     const GLYPHS = ['♪', '♫', '♩', '♬', '✦', '✧', '·'];
     const spawnNote = () => {
       if (document.hidden) return;
+      // ajustes → apariencia → movimiento: «menos» las apaga
+      if (window.MMSettings && window.MMSettings.reduceMotion()) return;
       if (!document.body.classList.contains('playing')) return;
       const tab = document.getElementById('tab-lyrics');
       if (!tab || !tab.classList.contains('active')) return;
@@ -623,7 +672,11 @@
 
       const n = document.createElement('span');
       n.className = 'la-note';
-      n.textContent = GLYPHS[(Math.random() * GLYPHS.length) | 0];
+      // el glifo va dentro de un <i> para que ambient.js pueda hacerlo
+      // rebotar con el bombo sin pisar la animación de subida
+      const g = document.createElement('i');
+      g.textContent = GLYPHS[(Math.random() * GLYPHS.length) | 0];
+      n.appendChild(g);
       // 42% borde izquierdo, 42% borde derecho, 16% por el medio
       const zona = Math.random();
       const x = zona < 0.42 ? 2 + Math.random() * 16
@@ -639,7 +692,40 @@
       lyricsAmbient.appendChild(n);
       n.addEventListener('animationend', () => n.remove());
     };
-    setInterval(spawnNote, 1400);
+    /* El goteo de fondo también sigue la energía de la canción (la calcula
+       ambient.js): en una balada cae una nota de vez en cuando; en algo
+       movido el ambiente se llena. Los golpes puntuales los lanza
+       ambient.js en cada bombo. */
+    let tocaNota = 0;
+    setInterval(() => {
+      const e = typeof window.MM_ENERGIA === 'number' ? window.MM_ENERGIA : 0.35;
+      // 1 nota cada ~2.8s en calma → cada ~0.7s a tope
+      tocaNota += 0.25 + e * 0.75;
+      if (tocaNota < 1) return;
+      tocaNota = 0;
+      spawnNote();
+    }, 700);
+  }
+
+  // ---------- Globo con el minuto sobre la barra de progreso ----------
+  // Estándar en cualquier reproductor serio: saber a dónde vas a saltar
+  // ANTES de soltar el clic.
+  const progBar = document.getElementById('progressBar');
+  if (progBar) {
+    const tip = document.createElement('div');
+    tip.className = 'prog-tip';
+    tip.textContent = '0:00';
+    progBar.appendChild(tip);
+    progBar.addEventListener('mousemove', (e) => {
+      const rect = progBar.getBoundingClientRect();
+      if (!rect.width) return;
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const st = window.PlayerCore && window.PlayerCore.state;
+      const dur = (st && st.currentTrack && st.currentTrack.duration)
+        || (window.PlayerCore && window.PlayerCore.audio && window.PlayerCore.audio.duration) || 0;
+      tip.textContent = formatTime(pct * dur);
+      tip.style.left = (pct * 100) + '%';
+    });
   }
 
   // ---------- Welcome status ----------

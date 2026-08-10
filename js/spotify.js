@@ -28,6 +28,10 @@
     'playlist-read-private',
     'playlist-read-collaborative',
     'user-library-read',
+    // Necesarios para las secciones "recientes" y "top" de la biblioteca.
+    // Si tu sesión es anterior a esto, desconecta y vuelve a conectar.
+    'user-read-recently-played',
+    'user-top-read',
   ].join(' ');
 
   // -------- PKCE helpers --------
@@ -468,12 +472,28 @@
     if (window.LyricsModule) window.LyricsModule.fetch(t);
   };
 
-  const playTrack = async (t) => {
+  // Reproduce un contexto entero (playlist / álbum), opcionalmente empezando
+  // en una pista concreta. Así la cola de Spotify sigue con el resto.
+  const playContext = async (contextUri, offsetUri) => {
+    const body = { context_uri: contextUri };
+    if (offsetUri) body.offset = { uri: offsetUri };
+    await api('/me/player/play', { method: 'PUT', body: JSON.stringify(body) });
+    lastTrackId = null;
+    lastIsPlaying = true;
+    if (window.PlayerCore) window.PlayerCore.state.isPreview = false;
+    startPolling();
+  };
+
+  // contextUri (opcional): reproduce la pista dentro de su playlist/álbum
+  const playTrack = async (t, contextUri) => {
     if (!t) return;
     setStatus('▣ cargando: ' + t.name);
     try {
       // Full playback via Spotify Connect (requiere Premium + un dispositivo activo)
-      await api('/me/player/play', { method: 'PUT', body: JSON.stringify({ uris: [t.uri] }) });
+      const body = contextUri
+        ? { context_uri: contextUri, offset: { uri: t.uri } }
+        : { uris: [t.uri] };
+      await api('/me/player/play', { method: 'PUT', body: JSON.stringify(body) });
       lastTrackId = null;          // fuerza al polling a refrescar la canción
       lastIsPlaying = true;
       window.PlayerCore.state.isPreview = false;
@@ -526,6 +546,7 @@
       window.PlayerCore.setUser(me.display_name || me.id, (me.images && me.images[0]) ? me.images[0].url : null);
       window.PlayerCore.setSpotifyConnected(true);
       showSearchBlock(true);
+      if (window.LibraryModule) window.LibraryModule.onAuthChange(true);
       startPolling();
     } catch (e) {
       console.warn('Spotify load user failed', e);
@@ -545,6 +566,7 @@
         renderResults();
         window.PlayerCore.setSpotifyConnected(false);
         window.PlayerCore.setUser('Invitado', null);
+        if (window.LibraryModule) window.LibraryModule.onAuthChange(false);
       }
       return;
     }
@@ -576,7 +598,7 @@
   };
 
   window.SpotifyModule = {
-    connect, api, search: doSearch, playTrack, isLoggedIn,
+    connect, api, search: doSearch, playTrack, playContext, isLoggedIn,
     togglePlay: spTogglePlay, next: spNext, prev: spPrev, seek: spSeek,
     setVolume: spSetVolume,
   };

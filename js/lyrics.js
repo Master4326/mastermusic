@@ -475,7 +475,25 @@
                        'ed-diagonal', // filas de esquina a esquina en diagonal
                        'ed-marco',    // corchetes de esquina que enmarcan el texto
                        'ed-persiana', // letras se abren como persianas (scaleY)
-                       'ed-tv'];      // TV CRT encendiéndose: línea que se expande
+                       'ed-tv',       // TV CRT encendiéndose: línea que se expande
+                       /* ── tanda 5: acabados limpios de lyric video ── */
+                       'ed-mascara',    // box reveal: un bloque barre y descubre el texto
+                       'ed-rebana',     // el texto llega partido en dos y se junta
+                       'ed-degradado',  // barrido de degradado por dentro de las letras
+                       'ed-sombralarga',// sombra dura larga que se retrae al texto
+                       'ed-neblina',    // aparece de la niebla, flotando (baladas)
+                       'ed-zoomlento',  // zoom lentísimo y elegante
+                       'ed-cortina',    // se abre desde el centro como telón
+                       'ed-eco',        // estela de copias que se recogen
+                       'ed-liquido',    // entrada gelatinosa con rebote
+                       'ed-flashcorte', // corte seco con destello blanco
+                       'ed-giroeje',    // voltea como panel de aeropuerto
+                       'ed-vibra',      // aterriza y vibra un instante
+                       'ed-difumina',   // letra a letra enfocando
+                       'ed-giraletra',  // letra a letra girando sobre su eje
+                       'ed-alterna',    // letras alternas desde arriba y abajo
+                       'ed-empuja',     // letras empujando de lado con estela
+                       'ed-apila'];     // filas que se acumulan, estilo edit TikTok
   const ED_LETTER_FX = {
     'ed-teclea': 'edl-teclea',     // tecleo
     'ed-cascada': 'edl-cae',       // letras que caen
@@ -486,9 +504,15 @@
     'ed-esquinas': 'edl-esquina',  // cada letra llega de una esquina
     'ed-tetris': 'edl-tetris',     // caída a saltos duros, estilo bloque
     'ed-persiana': 'edl-persiana', // se abren como persianas
+    /* tanda 5 */
+    'ed-difumina': 'edl-difumina', // cada letra enfoca desde el desenfoque
+    'ed-giraletra': 'edl-gira',    // cada letra gira sobre su eje vertical
+    'ed-alterna': 'edl-alterna',   // letras alternas entran de arriba y de abajo
+    'ed-empuja': 'edl-empuja',     // entran empujando de lado con estela
   };
   const ED_STRONG = ['ed-golpe', 'ed-zoomloco', 'ed-parpadeo', 'ed-glitch',
-                     'ed-sello', 'ed-explota', 'ed-tv'];
+                     'ed-sello', 'ed-explota', 'ed-tv',
+                     'ed-flashcorte', 'ed-rebana', 'ed-vibra'];
   const ED_PHRASE_FX = ['ed-acumula', 'ed-flotan', 'ed-crece', 'ed-maquina',
                         'ed-escalera', 'ed-caen', 'ed-giro', 'ed-latigo', 'ed-burbuja',
                         'ed-resorte',   // salta desde abajo con estirón elástico
@@ -518,12 +542,37 @@
                         'ed-susurro',   // fade lento y suave con tracking (baladas)
                         'ed-salto',     // brinco cartoon con squash & stretch
                         'ed-luzneon',   // cada palabra parpadea como letrero neón
-                        'ed-iman'];     // imán: llega disparada y se ajusta al centro
+                        'ed-iman',      // imán: llega disparada y se ajusta al centro
+                        /* ── tanda 5: acabados limpios de lyric video ── */
+                        'ed-desenfoca', // cada palabra enfoca desde el desenfoque
+                        'ed-zoomsuave', // escala mínima + fundido, muy elegante
+                        'ed-marcador',  // rotulador que subraya palabra por palabra
+                        'ed-nieve',     // caen despacio y se posan (baladas)
+                        'ed-brisa',     // se mecen al llegar, muy suave
+                        'ed-tinta',     // mancha de tinta que se define
+                        'ed-orbita',    // llegan describiendo una curva
+                        'ed-chispa',    // destello de color al aterrizar
+                        'ed-persianas', // cada palabra se revela por lamas
+                        'ed-goteo',     // caen como gotas con elástico
+                        'ed-espejo',    // entran reflejadas y se dan la vuelta
+                        'ed-tarjeta',   // cada palabra voltea como carta
+                        'ed-estela',    // llegan dejando rastro
+                        'ed-recorta',   // barrido que recorta la palabra al entrar
+                        'ed-pulso',     // aterrizan con doble latido
+                        'ed-empujon',   // empuje lateral fuerte con desenfoque
+                        'ed-apila'];    // filas que se acumulan, estilo edit TikTok
   const ED_CAMS = ['edcam-zin', 'edcam-zout', 'edcam-izq', 'edcam-der',
                    'edcam-giro', 'edcam-sube', 'edcam-baja', 'edcam-late',
                    'edcam-dolly',    // acercamiento con leve giro, muy cine
                    'edcam-tiembla',  // cámara en mano: micro-sacudidas
-                   'edcam-vaiven'];  // balanceo lateral suave
+                   'edcam-vaiven',   // balanceo lateral suave
+                   /* ── tanda 5 ── */
+                   'edcam-empuja',   // empujón de cámara que frena en seco
+                   'edcam-orbita',   // órbita 3D leve alrededor del texto
+                   'edcam-inclina',  // ladea el plano y se endereza
+                   'edcam-flota',    // deriva lenta, casi imperceptible
+                   'edcam-aleja',    // se retira despacio (pull back)
+                   'edcam-diagonal'];// deriva en diagonal
   const ED_TOPS = [42, 47, 55, 36, 58];
 
   const edLargo = (s) => s.replace(/[^\wáéíóúñ' ]/gi, '').length;
@@ -536,7 +585,97 @@
      usa exactamente ese efecto/cámara en vez del pseudo-azar. */
   let demoFx = null;
   let demoCam = '';
-  const elegirFx = (lista, i, salt) => {
+  /* Intensidad AUTOMÁTICA: la decide la propia canción, línea por línea.
+     Dos señales, la segunda solo si existe:
+       1. ritmo de la letra — palabras por segundo de esta línea (siempre
+          disponible: sale de los tiempos del LRC). Un estribillo apretado
+          pide golpe; un verso largo y espaciado pide calma.
+       2. energía de graves — solo cuando hay audio real en el navegador
+          (archivo local o ◈ sync); con Spotify Connect no lo hay y nos
+          quedamos solo con el ritmo, que ya funciona bien.
+
+     ED_STRONG NO sirve para clasificar frases (solo tiene títulos: marca
+     qué efectos disparan flash/sacudida). Esta lista es solo para el
+     filtro de intensidad y no cambia qué efectos dan golpe. */
+  const ED_PHRASE_HYPE = ['ed-latigo', 'ed-maquina', 'ed-zoombrusco', 'ed-impacto',
+                          'ed-sellos', 'ed-vhs', 'ed-cohete', 'ed-destello',
+                          'ed-pixelea', 'ed-salto', 'ed-luzneon', 'ed-iman',
+                          'ed-viento', 'ed-gravedad',
+                          'ed-chispa', 'ed-empujon', 'ed-pulso', 'ed-goteo',
+                          'ed-tarjeta', 'ed-estela'];
+  const ED_PHRASE_CALM = ['ed-flotan', 'ed-susurro', 'ed-poema', 'ed-foco',
+                          'ed-burbuja', 'ed-crece', 'ed-escalera', 'ed-subtitulo',
+                          'ed-lectura', 'ed-vidrio', 'ed-acumula', 'ed-ola',
+                          'ed-desenfoca', 'ed-zoomsuave', 'ed-nieve', 'ed-brisa',
+                          'ed-tinta', 'ed-marcador', 'ed-recorta', 'ed-persianas',
+                          'ed-apila'];
+
+  const esFuerte = (fx, lista) => lista === ED_PHRASE_FX
+    ? ED_PHRASE_HYPE.includes(fx)
+    : ED_STRONG.includes(fx);
+
+  /* Energía de graves (0..1) del momento actual. Sin audio real devuelve
+     null. Lo da el detector (js/beat.js), que sabe dónde están los graves
+     de verdad: las "8 primeras bandas" del espectro de dibujo llegaban
+     hasta 2.3 kHz, o sea que la voz contaba como grave. */
+  const energiaGraves = () => {
+    const M = window.BeatModule;
+    if (!M || !M.get) return null;
+    try {
+      const m = M.get();
+      if (m.fuente !== 'audio') return null;
+      return Math.max(0, Math.min(1, m.graves * 0.7 + m.boom * m.boomFuerza * 0.5));
+    } catch (_) { return null; }
+  };
+
+  /* Devuelve 'soft' | 'normal' | 'hype' para la línea i. */
+  const intensidadAuto = (i) => {
+    const cur = parsedLines[i];
+    if (!cur) return 'normal';
+
+    /* ── cadencia: cada cuánto se suceden las líneas ──
+       Ojo: NO usar palabras por segundo. Eso confunde "línea larga" con
+       "canción rápida" y deja los efectos suaves sin usar, porque las frases
+       largas siempre puntúan alto. Lo que marca la intensidad es el ritmo
+       al que van cayendo las líneas: 1.5s = estribillo apretado, 4.6s = balada. */
+    let hueco = 3.2;
+    for (let k = i + 1; k < parsedLines.length; k++) {
+      if (parsedLines[k].time > cur.time) { hueco = parsedLines[k].time - cur.time; break; }
+    }
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    let e = clamp((4.6 - hueco) / 3.1, 0, 1);
+
+    // La carga de texto solo MATIZA. Con más peso se comía la banda central
+    // y las canciones de ritmo medio nunca usaban los efectos suaves.
+    const chars = (cur.text || '').trim().length;
+    e = clamp(e + clamp((chars / Math.max(0.8, hueco) - 4) / 20, -0.12, 0.12), 0, 1);
+
+    // ── graves, si los hay: mandan casi tanto como el ritmo ──
+    const g = energiaGraves();
+    if (g !== null) e = e * 0.55 + g * 0.45;
+
+    // Banda central ancha a propósito: el ritmo medio (lo más común) usa el
+    // repertorio COMPLETO, y los extremos solo saltan con cadencias claras.
+    return e < 0.32 ? 'soft' : e > 0.68 ? 'hype' : 'normal';
+  };
+
+  const filtrarIntensidad = (lista, i) => {
+    const modo = intensidadAuto(i);
+    if (modo === 'normal') return lista;
+    let elegida;
+    if (modo === 'hype') {
+      elegida = lista.filter(f => esFuerte(f, lista));
+    } else if (lista === ED_PHRASE_FX) {
+      // en «suave» preferimos las frases explícitamente tranquilas
+      elegida = lista.filter(f => ED_PHRASE_CALM.includes(f));
+    } else {
+      elegida = lista.filter(f => !esFuerte(f, lista));
+    }
+    return elegida.length >= 3 ? elegida : lista;
+  };
+
+  const elegirFx = (listaOriginal, i, salt) => {
+    const lista = filtrarIntensidad(listaOriginal, i);
     if (demoFx && lista.includes(demoFx)) { edPrevFx = demoFx; return demoFx; }
     let k = semilla(i, salt, lista.length);
     if (lista[k] === edPrevFx) k = (k + 1 + semilla(i, salt + 50, lista.length - 1)) % lista.length;
@@ -578,7 +717,11 @@
     return tam.map(t => Math.max(20, t * esc));
   };
 
+  // Con «menos movimiento» los adornos de golpe se quedan fuera; el texto no.
+  const calma = () => !!(window.MMSettings && window.MMSettings.reduceMotion());
+
   const edFlash = () => {
+    if (calma()) return;
     const f = document.createElement('div');
     f.className = 'ed-flash';
     lyricsEdit.appendChild(f);
@@ -587,6 +730,7 @@
 
   // sacudida de todo el panel, para los efectos fuertes
   const edShake = () => {
+    if (calma()) return;
     lyricsEdit.classList.remove('ed-sacudida');
     void lyricsEdit.offsetWidth;   // reinicia la animación
     lyricsEdit.classList.add('ed-sacudida');
@@ -594,6 +738,7 @@
 
   // onda de choque: anillo que se expande desde el centro en los golpes
   const edRing = () => {
+    if (calma()) return;
     const r = document.createElement('div');
     r.className = 'ed-ring';
     lyricsEdit.appendChild(r);
@@ -602,6 +747,7 @@
 
   // chispas pixel que salen disparadas del centro (estilo retro del player)
   const edSparks = (n = 12) => {
+    if (calma()) return;
     const R = Math.min(lyricsEdit.clientWidth, lyricsEdit.clientHeight) || 300;
     for (let k = 0; k < n; k++) {
       const s = document.createElement('div');
@@ -639,6 +785,54 @@
 
   // composición tipo lockup: palabra más larga ENORME, el resto en mini filas
   // con tracking ancho arriba/abajo (como "you KNOW than this / YOU BETTER")
+  /* ── ed-apila: el estilo de los edits de TikTok que pasó el usuario ──
+     Las palabras se acumulan en filas de 2-3 SIN moverse: cada una asoma
+     en gris y se asienta a su color. Las filas alternan acento-cursiva /
+     blanco-recta. Nada de glow ni desplazamiento: lo que lo hace limpio
+     es justamente que no se mueve nada. */
+  const edApilaFilas = (words) => {
+    const filas = [];
+    let fila = [];
+    words.forEach((w) => {
+      fila.push(w);
+      if (fila.length >= 3 || fila.join(' ').length >= 13) { filas.push(fila); fila = []; }
+    });
+    if (fila.length) filas.push(fila);
+    return filas;
+  };
+
+  const edApila = (stack, words, durMs) => {
+    const filas = edApilaFilas(words);
+    const bloque = document.createElement('div');
+    bloque.className = 'ed-apila';
+
+    // que el bloque entero quepa: limita por ancho de la fila más larga
+    // y por alto según cuántas filas hay
+    const H = lyricsEdit.clientHeight || 400;
+    const W = lyricsEdit.clientWidth || 600;
+    const masLarga = filas.reduce((mx, f) => Math.max(mx, f.join(' ').length), 1);
+    let fs = Math.min((W * 0.92) / (masLarga * 0.6), (H * 0.8) / (filas.length * 1.25));
+    fs = Math.max(18, Math.min(fs, H * 0.2));
+    bloque.style.fontSize = fs.toFixed(1) + 'px';
+
+    const paso = Math.min(420, Math.max(110, (durMs * 0.62) / Math.max(1, words.length)));
+    let delay = 60;
+    filas.forEach((fila, r) => {
+      const div = document.createElement('div');
+      div.className = 'ed-apila-fila ' + (r % 2 === 0 ? 'acento' : 'claro');
+      fila.forEach((w) => {
+        const s = document.createElement('span');
+        s.className = 'ed-pal';
+        s.textContent = w;
+        s.style.setProperty('--d', Math.round(delay) + 'ms');
+        delay += paso;
+        div.appendChild(s);
+      });
+      bloque.appendChild(div);
+    });
+    stack.appendChild(bloque);
+  };
+
   const edLockup = (stack, words) => {
     let giant, arriba, abajo;
     if (words.length >= 3) {
@@ -773,8 +967,14 @@
           const v = bands[Math.round(d * (bands.length - 1))] || 0;
           b.style.transform = `scaleY(${(0.15 + v * 1.9).toFixed(3)})`;
         });
-        const graves = (bands[0] + bands[1] + bands[2]) / 3;
-        nota.style.transform = `scale(${(1 + graves * 0.22).toFixed(3)})`;
+        /* El ♪ pega con el BOMBO, no con el nivel medio de graves: aquello
+           era un globo hinchándose y deshinchándose. Las barras del
+           espectro sí siguen con getBands, que es lo suavizado y bonito. */
+        const M = window.BeatModule;
+        const m = M && M.get ? M.get() : null;
+        const graves = m ? m.graves : (bands[0] + bands[1] + bands[2]) / 3;
+        const golpe = m ? m.boom * m.boomFuerza : 0;
+        nota.style.transform = `scale(${(1 + graves * 0.12 + golpe * 0.28).toFixed(3)})`;
         raf = requestAnimationFrame(paso);
       };
       raf = requestAnimationFrame(paso);
@@ -829,6 +1029,8 @@
     if (caps) {
       /* TÍTULO GIGANTE */
       const fx = elegirFx(ED_TITLE_FX, i, 3);
+
+      if (fx === 'ed-apila') { edApila(stack, words, durMs); return; }
 
       if (fx === 'ed-lockup') {
         /* montaje propio: mini fila + palabra ENORME + mini fila */
@@ -937,6 +1139,9 @@
         } else {
           div.textContent = fila.toUpperCase();
           div.classList.add(fx);
+          // Copia del texto para los fx que pintan capas con ::before/::after
+          // (ed-rebana parte el texto en dos, ed-mascara barre por encima).
+          div.dataset.txt = fila.toUpperCase();
           div.style.setProperty('--d', Math.round(delay) + 'ms');
           if (fx === 'ed-desliza') {
             // cada fila entra deslizándose desde un lado distinto
@@ -976,6 +1181,8 @@
     } else {
       /* FRASE palabra a palabra */
       const fx = elegirFx(ED_PHRASE_FX, i, 19);
+
+      if (fx === 'ed-apila') { edApila(stack, words, durMs); return; }
 
       // eco gigante borroso detrás (solo en los modos tranquilos)
       if (fx === 'ed-acumula' || fx === 'ed-crece') {
@@ -1351,6 +1558,9 @@
   window.LyricsModule = {
     fetch: fetchLyrics,
     tick,
+    // ajustes → datos → limpiar caché (localStorage ya lo borra settings.js;
+    // esto tira además la copia que este módulo tiene en memoria)
+    clearCache: () => { cache = {}; },
     // Estado de sincronización (lo consume el modo cine)
     getSync: () => ({ lines: parsedLines, idx: activeIdx }),
     isEditMode: () => editMode,

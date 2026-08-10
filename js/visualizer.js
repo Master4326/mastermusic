@@ -23,6 +23,21 @@
   // Captura del audio del sistema (modo sync, para Spotify Connect)
   let capStream = null, capSource = null, capAnalyser = null;
 
+  /* ---- Analizador CRUDO, solo para el detector de ritmo (js/beat.js) ----
+     Va aparte del que dibuja. Aquel suaviza a propósito (0.82) para que las
+     barras no tiemblen, pero ESE suavizado se come el ataque del bombo: un
+     golpe seco llega convertido en una loma. El detector necesita la señal
+     tal cual entra, así que tiene su propio nodo con suavizado 0. */
+  let detAnalyser = null, capDet = null, detSink = null;
+  const crearDetector = (ac) => {
+    const a = ac.createAnalyser();
+    a.fftSize = FFT_SIZE;
+    a.smoothingTimeConstant = 0;
+    a.minDecibels = -100;
+    a.maxDecibels = -6;
+    return a;
+  };
+
   const NUM_BARS = 64;
   const FFT_SIZE = 2048;
   const smooth  = new Array(NUM_BARS).fill(0);
@@ -79,11 +94,21 @@
       analyser.maxDecibels = -10;
       source.connect(analyser);
       analyser.connect(audioCtx.destination);
+      /* Rama del detector. Termina en una ganancia 0 que sí llega al destino:
+         Chromium recorre el grafo HACIA ATRÁS desde la salida, así que una
+         rama muerta podría no procesarse nunca. Con ganancia 0 no suena. */
+      detAnalyser = crearDetector(audioCtx);
+      source.connect(detAnalyser);
+      detSink = audioCtx.createGain();
+      detSink.gain.value = 0;
+      detAnalyser.connect(detSink);
+      detSink.connect(audioCtx.destination);
       freqData = new Uint8Array(analyser.frequencyBinCount);
       connected = true;
     } catch (e) {
       console.warn('[viz] no se pudo conectar (el audio sigue sonando):', e);
       connected = false; audioCtx = null; source = null; analyser = null;
+      detAnalyser = null; detSink = null;   // que el detector no herede un nodo suelto
     } finally {
       attaching = false;
     }
@@ -171,7 +196,7 @@
   const stopCapture = () => {
     if (capStream) capStream.getTracks().forEach(t => { t.onended = null; t.stop(); });
     try { if (capSource) capSource.disconnect(); } catch (e) {}
-    capStream = null; capSource = null; capAnalyser = null;
+    capStream = null; capSource = null; capAnalyser = null; capDet = null;
     if (syncBtn) syncBtn.classList.remove('active');
   };
 
@@ -201,6 +226,10 @@
       capAnalyser.minDecibels = -90;
       capAnalyser.maxDecibels = -10;
       capSource.connect(capAnalyser);
+      // el detector también escucha la captura (aquí sí vale una rama sin
+      // salida: un MediaStreamSource corre siempre, no lo tira el destino)
+      capDet = crearDetector(audioCtx);
+      capSource.connect(capDet);
       if (!freqData) freqData = new Uint8Array(capAnalyser.frequencyBinCount);
       capStream = stream;
       stream.getTracks().forEach(t => { t.onended = () => { stopCapture(); setStatus('◈ sync desactivado'); }; });
@@ -248,6 +277,10 @@
     }
   };
 
+  // ¿está entrando audio de verdad AHORA? (no basta con que el grafo exista:
+  // el usuario puede tener el grafo montado y estar oyendo por Spotify Connect)
+  let haySenal = false;
+
   // ---- Bucle de render ----
   const draw = () => {
     requestAnimationFrame(draw);
@@ -256,6 +289,7 @@
     const live = isLive();
     let vals = live ? computeSpectrum() : null;
     const playing = !!(live && vals);
+    haySenal = playing;
     if (!vals) vals = idleSpectrum();
 
     const accent  = toRgb(cssVar('--accent', '#5ce1e6'));
@@ -320,7 +354,21 @@
 
   // API pública mínima
   window.VisualizerModule = {
-    isConnected: () => connected,
+    /* «Hay FFT real ahora mismo», que es lo que preguntan quienes la usan.
+       Antes devolvía `connected`, que solo mira si el grafo del <audio>
+       local está montado: seguía dando true al pasarse a Spotify Connect
+       (sin señal) y daba false con ◈ sync (con señal). Las dos al revés. */
+    isConnected: () => haySenal,
+    // ¿está activa la captura del audio del sistema?
+    haySync: () => !!capStream,
+    /* Nodo CRUDO para el detector de ritmo. Nadie más debería usarlo:
+       sus datos son el espectro sin suavizar, feo de dibujar. */
+    getDetector: () => {
+      const a = capDet || detAnalyser;
+      if (!a || !audioCtx || audioCtx.state !== 'running') return null;
+      return a;
+    },
+    getSampleRate: () => (audioCtx ? audioCtx.sampleRate : 44100),
     // Espectro suavizado remuestreado a n bandas (0..1, graves → agudos).
     // Con señal en vivo (local o ◈ sync) es FFT real; sin señal, la onda idle.
     getBands: (n) => {
