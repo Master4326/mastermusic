@@ -64,6 +64,38 @@
     const v = getComputedStyle(document.documentElement).getPropertyValue(n).trim();
     return v || f;
   };
+  /* Paleta cacheada. Antes se leían las variables con getComputedStyle EN
+     CADA FRAME: 180 recálculos de estilo forzados por segundo solo para
+     pintar unas barras. Los colores cambian cuando entra una carátula nueva
+     o el usuario toca los ajustes, o sea que refrescarlos cuatro veces por
+     segundo va sobrado. */
+
+  /* Punta de las barras: versión CLARA del acento (mezcla hacia blanco).
+     Antes era --magenta, un rosa fijo que se quedaba igual aunque la
+     carátula o el usuario cambiaran el color — regla de la casa: nada de
+     colores fijos, todo de la paleta viva. Blanco vale como mezcla porque
+     es luz, no color de marca. */
+  const aclarar = ({ r, g, b }, f) => ({
+    r: Math.round(r + (255 - r) * f),
+    g: Math.round(g + (255 - g) * f),
+    b: Math.round(b + (255 - b) * f),
+  });
+
+  let paleta = null, paletaT = 0;
+  const colores = () => {
+    const now = performance.now();
+    if (paleta && now - paletaT < 250) return paleta;
+    paletaT = now;
+    const cs = getComputedStyle(document.documentElement);
+    const leer = (n, f) => (cs.getPropertyValue(n).trim() || f);
+    const accent = toRgb(leer('--accent', '#5ce1e6'));
+    paleta = {
+      accent,
+      glow:  toRgb(leer('--accent-glow', '#5ce1e6')),
+      claro: aclarar(accent, 0.68),
+    };
+    return paleta;
+  };
   const toRgb = (hex) => {
     if (hex.startsWith('rgb')) { const m = hex.match(/\d+/g); return { r: +m[0], g: +m[1], b: +m[2] }; }
     let c = hex.replace('#', '');
@@ -262,18 +294,22 @@
   const eqBars = miniEq ? Array.from(miniEq.querySelectorAll('i')) : [];
   const eqIdx = [3, 10, 20, 33, 47];   // índices en smooth[] para cada barrita
   let eqLive = false;
+  const eqPrev = [0, 0, 0, 0, 0];      // última altura escrita, para no repetir
   const updateMiniEq = (playing) => {
     if (!eqBars.length) return;
     if (playing) {
       if (!eqLive) { miniEq.classList.add('live'); eqLive = true; }
       for (let k = 0; k < eqBars.length; k++) {
         const v = Math.min(1, (smooth[eqIdx[k]] || 0) * 1.35);
-        eqBars[k].style.height = (3 + Math.min(3, Math.round(v * 3)) * 3) + 'px';
+        const px = 3 + Math.min(3, Math.round(v * 3)) * 3;
+        // el valor está cuantizado a 4 alturas: casi todos los frames repiten.
+        // Comparar antes de escribir evita ~300 invalidaciones de estilo/s.
+        if (eqPrev[k] !== px) { eqPrev[k] = px; eqBars[k].style.height = px + 'px'; }
       }
     } else if (eqLive) {
       miniEq.classList.remove('live');
       eqLive = false;
-      for (const b of eqBars) b.style.height = '';
+      for (let k = 0; k < eqBars.length; k++) { eqBars[k].style.height = ''; eqPrev[k] = 0; }
     }
   };
 
@@ -281,20 +317,57 @@
   // el usuario puede tener el grafo montado y estar oyendo por Spotify Connect)
   let haySenal = false;
 
+  /* ¿El lienzo está realmente a la vista? En modo cine, con otra pestaña
+     abierta o con la ventana encogida, el visualizador sigue existiendo pero
+     no lo ve nadie: no tiene sentido pintarlo 60 veces por segundo. */
+  let visible = true;
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(
+      (ents) => { visible = ents[ents.length - 1].isIntersecting; },
+      { threshold: 0 }
+    ).observe(canvas);
+  }
+
   // ---- Bucle de render ----
-  const draw = () => {
+  let ultimoFrame = 0;
+  const draw = (ts) => {
     requestAnimationFrame(draw);
-    ctx.clearRect(0, 0, W, H);
+
+    if (document.hidden) return;   // en segundo plano no hay nada que hacer
 
     const live = isLive();
     let vals = live ? computeSpectrum() : null;
     const playing = !!(live && vals);
+
+    /* Sin señal lo que se ve es la onda de respaldo, que es lenta y suave:
+       a 30 fps se ve idéntica y cuesta la mitad. Con música real, los 60. */
+    const t0 = ts || performance.now();
+    if (!playing && t0 - ultimoFrame < 33) return;
+    ultimoFrame = t0;
+
     haySenal = playing;
     if (!vals) vals = idleSpectrum();
 
-    const accent  = toRgb(cssVar('--accent', '#5ce1e6'));
-    const glow    = toRgb(cssVar('--accent-glow', '#5ce1e6'));
-    const magenta = toRgb(cssVar('--magenta', '#ff5cc8'));
+    /* Fuera de pantalla (modo cine, ventana encogida) se hacen las cuentas
+       pero NO se pinta: smooth[] tiene que seguir vivo porque de ahí come
+       getBands(), que es lo que mueve la onda del modo cine. Lo que se ahorra
+       es justo lo caro: degradados, shadowBlur y relleno por barra. */
+    if (!visible) {
+      for (let i = 0; i < NUM_BARS; i++) {
+        const target = vals[i];
+        const s = smooth[i];
+        smooth[i] = target > s ? s + (target - s) * 0.5 : s + (target - s) * 0.12;
+        const v = smooth[i];
+        if (v > peaks[i]) { peaks[i] = v; peakVel[i] = 0; }
+        else { peakVel[i] += 0.0009; peaks[i] = Math.max(v, peaks[i] - peakVel[i]); }
+      }
+      updateMiniEq(playing);
+      return;
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    const { accent, glow, claro } = colores();
 
     const center = H / 2;
     const gap = 2;
@@ -322,7 +395,7 @@
 
       // barra superior con degradado + glow
       const grad = ctx.createLinearGradient(0, center - bh, 0, center);
-      grad.addColorStop(0,    rgba(magenta, playing ? 1 : 0.7));
+      grad.addColorStop(0,    rgba(claro, playing ? 1 : 0.7));
       grad.addColorStop(0.55, rgba(accent, 0.95));
       grad.addColorStop(1,    rgba(accent, 0.55));
       ctx.shadowColor = rgba(glow, playing ? 0.9 : 0.4);
@@ -339,11 +412,11 @@
       ctx.fillStyle = refl;
       ctx.fillRect(x, center, barW, bh * 0.7);
 
-      // tope del pico
+      // tope del pico: punta clara con el glow del acento
       const py = center - Math.max(1.5, peaks[i] * maxBar) - 2;
-      ctx.shadowColor = rgba(magenta, 0.9);
+      ctx.shadowColor = rgba(glow, 0.9);
       ctx.shadowBlur = 8;
-      ctx.fillStyle = rgba(magenta, 0.95);
+      ctx.fillStyle = rgba(claro, 0.95);
       ctx.fillRect(x, py, barW, 2);
       ctx.shadowBlur = 0;
     }

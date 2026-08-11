@@ -398,14 +398,118 @@
   const npAlbumEl = document.getElementById('npAlbum');
   const npTitleEl = document.getElementById('npTitle');
 
+  /* Esta función la dispara un MutationObserver Y un intervalo de seguridad,
+     o sea que corre dos veces por segundo para siempre. Antes reescribía el
+     innerHTML de la carátula y el estado en CADA pasada: dos reconstrucciones
+     de DOM por segundo sin que hubiera cambiado nada. Ahora compara primero y
+     solo escribe cuando de verdad cambia la canción. */
+  /* ---------- Marquesina: lo que no cabe RUEDA en vez de cortarse ----------
+     Como en cualquier radio de coche o en el Winamp de siempre: si el título
+     desborda, se desliza hasta el final, espera y vuelve. Solo se monta
+     cuando de verdad desborda; si cabe, texto plano y sin animación.
+
+     app.js escribe textContent directamente en estos elementos (y eso barre
+     el span interno), así que la marquesina se re-monta después de cada
+     cambio de canción — updateCover ya corre justo en ese momento. */
+  const npArtistEl = document.getElementById('npArtist');
+
+  const montarMarquesina = (el) => {
+    if (!el) return;
+    const previo = el.firstElementChild;
+    const conSpan = !!(previo && previo.classList && previo.classList.contains('ti-scroll'));
+    const texto = conSpan ? previo.textContent : (el.textContent || '');
+    if (!texto.trim()) {
+      if (conSpan) el.textContent = texto;
+      el.classList.remove('ti-desborda');
+      return;
+    }
+    // scrollWidth mide el contenido completo aunque el ellipsis lo recorte,
+    // y el transform del span no lo altera: la medida vale en ambos estados
+    const sobra = el.scrollWidth - el.clientWidth;
+    if (sobra > 4) {
+      if (!conSpan) {
+        el.textContent = '';
+        const s = document.createElement('span');
+        s.className = 'ti-scroll';
+        s.textContent = texto;
+        el.appendChild(s);
+      }
+      el.classList.add('ti-desborda');
+      // 10px extra para que el final no quede pegado al borde en la pausa
+      el.style.setProperty('--ti-desp', -(sobra + 10) + 'px');
+      // más recorrido = ciclo más largo (a ~30 px/s), con suelo de 7 s
+      el.style.setProperty('--ti-dur', Math.max(7, 4 + (sobra + 10) / 30).toFixed(1) + 's');
+    } else {
+      if (conSpan) el.textContent = texto;   // vuelve a texto plano (y al ellipsis)
+      el.classList.remove('ti-desborda');
+      el.style.removeProperty('--ti-desp');
+      el.style.removeProperty('--ti-dur');
+    }
+  };
+
+  const montarMarquesinas = () => {
+    montarMarquesina(npTitleEl);
+    montarMarquesina(npArtistEl);
+    montarMarquesina(npAlbumEl);
+  };
+
+  // al cambiar el tamaño de la ventana cambia lo que cabe: re-medir
+  let marqTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(marqTimer);
+    marqTimer = setTimeout(montarMarquesinas, 200);
+  });
+
+  /* ---------- Barra de pestañas que se esconde sola ----------
+     Como los controles del modo cine: sin tocar nada 2,5 s, la barra se
+     recoge y la letra gana su sitio. SOLO cuando manda la pestaña de la
+     letra — en buscar/biblioteca/cola/config la barra es la navegación y
+     esconderla mientras lees descolocaría todo el contenido. */
+  const tabBar = document.querySelector('.tab-bar');
+  let tabsTimer = null;
+
+  const tabActiva = () => {
+    const t = document.querySelector('.tab.active');
+    return t ? t.dataset.tab : '';
+  };
+
+  const ocultarTabs = () => {
+    if (!tabBar || tabActiva() !== 'lyrics') return;
+    // el mouse está justo encima (p. ej. a punto de pulsar el engranaje):
+    // esconderla bajo el cursor sería una trampa — se re-arma y ya
+    if (tabBar.matches(':hover')) { armarTabs(); return; }
+    tabBar.classList.add('se-esconde');
+  };
+
+  const armarTabs = () => {
+    clearTimeout(tabsTimer);
+    tabsTimer = setTimeout(ocultarTabs, 2500);
+  };
+
+  const despertarTabs = () => {
+    if (tabBar) tabBar.classList.remove('se-esconde');
+    armarTabs();
+  };
+
+  // mouse, toque o teclado: cualquiera la despierta (mismo trío que el cine)
+  ['pointermove', 'pointerdown', 'keydown'].forEach((ev) =>
+    document.addEventListener(ev, despertarTabs, { passive: true }));
+  armarTabs();
+
+  let coverFirma = null;
   const updateCover = () => {
     if (!window.PlayerCore) return;
     const t = window.PlayerCore.state.currentTrack;
+    const firma = t ? `${t.id}|${t.cover || ''}|${t.album || ''}|${t.name}|${t.artist || ''}` : '';
+    if (firma === coverFirma) return;
+    coverFirma = firma;
+
     if (!t) {
       coverArt.style.backgroundImage = '';
       coverArt.classList.remove('has-image');
       coverArt.innerHTML = '<span class="cover-placeholder">♪</span>';
       npAlbumEl.textContent = '';
+      montarMarquesinas();
       return;
     }
     if (t.cover) {
@@ -418,6 +522,9 @@
       coverArt.innerHTML = '<span class="cover-placeholder">♪</span>';
     }
     npAlbumEl.textContent = t.album || '';
+    /* Montar el span dispara otra vez el MutationObserver, pero ese pase
+       muere en el corte por firma de arriba: no hay bucle. */
+    montarMarquesinas();
     updateStatus(`♪ ${t.name} — ${t.artist || 'desconocido'}`);
   };
 
@@ -493,8 +600,14 @@
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
-  // Periodic refresh to catch new tracks added by app.js
-  setInterval(renderRetroTrackList, 500);
+  /* Refresco periódico por si app.js añade pistas. #trackList ya no existe en
+     la config actual, así que en cuanto se confirma que no está, el intervalo
+     se cancela solo en vez de despertar cada 500 ms el resto de la sesión.
+     Si algún día vuelve la lista, sigue funcionando igual. */
+  const listTimer = setInterval(() => {
+    if (!document.getElementById('trackList')) { clearInterval(listTimer); return; }
+    renderRetroTrackList();
+  }, 500);
 
   // ---------- Cola de reproducción (pestaña "cola") ----------
   const queueList = document.getElementById('queueList');
@@ -698,6 +811,16 @@
        ambient.js en cada bombo. */
     let tocaNota = 0;
     setInterval(() => {
+      /* Solo mientras suena algo, la pestaña está delante y la letra a la
+         vista. Antes goteaban notas al DOM cada 700 ms aunque el reproductor
+         llevara horas parado o el usuario estuviera en otra pestaña. */
+      if (document.hidden) return;
+      const pc = window.PlayerCore;
+      // isPlaying cubre los dos motores: <audio> local y Spotify Connect
+      const sonando = !!(pc && (pc.state.isPlaying || (pc.audio && !pc.audio.paused)));
+      if (!sonando) return;
+      const tab = document.getElementById('tab-lyrics');
+      if (!tab || !tab.classList.contains('active')) return;
       const e = typeof window.MM_ENERGIA === 'number' ? window.MM_ENERGIA : 0.35;
       // 1 nota cada ~2.8s en calma → cada ~0.7s a tope
       tocaNota += 0.25 + e * 0.75;

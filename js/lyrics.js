@@ -7,6 +7,7 @@
 
   const lyricsBody = document.getElementById('lyricsBody');
   const lyricsEdit = document.getElementById('lyricsEdit');
+  const lyricsIdle = document.getElementById('lyricsIdle');
   const modeBtn = document.getElementById('lyricsModeBtn');
   let editMode = localStorage.getItem('mm_lyrics_mode') === 'edit';
   let forceEdit = false;      // true mientras el modo cine está abierto
@@ -51,9 +52,73 @@
     return result.sort((a, b) => a.time - b.time);
   };
 
+  /* ---- Estado en reposo (sin canción) ----
+     Se muestra en los DOS modos: antes vivía dentro de #lyricsBody, que el
+     modo edit oculta, y el panel quedaba en blanco. */
+  let idleOn = true;
+  const setIdle = (on) => {
+    if (!lyricsIdle) return;
+    idleOn = !!on;
+    lyricsIdle.hidden = !idleOn;
+    // mientras el reposo manda, ninguna de las dos vistas ocupa sitio
+    if (idleOn) { lyricsBody.hidden = true; lyricsEdit.hidden = true; }
+  };
+
+  setIdle(true);   // arranque: aún no hay canción
+
+  // Consejos que rotan despacio: el panel vacío deja de ser un panel muerto.
+  if (lyricsIdle) {
+    const tipEl = document.getElementById('lyricsIdleTip');
+    const TIPS = [
+      'pulsa ✦ para el modo edit — la letra a pantalla completa, animada',
+      '⛶ es modo cine: carátula girando y letra gigante',
+      '◈ sync engancha el espectro al audio del sistema (ideal con Spotify)',
+      'clic en cualquier verso para saltar a ese momento',
+      '¿letra adelantada? ajústala en config ⚙ — se guarda por canción',
+      'el fondo se tiñe con el color de cada carátula',
+    ];
+    if (tipEl) {
+      let ti = Math.floor(Math.random() * TIPS.length);
+      const pinta = () => {
+        tipEl.textContent = TIPS[ti];
+        tipEl.classList.remove('li-tip-in');
+        void tipEl.offsetWidth;          // reinicia la animación de entrada
+        tipEl.classList.add('li-tip-in');
+        ti = (ti + 1) % TIPS.length;
+      };
+      pinta();
+      // solo gasta ciclos mientras el reposo está a la vista
+      setInterval(() => {
+        if (idleOn && !document.hidden && !lyricsIdle.hidden) pinta();
+      }, 6500);
+    }
+  }
+
+  /* La letra llega de LRClib, o sea de fuera: antes se metía cruda en
+     innerHTML. Cualquier verso con < o & rompía el HTML (y era una vía de
+     inyección con una respuesta manipulada). Ojo: hay otras dos variables
+     locales llamadas `esc` en este archivo, de ahí el nombre largo. */
+  const escHtml = (s) => String(s == null ? '' : s)
+    .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  /* Huecos instrumentales: si entre dos versos hay más de GAP_MIN segundos
+     (intro, solo, puente) se cuela un contador de tres puntos que se llena
+     mientras esperas. Sin esto la letra se queda congelada y parece que la
+     app se colgó justo en la parte más bonita del tema. */
+  const GAP_MIN = 6;
+  const GAP_LEAD = 1.8;        // respiro tras el verso anterior antes de contar
+
+  let lineNodes = [];          // .lyric-line, alineado con parsedLines
+  let gapMap = new Map();      // idx de la línea anterior → nodo contador
+  let gapAct = null;
+
   const setEmpty = (msg) => {
     parsedLines = [];
     activeIdx = -1;
+    // el innerHTML de abajo desconecta los nodos: suelta también las cachés
+    lineNodes = [];
+    gapMap = new Map();
+    gapAct = null;
     lyricsBody.innerHTML = `<p class="lyrics-empty">${msg}</p>`;
     lyricsEdit.innerHTML = `<p class="lyrics-empty">${msg}</p>`;
   };
@@ -63,9 +128,26 @@
       setEmpty('No se encontró letra para esta canción.');
       return;
     }
-    lyricsBody.innerHTML = parsedLines
-      .map((l, i) => `<div class="lyric-line" data-idx="${i}" data-time="${l.time}">${l.text || '♪'}</div>`)
-      .join('');
+    const conTiempos = parsedLines[0].time >= 0;
+    // sin tiempos no hay karaoke posible: la clase apaga el teñido palabra a
+    // palabra para que la letra plana no se quede toda apagada
+    lyricsBody.classList.toggle('sync', conTiempos);
+    const hueco = (i) => `<div class="lyric-gap" data-gap="${i}" aria-hidden="true"><i></i><i></i><i></i></div>`;
+    let html = '';
+    // intro larga: el contador arranca antes del primer verso
+    if (conTiempos && parsedLines[0].time > GAP_MIN) html += hueco(-1);
+    for (let i = 0; i < parsedLines.length; i++) {
+      const l = parsedLines[i];
+      html += `<div class="lyric-line" data-idx="${i}" data-time="${l.time}">${escHtml(l.text) || '♪'}</div>`;
+      const sig = parsedLines[i + 1];
+      if (conTiempos && sig && sig.time - l.time > GAP_MIN) html += hueco(i);
+    }
+    lyricsBody.innerHTML = html;
+    // cacheado: el tick ya no vuelve a consultar el DOM en cada cambio de línea
+    lineNodes = Array.prototype.slice.call(lyricsBody.querySelectorAll('.lyric-line'));
+    gapMap = new Map();
+    gapAct = null;
+    lyricsBody.querySelectorAll('.lyric-gap').forEach((g) => gapMap.set(+g.dataset.gap, g));
     lyricsEdit.innerHTML = '';   // el modo edit se repinta en el próximo tick
   };
 
@@ -253,6 +335,9 @@
 
   const fetchLyrics = async (track) => {
     const key = trackKey(track);
+    // hay canción: se acabó el reposo (antes del corte por clave repetida,
+    // para que reentrar en la misma pista también apague el panel de reposo)
+    if (idleOn) { setIdle(false); applyMode(); }
     if (key === lastTrackKey) return;   // misma canción ya resuelta: no parpadear
     lastTrackKey = key;
     songSalt = hashStr(key);   // secuencia de efectos propia de esta canción
@@ -373,6 +458,7 @@
     ln.classList.remove(...LINE_FX, 'done');
     delete ln.dataset.fx;
     delete ln.dataset.rev;
+    ln._kw = null;               // los spans mueren aquí: invalida el karaoke
     ln.textContent = (parsedLines[i] && parsedLines[i].text) || '♪';
   };
 
@@ -449,118 +535,148 @@
      Títulos (≤3 palabras) salen GIGANTES; frases van palabra a palabra
      con la más larga destacada. La línea anterior colapsa con blur. */
 
-  const ED_TITLE_FX = ['ed-golpe', 'ed-teclea', 'ed-cascada', 'ed-estira',
-                       'ed-parpadeo', 'ed-giro3d', 'ed-rebota', 'ed-zoomloco',
-                       'ed-glitch', 'ed-neon', 'ed-onda', 'ed-desliza',
-                       'ed-caida3d', 'ed-latido',
-                       'ed-recorte',  // cortina: el texto se revela con un barrido
-                       'ed-enfoca',   // desenfoque cinematográfico que enfoca
-                       'ed-sello',    // cae como sello/estampa con sacudida
-                       'ed-brillo',   // entra y un destello cromado lo recorre
-                       'ed-chroma',   // aberración cromática RGB que converge
-                       'ed-explota',  // letras vuelan desde fuera y se arman
-                       'ed-descifra', // letras aleatorias que se decodifican
-                       /* portados de los edits de referencia del usuario */
-                       'ed-invertido',// corte seco: fondo acento + texto oscuro
-                       'ed-duo',      // palabra doble: gigante + cursiva encima
-                       'ed-lockup',   // composición: palabra ENORME + mini filas
-                       'ed-cinta',    // marquesinas con la frase repetida
-                       'ed-contorno', // solo contorno neón, el relleno parpadea
-                       'ed-portada',  // la carátula como textura de las letras
-                       /* tanda 4: pedidos del usuario + tendencias caption */
-                       'ed-esquinas', // letras vuelan desde las 4 esquinas
-                       'ed-caja',     // caja de color con texto oscuro (highlight)
-                       'ed-deletreo', // cada letra GIGANTE en secuencia, luego la palabra
-                       'ed-tetris',   // letras caen a saltos duros y encajan
-                       'ed-diagonal', // filas de esquina a esquina en diagonal
-                       'ed-marco',    // corchetes de esquina que enmarcan el texto
-                       'ed-persiana', // letras se abren como persianas (scaleY)
-                       'ed-tv',       // TV CRT encendiéndose: línea que se expande
-                       /* ── tanda 5: acabados limpios de lyric video ── */
-                       'ed-mascara',    // box reveal: un bloque barre y descubre el texto
-                       'ed-rebana',     // el texto llega partido en dos y se junta
-                       'ed-degradado',  // barrido de degradado por dentro de las letras
-                       'ed-sombralarga',// sombra dura larga que se retrae al texto
-                       'ed-neblina',    // aparece de la niebla, flotando (baladas)
-                       'ed-zoomlento',  // zoom lentísimo y elegante
-                       'ed-cortina',    // se abre desde el centro como telón
-                       'ed-eco',        // estela de copias que se recogen
-                       'ed-liquido',    // entrada gelatinosa con rebote
-                       'ed-flashcorte', // corte seco con destello blanco
-                       'ed-giroeje',    // voltea como panel de aeropuerto
-                       'ed-vibra',      // aterriza y vibra un instante
-                       'ed-difumina',   // letra a letra enfocando
-                       'ed-giraletra',  // letra a letra girando sobre su eje
-                       'ed-alterna',    // letras alternas desde arriba y abajo
-                       'ed-empuja',     // letras empujando de lado con estela
-                       'ed-apila'];     // filas que se acumulan, estilo edit TikTok
-  const ED_LETTER_FX = {
-    'ed-teclea': 'edl-teclea',     // tecleo
-    'ed-cascada': 'edl-cae',       // letras que caen
-    'ed-onda': 'edl-onda',         // olita con rebote letra a letra
-    'ed-neon': 'edl-neon',         // letrero de neón encendiéndose
-    'ed-explota': 'edl-explota',   // letras convergen desde posiciones locas
-    'ed-descifra': 'edl-descifra', // efecto decode/hacker
-    'ed-esquinas': 'edl-esquina',  // cada letra llega de una esquina
-    'ed-tetris': 'edl-tetris',     // caída a saltos duros, estilo bloque
-    'ed-persiana': 'edl-persiana', // se abren como persianas
-    /* tanda 5 */
-    'ed-difumina': 'edl-difumina', // cada letra enfoca desde el desenfoque
-    'ed-giraletra': 'edl-gira',    // cada letra gira sobre su eje vertical
-    'ed-alterna': 'edl-alterna',   // letras alternas entran de arriba y de abajo
-    'ed-empuja': 'edl-empuja',     // entran empujando de lado con estela
-  };
-  const ED_STRONG = ['ed-golpe', 'ed-zoomloco', 'ed-parpadeo', 'ed-glitch',
-                     'ed-sello', 'ed-explota', 'ed-tv',
-                     'ed-flashcorte', 'ed-rebana', 'ed-vibra'];
-  const ED_PHRASE_FX = ['ed-acumula', 'ed-flotan', 'ed-crece', 'ed-maquina',
-                        'ed-escalera', 'ed-caen', 'ed-giro', 'ed-latigo', 'ed-burbuja',
-                        'ed-resorte',   // salta desde abajo con estirón elástico
-                        'ed-remolino',  // cada palabra entra girando en espiral
-                        'ed-foco',      // palabras borrosas gigantes que enfocan
-                        'ed-poema',     // torre centrada elegante, palabra por renglón
-                        /* tanda 4: tendencias caption 2026, todas distintas */
-                        'ed-resalta',   // karaoke: caja de color enciende palabra a palabra
-                        'ed-cubo',      // cada palabra gira como cara de cubo 3D
-                        'ed-vidrio',    // palabras transparentes (contorno) que se rellenan
-                        'ed-subtitulo', // píldora de subtítulo estilo caption de TikTok
-                        'ed-zoombrusco',// cada palabra se estampa desde tamaño gigante
-                        'ed-impacto',   // la frase cae en bloque y hace onda + sacudida
-                        'ed-sellos',    // cada palabra se estampa girada como sello
-                        'ed-lectura',   // subrayado que corre palabra por palabra
-                        /* tanda 3: presets estilo AE/CapCut para empatar con títulos */
-                        'ed-ola',       // ola: cada palabra sube con rebote encadenado
-                        'ed-corte',     // cortina por palabra: barrido que la revela
-                        'ed-pendulo',   // columpio: cuelga y oscila hasta asentarse
-                        'ed-gravedad',  // cae y rebota dos veces, como pelota
-                        'ed-viento',    // ráfaga: todas llegan volando del mismo lado
-                        'ed-pixelea',   // aparición pixelada a saltos (retro juego)
-                        'ed-vhs',       // jitter VHS con separación RGB por palabra
-                        'ed-cohete',    // despega desde abajo estirada y frena
-                        'ed-carrusel',  // panel que gira como tablero de aeropuerto
-                        'ed-destello',  // cada palabra enciende un flash blanco
-                        'ed-susurro',   // fade lento y suave con tracking (baladas)
-                        'ed-salto',     // brinco cartoon con squash & stretch
-                        'ed-luzneon',   // cada palabra parpadea como letrero neón
-                        'ed-iman',      // imán: llega disparada y se ajusta al centro
-                        /* ── tanda 5: acabados limpios de lyric video ── */
-                        'ed-desenfoca', // cada palabra enfoca desde el desenfoque
-                        'ed-zoomsuave', // escala mínima + fundido, muy elegante
-                        'ed-marcador',  // rotulador que subraya palabra por palabra
-                        'ed-nieve',     // caen despacio y se posan (baladas)
-                        'ed-brisa',     // se mecen al llegar, muy suave
-                        'ed-tinta',     // mancha de tinta que se define
-                        'ed-orbita',    // llegan describiendo una curva
-                        'ed-chispa',    // destello de color al aterrizar
-                        'ed-persianas', // cada palabra se revela por lamas
-                        'ed-goteo',     // caen como gotas con elástico
-                        'ed-espejo',    // entran reflejadas y se dan la vuelta
-                        'ed-tarjeta',   // cada palabra voltea como carta
-                        'ed-estela',    // llegan dejando rastro
-                        'ed-recorta',   // barrido que recorta la palabra al entrar
-                        'ed-pulso',     // aterrizan con doble latido
-                        'ed-empujon',   // empuje lateral fuerte con desenfoque
-                        'ed-apila'];    // filas que se acumulan, estilo edit TikTok
+  /* ══════════ MANIFIESTO DE EFECTOS ══════════
+     Fuente ÚNICA de verdad del modo edit. Cada efecto se declara UNA vez,
+     aquí, y las listas que usa el motor se derivan justo debajo.
+
+     Antes esto vivía repartido en cuatro listas distintas y añadir un efecto
+     obligaba a acordarse de todas. La peligrosa era la de intensidad: si te
+     la saltabas, el efecto quedaba invisible en las partes rápidas y en las
+     lentas — y no fallaba nada, simplemente no salía nunca.
+
+     Columnas:
+       n  nombre     la clase CSS del efecto
+       t  tipo       'T' título gigante · 'F' frase · 'TF' vale para los dos
+       i  intensidad 'h' se reserva a lo movido · 'c' a lo tranquilo
+                     ''  banda media (sale con cualquier cadencia)
+       l  letra      clase edl-* si el efecto revela LETRA a letra
+       g  golpe      1 si dispara flash + sacudida + aro + chispas
+
+     Para añadir un efecto: una fila aquí y su CSS. Nada más. */
+  const FX = [
+    ['ed-golpe',         'T',   '',  '',               1],
+    ['ed-teclea',        'T',   '',  'edl-teclea',     0],
+    ['ed-cascada',       'T',   '',  'edl-cae',        0],
+    ['ed-estira',        'T',   '',  '',               0],
+    ['ed-parpadeo',      'T',   '',  '',               1],
+    ['ed-giro3d',        'T',   '',  '',               0],
+    ['ed-rebota',        'T',   '',  '',               0],
+    ['ed-zoomloco',      'T',   '',  '',               1],
+    ['ed-glitch',        'T',   '',  '',               1],
+    ['ed-neon',          'T',   '',  'edl-neon',       0],
+    ['ed-onda',          'T',   '',  'edl-onda',       0],
+    ['ed-desliza',       'T',   '',  '',               0],
+    ['ed-caida3d',       'T',   '',  '',               0],
+    ['ed-latido',        'T',   '',  '',               0],
+    ['ed-recorte',       'T',   '',  '',               0],  // cortina: el texto se revela con un barrido
+    ['ed-enfoca',        'T',   '',  '',               0],  // desenfoque cinematográfico que enfoca
+    ['ed-sello',         'T',   '',  '',               1],  // cae como sello/estampa con sacudida
+    ['ed-brillo',        'T',   '',  '',               0],  // entra y un destello cromado lo recorre
+    ['ed-chroma',        'T',   '',  '',               0],  // aberración cromática RGB que converge
+    ['ed-explota',       'T',   '',  'edl-explota',    1],  // letras vuelan desde fuera y se arman
+    ['ed-descifra',      'T',   '',  'edl-descifra',   0],  // letras aleatorias que se decodifican
+    ['ed-invertido',     'T',   '',  '',               0],  // corte seco: fondo acento + texto oscuro
+    ['ed-duo',           'T',   '',  '',               0],  // palabra doble: gigante + cursiva encima
+    ['ed-lockup',        'T',   '',  '',               0],  // composición: palabra ENORME + mini filas
+    ['ed-cinta',         'T',   '',  '',               0],  // marquesinas con la frase repetida
+    ['ed-contorno',      'T',   '',  '',               0],  // solo contorno neón, el relleno parpadea
+    ['ed-portada',       'T',   '',  '',               0],  // la carátula como textura de las letras
+    ['ed-esquinas',      'T',   '',  'edl-esquina',    0],  // letras vuelan desde las 4 esquinas
+    ['ed-caja',          'T',   '',  '',               0],  // caja de color con texto oscuro (highlight)
+    ['ed-deletreo',      'T',   '',  '',               0],  // cada letra GIGANTE en secuencia, luego la palabra
+    ['ed-tetris',        'T',   '',  'edl-tetris',     0],  // letras caen a saltos duros y encajan
+    ['ed-diagonal',      'T',   '',  '',               0],  // filas de esquina a esquina en diagonal
+    ['ed-marco',         'T',   '',  '',               0],  // corchetes de esquina que enmarcan el texto
+    ['ed-persiana',      'T',   '',  'edl-persiana',   0],  // letras se abren como persianas (scaleY)
+    ['ed-tv',            'T',   '',  '',               1],  // TV CRT encendiéndose: línea que se expande
+    ['ed-mascara',       'T',   '',  '',               0],  // box reveal: un bloque barre y descubre el texto
+    ['ed-rebana',        'T',   '',  '',               1],  // el texto llega partido en dos y se junta
+    ['ed-degradado',     'T',   '',  '',               0],  // barrido de degradado por dentro de las letras
+    ['ed-sombralarga',   'T',   '',  '',               0],  // sombra dura larga que se retrae al texto
+    ['ed-neblina',       'T',   '',  '',               0],  // aparece de la niebla, flotando (baladas)
+    ['ed-zoomlento',     'T',   '',  '',               0],  // zoom lentísimo y elegante
+    ['ed-cortina',       'T',   '',  '',               0],  // se abre desde el centro como telón
+    ['ed-eco',           'T',   '',  '',               0],  // estela de copias que se recogen
+    ['ed-liquido',       'T',   '',  '',               0],  // entrada gelatinosa con rebote
+    ['ed-flashcorte',    'T',   '',  '',               1],  // corte seco con destello blanco
+    ['ed-giroeje',       'T',   '',  '',               0],  // voltea como panel de aeropuerto
+    ['ed-vibra',         'T',   '',  '',               1],  // aterriza y vibra un instante
+    ['ed-difumina',      'T',   '',  'edl-difumina',   0],  // letra a letra enfocando
+    ['ed-giraletra',     'T',   '',  'edl-gira',       0],  // letra a letra girando sobre su eje
+    ['ed-alterna',       'T',   '',  'edl-alterna',    0],  // letras alternas desde arriba y abajo
+    ['ed-empuja',        'T',   '',  'edl-empuja',     0],  // letras empujando de lado con estela
+    ['ed-acumula',       'F',   'c', '',               0],
+    ['ed-flotan',        'F',   'c', '',               0],
+    ['ed-crece',         'F',   'c', '',               0],
+    ['ed-maquina',       'F',   'h', '',               0],
+    ['ed-escalera',      'F',   'c', '',               0],
+    ['ed-caen',          'F',   '',  '',               0],
+    ['ed-giro',          'F',   '',  '',               0],
+    ['ed-latigo',        'F',   'h', '',               0],
+    ['ed-burbuja',       'F',   'c', '',               0],
+    ['ed-resorte',       'F',   '',  '',               0],  // salta desde abajo con estirón elástico
+    ['ed-remolino',      'F',   '',  '',               0],  // cada palabra entra girando en espiral
+    ['ed-foco',          'F',   'c', '',               0],  // palabras borrosas gigantes que enfocan
+    ['ed-poema',         'F',   'c', '',               0],  // torre centrada elegante, palabra por renglón
+    ['ed-resalta',       'F',   '',  '',               0],  // karaoke: caja de color enciende palabra a palabra
+    ['ed-cubo',          'F',   '',  '',               0],  // cada palabra gira como cara de cubo 3D
+    ['ed-vidrio',        'F',   'c', '',               0],  // palabras transparentes (contorno) que se rellenan
+    ['ed-subtitulo',     'F',   'c', '',               0],  // píldora de subtítulo estilo caption de TikTok
+    ['ed-zoombrusco',    'F',   'h', '',               0],  // cada palabra se estampa desde tamaño gigante
+    ['ed-impacto',       'F',   'h', '',               0],  // la frase cae en bloque y hace onda + sacudida
+    ['ed-sellos',        'F',   'h', '',               0],  // cada palabra se estampa girada como sello
+    ['ed-lectura',       'F',   'c', '',               0],  // subrayado que corre palabra por palabra
+    ['ed-ola',           'F',   'c', '',               0],  // ola: cada palabra sube con rebote encadenado
+    ['ed-corte',         'F',   '',  '',               0],  // cortina por palabra: barrido que la revela
+    ['ed-pendulo',       'F',   '',  '',               0],  // columpio: cuelga y oscila hasta asentarse
+    ['ed-gravedad',      'F',   'h', '',               0],  // cae y rebota dos veces, como pelota
+    ['ed-viento',        'F',   'h', '',               0],  // ráfaga: todas llegan volando del mismo lado
+    ['ed-pixelea',       'F',   'h', '',               0],  // aparición pixelada a saltos (retro juego)
+    ['ed-vhs',           'F',   'h', '',               0],  // jitter VHS con separación RGB por palabra
+    ['ed-cohete',        'F',   'h', '',               0],  // despega desde abajo estirada y frena
+    ['ed-carrusel',      'F',   '',  '',               0],  // panel que gira como tablero de aeropuerto
+    ['ed-destello',      'F',   'h', '',               0],  // cada palabra enciende un flash blanco
+    ['ed-susurro',       'F',   'c', '',               0],  // fade lento y suave con tracking (baladas)
+    ['ed-salto',         'F',   'h', '',               0],  // brinco cartoon con squash & stretch
+    ['ed-luzneon',       'F',   'h', '',               0],  // cada palabra parpadea como letrero neón
+    ['ed-iman',          'F',   'h', '',               0],  // imán: llega disparada y se ajusta al centro
+    ['ed-desenfoca',     'F',   'c', '',               0],  // cada palabra enfoca desde el desenfoque
+    ['ed-zoomsuave',     'F',   'c', '',               0],  // escala mínima + fundido, muy elegante
+    ['ed-marcador',      'F',   'c', '',               0],  // rotulador que subraya palabra por palabra
+    ['ed-nieve',         'F',   'c', '',               0],  // caen despacio y se posan (baladas)
+    ['ed-brisa',         'F',   'c', '',               0],  // se mecen al llegar, muy suave
+    ['ed-tinta',         'F',   'c', '',               0],  // mancha de tinta que se define
+    ['ed-orbita',        'F',   '',  '',               0],  // llegan describiendo una curva
+    ['ed-chispa',        'F',   'h', '',               0],  // destello de color al aterrizar
+    ['ed-persianas',     'F',   'c', '',               0],  // cada palabra se revela por lamas
+    ['ed-goteo',         'F',   'h', '',               0],  // caen como gotas con elástico
+    ['ed-espejo',        'F',   '',  '',               0],  // entran reflejadas y se dan la vuelta
+    ['ed-tarjeta',       'F',   'h', '',               0],  // cada palabra voltea como carta
+    ['ed-estela',        'F',   'h', '',               0],  // los cortes entre trozos son secos: cuentan como golpe
+    ['ed-recorta',       'F',   'c', '',               0],  // barrido que recorta la palabra al entrar
+    ['ed-pulso',         'F',   'h', '',               0],  // aterrizan con doble latido
+    ['ed-empujon',       'F',   'h', '',               0],  // empuje lateral fuerte con desenfoque
+    ['ed-apila',         'TF',  'c', '',               0],  // filas que se acumulan, estilo edit TikTok
+    ['ed-tijera',        'T',   '',  '',               0],  // corte en DIAGONAL, las dos mitades encajan
+    ['ed-esquirla',      'T',   '',  '',               1],
+    ['ed-trozos',        'F',   'h', '',               0],  // el verso en trozos de 2-4 palabras que se relevan
+    ['ed-relevo',        'F',   'h', '',               0],  // cada palabra entra empujando a la anterior
+    ['ed-ondula',        'F',   'c', '',               0],
+  ];
+
+  /* ── listas derivadas ──
+     El ORDEN de títulos y frases sí importa (semilla() elige por índice), y
+     sale del orden del manifiesto. En las demás solo cuenta la pertenencia:
+     se consultan con includes(). */
+  const soloNombres = (f) => f[0];
+  const ED_TITLE_FX  = FX.filter((f) => f[1].includes('T')).map(soloNombres);
+  const ED_PHRASE_FX = FX.filter((f) => f[1].includes('F')).map(soloNombres);
+  const ED_STRONG    = FX.filter((f) => f[4]).map(soloNombres);
+  const ED_PHRASE_HYPE = FX.filter((f) => f[1].includes('F') && f[2] === 'h').map(soloNombres);
+  const ED_PHRASE_CALM = FX.filter((f) => f[1].includes('F') && f[2] === 'c').map(soloNombres);
+  const ED_LETTER_FX = {};
+  for (const f of FX) if (f[3]) ED_LETTER_FX[f[0]] = f[3];
+
   const ED_CAMS = ['edcam-zin', 'edcam-zout', 'edcam-izq', 'edcam-der',
                    'edcam-giro', 'edcam-sube', 'edcam-baja', 'edcam-late',
                    'edcam-dolly',    // acercamiento con leve giro, muy cine
@@ -572,10 +688,49 @@
                    'edcam-inclina',  // ladea el plano y se endereza
                    'edcam-flota',    // deriva lenta, casi imperceptible
                    'edcam-aleja',    // se retira despacio (pull back)
-                   'edcam-diagonal'];// deriva en diagonal
+                   'edcam-diagonal', // deriva en diagonal
+                   /* ── tanda 7: cámaras VIVAS ──
+                      Las de arriba hacen su recorrido y se asientan; a partir
+                      de ahí el verso queda clavado hasta que se va. Estas no
+                      se asientan nunca: siguen respirando todo el rato. */
+                   'edcam-respira',  // se acerca y se aleja, muy poco
+                   'edcam-deriva',   // deriva diagonal sin fin
+                   'edcam-pendulo',  // se mece como colgado
+                   'edcam-marea',    // sube y baja como una boya
+                   'edcam-espiral',  // gira y se acerca a la vez
+                   'edcam-zumbido',  // cámara en mano suave
+                   'edcam-acecha',   // órbita 3D sin fin
+                   'edcam-vertigo']; // el efecto Hitchcock, en pequeño
   const ED_TOPS = [42, 47, 55, 36, 58];
 
   const edLargo = (s) => s.replace(/[^\wáéíóúñ' ]/gi, '').length;
+
+  /* ══════ FIRMA DEL ESTRIBILLO ══════
+     Hasta ahora el efecto de cada verso salía de su ÍNDICE, así que el mismo
+     estribillo se veía distinto cada vuelta. En un lyric video de verdad el
+     gancho entra siempre con la misma pinta: eso es lo que hace que parezca
+     hecho a propósito y no una tómbola.
+
+     edCanon(i) devuelve el índice de la PRIMERA vez que aparece ese texto, y
+     todas las semillas del render se calculan con él. Resultado: efecto,
+     posición, inclinación y cámara idénticos en cada repetición. */
+  let canonMapa = null, canonDe = null;
+  const edCanon = (i) => {
+    if (canonDe !== lastTrackKey || !canonMapa) {
+      canonDe = lastTrackKey;
+      canonMapa = new Map();
+      const primero = new Map();
+      for (let k = 0; k < parsedLines.length; k++) {
+        const clave = ((parsedLines[k] && parsedLines[k].text) || '')
+          .toLowerCase().replace(/[^\wáéíóúñ ]/gi, '').replace(/\s+/g, ' ').trim();
+        if (!clave) { canonMapa.set(k, k); continue; }
+        if (!primero.has(clave)) primero.set(clave, k);
+        canonMapa.set(k, primero.get(clave));
+      }
+    }
+    const c = canonMapa.get(i);
+    return c === undefined ? i : c;
+  };
 
   // Elige un efecto de la lista evitando repetir el de la línea anterior:
   // dos líneas seguidas con la misma animación matan la sensación de "edit".
@@ -597,18 +752,7 @@
      ED_STRONG NO sirve para clasificar frases (solo tiene títulos: marca
      qué efectos disparan flash/sacudida). Esta lista es solo para el
      filtro de intensidad y no cambia qué efectos dan golpe. */
-  const ED_PHRASE_HYPE = ['ed-latigo', 'ed-maquina', 'ed-zoombrusco', 'ed-impacto',
-                          'ed-sellos', 'ed-vhs', 'ed-cohete', 'ed-destello',
-                          'ed-pixelea', 'ed-salto', 'ed-luzneon', 'ed-iman',
-                          'ed-viento', 'ed-gravedad',
-                          'ed-chispa', 'ed-empujon', 'ed-pulso', 'ed-goteo',
-                          'ed-tarjeta', 'ed-estela'];
-  const ED_PHRASE_CALM = ['ed-flotan', 'ed-susurro', 'ed-poema', 'ed-foco',
-                          'ed-burbuja', 'ed-crece', 'ed-escalera', 'ed-subtitulo',
-                          'ed-lectura', 'ed-vidrio', 'ed-acumula', 'ed-ola',
-                          'ed-desenfoca', 'ed-zoomsuave', 'ed-nieve', 'ed-brisa',
-                          'ed-tinta', 'ed-marcador', 'ed-recorta', 'ed-persianas',
-                          'ed-apila'];
+  /* (ED_PHRASE_HYPE y ED_PHRASE_CALM salen del manifiesto, arriba.) */
 
   const esFuerte = (fx, lista) => lista === ED_PHRASE_FX
     ? ED_PHRASE_HYPE.includes(fx)
@@ -801,6 +945,71 @@
     return filas;
   };
 
+  /* ══════ ed-trozos — captions por trozos ══════
+     La técnica que hoy es el estándar de los lyric edits: en vez de soltar el
+     verso entero de golpe, se enseña en trozos de 2-4 palabras que se
+     sostienen y se relevan. El tamaño del trozo lo decide la LONGITUD, no el
+     número de palabras: tres palabras largas ocupan lo que cinco cortas y
+     desbordarían.
+
+     Y dentro de cada trozo, la palabra más larga sale en el color de acento
+     («keyword colour pop»): es lo que hace que el ojo enganche a la primera. */
+  const edPartir = (words) => {
+    const out = [];
+    let k = 0;
+    while (k < words.length) {
+      const resto = words.length - k;
+      let n = 3;
+      const largo3 = words.slice(k, k + 3).join(' ').length;
+      if (largo3 > 22) n = 2;
+      else if (largo3 < 11) n = 4;
+      n = Math.min(n, resto);
+      // nunca dejar un trozo suelto de una sola palabra al final
+      if (resto - n === 1) n = Math.min(resto, n + 1);
+      out.push(words.slice(k, k + n));
+      k += n;
+    }
+    return out;
+  };
+
+  const edTrozos = (stack, words, durMs) => {
+    const trozos = edPartir(words);
+    const H = lyricsEdit.clientHeight || 400;
+    const W = lyricsEdit.clientWidth || 600;
+
+    /* Cada trozo ocupa su turno dentro de lo que dura el verso. El sostén
+       recomendado es de 600-900 ms; si la línea no da para tanto se reparte
+       lo que haya, pero nunca por debajo de 260 ms o no da tiempo a leer. */
+    const turno = Math.max(260, (durMs * 0.94) / trozos.length);
+    const caja = document.createElement('div');
+    caja.className = 'ed-trozos';
+    // altura fija: los trozos se apilan en la misma posición, no en cascada
+    caja.style.setProperty('--turno', Math.round(turno) + 'ms');
+
+    trozos.forEach((tr, k) => {
+      const texto = tr.join(' ');
+      const div = document.createElement('div');
+      div.className = 'ed-trozo';
+      // se escala por el trozo MÁS LARGO de todos para que no bailen de tamaño
+      div.style.setProperty('--d', Math.round(k * turno) + 'ms');
+      const idxClave = tr.reduce((mx, w, j) => (edLargo(w) > edLargo(tr[mx]) ? j : mx), 0);
+      tr.forEach((w, j) => {
+        const s = document.createElement('span');
+        s.className = 'ed-pal' + (tr.length > 1 && j === idxClave ? ' ed-clave' : '');
+        s.textContent = w;
+        div.appendChild(s);
+      });
+      div.dataset.txt = texto;
+      caja.appendChild(div);
+    });
+
+    // tamaño según el trozo más ancho: alto y estable, estilo cartel
+    const masAncho = trozos.reduce((mx, t) => Math.max(mx, t.join(' ').length), 1);
+    let fs = Math.min((W * 0.88) / (masAncho * 0.54), H * 0.30);
+    caja.style.fontSize = Math.max(22, fs).toFixed(1) + 'px';
+    stack.appendChild(caja);
+  };
+
   const edApila = (stack, words, durMs) => {
     const filas = edApilaFilas(words);
     const bloque = document.createElement('div');
@@ -982,16 +1191,37 @@
   };
 
   // salidas variadas: la línea anterior no siempre se va igual (más "edit")
-  const ED_SALIDAS = ['colapsa', 'colapsa-sube', 'colapsa-glitch'];
+  /* Salidas. Eran 3 contra 105 entradas: cada verso se despedía casi siempre
+     igual, y la despedida se ve tanto como la llegada. */
+  const ED_SALIDAS = ['colapsa', 'colapsa-sube', 'colapsa-glitch',
+                      /* ── tanda 7 ── */
+                      'sal-baja',      // se hunde con desenfoque
+                      'sal-derrite',   // se escurre aplastándose
+                      'sal-persiana',  // se cierra por lamas
+                      'sal-gira',      // voltea sobre su eje y se va
+                      'sal-aspira',    // absorbida hacia el centro
+                      'sal-barre',     // un barrido se la lleva
+                      'sal-rompe',     // se quiebra en diagonal
+                      'sal-desenfoca', // solo pierde el foco, la más elegante
+                      'sal-estira',    // se estira a lo ancho hasta nada
+                      'sal-cae',       // cae con peso, girando
+                      'sal-tv',        // apagado de CRT: a una raya y a un punto
+                      'sal-lateral',   // se escapa de lado
+                      'sal-flash',     // corte seco con destello
+                      'sal-encoge'];   // se va hacia dentro
 
   const renderEdit = (i) => {
+    /* TODAS las semillas del render usan el índice canónico, no el de la
+       línea: así un estribillo repetido sale idéntico cada vuelta. */
+    const ci = edCanon(i);
+
     // la línea anterior colapsa con una salida elegida por línea
     // (.ed-fondo del invertido vive fuera del stack: se despide igual)
     lyricsEdit.querySelectorAll('.ed-stack, .ed-fondo').forEach(v => {
       if (v.dataset.out) v.remove();
       else {
         v.dataset.out = '1';
-        v.classList.add(ED_SALIDAS[semilla(i, 61, ED_SALIDAS.length)]);
+        v.classList.add(ED_SALIDAS[semilla(ci, 61, ED_SALIDAS.length)]);
         setTimeout(() => v.remove(), 500);
       }
     });
@@ -1002,9 +1232,9 @@
     const durMs = duracionLinea(i) * 1000;
 
     const stack = document.createElement('div');
-    stack.className = 'ed-stack ' + elegirCam(i);
-    stack.style.setProperty('--top', ED_TOPS[semilla(i, 7, ED_TOPS.length)] + '%');
-    stack.style.setProperty('--tilt', (semilla(i, 11, 7) - 3) + 'deg');
+    stack.className = 'ed-stack ' + elegirCam(ci);
+    stack.style.setProperty('--top', ED_TOPS[semilla(ci, 7, ED_TOPS.length)] + '%');
+    stack.style.setProperty('--tilt', (semilla(ci, 11, 7) - 3) + 'deg');
     lyricsEdit.appendChild(stack);
 
     // ¿línea instrumental? (solo ♪/♫ o puntos): escena viva en vez de título
@@ -1023,12 +1253,12 @@
     const caps = demoFx
       ? ED_TITLE_FX.includes(demoFx)   // en el lab manda el efecto elegido
       : (words.length <= 3
-        || (words.length <= 5 && lenTxt <= 30 && semilla(i, 41, 10) < 7)
-        || (words.length <= 7 && lenTxt <= 44 && semilla(i, 41, 10) < 4));
+        || (words.length <= 5 && lenTxt <= 30 && semilla(ci, 41, 10) < 7)
+        || (words.length <= 7 && lenTxt <= 44 && semilla(ci, 41, 10) < 4));
 
     if (caps) {
       /* TÍTULO GIGANTE */
-      const fx = elegirFx(ED_TITLE_FX, i, 3);
+      const fx = elegirFx(ED_TITLE_FX, ci, 3);
 
       if (fx === 'ed-apila') { edApila(stack, words, durMs); return; }
 
@@ -1180,9 +1410,15 @@
       if (fx === 'ed-descifra') edScramble(stack);
     } else {
       /* FRASE palabra a palabra */
-      const fx = elegirFx(ED_PHRASE_FX, i, 19);
+      let fx = elegirFx(ED_PHRASE_FX, ci, 19);
 
       if (fx === 'ed-apila') { edApila(stack, words, durMs); return; }
+      if (fx === 'ed-trozos') {
+        // por debajo de 4 palabras no hay nada que trocear: se rendiría a un
+        // solo trozo, que es exactamente la frase entera de siempre
+        if (words.length >= 4) { edTrozos(stack, words, durMs); return; }
+        fx = 'ed-zoomsuave';
+      }
 
       // eco gigante borroso detrás (solo en los modos tranquilos)
       if (fx === 'ed-acumula' || fx === 'ed-crece') {
@@ -1226,7 +1462,7 @@
       let idxGrande = -1, idxCursiva = -1;
       if (fx !== 'ed-escalera' && fx !== 'ed-maquina' && fx !== 'ed-poema' && words.length >= 4) {
         idxGrande = words.reduce((mx, w, j, a) => (edLargo(w) > edLargo(a[mx]) ? j : mx), 0);
-        idxCursiva = semilla(i, 29, words.length);
+        idxCursiva = semilla(ci, 29, words.length);
         if (idxCursiva === idxGrande) idxCursiva = -1;
       }
 
@@ -1286,8 +1522,9 @@
 
   /* ── alternar lista ↔ edit ── */
   const applyMode = () => {
-    lyricsBody.hidden = editMode;
-    lyricsEdit.hidden = !editMode;
+    // en reposo mandan ni lista ni edit: se ve el panel de bienvenida
+    lyricsBody.hidden = idleOn || editMode;
+    lyricsEdit.hidden = idleOn || !editMode;
     modeBtn.textContent = editMode ? '≡' : '✦';
     modeBtn.title = editMode ? 'Volver a vista lista' : 'Modo edit (letra animada)';
     modeBtn.classList.toggle('on', editMode);
@@ -1442,56 +1679,242 @@
     }, 250);
   });
 
+  // Búsqueda binaria: antes se recorrían TODAS las líneas en cada frame.
+  const buscarIdx = (t) => {
+    let lo = 0, hi = parsedLines.length - 1, r = -1;
+    while (lo <= hi) {
+      const m = (lo + hi) >> 1;
+      if (parsedLines[m].time <= t) { r = m; lo = m + 1; } else { hi = m - 1; }
+    }
+    return r;
+  };
+
+  /* Cambio de línea INCREMENTAL. Antes esto recorría la lista entera
+     quitando y poniendo clases en cada verso, o sea que cada línea nueva
+     invalidaba el estilo de toda la letra. Ahora, en la reproducción normal,
+     se tocan exactamente dos nodos: el que sale y el que entra. */
+  const cambiarLinea = (prev, idx) => {
+    if (prev >= 0 && lineNodes[prev]) {
+      lineNodes[prev].classList.remove('active');
+      restoreLine(lineNodes[prev], prev);
+    }
+    if (idx > prev) {
+      for (let i = Math.max(0, prev); i < idx; i++) {
+        if (lineNodes[i]) lineNodes[i].classList.add('past');
+      }
+    } else {
+      // el usuario saltó atrás: lo que ya no es pasado vuelve a su sitio
+      for (let i = idx + 1; i <= prev && i < lineNodes.length; i++) {
+        if (!lineNodes[i]) continue;
+        lineNodes[i].classList.remove('past', 'active');
+        restoreLine(lineNodes[i], i);
+      }
+    }
+
+    const active = idx >= 0 ? lineNodes[idx] : null;
+    if (!active) return;
+    active.classList.remove('past');
+    active.classList.add('active');
+    decorateLine(active, idx);
+
+    if (userScrolledRecently) return;
+    // Manual VERTICAL-only scroll. Avoids scrollIntoView, which would
+    // also scroll horizontally to chase a transform-scaled line and crop
+    // the start/end of the text.
+    const containerH = lyricsBody.clientHeight;
+    const targetTop = active.offsetTop + active.offsetHeight / 2 - containerH / 2;
+    // Flag this as a programmatic scroll so the 'scroll' listener below
+    // doesn't mistake it for the user scrolling (which would disable
+    // auto-centering and leave the lyrics drifting off-center).
+    autoScrolling = true;
+    clearTimeout(autoScrollTimer);
+    autoScrollTimer = setTimeout(() => { autoScrolling = false; }, 700);
+    lyricsBody.scrollTo({ top: Math.max(0, targetTop), left: 0, behavior: 'smooth' });
+  };
+
+  /* ---- Karaoke: la línea activa se va tiñendo palabra a palabra ----
+     El LRC solo trae el arranque de cada verso, así que el reparto va por
+     longitud (letras + 1 por palabra), que es la aproximación estándar y se
+     ve clavada. La palabra que suena AHORA lleva .cantando; las ya cantadas,
+     .sung. Solo se tocan clases, nunca se reconstruye el DOM. */
+  // reparto por longitud: lo comparten la vista lista y el modo edit
+  const repartir = (els) => {
+    if (!els.length) return [];
+    const pesos = new Array(els.length);
+    let total = 0;
+    for (let i = 0; i < els.length; i++) {
+      const p = (els[i].textContent || '').trim().length + 1;
+      pesos[i] = p;
+      total += p;
+    }
+    const out = new Array(els.length);
+    let acc = 0;
+    for (let i = 0; i < els.length; i++) {
+      out[i] = { el: els[i], s: acc / total };
+      acc += pesos[i];
+    }
+    return out;
+  };
+
+  const prepararKaraoke = (ln) =>
+    repartir(Array.prototype.slice.call(ln.querySelectorAll('.w')));
+
+  let kIdx = -1, kSpans = null, kNext = 0;
+  const karaokeReset = () => {
+    if (kSpans) {
+      for (let i = 0; i < kSpans.length; i++) kSpans[i].el.classList.remove('sung', 'cantando');
+    }
+    kNext = 0;
+  };
+  const karaoke = (t, idx) => {
+    if (idx < 0 || !lineNodes[idx]) { kIdx = -1; kSpans = null; return; }
+    const ln = lineNodes[idx];
+    if (kIdx !== idx) { kIdx = idx; kSpans = null; kNext = 0; }
+    if (!kSpans) {
+      // _kw puede ser [] (línea sin palabras): también vale como caché, así
+      // que se comprueba la referencia, no la longitud — si no, se volvería a
+      // consultar el DOM en cada frame.
+      const cache = ln._kw;
+      kSpans = (cache && (!cache.length || cache[0].el.isConnected))
+        ? cache
+        : (ln._kw = prepararKaraoke(ln));
+    }
+    if (!kSpans.length) return;
+
+    const ini = parsedLines[idx].time;
+    // 0.88: el verso se termina de cantar algo antes de que entre el siguiente
+    const p = (t - ini) / (duracionLinea(idx) * 0.88);
+    if (p < 0) return;
+    if (kNext && p < kSpans[kNext - 1].s) karaokeReset();   // saltó hacia atrás
+
+    if (kNext >= kSpans.length) return;
+    let cambio = false;
+    while (kNext < kSpans.length && p >= kSpans[kNext].s) {
+      kSpans[kNext].el.classList.add('sung');
+      kNext++;
+      cambio = true;
+    }
+    if (!cambio) return;
+    for (let i = 0; i < kSpans.length; i++) {
+      kSpans[i].el.classList.toggle('cantando', i === kNext - 1);
+    }
+  };
+
+  /* ══════ KARAOKE EN MODO EDIT ══════
+     La técnica que hoy es estándar en los lyric edits: la palabra que suena
+     se enciende, las que faltan quedan apagadas. El modo edit tenía el
+     revelado de entrada (todas las palabras salen escalonadas nada más
+     empezar la línea) pero NADA que siguiera la voz durante el verso.
+
+     Aquí solo se tocan `color` y `text-shadow`. Ni transform, ni animation,
+     ni opacity: esos tres canales son de los 52 efectos de entrada, y
+     pisarlos corta la animación de la palabra a medias. Misma lección que en
+     la vista lista.
+
+     No se engancha dentro de renderEdit a propósito: esa función tiene cinco
+     salidas tempranas (instrumental, apila, lockup, deletreo, diagonal).
+     Buscando el stack vivo desde fuera, TODOS los montajes reciben karaoke
+     sin tocar ninguna de sus ramas. */
+  const karaokeEdit = (t, idx) => {
+    if (idx < 0 || !parsedLines[idx]) return;
+    const stack = lyricsEdit.querySelector('.ed-stack:not([data-out])');
+    if (!stack) return;
+    // ed-trozos ya lleva su propio ritmo: los trozos SON la sincronía, y
+    // teñir por dentro solo restaría claridad al trozo que está en pantalla
+    if (stack.querySelector('.ed-trozos')) return;
+
+    if (stack._kIdx !== idx) { stack._kIdx = idx; stack._kw = null; stack._kn = 0; }
+    if (!stack._kw) {
+      // palabras si las hay; si no (título gigante), filas enteras
+      let els = Array.prototype.slice.call(stack.querySelectorAll('.ed-pal'));
+      if (!els.length) els = Array.prototype.slice.call(stack.querySelectorAll('.ed-titulo'));
+      // fuera los separadores en blanco que mete el tecleo de ed-maquina
+      els = els.filter((e) => (e.textContent || '').trim());
+      stack._kw = repartir(els);
+      if (stack._kw.length > 1) stack.classList.add('ed-kara');
+    }
+    const ks = stack._kw;
+    // con una sola palabra/fila no hay karaoke que valga: se queda encendida
+    if (ks.length < 2) return;
+
+    const p = (t - parsedLines[idx].time) / (duracionLinea(idx) * 0.88);
+    if (p < 0) return;
+    if (stack._kn && p < ks[stack._kn - 1].s) {
+      for (let i = 0; i < ks.length; i++) ks[i].el.classList.remove('sung', 'cantando');
+      stack._kn = 0;
+    }
+    if (stack._kn >= ks.length) return;
+
+    let cambio = false;
+    while (stack._kn < ks.length && p >= ks[stack._kn].s) {
+      ks[stack._kn].el.classList.add('sung');
+      stack._kn++;
+      cambio = true;
+    }
+    if (!cambio) return;
+    for (let i = 0; i < ks.length; i++) {
+      ks[i].el.classList.toggle('cantando', i === stack._kn - 1);
+    }
+  };
+
+  // ---- Contador de los huecos instrumentales ----
+  let gapUltimo = -1;
+  const interludio = (t, idx) => {
+    const g = gapMap.get(idx);
+    if (gapAct && gapAct !== g) {
+      gapAct.classList.remove('on');
+      gapAct = null;
+      gapUltimo = -1;
+    }
+    if (!g) return;
+    const sig = parsedLines[idx + 1];
+    if (!sig) return;
+    const ini = (idx < 0 ? 0 : parsedLines[idx].time) + (idx < 0 ? 0 : GAP_LEAD);
+    if (t < ini || t >= sig.time) {
+      if (gapAct === g) { g.classList.remove('on'); gapAct = null; gapUltimo = -1; }
+      return;
+    }
+    const p = (t - ini) / Math.max(0.1, sig.time - ini);
+    if (gapAct !== g) { g.classList.add('on'); gapAct = g; }
+    // redondeo a centésimas: recorta ~60 escrituras de estilo por segundo a las que de verdad cambian
+    const q = Math.round(p * 100);
+    if (q !== gapUltimo) {
+      gapUltimo = q;
+      g.style.setProperty('--gp', q / 100);
+    }
+  };
+
   const tick = (currentTime) => {
     if (labOpen) return;   // el lab manda: la canción no pisa la demo
     if (!parsedLines.length || parsedLines[0].time < 0) return;
     // Apply user-adjustable offset: positive = letras se adelantan
     const t = currentTime + offset;
-    let idx = -1;
-    for (let i = 0; i < parsedLines.length; i++) {
-      if (parsedLines[i].time <= t) idx = i;
-      else break;
-    }
-    if (idx === activeIdx) return;
-    activeIdx = idx;
+    const idx = buscarIdx(t);
+    const modoEdit = editMode || forceEdit;
 
-    /* MODO EDIT: solo la línea actual, gigante y con efectos
-       (forceEdit = el modo cine lo activa sin tocar la preferencia) */
-    if (editMode || forceEdit) {
-      if (idx >= 0) renderEdit(idx);
-      else lyricsEdit.querySelectorAll('.ed-stack, .ed-fondo').forEach(v => {
-        v.dataset.out = '1';
-        v.classList.add('colapsa');
-        setTimeout(() => v.remove(), 500);
-      });
-      return;
+    if (idx !== activeIdx) {
+      const prev = activeIdx;
+      activeIdx = idx;
+      /* MODO EDIT: solo la línea actual, gigante y con efectos
+         (forceEdit = el modo cine lo activa sin tocar la preferencia) */
+      if (modoEdit) {
+        if (idx >= 0) renderEdit(idx);
+        else lyricsEdit.querySelectorAll('.ed-stack, .ed-fondo').forEach(v => {
+          v.dataset.out = '1';
+          v.classList.add('colapsa');
+          setTimeout(() => v.remove(), 500);
+        });
+      } else {
+        cambiarLinea(prev, idx);
+      }
     }
 
-    const allLines = lyricsBody.querySelectorAll('.lyric-line');
-    allLines.forEach((ln, i) => {
-      ln.classList.remove('active', 'past');
-      if (i !== idx) restoreLine(ln, i);
-      if (i < idx) ln.classList.add('past');
-      else if (i === idx) { ln.classList.add('active'); decorateLine(ln, i); }
-    });
-    const active = lyricsBody.querySelector('.lyric-line.active');
-    if (active && !userScrolledRecently) {
-      // Manual VERTICAL-only scroll. Avoids scrollIntoView, which would
-      // also scroll horizontally to chase a transform-scaled line and crop
-      // the start/end of the text.
-      const containerH = lyricsBody.clientHeight;
-      const targetTop = active.offsetTop + active.offsetHeight / 2 - containerH / 2;
-      // Flag this as a programmatic scroll so the 'scroll' listener below
-      // doesn't mistake it for the user scrolling (which would disable
-      // auto-centering and leave the lyrics drifting off-center).
-      autoScrolling = true;
-      clearTimeout(autoScrollTimer);
-      autoScrollTimer = setTimeout(() => { autoScrolling = false; }, 700);
-      lyricsBody.scrollTo({
-        top: Math.max(0, targetTop),
-        left: 0,
-        behavior: 'smooth',
-      });
+    // Cada frame: el teñido palabra a palabra, en la vista que toque.
+    if (modoEdit) {
+      karaokeEdit(t, idx);
+    } else {
+      karaoke(t, idx);
+      interludio(t, idx);
     }
   };
 
@@ -1501,6 +1924,7 @@
   const startLoop = () => {
     const loop = () => {
       requestAnimationFrame(loop);
+      if (document.hidden) return;   // en segundo plano no hay nada que pintar
       const audio = window.PlayerCore && window.PlayerCore.audio;
       if (!audio || audio.paused) return;
       tick(audio.currentTime);

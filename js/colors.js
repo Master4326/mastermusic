@@ -244,8 +244,15 @@
     }
   };
 
-  // Poll because backgroundImage style change doesn't fire MutationObserver reliably
-  setInterval(checkCover, 400);
+  /* Cambiar coverArt.style.backgroundImage SÍ muta el atributo style, así que
+     un observer lo caza al instante: el fondo se tiñe en cuanto entra la
+     carátula, no hasta 400 ms después. El sondeo se queda como red de
+     seguridad, ahora lento y dormido cuando la pestaña no está delante. */
+  if ('MutationObserver' in window && coverArt) {
+    new MutationObserver(checkCover)
+      .observe(coverArt, { attributes: true, attributeFilter: ['style'] });
+  }
+  setInterval(() => { if (!document.hidden) checkCover(); }, 2000);
   checkCover();
 
   // Re-extracción forzada (p. ej. al devolver el fondo a modo auto)

@@ -302,6 +302,43 @@ body:has(.window.maximized) { padding: 0; }
   letter-spacing: 0.1em;
   margin-bottom: 4px;
 }
+/* Fila del título: mini-EQ + título. El min-width: 0 es obligatorio en los
+   dos niveles — sin él, un hijo flex se niega a encoger y el ellipsis y la
+   marquesina no llegan a activarse nunca. */
+.ti-title-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 0.7cqw, 12px);
+  min-width: 0;
+}
+/* tres barritas que bailan mientras suena algo: la señal de "sonando AHORA"
+   junto al título, como en cualquier reproductor. Solo transform. */
+.ti-eq {
+  display: none;
+  align-items: flex-end;
+  gap: 2px;
+  height: 0.8em;
+  flex-shrink: 0;
+}
+body.playing .ti-eq { display: inline-flex; }
+.ti-eq i {
+  width: 3px;
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 4px var(--accent-glow);
+  transform-origin: bottom;
+  /* steps: el salto seco pixelado, como el mini-EQ de la barra de estado */
+  animation: ti-eq-bar 0.9s steps(3, jump-none) infinite;
+}
+.ti-eq i:nth-child(1) { animation-duration: 0.7s; }
+.ti-eq i:nth-child(2) { animation-duration: 0.95s; animation-delay: 0.15s; }
+.ti-eq i:nth-child(3) { animation-duration: 0.8s; animation-delay: 0.3s; }
+@keyframes ti-eq-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%      { transform: scaleY(1); }
+}
+body.reduce-motion .ti-eq i { animation: none; transform: scaleY(0.55); }
+
 .ti-title {
   color: var(--accent);
   font-size: 22px;
@@ -310,6 +347,35 @@ body:has(.window.maximized) { padding: 0; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ----- Marquesina (seven.js): lo que no cabe rueda, espera y vuelve -----
+   El span interior se desliza --ti-desp px; el elemento guarda el recorte.
+   Mientras rueda, fuera el ellipsis (taparía el texto en movimiento) y
+   desvanecido en los bordes para que entre y salga con suavidad. */
+.ti-desborda { text-overflow: clip; }
+.ti-desborda {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+}
+.ti-scroll {
+  display: inline-block;
+  animation: ti-marquesina var(--ti-dur, 9s) ease-in-out infinite;
+}
+@keyframes ti-marquesina {
+  /* pausa al arrancar (se lee el principio), viaje, pausa al final, vuelta */
+  0%, 16%  { transform: translateX(0); }
+  46%, 60% { transform: translateX(var(--ti-desp, -40px)); }
+  90%, 100% { transform: translateX(0); }
+}
+/* con «menos movimiento» no rueda nada: texto quieto y ellipsis de siempre */
+body.reduce-motion .ti-scroll { animation: none; }
+body.reduce-motion .ti-desborda {
+  text-overflow: ellipsis;
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 .ti-artist {
   color: var(--text);
@@ -367,7 +433,25 @@ body:has(.window.maximized) { padding: 0; }
   background: var(--bg-panel-2);
   border-bottom: 2px solid var(--border-dark);
   font-size: 18px;
+  /* La barra se esconde sola en la pestaña de letras (seven.js), como los
+     controles del cine. Colapsa DE VERDAD (max-height) para que la letra
+     gane el sitio, no un simple fundido. Es una transición de un disparo
+     al ocultar/mostrar, no una animación por frame. El tope de 90px cubre
+     de sobra su alto real incluso con la tipografía fluida al máximo. */
+  max-height: 90px;
+  overflow: hidden;
+  transition: max-height 0.35s ease-out, opacity 0.3s ease-out,
+              padding 0.35s ease-out, border-bottom-width 0.35s ease-out;
 }
+.tab-bar.se-esconde {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-width: 0;
+  pointer-events: none;
+}
+body.reduce-motion .tab-bar { transition: none; }
 .tab {
   padding: 4px 12px;
   color: var(--text-dim);
@@ -403,31 +487,12 @@ body:has(.window.maximized) { padding: 0; }
   align-items: center;
   gap: 10px;
 }
-.tab-right .status-dot { margin-left: 0; }
-
 /* El engranaje es un botón, no una pestaña: sin subrayado y gira al hover */
 .tab-gear { border-bottom: none !important; }
 .tab-gear svg { transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .tab-gear:hover svg, .tab-gear.active svg { transform: rotate(90deg); }
-.status-dot {
-  margin-left: auto;
-  font-size: 14px;
-  color: var(--text-dim);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.status-dot .dot {
-  width: 8px; height: 8px;
-  background: var(--green);
-  border-radius: 50%;
-  box-shadow: 0 0 6px var(--green);
-  animation: blink 2s infinite;
-}
-@keyframes blink {
-  0%, 60%, 100% { opacity: 1; }
-  70% { opacity: 0.2; }
-}
+/* (El "● online" que vivía aquí se quitó a pedido del usuario — además
+   siempre decía online, hasta sin conexión.) */
 
 .tab-content {
   flex: 1;
@@ -505,6 +570,16 @@ body:has(.window.maximized) { padding: 0; }
   letter-spacing: 0.02em;
   animation: lyric-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 3;
+  /* La línea activa entra enfocada DE GOLPE: sin `filter` en la transición.
+     Mientras se interpolaba blur(0.6px) → none, la línea tenía filtro medio
+     segundo, y un elemento con filtro se pinta recortado a su caja: el glow
+     de la palabra destacada salía cortado por arriba y por abajo. Los 0,6 px
+     de desenfoque que se pierden no se ven; el recorte sí se veía. */
+  transition:
+    color 0.3s ease-out,
+    text-shadow 0.3s ease-out,
+    transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.4s ease-out;
 }
 /* The pop animation — quick squish-then-overshoot like a music video edit */
 @keyframes lyric-pop {
@@ -517,7 +592,7 @@ body:has(.window.maximized) { padding: 0; }
   35% {
     transform: scale(1.22) translateY(-2px);
     opacity: 1;
-    filter: blur(0);
+    filter: none;
   }
   60% {
     transform: scale(1.06);
@@ -554,7 +629,14 @@ body:has(.window.maximized) { padding: 0; }
    y --sx (signo alternante -1/1 para efectos con dirección).
    Cada línea trae uno de 12 efectos deterministas: rise / slide / wave /
    type / flip / fall / glitch / zoom / neon / spin / elastic / swing.
-   La palabra más larga sale destacada (.w-big). */
+   La palabra más larga sale destacada (.w-big).
+
+   REGLA: el último `filter` de cada keyframe tiene que ser `none`, nunca
+   `blur(0)`. Con fill-mode "both" ese valor se queda puesto, y un elemento
+   con filtro se pinta recortado a su región de filtro (su caja + el ensanche
+   del filtro, que con blur(0) es cero): el glow de .w-big salía cortado en
+   un rectángulo hasta que llegaba .done. Se ven igual, así que none siempre.
+   Lo vigila check-glow.js. */
 .lyrics-body .lyric-line .w {
   display: inline-block;
   /* Base VISIBLE: si una animación se cancela a mitad, la palabra aparece
@@ -586,11 +668,11 @@ body:has(.window.maximized) { padding: 0; }
 }
 @keyframes w-rise {
   from { opacity: 0; transform: translateY(0.65em); filter: blur(3px); }
-  to   { opacity: 1; transform: translateY(0);      filter: blur(0); }
+  to   { opacity: 1; transform: translateY(0);      filter: none; }
 }
 @keyframes w-slide {
   from { opacity: 0; transform: translateX(calc(var(--sx, 1) * 0.9em)) skewX(-8deg); filter: blur(3px); }
-  to   { opacity: 1; transform: translateX(0) skewX(0);                              filter: blur(0); }
+  to   { opacity: 1; transform: translateX(0) skewX(0);                              filter: none; }
 }
 @keyframes w-wave {
   0%   { opacity: 0; transform: translateY(0.5em) scale(0.55) rotate(-6deg); }
@@ -614,7 +696,7 @@ body:has(.window.maximized) { padding: 0; }
 }
 @keyframes w-flip {
   0%   { opacity: 0; transform: rotateX(95deg) translateY(0.3em); filter: blur(2px); }
-  60%  { opacity: 1; transform: rotateX(-16deg); filter: blur(0); }
+  60%  { opacity: 1; transform: rotateX(-16deg); filter: none; }
   100% { opacity: 1; transform: rotateX(0); }
 }
 
@@ -626,7 +708,7 @@ body:has(.window.maximized) { padding: 0; }
 }
 @keyframes w-fall {
   0%   { opacity: 0; transform: translateY(-1.1em) rotate(calc(var(--sx, 1) * 16deg)) scale(1.2); filter: blur(2px); }
-  65%  { opacity: 1; transform: translateY(0.08em) rotate(calc(var(--sx, 1) * -4deg)) scale(0.98); filter: blur(0); }
+  65%  { opacity: 1; transform: translateY(0.08em) rotate(calc(var(--sx, 1) * -4deg)) scale(0.98); filter: none; }
   100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
 }
 
@@ -653,7 +735,7 @@ body:has(.window.maximized) { padding: 0; }
 }
 @keyframes w-zoom {
   0%   { opacity: 0; transform: scale(2.6); filter: blur(8px); }
-  55%  { opacity: 1; transform: scale(0.94); filter: blur(0); }
+  55%  { opacity: 1; transform: scale(0.94); filter: none; }
   100% { opacity: 1; transform: scale(1); }
 }
 
@@ -681,7 +763,7 @@ body:has(.window.maximized) { padding: 0; }
 }
 @keyframes w-spin {
   0%   { opacity: 0; transform: rotateY(95deg) translateX(0.2em); filter: blur(2px); }
-  60%  { opacity: 1; transform: rotateY(-20deg); filter: blur(0); }
+  60%  { opacity: 1; transform: rotateY(-20deg); filter: none; }
   100% { opacity: 1; transform: rotateY(0); }
 }
 
@@ -692,7 +774,7 @@ body:has(.window.maximized) { padding: 0; }
 }
 @keyframes w-elastic {
   0%   { opacity: 0; transform: scale(0.3, 1.7); filter: blur(3px); }
-  45%  { opacity: 1; transform: scale(1.28, 0.75); filter: blur(0); }
+  45%  { opacity: 1; transform: scale(1.28, 0.75); filter: none; }
   70%  { transform: scale(0.92, 1.1); }
   100% { opacity: 1; transform: scale(1, 1); }
 }
@@ -719,6 +801,90 @@ body:has(.window.maximized) { padding: 0; }
     0 0 40px var(--accent-glow),
     2px 2px 0 rgba(0, 0, 0, 0.6);
 }
+
+/* ----- KARAOKE: el verso activo se tiñe palabra a palabra -----
+   El LRC solo marca el arranque de cada línea, así que lyrics.js reparte el
+   verso por longitud y va poniendo .sung / .cantando. Aquí solo se anima
+   color y text-shadow: nada que dispare layout, y ni una sola capa nueva de
+   composición sobre las que ya monta el revelado. */
+.lyrics-body.sync .lyric-line.active .w {
+  color: var(--text-dim);
+  transition: color 0.18s linear, text-shadow 0.18s linear;
+}
+/* ya cantada: acento pleno, es la parte "rellenada" de la barra de karaoke */
+.lyrics-body.sync .lyric-line.active .w.sung {
+  color: var(--accent);
+  text-shadow:
+    0 0 6px var(--accent-glow),
+    0 0 16px var(--accent-glow),
+    2px 2px 0 rgba(0, 0, 0, 0.55);
+}
+/* la palabra que suena AHORA: blanca y encendida, marca el punto exacto */
+.lyrics-body.sync .lyric-line.active .w.cantando {
+  color: var(--text);
+  text-shadow:
+    0 0 8px var(--accent-glow),
+    0 0 22px var(--accent-glow),
+    0 0 44px var(--accent-glow),
+    2px 2px 0 rgba(0, 0, 0, 0.55);
+}
+/* A propósito NO se anima ni transform ni animation en la palabra activa:
+   esos dos canales ya los usa el revelado de entrada (fx-rise, fx-swing…) y
+   pisarlos cortaba la animación de la primera palabra de cada verso. El
+   karaoke se queda en color + glow, que es exactamente lo que hace Apple
+   Music, se compone gratis y sigue funcionando con «menos movimiento». */
+
+/* ----- HUECO INSTRUMENTAL: intro, solo o puente -----
+   Tres puntos que se encienden con el avance (--gp, 0→1 desde lyrics.js).
+   Sin esto la letra se congela y parece que la app se colgó. */
+.lyric-gap {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  /* colapsado del todo: sin --on no ocupa NADA (el padding vertical iba
+     aparte y dejaba un hueco fantasma de 20 px entre versos) */
+  padding: 0 0 0 24px;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: height 0.35s ease-out, opacity 0.35s ease-out, margin 0.35s ease-out;
+}
+.lyric-gap.on {
+  height: 22px;
+  margin: 10px 0;
+  opacity: 1;
+}
+/* Cada punto tiene su tercio de --gp: --g1 va de 0 a 1 en el primer tercio,
+   --g2 en el segundo, --g3 en el último. Solo opacidad y transform, o sea
+   que el navegador lo compone sin repintar. */
+.lyric-gap i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45);
+  --g1: clamp(0, var(--gp, 0) * 3, 1);
+  --g2: clamp(0, var(--gp, 0) * 3 - 1, 1);
+  --g3: clamp(0, var(--gp, 0) * 3 - 2, 1);
+  opacity: 0.22;
+  transform: scale(0.78);
+  transition: opacity 0.2s linear, transform 0.2s ease-out;
+}
+.lyric-gap.on i:nth-child(1) {
+  opacity: calc(0.22 + 0.78 * var(--g1));
+  transform: scale(calc(0.78 + 0.34 * var(--g1)));
+}
+.lyric-gap.on i:nth-child(2) {
+  opacity: calc(0.22 + 0.78 * var(--g2));
+  transform: scale(calc(0.78 + 0.34 * var(--g2)));
+}
+/* el tercero, ya lleno, avisa de que el verso entra YA */
+.lyric-gap.on i:nth-child(3) {
+  opacity: calc(0.22 + 0.78 * var(--g3));
+  transform: scale(calc(0.78 + 0.34 * var(--g3)));
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 0 calc(var(--g3) * 14px) var(--accent-glow);
+}
+body.reduce-motion .lyric-gap i { transition: none; }
 
 .lyrics-empty {
   text-align: center;
@@ -810,139 +976,7 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
 }
 .lyrics-edit .lyrics-empty { padding: 0 24px; }
 
-.ed-stack {
-  position: absolute;
-  left: 4%;
-  right: 4%;
-  top: var(--top, 47%);
-  translate: 0 -50%;                 /* separado de transform: la cámara anima transform */
-  rotate: var(--tilt, 0deg);
-  text-align: center;
-  perspective: 700px;
-  pointer-events: none;
-}
-.ed-stack.colapsa {
-  animation: ed-colapsa 0.5s ease-in forwards !important;
-}
-@keyframes ed-colapsa {
-  to { opacity: 0; filter: blur(10px); transform: scale(0.88); }
-}
 
-/* movimientos de cámara: lentos, durante toda la línea */
-.edcam-zin  { animation: edcam-zin  6s ease-out forwards; }
-.edcam-zout { animation: edcam-zout 6s ease-out forwards; }
-.edcam-izq  { animation: edcam-izq  6s linear forwards; }
-.edcam-der  { animation: edcam-der  6s linear forwards; }
-.edcam-giro { animation: edcam-giro 6s ease-out forwards; }
-.edcam-sube { animation: edcam-sube 6s ease-out forwards; }
-.edcam-baja { animation: edcam-baja 6s ease-out forwards; }
-.edcam-late { animation: edcam-late 2.2s ease-in-out infinite; }
-@keyframes edcam-zin  { from { transform: scale(1); }    to { transform: scale(1.14); } }
-@keyframes edcam-zout { from { transform: scale(1.16); } to { transform: scale(1); } }
-@keyframes edcam-izq  { from { transform: translateX(2.5%); }  to { transform: translateX(-2.5%) scale(1.05); } }
-@keyframes edcam-der  { from { transform: translateX(-2.5%); } to { transform: translateX(2.5%) scale(1.05); } }
-@keyframes edcam-giro { from { transform: rotate(1.5deg); }    to { transform: rotate(-1.2deg) scale(1.1); } }
-@keyframes edcam-sube { from { transform: translateY(3%) scale(1.02); }  to { transform: translateY(-3%) scale(1.09); } }
-@keyframes edcam-baja { from { transform: translateY(-3%) scale(1.02); } to { transform: translateY(3%) scale(1.09); } }
-@keyframes edcam-late {                       /* latido: respira al ritmo */
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.06); }
-}
-
-/* sacudida del panel entero en los efectos fuertes */
-.lyrics-edit.ed-sacudida { animation: ed-sacudida 0.35s linear; }
-@keyframes ed-sacudida {
-  0%   { transform: translate(3px, -2px); }
-  20%  { transform: translate(-4px, 3px); }
-  40%  { transform: translate(3px, 2px); }
-  60%  { transform: translate(-2px, -3px); }
-  80%  { transform: translate(2px, 1px); }
-  100% { transform: none; }
-}
-
-/* ── TÍTULO GIGANTE ── */
-.ed-titulo {
-  font-weight: 900;
-  line-height: 0.98;
-  letter-spacing: 0.01em;
-  color: var(--accent);
-  text-shadow:
-    0 0 10px var(--accent-glow),
-    0 0 30px var(--accent-glow),
-    3px 3px 0 rgba(0, 0, 0, 0.65);
-  animation-duration: 0.55s;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-.ed-titulo.ed-golpe    { animation-name: ed-golpe; animation-duration: 0.4s; }
-.ed-titulo.ed-estira   { animation-name: ed-estira; }
-.ed-titulo.ed-parpadeo { animation-name: ed-parpadeo; animation-duration: 0.7s; animation-timing-function: steps(1, end); }
-.ed-titulo.ed-giro3d   { animation-name: ed-giro3d; animation-duration: 0.7s; }
-.ed-titulo.ed-rebota   { animation-name: ed-rebota; animation-duration: 0.65s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-.ed-titulo.ed-zoomloco { animation-name: ed-zoomloco; animation-duration: 0.55s; }
-@keyframes ed-golpe {
-  0%   { opacity: 0; transform: scale(2.3); filter: blur(10px); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0); }
-}
-@keyframes ed-estira {
-  0%   { opacity: 0; transform: scaleX(2.6); filter: blur(5px); }
-  100% { opacity: 1; transform: scaleX(1); filter: blur(0); }
-}
-@keyframes ed-parpadeo {
-  0%   { opacity: 0; }
-  12%  { opacity: 1; }
-  24%  { opacity: 0.15; }
-  40%  { opacity: 1; }
-  55%  { opacity: 0.3; }
-  70%  { opacity: 1; }
-  100% { opacity: 1; }
-}
-@keyframes ed-giro3d {
-  0%   { opacity: 0; transform: rotateY(100deg) scale(0.8); filter: blur(3px); }
-  60%  { opacity: 1; transform: rotateY(-18deg) scale(1.04); filter: blur(0); }
-  100% { opacity: 1; transform: rotateY(0) scale(1); }
-}
-@keyframes ed-rebota {
-  0%   { opacity: 0; transform: translateY(-1.3em) scale(1.15); }
-  60%  { opacity: 1; transform: translateY(0.1em) scale(0.96); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes ed-zoomloco {
-  0%   { opacity: 0; transform: scale(0.15) rotate(-10deg); filter: blur(4px); }
-  70%  { opacity: 1; transform: scale(1.18) rotate(2deg); filter: blur(0); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
-}
-.ed-titulo.ed-glitch  { animation-name: ed-glitch; animation-duration: 0.5s; animation-timing-function: steps(2, end); }
-.ed-titulo.ed-desliza { animation-name: ed-desliza; animation-duration: 0.6s; }
-.ed-titulo.ed-caida3d { animation-name: ed-caida3d; animation-duration: 0.65s; }
-.ed-titulo.ed-latido  { animation-name: ed-latido; animation-duration: 0.9s; }
-@keyframes ed-glitch {
-  0%   { opacity: 0;   transform: translate(-0.06em, 0.04em) skewX(15deg); text-shadow: -6px 0 #ff00d4, 6px 0 #00f0ff; }
-  30%  { opacity: 1;   transform: translate(0.05em, -0.03em) skewX(-8deg); text-shadow: 6px 0 #ff00d4, -6px 0 #00f0ff; }
-  55%  { opacity: 0.5; transform: translate(-0.03em, 0.02em);              text-shadow: -8px 0 #00f0ff, 8px 0 #ff00d4; }
-  80%  { opacity: 1;   transform: translate(0.02em, 0); }
-  /* sin text-shadow al final: recupera el glow normal del título */
-  100% { opacity: 1;   transform: none; }
-}
-@keyframes ed-desliza {
-  0%   { opacity: 0; transform: translateX(var(--sx, -45%)) skewX(var(--sk, 14deg)); filter: blur(6px); }
-  70%  { opacity: 1; transform: translateX(-2%) skewX(calc(var(--sk, 14deg) * -0.25)); filter: blur(0); }
-  100% { opacity: 1; transform: translateX(0) skewX(0); }
-}
-@keyframes ed-caida3d {
-  0%   { opacity: 0; transform: rotateX(90deg) translateY(-0.4em) scale(1.3); filter: blur(3px); }
-  60%  { opacity: 1; transform: rotateX(-20deg) scale(1.02); filter: blur(0); }
-  100% { opacity: 1; transform: rotateX(0) scale(1); }
-}
-@keyframes ed-latido {
-  0%   { opacity: 0; transform: scale(0.7); filter: blur(4px); }
-  25%  { opacity: 1; transform: scale(1.12); filter: blur(0); }
-  40%  { transform: scale(0.98); }
-  55%  { transform: scale(1.1); }
-  70%  { transform: scale(1); }
-  100% { opacity: 1; transform: scale(1); }
-}
 /* títulos letra a letra */
 .edl-teclea, .edl-cae, .edl-onda, .edl-neon {
   display: inline-block;
@@ -954,221 +988,22 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
 .edl-cae    { animation-name: edl-cae; animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
 .edl-onda   { animation-name: edl-onda; animation-duration: 0.55s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
 .edl-neon   { animation-name: edl-neon; animation-duration: 0.7s; animation-timing-function: linear; }
-@keyframes edl-teclea {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes edl-cae {
-  0%   { opacity: 0; transform: translateY(-1.3em) rotate(9deg); filter: blur(2px); }
-  70%  { opacity: 1; transform: translateY(0.06em) rotate(-2deg); filter: blur(0); }
-  100% { opacity: 1; transform: translateY(0) rotate(0); }
-}
-@keyframes edl-onda {
-  0%   { opacity: 0; transform: translateY(0.6em) scale(0.5) rotate(-8deg); }
-  60%  { opacity: 1; transform: translateY(-0.15em) scale(1.12) rotate(3deg); }
-  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
-}
-@keyframes edl-neon {
-  0%   { opacity: 0; }
-  8%   { opacity: 1;    text-shadow: 0 0 12px currentColor, 0 0 40px currentColor; }
-  16%  { opacity: 0.2;  text-shadow: none; }
-  28%  { opacity: 1;    text-shadow: 0 0 14px currentColor, 0 0 44px currentColor; }
-  40%  { opacity: 0.35; text-shadow: none; }
-  55%  { opacity: 1;    text-shadow: 0 0 16px currentColor, 0 0 52px currentColor; }
-  /* sin text-shadow al final: queda el glow normal del título */
-  100% { opacity: 1; }
-}
 
-/* ── FRASE palabra a palabra ── */
-.ed-frase {
-  font-weight: 500;
-  color: var(--text);
-  line-height: 1.5;
-  padding: 0 6%;
-  position: relative;
-  z-index: 2;
-  perspective: 600px;        /* profundidad para las palabras que giran en 3D */
-}
-.ed-pal {
-  display: inline-block;
-  margin: 0 0.16em;
-  animation-duration: 0.55s;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-.ed-acumula .ed-pal  { animation-name: edp-sube; }
-.ed-crece .ed-pal    { animation-name: edp-crece; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-.ed-flotan .ed-pal   { animation-name: edp-flota; animation-duration: 0.7s; }
-.ed-maquina .ed-pal  { animation-name: edl-teclea; animation-duration: 0.1s; animation-timing-function: steps(1, end); }
-.ed-escalera { line-height: 1.25; }   /* compacta la torre vertical */
-.ed-escalera .ed-pal {
-  display: block;
-  animation-name: edp-sube;
-  font-size: var(--fs, 1em);
-  margin-left: var(--mx, 0);
-}
-@keyframes edp-sube {
-  from { opacity: 0; transform: translateY(0.8em); filter: blur(4px); }
-  to   { opacity: 1; transform: translateY(0); filter: blur(0); }
-}
-@keyframes edp-crece {
-  0%   { opacity: 0; transform: scale(0.3); }
-  100% { opacity: 1; transform: scale(1); }
-}
-@keyframes edp-flota {
-  0%   { opacity: 0; transform: translate(var(--tx, 0), var(--ty, 0)) rotate(var(--rot, 0deg)) scale(1.6); filter: blur(5px); }
-  100% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); filter: blur(0); }
-}
-/* nuevas entradas de palabra */
-.ed-caen .ed-pal    { animation-name: edp-cae; animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-.ed-giro .ed-pal    { animation-name: edp-giro; animation-duration: 0.6s; }
-.ed-latigo .ed-pal  { animation-name: edp-latigo; animation-duration: 0.55s; }
-.ed-burbuja .ed-pal { animation-name: edp-burbuja; animation-duration: 0.65s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-@keyframes edp-cae {
-  0%   { opacity: 0; transform: translateY(-1.2em) rotate(calc(var(--sx, 1) * 12deg)) scale(1.15); filter: blur(2px); }
-  65%  { opacity: 1; transform: translateY(0.08em) rotate(calc(var(--sx, 1) * -3deg)) scale(1); filter: blur(0); }
-  100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
-}
-@keyframes edp-giro {
-  0%   { opacity: 0; transform: rotateY(95deg) translateX(0.3em); filter: blur(2px); }
-  60%  { opacity: 1; transform: rotateY(-18deg); filter: blur(0); }
-  100% { opacity: 1; transform: rotateY(0); }
-}
-@keyframes edp-latigo {
-  0%   { opacity: 0; transform: translateX(calc(var(--sx, 1) * 1.6em)) skewX(calc(var(--sx, 1) * -24deg)); filter: blur(3px); }
-  70%  { opacity: 1; transform: translateX(calc(var(--sx, 1) * -0.08em)) skewX(calc(var(--sx, 1) * 6deg)); filter: blur(0); }
-  100% { opacity: 1; transform: translateX(0) skewX(0); }
-}
-@keyframes edp-burbuja {
-  0%   { opacity: 0; transform: scale(0) rotate(calc(var(--sx, 1) * 20deg)); }
-  70%  { opacity: 1; transform: scale(1.18) rotate(calc(var(--sx, 1) * -5deg)); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
-}
-/* palabra destacada / cursiva, como en el regalo */
-.ed-pal.ed-grande {
-  font-size: 1.55em;
-  font-weight: 600;
-  font-style: italic;
-  color: var(--accent);
-  text-shadow: 0 0 10px var(--accent-glow), 0 0 26px var(--accent-glow);
-}
-.ed-pal.ed-cursiva { font-style: italic; opacity: 0.95; }
 
-/* eco gigante borroso detrás de la frase */
-.ed-eco {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  translate: 0 -50%;
-  font-weight: 900;
-  font-size: 3.2em;
-  line-height: 1;
-  opacity: 0.07;
-  filter: blur(3px);
-  white-space: nowrap;
-  overflow: hidden;
-  z-index: 1;
-  text-transform: uppercase;
-}
+   
 
-/* flash de impacto para los efectos fuertes */
-.ed-flash {
-  position: absolute;
-  inset: 0;
-  background: #fff;
-  z-index: 9;
-  pointer-events: none;
-  animation: ed-flash 0.24s ease-out forwards;
-}
-@keyframes ed-flash {
-  from { opacity: 0.85; }
-  to   { opacity: 0; }
-}
 
 /* ═══ MODO EDIT · pack de animaciones nuevas (estilo edits TikTok/CapCut) ═══
    Onda de choque + chispas en los golpes, decode hacker, aberración
    cromática, destello cromado, sello, enfoque cine y salidas variadas. */
 
-/* ── salidas variadas de la línea anterior ── */
-.ed-stack.colapsa-sube   { animation: ed-colapsa-sube 0.45s ease-in forwards !important; }
-.ed-stack.colapsa-glitch { animation: ed-colapsa-glitch 0.4s steps(3, end) forwards !important; }
-@keyframes ed-colapsa-sube {
-  to { opacity: 0; transform: translateY(-1.4em) scale(1.15); filter: blur(8px); }
-}
-@keyframes ed-colapsa-glitch {
-  0%   { opacity: 1; }
-  30%  { opacity: 0.6;  transform: translateX(0.12em) skewX(-12deg); text-shadow: -5px 0 #ff00d4, 5px 0 #00f0ff; }
-  60%  { opacity: 0.35; transform: translateX(-0.1em) skewX(9deg);   text-shadow: 5px 0 #00f0ff, -5px 0 #ff00d4; }
-  100% { opacity: 0;    transform: translateX(0.05em) scaleY(0.1); }
-}
 
-/* ── cámaras nuevas ── */
-.edcam-dolly   { animation: edcam-dolly 6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
-.edcam-tiembla { animation: edcam-tiembla 0.5s steps(2, end) infinite; }
-.edcam-vaiven  { animation: edcam-vaiven 3.2s ease-in-out infinite; }
-@keyframes edcam-dolly {                /* acercamiento con leve giro, muy cine */
-  from { transform: scale(0.96) rotate(0.6deg); }
-  to   { transform: scale(1.2) rotate(-0.8deg) translateY(-1.5%); }
-}
-@keyframes edcam-tiembla {              /* cámara en mano: micro-sacudidas */
-  0%   { transform: translate(0.15%, -0.2%) rotate(0.12deg); }
-  50%  { transform: translate(-0.18%, 0.15%) rotate(-0.1deg); }
-  100% { transform: translate(0.1%, 0.1%) rotate(0.08deg); }
-}
-@keyframes edcam-vaiven {               /* balanceo lateral suave */
-  0%, 100% { transform: translateX(-1.6%) rotate(-0.5deg); }
-  50%      { transform: translateX(1.6%) rotate(0.5deg); }
-}
+/* ══════ TANDA 7 · ENTRADAS NUEVAS ══════
+   El catálogo de entradas está saturado, así que estas cuatro usan mecánicas
+   que NO estaba usando ninguna de las 105: corte en diagonal, copias
+   desplazadas que convergen, empuje encadenado entre palabras y una onda que
+   recorre la frase en 3D. */
 
-/* ── títulos nuevos ── */
-.ed-titulo.ed-recorte { animation-name: ed-recorte; animation-duration: 0.6s; }
-.ed-titulo.ed-enfoca  { animation-name: ed-enfoca; animation-duration: 0.9s; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
-.ed-titulo.ed-sello   { animation-name: ed-sello; animation-duration: 0.45s; animation-timing-function: cubic-bezier(0.55, 0, 0.68, 0.53); }
-.ed-titulo.ed-chroma  { animation-name: ed-chroma; animation-duration: 0.7s; }
-@keyframes ed-recorte {                 /* cortina: barrido que revela el texto */
-  0%   { opacity: 0; clip-path: inset(0 100% 0 0); transform: skewX(8deg) translateX(-0.15em); }
-  40%  { opacity: 1; }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); transform: skewX(0) translateX(0); }
-}
-@keyframes ed-enfoca {                  /* desenfoque cinematográfico que enfoca */
-  0%   { opacity: 0; filter: blur(18px); transform: scale(1.5, 1.25); }
-  55%  { opacity: 1; }
-  100% { opacity: 1; filter: blur(0); transform: scale(1); }
-}
-@keyframes ed-sello {                   /* cae como sello/estampa */
-  0%   { opacity: 0; transform: scale(2.8) rotate(-14deg); filter: blur(6px); }
-  70%  { opacity: 1; transform: scale(0.94) rotate(1.5deg); filter: blur(0); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
-}
-@keyframes ed-chroma {                  /* aberración cromática RGB que converge */
-  0%   { opacity: 0; text-shadow: -0.35em 0 0 rgba(255, 0, 80, 0.9), 0.35em 0 0 rgba(0, 220, 255, 0.9); filter: blur(2px); }
-  35%  { opacity: 1; text-shadow: -0.15em 0 0 rgba(255, 0, 80, 0.8), 0.15em 0 0 rgba(0, 220, 255, 0.8); }
-  70%  { text-shadow: -0.04em 0 0 rgba(255, 0, 80, 0.7), 0.04em 0 0 rgba(0, 220, 255, 0.7); filter: blur(0); }
-  /* sin text-shadow al final: recupera el glow normal del título */
-  100% { opacity: 1; }
-}
-/* destello cromado que recorre el texto tras entrar */
-.ed-titulo.ed-brillo {
-  color: transparent;
-  background: linear-gradient(105deg, var(--accent) 30%, #fff 48%, var(--accent) 62%);
-  background-size: 280% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  text-shadow: none;
-  filter: drop-shadow(0 0 12px var(--accent-glow)) drop-shadow(3px 3px 0 rgba(0, 0, 0, 0.55));
-  animation: ed-brillo-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms) both,
-             ed-brillo-sweep 1.5s ease-in-out calc(var(--d, 0ms) + 250ms) both;
-}
-@keyframes ed-brillo-in {
-  from { opacity: 0; transform: translateY(0.5em) scale(1.08); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes ed-brillo-sweep {
-  from { background-position: 120% 0; }
-  to   { background-position: -60% 0; }
-}
 
 /* ── títulos letra a letra nuevos ── */
 .edl-explota, .edl-descifra {
@@ -1179,325 +1014,13 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
 }
 .edl-explota  { animation-name: edl-explota; animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
 .edl-descifra { animation-name: edl-descifra; animation-duration: 0.3s; animation-timing-function: linear; }
-@keyframes edl-explota {                /* cada letra llega volando y se arma */
-  0%   { opacity: 0; transform: translate(var(--rx, 2em), var(--ry, -1em)) rotate(var(--rr, 90deg)) scale(1.6); filter: blur(4px); }
-  70%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1.05); filter: blur(0); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edl-descifra {               /* decode: de tenue revuelta a fija con flash */
-  0%   { opacity: 0.4; filter: blur(1.5px); }
-  60%  { opacity: 1; text-shadow: 0 0 14px currentColor, 0 0 40px currentColor; }
-  100% { opacity: 1; filter: blur(0); }
-}
 
-/* ── frases palabra a palabra nuevas ── */
-.ed-resorte .ed-pal  { animation-name: edp-resorte; animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-.ed-remolino .ed-pal { animation-name: edp-remolino; animation-duration: 0.65s; }
-.ed-foco .ed-pal     { animation-name: edp-foco; animation-duration: 0.7s; }
-@keyframes edp-resorte {                /* salta desde abajo con estirón elástico */
-  0%   { opacity: 0; transform: translateY(1.6em) scaleY(1.5) scaleX(0.7); }
-  55%  { opacity: 1; transform: translateY(-0.12em) scaleY(0.85) scaleX(1.1); }
-  80%  { transform: translateY(0.04em) scaleY(1.05) scaleX(0.98); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes edp-remolino {               /* entra girando en espiral */
-  0%   { opacity: 0; transform: rotate(calc(var(--sx, 1) * 200deg)) scale(0) translateY(0.4em); }
-  70%  { opacity: 1; transform: rotate(calc(var(--sx, 1) * -12deg)) scale(1.1); }
-  100% { opacity: 1; transform: rotate(0) scale(1); }
-}
-@keyframes edp-foco {                   /* gigante borrosa que enfoca en su sitio */
-  0%   { opacity: 0; filter: blur(10px); transform: scale(1.7); }
-  60%  { opacity: 1; }
-  100% { opacity: 1; filter: blur(0); transform: scale(1); }
-}
-
-/* ── onda de choque + chispas pixel en los golpes fuertes ── */
-.ed-ring {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 24px;
-  height: 24px;
-  margin: -12px 0 0 -12px;
-  border: 3px solid var(--accent);
-  border-radius: 50%;
-  box-shadow: 0 0 18px var(--accent-glow), inset 0 0 12px var(--accent-glow);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 8;
-  animation: ed-ring 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-@keyframes ed-ring {
-  0%   { opacity: 0.9; transform: scale(0.4); border-width: 6px; }
-  100% { opacity: 0; transform: scale(16); border-width: 1px; }
-}
-.ed-spark {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: var(--sz, 4px);
-  height: var(--sz, 4px);
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 8;
-  animation: ed-spark 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-@keyframes ed-spark {
-  0%   { opacity: 1; transform: translate(0, 0); }
-  100% { opacity: 0; transform: translate(var(--dx, 40px), var(--dy, -40px)) rotate(180deg); }
-}
 
 /* ═══ MODO EDIT · fx replicados de los edits de referencia del usuario ═══
    v16: palabra con la carátula de textura · v17: lockups, marquesinas y
    contorno neón · v18: inversión de color y palabra doble con cursiva ·
    v19: cortes secos elegantes. */
 
-/* ── ed-invertido: corte seco, fondo acento + texto oscuro (v18/v19) ──
-   El fondo vive como hermano del stack (la cámara no lo arrastra):
-   en el panel llena el cuadro de letras; en modo cine se ancla FIJO
-   al viewport para pintar la pantalla completa, vinilo y onda incluidos. */
-.ed-fondo {
-  position: absolute;
-  inset: 0;
-  background: var(--accent);
-  animation: ed-fondo-in 0.16s steps(2, end) both;
-  pointer-events: none;
-}
-body.cinema-open .cinema-stage .ed-fondo {
-  position: fixed;
-  inset: 0;
-}
-@keyframes ed-fondo-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-/* el fondo se despide con fundido, sea cual sea la salida del stack */
-.ed-fondo.colapsa,
-.ed-fondo.colapsa-sube,
-.ed-fondo.colapsa-glitch {
-  animation: ed-fondo-out 0.45s ease-out forwards !important;
-}
-@keyframes ed-fondo-out {
-  from { opacity: 1; }
-  to   { opacity: 0; }
-}
-.ed-stack-inv .ed-titulo {
-  /* texto oscuro SOBRE el acento: sale del fondo de la app, no de un fijo,
-     para que siga funcionando con cualquier tema */
-  color: var(--bg-deep);
-  text-shadow: 0.04em 0.04em 0 rgba(255, 255, 255, 0.25);
-}
-.ed-titulo.ed-invertido { animation-name: ed-invertido; animation-duration: 0.45s; animation-timing-function: steps(3, end); }
-@keyframes ed-invertido {
-  0%   { opacity: 0; transform: scale(1.3); }
-  34%  { opacity: 1; transform: scale(1.3); }
-  67%  { opacity: 1; transform: scale(0.96); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* ── ed-duo: palabra gigante + eco cursivo en minúsculas encima (v18) ── */
-.ed-titulo.ed-duo { position: relative; animation-name: ed-golpe; animation-duration: 0.45s; }
-.ed-duo-eco {
-  position: absolute;
-  left: 50%;
-  top: 60%;
-  font-style: italic;
-  font-weight: 500;
-  font-size: 0.62em;
-  letter-spacing: 0.02em;
-  color: var(--text);
-  text-shadow: 0.06em 0.06em 0 rgba(0, 0, 0, 0.55), 0 0 14px var(--accent-glow);
-  animation: ed-duo-eco 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms) both;
-  pointer-events: none;
-}
-@keyframes ed-duo-eco {
-  from { opacity: 0; transform: translate(-50%, -20%) rotate(-7deg) scale(1.5); filter: blur(4px); }
-  to   { opacity: 1; transform: translate(-50%, -50%) rotate(-7deg) scale(1); filter: blur(0); }
-}
-
-/* ── ed-lockup: mini filas con tracking + palabra ENORME (v17/v18) ── */
-.ed-lockup-mini {
-  letter-spacing: 0.42em;
-  text-transform: uppercase;
-  color: var(--text);
-  text-shadow: 0 0 8px var(--accent-glow), 0.08em 0.08em 0 rgba(0, 0, 0, 0.5);
-  animation: ed-lockup-mini 0.55s ease-out var(--d, 0ms) both;
-}
-@keyframes ed-lockup-mini {
-  from { opacity: 0; transform: scaleX(1.6); filter: blur(3px); }
-  to   { opacity: 0.9; transform: scaleX(1); filter: blur(0); }
-}
-.ed-titulo.ed-lockup-big {
-  animation-name: ed-golpe;
-  animation-duration: 0.45s;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* ── ed-cinta: marquesinas con la frase repetida, arriba y abajo (v17) ── */
-.ed-cinta-banda {
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
-  opacity: 0.55;
-  color: var(--accent);
-  letter-spacing: 0.2em;
-  margin: 0.5em 0;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-  animation: ed-cinta-banda-in 0.4s ease-out both;
-}
-@keyframes ed-cinta-banda-in {
-  from { opacity: 0; }
-  to   { opacity: 0.55; }
-}
-.ed-cinta-track {
-  display: inline-block;
-  animation: ed-cinta-move 14s linear infinite;
-}
-.ed-cinta-banda.rev .ed-cinta-track { animation-direction: reverse; }
-@keyframes ed-cinta-move {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-.ed-titulo.ed-cinta { animation-name: ed-rebota; animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-
-/* ── ed-contorno: solo contorno neón; el relleno parpadea al final (v17) ── */
-.ed-titulo.ed-contorno {
-  -webkit-text-stroke: 0.028em var(--accent);
-  animation-name: ed-contorno;
-  animation-duration: 1s;
-  animation-timing-function: steps(1, end);
-}
-@keyframes ed-contorno {
-  0%   { opacity: 0; color: transparent; text-shadow: none; }
-  14%  { opacity: 1; color: transparent; text-shadow: 0 0 12px var(--accent-glow); }
-  48%  { color: transparent; }
-  60%  { color: var(--accent); text-shadow: 0 0 20px var(--accent-glow); }
-  72%  { color: transparent; text-shadow: 0 0 12px var(--accent-glow); }
-  100% { opacity: 1; color: var(--accent); }
-}
-
-/* ── ed-portada: la carátula como textura dentro de las letras (v16) ── */
-.ed-titulo.ed-portada {
-  color: transparent;
-  background: linear-gradient(160deg, var(--accent), #fff 150%);   /* fallback sin carátula */
-  background-size: cover;
-  background-position: center;
-  -webkit-background-clip: text;
-  background-clip: text;
-  text-shadow: none;
-  filter: drop-shadow(0 0 14px var(--accent-glow)) drop-shadow(0.04em 0.05em 0 rgba(0, 0, 0, 0.6));
-  animation-name: ed-portada;
-  animation-duration: 0.8s;
-}
-@keyframes ed-portada {
-  0%   { opacity: 0; transform: scale(1.55, 1.4); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* ═══ ESCENA INSTRUMENTAL · cuando la letra es solo "♪" ═══
-   Nota central que late con los graves (JS la escala vía getBands),
-   espectro de barras (scaleY, GPU), anillos sonar y satélites en órbita.
-   Sin señal en vivo, el visualizador entrega su onda idle: siempre fluye. */
-.ed-inst {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  animation: ed-inst-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-@keyframes ed-inst-in {
-  from { opacity: 0; transform: scale(0.6); filter: blur(8px); }
-  to   { opacity: 1; transform: scale(1); filter: blur(0); }
-}
-.ed-inst-centro {
-  position: relative;
-  display: grid;
-  place-items: center;
-}
-.ed-inst-nota {
-  line-height: 1;
-  color: var(--accent);
-  text-shadow: 0 0 18px var(--accent-glow), 0 0 50px var(--accent-glow);
-  will-change: transform;
-}
-/* sin motor JS (fallback): la nota late sola */
-.ed-inst:not(.live) .ed-inst-nota { animation: ed-inst-late 1.6s ease-in-out infinite; }
-@keyframes ed-inst-late {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.12); }
-}
-.ed-inst-anillo {
-  position: absolute;
-  width: 1.6em;
-  height: 1.6em;
-  border: 2px solid var(--accent);
-  border-radius: 50%;
-  opacity: 0;
-  animation: ed-inst-anillo 3.3s ease-out infinite;
-  pointer-events: none;
-}
-@keyframes ed-inst-anillo {
-  0%   { transform: scale(0.5); opacity: 0.65; }
-  100% { transform: scale(2.7); opacity: 0; }
-}
-.ed-inst-orbita {
-  position: absolute;
-  width: 0;
-  height: 0;
-  animation: ed-inst-orbita var(--dur, 9s) linear infinite;
-}
-.ed-inst-orbita.rev { animation-direction: reverse; }
-@keyframes ed-inst-orbita {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-.ed-inst-sat {
-  position: absolute;
-  left: var(--r, 1.2em);
-  top: 0;
-  translate: -50% -50%;
-  font-size: 0.3em;
-  color: var(--accent);
-  opacity: 0.75;
-  text-shadow: 0 0 10px var(--accent-glow);
-}
-/* espectro circular estilo NCS: rayos alrededor de la nota.
-   El wrapper .ed-inst-rad fija el ángulo; la barra crece hacia afuera
-   con scaleY (origen abajo = borde interior del anillo). Todo GPU. */
-.ed-inst-rad {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-.ed-inst-radbar {
-  position: absolute;
-  left: -0.024em;
-  bottom: 0.92em;              /* radio interior del anillo */
-  width: 0.048em;
-  height: 0.3em;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-  transform: scaleY(0.15);
-  transform-origin: center bottom;
-  will-change: transform;
-}
-/* sin motor JS: los rayos laten en cascada alrededor del círculo */
-.ed-inst:not(.live) .ed-inst-radbar {
-  animation: ed-inst-eqidle 1.1s ease-in-out infinite alternate;
-}
-@keyframes ed-inst-eqidle {
-  from { transform: scaleY(0.15); }
-  to   { transform: scaleY(1.4); }
-}
 
 /* ═══ ⚗ LABORATORIO DE EFECTOS · panel para probar animaciones sin música ═══ */
 .fx-lab {
@@ -1606,120 +1129,6 @@ body.cinema-open .cinema-stage .ed-fondo {
   .fx-lab { width: 156px; font-size: 13px; }
 }
 
-/* ── ed-poema: torre centrada elegante, una palabra por renglón (v18) ── */
-.ed-poema { line-height: 1.45; }
-.ed-poema .ed-pal {
-  display: block;
-  margin: 0.08em 0;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  animation-name: edp-poema;
-  animation-duration: 0.7s;
-}
-@keyframes edp-poema {
-  from { opacity: 0; transform: translateY(0.3em) scaleX(1.45); filter: blur(4px); }
-  to   { opacity: 1; transform: translateY(0) scaleX(1); filter: blur(0); }
-}
-
-/* ═══ FRASES · tanda 3: presets estilo AE/CapCut, empatadas con títulos ═══ */
-.ed-ola .ed-pal      { animation-name: edp-ola; animation-duration: 0.65s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-.ed-corte .ed-pal    { animation-name: edp-corte; animation-duration: 0.45s; }
-.ed-pendulo .ed-pal  { animation-name: edp-pendulo; animation-duration: 0.8s; transform-origin: top center; }
-.ed-gravedad .ed-pal { animation-name: edp-gravedad; animation-duration: 0.75s; animation-timing-function: linear; }
-.ed-viento .ed-pal   { animation-name: edp-viento; animation-duration: 0.6s; }
-.ed-pixelea .ed-pal  { animation-name: edp-pixelea; animation-duration: 0.4s; animation-timing-function: steps(4, end); }
-.ed-vhs .ed-pal      { animation-name: edp-vhs; animation-duration: 0.5s; animation-timing-function: steps(3, end); }
-.ed-cohete .ed-pal   { animation-name: edp-cohete; animation-duration: 0.55s; }
-.ed-carrusel .ed-pal { animation-name: edp-carrusel; animation-duration: 0.7s; transform-origin: top center; }
-.ed-destello .ed-pal { animation-name: edp-destello; animation-duration: 0.6s; }
-.ed-susurro .ed-pal  { animation-name: edp-susurro; animation-duration: 1.1s; animation-timing-function: ease-out; }
-.ed-salto .ed-pal    { animation-name: edp-salto; animation-duration: 0.7s; }
-.ed-luzneon .ed-pal  { animation-name: edp-luzneon; animation-duration: 0.6s; animation-timing-function: linear; }
-.ed-iman .ed-pal     { animation-name: edp-iman; animation-duration: 0.5s; }
-
-@keyframes edp-ola {                    /* ola con rebote encadenado */
-  0%   { opacity: 0; transform: translateY(0.9em) rotate(calc(var(--sx, 1) * 6deg)); }
-  55%  { opacity: 1; transform: translateY(-0.28em) rotate(calc(var(--sx, 1) * -3deg)); }
-  80%  { transform: translateY(0.08em) rotate(0); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-@keyframes edp-corte {                  /* cortina: barrido que revela la palabra */
-  0%   { opacity: 1; clip-path: inset(0 100% 0 0); transform: translateX(-0.12em); }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); transform: translateX(0); }
-}
-@keyframes edp-pendulo {                /* columpio colgado desde arriba */
-  0%   { opacity: 0; transform: rotate(calc(var(--sx, 1) * 55deg)) translateY(-0.2em); }
-  40%  { opacity: 1; transform: rotate(calc(var(--sx, 1) * -18deg)); }
-  70%  { transform: rotate(calc(var(--sx, 1) * 8deg)); }
-  100% { opacity: 1; transform: rotate(0) translateY(0); }
-}
-@keyframes edp-gravedad {               /* cae y rebota como pelota */
-  0%   { opacity: 0; transform: translateY(-1.6em); }
-  35%  { opacity: 1; transform: translateY(0); }
-  55%  { transform: translateY(-0.5em); }
-  72%  { transform: translateY(0); }
-  85%  { transform: translateY(-0.15em); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-@keyframes edp-viento {                 /* ráfaga: todas desde el mismo lado */
-  0%   { opacity: 0; transform: translateX(-2.2em) skewX(18deg); filter: blur(6px); }
-  70%  { opacity: 1; transform: translateX(0.1em) skewX(-4deg); filter: blur(0); }
-  100% { opacity: 1; transform: translateX(0) skewX(0); }
-}
-@keyframes edp-pixelea {                /* materialización pixelada a saltos */
-  0%   { opacity: 0; transform: scale(1.6); filter: contrast(3) brightness(2); }
-  50%  { opacity: 1; transform: scale(0.9); }
-  100% { opacity: 1; transform: scale(1); filter: none; }
-}
-@keyframes edp-vhs {                    /* jitter VHS con separación RGB */
-  0%   { opacity: 0; transform: translate(-0.15em, 0.08em) skewX(-10deg); text-shadow: -0.12em 0 #ff00d4, 0.12em 0 #00f0ff; }
-  35%  { opacity: 1; transform: translate(0.08em, -0.05em) skewX(6deg);   text-shadow: 0.07em 0 #ff00d4, -0.07em 0 #00f0ff; }
-  70%  { transform: translate(-0.03em, 0.02em);                            text-shadow: -0.03em 0 #ff00d4, 0.03em 0 #00f0ff; }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edp-cohete {                 /* despega estirada y frena arriba */
-  0%   { opacity: 0; transform: translateY(2.2em) scale(0.6, 2.2); filter: blur(4px); }
-  60%  { opacity: 1; transform: translateY(-0.18em) scale(1.05, 0.9); filter: blur(0); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes edp-carrusel {               /* tablero de aeropuerto que gira */
-  0%   { opacity: 0; transform: rotateX(-100deg); }
-  55%  { opacity: 1; transform: rotateX(16deg); }
-  80%  { transform: rotateX(-6deg); }
-  100% { opacity: 1; transform: rotateX(0); }
-}
-@keyframes edp-destello {               /* flash blanco al encender */
-  0%   { opacity: 0; transform: scale(0.85); }
-  25%  { opacity: 1; color: #fff; text-shadow: 0 0 16px #fff, 0 0 34px var(--accent-glow); transform: scale(1.15); }
-  100% { opacity: 1; transform: scale(1); }
-}
-@keyframes edp-susurro {                /* suave, para baladas
-  (scaleX en vez de letter-spacing: animar tracking reflowea todo el texto
-   por frame y se ve a tirones; el transform va por GPU) */
-  0%   { opacity: 0; transform: translateY(0.2em) scaleX(1.18); filter: blur(5px); }
-  100% { opacity: 1; transform: translateY(0) scaleX(1); filter: blur(0); }
-}
-@keyframes edp-salto {                  /* brinco cartoon squash & stretch */
-  0%   { opacity: 0; transform: translateY(1.2em) scale(1.4, 0.6); }
-  40%  { opacity: 1; transform: translateY(-0.35em) scale(0.8, 1.25); }
-  65%  { transform: translateY(0.06em) scale(1.15, 0.85); }
-  85%  { transform: translateY(0) scale(0.95, 1.05); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes edp-luzneon {                /* letrero neón por palabra */
-  0%   { opacity: 0; }
-  10%  { opacity: 1; text-shadow: 0 0 12px currentColor, 0 0 32px currentColor; }
-  22%  { opacity: 0.25; text-shadow: none; }
-  38%  { opacity: 1; text-shadow: 0 0 14px currentColor, 0 0 38px currentColor; }
-  52%  { opacity: 0.4; text-shadow: none; }
-  70%  { opacity: 1; text-shadow: 0 0 16px currentColor, 0 0 44px currentColor; }
-  100% { opacity: 1; }
-}
-@keyframes edp-iman {                   /* llega disparada y se ajusta */
-  0%   { opacity: 0; transform: translateX(calc(var(--sx, 1) * 2.4em)) scaleX(1.7); filter: blur(3px); }
-  65%  { opacity: 1; transform: translateX(calc(var(--sx, 1) * -0.12em)) scaleX(0.96); filter: blur(0); }
-  100% { opacity: 1; transform: translateX(0) scaleX(1); }
-}
 
 /* ═══ TANDA 4 · pedidos del usuario + tendencias caption 2026 ═══ */
 
@@ -1735,48 +1144,7 @@ body.cinema-open .cinema-stage .ed-fondo {
   animation-duration: 0.6s;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
-@keyframes edl-esquina {
-  0%   { opacity: 0; transform: translate(var(--cx, 5em), var(--cy, -3em)) rotate(25deg) scale(1.5); filter: blur(4px); }
-  70%  { opacity: 1; transform: translate(0, 0) rotate(-3deg) scale(1.04); filter: blur(0); }
-  100% { opacity: 1; transform: none; }
-}
 
-/* ed-caja: caja de acento con texto oscuro (highlight de caption) */
-.ed-titulo.ed-caja {
-  display: table;                  /* caja al ancho del texto, centrada */
-  margin: 0.07em auto;
-  padding: 0.04em 0.24em;
-  background: var(--accent);
-  color: var(--bg-deep);           /* sobre el acento: sigue el fondo del tema */
-  text-shadow: none;
-  box-shadow: 0 0 16px var(--accent-glow), 0.06em 0.08em 0 rgba(0, 0, 0, 0.45);
-  transform-origin: left center;
-  animation-name: ed-caja;
-}
-@keyframes ed-caja {
-  0%   { opacity: 0; transform: scaleX(0); }
-  60%  { opacity: 1; transform: scaleX(1.05); }
-  100% { opacity: 1; transform: scaleX(1); }
-}
-
-/* ed-deletreo: letras GIGANTES en ráfaga y al final la palabra */
-.ed-letrona {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  line-height: 1;
-  color: var(--accent);
-  text-shadow: 0 0 20px var(--accent-glow), 0 0 60px var(--accent-glow),
-               0.03em 0.03em 0 rgba(0, 0, 0, 0.6);
-  animation: ed-letrona 0.3s linear var(--d, 0ms) both;
-  pointer-events: none;
-}
-@keyframes ed-letrona {
-  0%   { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }
-  18%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  80%  { opacity: 1; transform: translate(-50%, -50%) scale(0.96); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-}
 
 /* ed-tetris: letras caen a saltos duros y encajan como bloques */
 .edl-tetris {
@@ -1788,42 +1156,7 @@ body.cinema-open .cinema-stage .ed-fondo {
   animation-duration: 0.45s;
   animation-timing-function: steps(5, end);
 }
-@keyframes edl-tetris {
-  0%   { opacity: 0; transform: translateY(-2.8em); }
-  12%  { opacity: 1; }
-  100% { opacity: 1; transform: translateY(0); }
-}
 
-/* ed-diagonal: filas alineadas de esquina a esquina */
-.ed-titulo.ed-diagonal { animation-name: ed-diagonal; animation-duration: 0.55s; }
-@keyframes ed-diagonal {
-  0%   { opacity: 0; transform: translate(calc(var(--sx, -1) * 1.3em), calc(var(--sx, -1) * -0.4em)); filter: blur(5px); }
-  100% { opacity: 1; transform: translate(0, 0); filter: blur(0); }
-}
-
-/* ed-marco: corchetes de esquina que enmarcan el título */
-.ed-titulo.ed-marco { animation-name: ed-marco-in; animation-duration: 0.6s; }
-@keyframes ed-marco-in {
-  0%   { opacity: 0; transform: scale(0.92); filter: blur(4px); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0); }
-}
-.ed-marco-esq {
-  position: absolute;
-  width: 0.9em;
-  height: 0.9em;
-  border: 3px solid var(--accent);
-  box-shadow: 0 0 10px var(--accent-glow);
-  animation: ed-marco-esq 0.4s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms) both;
-  pointer-events: none;
-}
-.ed-marco-esq.tl { top: -0.5em;    left: -0.35em;  border-right: 0; border-bottom: 0; }
-.ed-marco-esq.tr { top: -0.5em;    right: -0.35em; border-left: 0;  border-bottom: 0; }
-.ed-marco-esq.bl { bottom: -0.5em; left: -0.35em;  border-right: 0; border-top: 0; }
-.ed-marco-esq.br { bottom: -0.5em; right: -0.35em; border-left: 0;  border-top: 0; }
-@keyframes ed-marco-esq {
-  from { opacity: 0; transform: scale(0); }
-  to   { opacity: 0.9; transform: scale(1); }
-}
 
 /* ed-persiana: letras se abren como persianas, origen alternado */
 .edl-persiana {
@@ -1837,150 +1170,10 @@ body.cinema-open .cinema-stage .ed-fondo {
   transform-origin: center top;
 }
 .edl-persiana:nth-child(even) { transform-origin: center bottom; }
-@keyframes edl-persiana {
-  0%   { opacity: 0; transform: scaleY(0); }
-  70%  { opacity: 1; transform: scaleY(1.12); }
-  100% { opacity: 1; transform: scaleY(1); }
-}
 
-/* ed-tv: televisor CRT encendiéndose (línea brillante que se expande) */
-.ed-titulo.ed-tv { animation-name: ed-tv; animation-duration: 0.6s; }
-@keyframes ed-tv {
-  0%   { opacity: 0; transform: scale(1.4, 0.01); filter: brightness(4); }
-  35%  { opacity: 1; transform: scale(1.15, 0.03); filter: brightness(6); }
-  55%  { transform: scale(1, 1.08); filter: brightness(1.6); }
-  70%  { opacity: 0.6; }
-  80%  { opacity: 1; transform: scale(1); filter: brightness(1); }
-  100% { opacity: 1; transform: scale(1); filter: none; }
-}
 
 /* ── FRASES ── */
 
-/* ed-resalta: karaoke, la caja de color enciende palabra a palabra */
-.ed-resalta .ed-pal {
-  animation-name: edp-resalta;
-  animation-duration: 0.3s;
-  padding: 0.02em 0.14em;
-}
-@keyframes edp-resalta {
-  0%   { opacity: 0.35; background: transparent; color: var(--text); }
-  60%  { opacity: 1; background: var(--accent); color: #10101a; transform: scale(1.08); }
-  100% { opacity: 1; background: var(--accent); color: #10101a; transform: scale(1); }
-}
-
-/* ed-cubo: cada palabra gira como cara de cubo (bisagra izquierda) */
-.ed-cubo .ed-pal {
-  animation-name: edp-cubo;
-  animation-duration: 0.6s;
-  transform-origin: left center;
-}
-@keyframes edp-cubo {
-  0%   { opacity: 0; transform: rotateY(-92deg) translateX(0.2em); filter: blur(2px); }
-  60%  { opacity: 1; transform: rotateY(14deg); filter: blur(0); }
-  100% { opacity: 1; transform: rotateY(0); }
-}
-
-/* ed-vidrio: palabras transparentes de contorno que se rellenan */
-.ed-vidrio .ed-pal {
-  -webkit-text-stroke: 1.5px var(--accent);
-  animation-name: edp-vidrio;
-  animation-duration: 0.8s;
-}
-@keyframes edp-vidrio {
-  0%   { opacity: 0; color: transparent; transform: scale(1.25); }
-  40%  { opacity: 1; color: transparent; transform: scale(1); }
-  75%  { color: transparent; }
-  100% { opacity: 1; color: var(--text); text-shadow: 0 0 10px var(--accent-glow); }
-}
-
-/* ed-subtitulo: píldora de caption estilo TikTok */
-.ed-frase.ed-subtitulo {
-  display: table;
-  margin: 0 auto;
-  background: rgba(0, 0, 0, 0.72);
-  border: 2px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.35em;
-  padding: 0.28em 0.55em;
-  box-shadow: 0 0.15em 1em rgba(0, 0, 0, 0.5);
-  animation: edp-subtitulo-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-@keyframes edp-subtitulo-in {
-  from { opacity: 0; transform: scale(0.75); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.ed-subtitulo .ed-pal {
-  animation-name: edp-subpop;
-  animation-duration: 0.35s;
-  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes edp-subpop {
-  0%   { opacity: 0; transform: scale(0.4); }
-  70%  { opacity: 1; transform: scale(1.12); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* ed-zoombrusco: cada palabra se estampa desde gigante */
-.ed-zoombrusco .ed-pal { animation-name: edp-zoombrusco; animation-duration: 0.45s; }
-@keyframes edp-zoombrusco {
-  0%   { opacity: 0; transform: scale(6); filter: blur(3px); }
-  55%  { opacity: 1; transform: scale(0.94); filter: blur(0); }
-  75%  { transform: scale(1.05); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* ed-impacto: la frase cae en BLOQUE (todas a la vez) y luego hace onda */
-.ed-impacto .ed-pal {
-  animation-name: edp-impacto-cae, edp-impacto-onda;
-  animation-duration: 0.35s, 0.5s;
-  animation-delay: 0ms, calc(var(--d, 0ms) + 350ms);
-  animation-fill-mode: both, both;
-  animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.36), cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes edp-impacto-cae {
-  0%   { opacity: 0; transform: translateY(-2em); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-@keyframes edp-impacto-onda {
-  0%   { transform: translateY(0); }
-  40%  { transform: translateY(-0.28em) scale(1.08); }
-  100% { transform: translateY(0) scale(1); }
-}
-
-/* ed-sellos: cada palabra se estampa girada */
-.ed-sellos .ed-pal {
-  animation-name: edp-sellos;
-  animation-duration: 0.4s;
-  animation-timing-function: cubic-bezier(0.55, 0, 0.68, 0.53);
-}
-@keyframes edp-sellos {
-  0%   { opacity: 0; transform: scale(2.4) rotate(calc(var(--sx, 1) * 10deg)); filter: blur(3px); }
-  60%  { opacity: 1; transform: scale(0.92) rotate(calc(var(--sx, 1) * -3deg)); filter: blur(0); }
-  100% { opacity: 1; transform: scale(1) rotate(0); }
-}
-
-/* ed-lectura: la palabra aparece y un subrayado corre debajo */
-.ed-lectura .ed-pal {
-  position: relative;
-  animation-name: edp-sube;
-  animation-duration: 0.35s;
-}
-.ed-lectura .ed-pal::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -0.1em;
-  height: 0.09em;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-  transform: scaleX(0);
-  transform-origin: left center;
-  animation: edp-lectura-sub 0.3s ease-out calc(var(--d, 0ms) + 120ms) both;
-}
-@keyframes edp-lectura-sub {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
-}
 
 /* ----- Library tab ----- */
 .library-actions {
@@ -2733,6 +1926,9 @@ body.cinema-open #fxLabBtn { pointer-events: none; opacity: 0.3; }
   filter: blur(42px) saturate(1.35) brightness(0.5);
   animation: cin-zoom 26s ease-in-out infinite alternate;
 }
+/* Zoom lento y constante. El fondo NO late con el bombo a propósito: daba
+   flashazos. Lo que da vida ahora es el aura de color (.cinema-aura), que se
+   abre y se cierra despacio. */
 @keyframes cin-zoom {
   from { transform: scale(1.06); }
   to   { transform: scale(1.2); }
@@ -2884,6 +2080,7 @@ body.playing .cinema-disc { animation-play-state: running; }
 .cinema-stage .lyrics-edit {
   position: absolute;
   inset: 0;
+  z-index: 2;   /* por encima de la palabra clave (0) y de los fantasmas (1) */
 }
 
 /* Mensaje cuando no hay letra sincronizada */
@@ -2901,26 +2098,467 @@ body.playing .cinema-disc { animation-play-state: running; }
 }
 .cinema-msg[hidden] { display: none; }
 
-/* Pantallas angostas / vertical: el vinilo pasa detrás, tenue */
+/* Pantallas angostas / vertical: el vinilo pasa detrás, tenue.
+   El envoltorio se centra con inset+margin, NUNCA con translate: cinema.js
+   le escribe `transform: scale()` para el latido y un translate se perdería
+   (misma trampa que ya documentamos con el aura y los rayos del panel). */
 @media (max-width: 820px), (orientation: portrait) {
   .cinema-body { padding: 80px 14px 60px; }
-  .cinema-disc {
+  .cinema-disc-wrap {
     position: absolute;
-    top: 50%; left: 50%;
-    margin: 0;
-    transform: translate(-50%, -50%);
+    inset: 0;
+    margin: auto;
     width: min(70vmin, 460px);
+    height: min(70vmin, 460px);
     opacity: 0.3;
     filter: brightness(0.7);
-    box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
   }
-  /* el giro no puede pisar el translate de centrado */
-  @keyframes cin-spin-c {
-    from { transform: translate(-50%, -50%) rotate(0deg); }
-    to   { transform: translate(-50%, -50%) rotate(360deg); }
-  }
-  .cinema-disc { animation-name: cin-spin-c; }
+  .cinema-disc { box-shadow: 0 0 60px rgba(0, 0, 0, 0.8); }
+  .cinema-brazo { display: none; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   MODO CINE · ampliación
+   1) la pantalla respira con la música   2) pantalla completa de verdad
+   3) contexto de la letra                4) acabado de película + control
+   ══════════════════════════════════════════════════════════ */
+
+/* ---- 2) Entrada y salida: antes era un corte seco (hidden on/off) ---- */
+.cinema {
+  opacity: 0;
+  transition: opacity 0.26s ease-out;
+}
+.cinema.entrando { opacity: 1; }
+.cinema.saliendo { opacity: 0; }
+.cinema.entrando .cinema-body { animation: cin-entra 0.44s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes cin-entra {
+  from { opacity: 0; transform: scale(1.045); filter: blur(6px); }
+  to   { opacity: 1; transform: scale(1);     filter: none; }
+}
+
+/* Cursor y adornos que se van solos tras 2,5 s quieto */
+.cinema.quieto { cursor: none; }
+.cinema.quieto .cinema-ctl,
+.cinema.quieto .cinema-close,
+.cinema.quieto .cinema-head { opacity: 0; pointer-events: none; }
+.cinema-head, .cinema-close { transition: opacity 0.4s ease-out; }
+
+/* ---- 1) AURA estilo Apple Music ----
+   Cuatro manchas grandes y muy difuminadas con los colores de la carátula
+   (--dyn-1/--dyn-2 los saca colors.js) que van cada una a su aire, con
+   duraciones primas entre sí para que la combinación no se repita nunca.
+   cinema.js escribe --au-e (energía de la canción) y --au-b (graves), los dos
+   MUY suavizados: el aura se abre y se cierra despacio, nunca parpadea.
+   Las manchas ya usan su transform para la deriva, así que el tamaño que
+   manda el audio entra DENTRO del keyframe como variable. */
+.cinema-aura {
+  position: absolute;
+  inset: -12%;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+  /* se llena de color con la energía, sin llegar nunca a tapar la letra */
+  opacity: calc(0.34 + 0.30 * var(--au-e, 0));
+  transition: opacity 1.6s ease-out;
+}
+.au-blob {
+  position: absolute;
+  width: 62%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(70px);
+  mix-blend-mode: screen;
+  will-change: transform;
+}
+/* --au-b (graves) hincha las manchas un 12% como mucho, y despacio */
+.au-blob.b1 {
+  top: -12%; left: -8%;
+  background: radial-gradient(circle, var(--dyn-1, #1a1f4a) 0%, transparent 68%);
+  animation: au-1 27s ease-in-out infinite alternate;
+}
+.au-blob.b2 {
+  bottom: -16%; right: -10%;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 66%);
+  animation: au-2 34s ease-in-out infinite alternate;
+}
+.au-blob.b3 {
+  top: 22%; right: 6%;
+  background: radial-gradient(circle, var(--dyn-2, #0a0e2e) 0%, transparent 70%);
+  animation: au-3 41s ease-in-out infinite alternate;
+}
+.au-blob.b4 {
+  bottom: 8%; left: 14%;
+  width: 48%;
+  background: radial-gradient(circle, var(--magenta) 0%, transparent 68%);
+  animation: au-4 23s ease-in-out infinite alternate;
+  opacity: 0.55;
+}
+@keyframes au-1 {
+  from { transform: translate(0, 0)        scale(calc(1    + 0.12 * var(--au-b, 0))); }
+  to   { transform: translate(26%, 18%)    scale(calc(1.22 + 0.12 * var(--au-b, 0))); }
+}
+@keyframes au-2 {
+  from { transform: translate(0, 0)        scale(calc(1.14 + 0.12 * var(--au-b, 0))); }
+  to   { transform: translate(-22%, -20%)  scale(calc(0.94 + 0.12 * var(--au-b, 0))); }
+}
+@keyframes au-3 {
+  from { transform: translate(0, 0)        scale(calc(1    + 0.10 * var(--au-b, 0))); }
+  to   { transform: translate(-18%, 24%)   scale(calc(1.3  + 0.10 * var(--au-b, 0))); }
+}
+@keyframes au-4 {
+  from { transform: translate(0, 0)        scale(calc(0.9  + 0.14 * var(--au-b, 0))); }
+  to   { transform: translate(20%, -16%)   scale(calc(1.16 + 0.14 * var(--au-b, 0))); }
+}
+
+/* ---- 1) Capa reactiva: destellos de los platillos ---- */
+.cinema-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.cin-destellos { position: absolute; inset: 0; }
+.cin-destello {
+  position: absolute;
+  left: var(--x, 50%);
+  top: var(--y, 50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px var(--accent-glow), 0 0 16px var(--accent-glow);
+  opacity: 0;
+}
+/* rayos de la estrella: centrados con inset+margin, no con translate */
+.cin-destello::before,
+.cin-destello::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  background: #fff;
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+.cin-destello::before { width: 22px; height: 1px; }
+.cin-destello::after  { width: 1px; height: 22px; }
+.cin-destello.on {
+  animation: cin-brillo 0.5s ease-out forwards;
+}
+@keyframes cin-brillo {
+  0%   { opacity: 0;   transform: rotate(var(--g, 0deg)) scale(0.2); }
+  35%  { opacity: calc(0.30 + 0.38 * var(--s, 0.6)); transform: rotate(var(--g, 0deg)) scale(var(--s, 0.8)); }
+  100% { opacity: 0;   transform: rotate(var(--g, 0deg)) scale(0.3); }
+}
+
+/* El velo toma el color de la carátula (--dyn-1 lo pone colors.js) en vez
+   de ser negro plano: la canción baña toda la pantalla. */
+.cinema-veil {
+  background:
+    linear-gradient(180deg,
+      rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 32%,
+      rgba(0,0,0,0.2) 68%, rgba(0,0,0,0.72) 100%),
+    radial-gradient(ellipse at 50% 55%, transparent 35%, var(--dyn-1, #1a1f4a) 130%),
+    repeating-linear-gradient(0deg,
+      rgba(0,0,0,0.2) 0, rgba(0,0,0,0.2) 1px,
+      transparent 1px, transparent 3px);
+}
+
+/* ---- 1) TOCADISCOS: vinilo de verdad + brazo que recorre el disco ----
+   Medidas explícitas (las mismas del disco) en vez de dejar que las herede
+   del contenido: el brazo se posiciona en %, y sobre una altura "auto" esos
+   porcentajes no tienen contra qué resolverse. */
+.cinema-disc-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: min(38vmin, 400px);
+  height: min(38vmin, 400px);
+  line-height: 0;
+}
+.cinema.no-cover .cinema-disc-wrap { display: none; }
+
+/* El disco ya NO lleva la portada estirada por toda la cara: es pasta negra
+   con surcos, que es lo que hace que se lea como un vinilo. La carátula vive
+   en la etiqueta central, y al girar ELLA es cuando se ve que el disco rueda. */
+.cinema-disc {
+  background:
+    /* surcos finos */
+    repeating-radial-gradient(circle at center,
+      rgba(255,255,255,0.045) 0, rgba(255,255,255,0.045) 1px,
+      transparent 1px, transparent 4px),
+    /* zonas mate/brillo que separan los cortes del disco */
+    repeating-radial-gradient(circle at center,
+      rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 14px,
+      transparent 14px, transparent 30px),
+    radial-gradient(circle at 34% 28%, #2b2b36 0%, #141419 42%, #08080c 100%);
+  background-size: auto;
+}
+.cinema-disc::before { content: none; }     /* los surcos ya van en el fondo */
+/* agujero central */
+.cinema-disc::after {
+  width: 5%;
+  border: 2px solid rgba(0, 0, 0, 0.9);
+  background: #05050a;
+  box-shadow: inset 0 0 6px #000;
+  z-index: 3;
+}
+/* etiqueta: aquí sí va la carátula */
+.cin-label {
+  position: absolute;
+  inset: 0;
+  margin: auto;                  /* centrado sin transform: el disco rota */
+  width: 38%;
+  height: 38%;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--bg-panel-2);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 0 14px rgba(0, 0, 0, 0.55);
+  z-index: 2;
+}
+/* Reflejo especular: se queda QUIETO mientras el vinilo gira por debajo.
+   Es el truco que hace que el giro se note de verdad. */
+.cin-brillo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(112deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.10) 44%,
+    rgba(255, 255, 255, 0.02) 50%,
+    transparent 62%);
+  /* contra-giro exacto: anula la rotación del padre y el brillo no se mueve */
+  animation: cin-spin-inv 16s linear infinite;
+  animation-play-state: paused;
+}
+body.playing .cin-brillo { animation-play-state: running; }
+@keyframes cin-spin-inv { to { transform: rotate(-360deg); } }
+
+/* ---- Brazo ----
+   El pivote va FUERA del plato (arriba a la derecha) y el brazo tiene largo
+   fijo: por eso la aguja describe un arco de fuera hacia dentro, como en un
+   tocadiscos real. El ángulo lo escribe cinema.js en --br-ang según el avance
+   de la canción; aquí solo se dibuja. */
+.cinema-brazo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.br-base {                       /* pivote sobre el plinto */
+  position: absolute;
+  left: 102%;
+  top: 10%;
+  width: 13%;
+  aspect-ratio: 1;
+  margin: -6.5% 0 0 -6.5%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, #40404f, #16161d 70%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.85);
+}
+.br-arm {
+  position: absolute;
+  left: 102%;
+  top: 10%;
+  width: 62%;                    /* largo fijo — el que da el arco correcto */
+  height: 3px;
+  margin-left: -62%;             /* el brazo sale hacia la IZQUIERDA del pivote */
+  margin-top: -1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg,
+    rgba(210, 216, 240, 0.55) 0%,
+    rgba(232, 236, 255, 0.92) 22%,
+    rgba(232, 236, 255, 0.92) 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  transform-origin: 100% 50%;    /* gira alrededor del pivote */
+  transform: rotate(var(--br-ang, -90deg));
+  /* el recorrido es lentísimo; la transición solo suaviza los saltos al
+     cambiar de canción o al arrastrar la onda */
+  transition: transform 0.7s cubic-bezier(0.33, 1, 0.68, 1);
+}
+.br-head {                       /* cápsula + aguja en la punta */
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 13%;
+  height: 9px;
+  margin-top: -4.5px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #2a2a36, #12121a);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transform: rotate(18deg);
+}
+.br-head::after {                /* la aguja, encendida solo si está apoyada */
+  content: '';
+  position: absolute;
+  left: 2px;
+  bottom: -3px;
+  width: 3px; height: 4px;
+  background: var(--text-muted);
+  transition: background 0.4s, box-shadow 0.4s;
+}
+.cinema-brazo.apoyado .br-head::after {
+  background: var(--accent);
+  box-shadow: 0 0 7px var(--accent-glow);
+}
+
+/* ---- 3) Contexto: verso anterior y siguiente en fantasma ---- */
+.cinema-ghost {
+  position: absolute;
+  left: 0; right: 0;
+  z-index: 1;
+  text-align: center;
+  font-family: 'VT323', monospace;
+  font-size: clamp(15px, 1.9vw, 27px);
+  color: var(--text-dim);
+  opacity: 0;
+  filter: blur(1.4px);
+  padding: 0 4%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+  transition: opacity 0.45s ease-out, transform 0.45s ease-out;
+  pointer-events: none;
+}
+.cinema-ghost.prev { top: 4%;    transform: translateY(-6px); }
+.cinema-ghost.next { bottom: 4%; transform: translateY(6px); }
+.cinema-ghost.prev.on { opacity: 0.30; transform: translateY(0); }
+.cinema-ghost.next.on { opacity: 0.42; transform: translateY(0); }
+
+/* Palabra clave del verso: enorme, detrás de todo, casi un fondo */
+.cinema-clave {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Nunito', 'VT323', sans-serif;
+  font-weight: 900;
+  font-size: clamp(70px, 17vw, 300px);
+  letter-spacing: -0.02em;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.cinema-clave.on { animation: cin-clave 3.4s ease-out forwards; }
+@keyframes cin-clave {
+  0%   { opacity: 0;     transform: scale(1.16); }
+  22%  { opacity: 0.085; transform: scale(1.02); }
+  70%  { opacity: 0.06;  transform: scale(1); }
+  100% { opacity: 0;     transform: scale(0.99); }
+}
+
+/* ---- 3) Hueco instrumental, en grande ---- */
+.cinema-gap {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 15vh;
+  z-index: 2;
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  pointer-events: none;
+}
+.cinema-gap[hidden] { display: none; }
+.cinema-gap i {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  --g1: clamp(0, var(--gp, 0) * 3, 1);
+  --g2: clamp(0, var(--gp, 0) * 3 - 1, 1);
+  --g3: clamp(0, var(--gp, 0) * 3 - 2, 1);
+  transition: opacity 0.2s linear, transform 0.2s ease-out;
+}
+.cinema-gap i:nth-child(1) { opacity: calc(0.2 + 0.8 * var(--g1)); transform: scale(calc(0.75 + 0.4 * var(--g1))); }
+.cinema-gap i:nth-child(2) { opacity: calc(0.2 + 0.8 * var(--g2)); transform: scale(calc(0.75 + 0.4 * var(--g2))); }
+.cinema-gap i:nth-child(3) {
+  opacity: calc(0.2 + 0.8 * var(--g3));
+  transform: scale(calc(0.75 + 0.4 * var(--g3)));
+  box-shadow: 0 0 calc(var(--g3) * 20px) var(--accent-glow);
+}
+
+/* ---- 4) Acabado de película: grano + viñeta ---- */
+.cinema-grano {
+  position: absolute;
+  /* justo lo que necesita el vaivén del 3%: con inset -50% la capa ocupaba
+     cuatro pantallas y se repintaba entera en cada paso del grano */
+  inset: -8%;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0.045;
+  /* ruido en un SVG embebido: sin peticiones y sin imagen que cargar */
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: cin-grano 0.7s steps(4) infinite;
+}
+@keyframes cin-grano {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-3%, 2%); }
+  50%  { transform: translate(2%, -3%); }
+  75%  { transform: translate(-2%, -2%); }
+  100% { transform: translate(0, 0); }
+}
+.cinema-vineta {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.62) 100%);
+}
+
+/* ---- 4) Controles que asoman al mover el ratón ---- */
+.cinema-ctl {
+  position: absolute;
+  left: 50%;
+  bottom: calc(clamp(44px, 9vh, 84px) + 14px);
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid var(--border-pixel);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7);
+  transition: opacity 0.4s ease-out;
+}
+.cin-time {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--text-dim);
+  min-width: 42px;
+  text-align: center;
+}
+.cin-btn {
+  width: 34px; height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+  transition: color 0.15s, transform 0.15s;
+}
+.cin-btn svg { width: 18px; height: 18px; }
+.cin-btn:hover { color: var(--accent); transform: scale(1.14); }
+.cin-play { color: var(--accent); }
+.cin-play svg { width: 22px; height: 22px; }
+
+/* ---- «menos movimiento»: se queda todo quieto pero sigue legible ---- */
+body.reduce-motion .cinema-grano,
+body.reduce-motion .cin-destellos,
+body.reduce-motion .cinema-clave { display: none; }
+body.reduce-motion .cinema.entrando .cinema-body,
+body.reduce-motion .au-blob,
+body.reduce-motion .cin-brillo { animation: none; }
+body.reduce-motion .cinema { transition: none; }
+/* el aura se queda, quieta: es color de ambiente, no movimiento */
+body.reduce-motion .cinema-aura { opacity: 0.34; }
 
 /* Onda de progreso al pie: espectro que baila con la música;
    lo reproducido se pinta de acento, el resto queda tenue */
@@ -3047,7 +2685,6 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
 /* --- Pestañas --- */
 .tab-bar { font-size: clamp(15px, 1.7cqw, 28px); }
 .tab { padding: clamp(4px, 0.5cqw, 10px) clamp(10px, 1.2cqw, 24px); }
-.status-dot { font-size: clamp(13px, 1.3cqw, 22px); }
 
 /* --- LETRA: el protagonista, crece con la ventana --- */
 .lyrics-body { font-size: clamp(19px, 2.3cqw, 46px); }
@@ -3619,16 +3256,13 @@ body.reduce-motion .scanlines { animation: none; }
 body.reduce-motion .crt { display: none; }
 body.reduce-motion .la-note { display: none; }
 body.reduce-motion .mini-eq i { animation: none !important; height: 6px !important; }
-body.reduce-motion .status-dot .dot,
 body.reduce-motion #clock .c,
 body.reduce-motion .progress-thumb { animation: none !important; }
 body.reduce-motion .cover-inner.vinyl,
 body.reduce-motion .cinema-disc { animation: none !important; }
 body.reduce-motion .cinema-bg { animation: none !important; }
 body.reduce-motion .lyrics-ambient .la-corner { animation: none !important; }
-body.reduce-motion .ed-fx-flash,
-body.reduce-motion .ed-ring,
-body.reduce-motion .ed-spark { display: none !important; }
+
 body.reduce-motion .lyrics-edit { animation: none !important; }
 /* Sin fundido de acento ni transiciones de pestaña */
 body.reduce-motion :root,
@@ -3800,37 +3434,173 @@ body.reduce-motion .skel-line { animation: none; }
 .as-grid .skel { display: block; padding: 8px; }
 .as-grid .skel-box { width: 100%; height: auto; aspect-ratio: 1/1; margin-bottom: 8px; }
 
-/* Primer arranque: en vez de "sin canción" a secas, las dos rutas posibles */
-.first-run {
-  text-align: center;
-  padding: 24px 12px;
-  font-family: 'Share Tech Mono', monospace;
-  color: var(--text-dim);
-  font-size: 13px;
-  line-height: 1.9;
-}
-.first-run h4 {
-  font-family: 'VT323', monospace;
-  font-size: 22px;
-  letter-spacing: 2px;
-  color: var(--accent);
-  text-shadow: 0 0 8px var(--accent-glow);
-  margin-bottom: 10px;
-}
-.first-run .fr-ways {
+/* ══════════ ESTADO EN REPOSO ══════════
+   Lo que se ve cuando todavía no suena nada. Vive fuera de #lyricsBody
+   (el modo edit lo oculta) para que el panel nunca quede en blanco. */
+.lyrics-idle {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  gap: 14px;
+  padding: 24px 16px;
+  text-align: center;
+  pointer-events: none;   /* decorativo: no roba clics al panel */
+}
+.lyrics-idle[hidden] { display: none; }
+
+/* ecualizador en espera: nueve barras respirando, no una animación plana */
+.li-eq {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 46px;
+  margin-bottom: 2px;
+}
+.li-eq i {
+  width: 6px;
+  height: 10px;
+  /* punta clara → acento, igual que las barras del visualizador (el rosa
+     fijo de antes no seguía a la paleta; blanco vale: es luz, no color) */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), var(--accent));
+  box-shadow: 0 0 10px var(--accent-glow);
+  transform-origin: bottom;
+  animation: li-eq-bar 1.9s ease-in-out infinite;
+}
+.li-eq i:nth-child(1) { animation-delay: -0.1s; }
+.li-eq i:nth-child(2) { animation-delay: -0.5s; }
+.li-eq i:nth-child(3) { animation-delay: -0.9s; }
+.li-eq i:nth-child(4) { animation-delay: -1.4s; }
+.li-eq i:nth-child(5) { animation-delay: -0.3s; }
+.li-eq i:nth-child(6) { animation-delay: -1.1s; }
+.li-eq i:nth-child(7) { animation-delay: -0.7s; }
+.li-eq i:nth-child(8) { animation-delay: -1.6s; }
+.li-eq i:nth-child(9) { animation-delay: -0.2s; }
+@keyframes li-eq-bar {
+  0%, 100% { transform: scaleY(1);   opacity: 0.55; }
+  50%      { transform: scaleY(3.4); opacity: 1; }
+}
+
+/* el nombre, con la separación cromática justa para que se sienta CRT */
+.li-mark {
+  position: relative;
+  font-family: 'VT323', monospace;
+  font-size: clamp(26px, 3.4cqw, 44px);
+  letter-spacing: 4px;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow), 0 0 26px var(--accent-glow);
+}
+.li-mark::before,
+.li-mark::after {
+  content: attr(data-txt);
+  position: absolute;
+  inset: 0;
+  opacity: 0.42;
+  pointer-events: none;
+}
+.li-mark::before { color: var(--magenta); animation: li-chroma-a 3.6s ease-in-out infinite; }
+.li-mark::after  { color: var(--accent);  animation: li-chroma-b 3.6s ease-in-out infinite; }
+@keyframes li-chroma-a {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(-2px, 1px); }
+}
+@keyframes li-chroma-b {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(2px, -1px); }
+}
+
+.li-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 0.03em;
+}
+
+/* las dos maneras de meter música, como dos tarjetas de consola */
+.li-ways {
+  display: flex;
+  gap: 12px;
   flex-wrap: wrap;
-  margin-top: 14px;
+  justify-content: center;
+  margin-top: 6px;
 }
-.first-run .fr-way {
-  border: 2px solid var(--border-dark);
-  padding: 10px 14px;
-  min-width: 150px;
-  background: var(--bg-panel-2);
+.li-way {
+  position: relative;
+  min-width: 168px;
+  padding: 14px 16px 12px;
+  border: 2px solid var(--border-pixel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 60%), var(--bg-panel-2);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 0 var(--border-dark);
+  font-family: 'Share Tech Mono', monospace;
+  overflow: hidden;
 }
-.first-run .fr-way b { color: var(--text); display: block; margin-bottom: 2px; }
+/* barrido de luz que cruza las tarjetas por turnos */
+.li-way::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.10) 50%, transparent 60%);
+  transform: translateX(-120%);
+  animation: li-sweep 5.5s ease-in-out infinite;
+}
+.li-way:nth-child(2)::after { animation-delay: 2.4s; }
+@keyframes li-sweep {
+  0%, 62%  { transform: translateX(-120%); }
+  86%, 100% { transform: translateX(120%); }
+}
+.li-ico {
+  display: block;
+  font-size: 20px;
+  line-height: 1;
+  margin-bottom: 8px;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow);
+}
+.li-way b {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  margin-bottom: 3px;
+}
+.li-way em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* consejo que rota cada ~6.5 s (lyrics.js) */
+.li-tip {
+  margin-top: 8px;
+  min-height: 1.4em;
+  max-width: 46ch;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.li-tip::before { content: '▸ '; color: var(--accent); }
+.li-tip-in { animation: li-tip-in 0.5s ease-out both; }
+@keyframes li-tip-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* «menos movimiento»: se queda todo quieto, pero legible */
+body.reduce-motion .li-eq i,
+body.reduce-motion .li-mark::before,
+body.reduce-motion .li-mark::after,
+body.reduce-motion .li-way::after,
+body.reduce-motion .li-tip-in { animation: none; }
+body.reduce-motion .li-eq i { transform: scaleY(2); }
+body.reduce-motion .li-way::after { opacity: 0; }
+
+/* (El viejo .first-run vivía dentro de #lyricsBody, que el modo edit oculta:
+   por eso el panel salía en blanco sin canción. Lo sustituye .lyrics-idle,
+   más arriba en este archivo, que va fuera de las dos vistas.) */
 
 /* ==========================================================
    MODO EDIT · TANDA 5 — títulos de fila completa
@@ -3839,225 +3609,6 @@ body.reduce-motion .skel-line { animation: none; }
    filter, clip-path, color, text-shadow y background-position.
    ========================================================== */
 
-/* ── ed-mascara: box reveal. Un bloque de acento barre y deja el texto ── */
-.ed-titulo.ed-mascara {
-  position: relative;
-  /* el texto se enciende cuando la barra ya lo ha tapado (≈45% de 0.72s),
-     que es lo que vende el truco del box reveal */
-  animation: ed-mascara-txt 0.01s linear calc(var(--d, 0ms) + 320ms) both;
-}
-.ed-titulo.ed-mascara::after {
-  content: '';
-  position: absolute;
-  inset: -0.06em -0.12em;
-  background: var(--accent);
-  transform-origin: left center;
-  animation: ed-mascara-barra 0.72s cubic-bezier(0.76, 0, 0.24, 1) var(--d, 0ms) both;
-}
-@keyframes ed-mascara-txt {           /* el texto aparece cuando el bloque ya pasó */
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes ed-mascara-barra {
-  0%   { transform: scaleX(0); transform-origin: left center; }
-  45%  { transform: scaleX(1); transform-origin: left center; }
-  55%  { transform: scaleX(1); transform-origin: right center; }
-  100% { transform: scaleX(0); transform-origin: right center; }
-}
-
-/* ── ed-rebana: el texto llega partido por la mitad y se junta ── */
-.ed-titulo.ed-rebana {
-  position: relative;
-  color: transparent;
-  text-shadow: none;
-  animation: none;
-}
-.ed-titulo.ed-rebana::before,
-.ed-titulo.ed-rebana::after {
-  content: attr(data-txt);
-  position: absolute;
-  inset: 0;
-  color: var(--accent);
-  text-shadow: 0 0 10px var(--accent-glow), 3px 3px 0 rgba(0, 0, 0, 0.65);
-  animation-duration: 0.6s;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-.ed-titulo.ed-rebana::before {
-  clip-path: inset(0 0 50% 0);
-  animation-name: ed-rebana-alta;
-}
-.ed-titulo.ed-rebana::after {
-  clip-path: inset(50% 0 0 0);
-  animation-name: ed-rebana-baja;
-}
-@keyframes ed-rebana-alta {
-  0%   { opacity: 0; transform: translate(-0.5em, -0.28em); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes ed-rebana-baja {
-  0%   { opacity: 0; transform: translate(0.5em, 0.28em); }
-  100% { opacity: 1; transform: none; }
-}
-
-/* ── ed-degradado: la luz recorre el interior de las letras ── */
-.ed-titulo.ed-degradado {
-  color: transparent;
-  background: linear-gradient(100deg,
-    var(--accent) 20%, #fff 38%, var(--accent) 50%, var(--accent-dim, var(--accent)) 70%);
-  background-size: 320% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  text-shadow: none;
-  filter: drop-shadow(0 0 14px var(--accent-glow)) drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.55));
-  animation: ed-degradado-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms) both,
-             ed-degradado-luz 2.2s ease-in-out calc(var(--d, 0ms) + 180ms) both;
-}
-@keyframes ed-degradado-in {
-  from { opacity: 0; transform: translateY(0.32em) scale(0.96); }
-  to   { opacity: 1; transform: none; }
-}
-@keyframes ed-degradado-luz {
-  from { background-position: 130% 0; }
-  to   { background-position: -70% 0; }
-}
-
-/* ── ed-sombralarga: sombra dura que se recoge dentro del texto ── */
-.ed-titulo.ed-sombralarga {
-  animation-name: ed-sombralarga;
-  animation-duration: 0.85s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes ed-sombralarga {
-  0% {
-    opacity: 0;
-    transform: translate(-0.16em, -0.1em);
-    text-shadow: 0.42em 0.3em 0 rgba(0, 0, 0, 0.55), 0 0 0 var(--accent-glow);
-  }
-  60% { opacity: 1; }
-  100% {
-    opacity: 1;
-    transform: none;
-    text-shadow: 0 0 10px var(--accent-glow), 0 0 30px var(--accent-glow), 3px 3px 0 rgba(0, 0, 0, 0.65);
-  }
-}
-
-/* ── ed-neblina: sale de la niebla flotando. Para baladas ── */
-.ed-titulo.ed-neblina {
-  animation-name: ed-neblina;
-  animation-duration: 1.5s;
-  animation-timing-function: ease-out;
-}
-@keyframes ed-neblina {
-  0%   { opacity: 0; transform: translateY(0.3em) scale(1.06); filter: blur(18px); }
-  55%  { opacity: 0.85; filter: blur(4px); }
-  100% { opacity: 1; transform: none; filter: blur(0); }
-}
-
-/* ── ed-zoomlento: acercamiento larguísimo, elegante ── */
-.ed-titulo.ed-zoomlento {
-  animation-name: ed-zoomlento;
-  animation-duration: 2.6s;
-  animation-timing-function: cubic-bezier(0.16, 0.8, 0.3, 1);
-}
-@keyframes ed-zoomlento {
-  0%   { opacity: 0; transform: scale(1.16); }
-  25%  { opacity: 1; }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-/* ── ed-cortina: se abre desde el centro como un telón ── */
-.ed-titulo.ed-cortina {
-  animation-name: ed-cortina;
-  animation-duration: 0.75s;
-  animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
-}
-@keyframes ed-cortina {
-  0%   { opacity: 0; clip-path: inset(0 50% 0 50%); transform: scaleY(1.1); }
-  60%  { opacity: 1; }
-  100% { opacity: 1; clip-path: inset(0 -6% 0 -6%); transform: scaleY(1); }
-}
-
-/* ── ed-eco: llega con estela de copias que se recogen ── */
-.ed-titulo.ed-eco {
-  animation-name: ed-eco;
-  animation-duration: 0.8s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes ed-eco {
-  0% {
-    opacity: 0;
-    transform: translateX(0.5em);
-    text-shadow: -0.14em 0 var(--accent-dim, var(--accent)), -0.28em 0 rgba(0, 0, 0, 0.35);
-  }
-  55% { opacity: 1; }
-  100% {
-    opacity: 1;
-    transform: none;
-    text-shadow: 0 0 10px var(--accent-glow), 0 0 30px var(--accent-glow), 3px 3px 0 rgba(0, 0, 0, 0.65);
-  }
-}
-
-/* ── ed-liquido: entrada gelatinosa con rebote ── */
-.ed-titulo.ed-liquido {
-  animation-name: ed-liquido;
-  animation-duration: 0.9s;
-  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-@keyframes ed-liquido {
-  0%   { opacity: 0; transform: scale(0.6, 1.5) skewX(-10deg); filter: blur(5px); }
-  40%  { opacity: 1; transform: scale(1.18, 0.82) skewX(5deg); filter: blur(0); }
-  65%  { transform: scale(0.94, 1.06) skewX(-2deg); }
-  85%  { transform: scale(1.03, 0.98); }
-  100% { opacity: 1; transform: none; }
-}
-
-/* ── ed-flashcorte: corte seco con fogonazo blanco ── */
-.ed-titulo.ed-flashcorte {
-  animation-name: ed-flashcorte;
-  animation-duration: 0.5s;
-  animation-timing-function: steps(1, end);
-}
-@keyframes ed-flashcorte {
-  0%   { opacity: 0; transform: scale(1.12); filter: brightness(4) blur(2px); }
-  18%  { opacity: 1; transform: scale(1.04); filter: brightness(4); }
-  34%  { opacity: 1; transform: scale(1); filter: brightness(1.6); }
-  50%  { opacity: 0.35; }
-  62%  { opacity: 1; filter: brightness(1); }
-  100% { opacity: 1; transform: none; filter: none; }
-}
-
-/* ── ed-giroeje: voltea como panel de aeropuerto ── */
-.ed-titulo.ed-giroeje {
-  animation-name: ed-giroeje;
-  animation-duration: 0.8s;
-  animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1);
-  transform-origin: center top;
-}
-@keyframes ed-giroeje {
-  0%   { opacity: 0; transform: perspective(700px) rotateX(-92deg); }
-  55%  { opacity: 1; transform: perspective(700px) rotateX(12deg); }
-  78%  { transform: perspective(700px) rotateX(-5deg); }
-  100% { opacity: 1; transform: perspective(700px) rotateX(0); }
-}
-
-/* ── ed-vibra: aterriza y tiembla un instante ── */
-.ed-titulo.ed-vibra {
-  animation-name: ed-vibra;
-  animation-duration: 0.62s;
-  animation-timing-function: linear;
-}
-@keyframes ed-vibra {
-  0%   { opacity: 0; transform: scale(1.3); filter: blur(6px); }
-  22%  { opacity: 1; transform: scale(1); filter: blur(0); }
-  32%  { transform: translate(-0.035em, 0.02em); }
-  42%  { transform: translate(0.03em, -0.025em); }
-  52%  { transform: translate(-0.025em, -0.015em); }
-  62%  { transform: translate(0.02em, 0.02em); }
-  72%  { transform: translate(-0.012em, 0); }
-  100% { opacity: 1; transform: none; }
-}
 
 /* ==========================================================
    MODO EDIT · TANDA 5 — títulos letra a letra
@@ -4075,156 +3626,6 @@ body.reduce-motion .skel-line { animation: none; }
 /* las letras impares entran por el otro lado: da ritmo alterno */
 .edl-alterna:nth-child(even) { animation-name: edl-alterna-inv; }
 
-@keyframes edl-difumina {
-  0%   { opacity: 0; transform: scale(1.35); filter: blur(14px); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0); }
-}
-@keyframes edl-gira {
-  0%   { opacity: 0; transform: perspective(500px) rotateY(-96deg) translateZ(0.2em); }
-  70%  { opacity: 1; transform: perspective(500px) rotateY(14deg); }
-  100% { opacity: 1; transform: perspective(500px) rotateY(0); }
-}
-@keyframes edl-alterna {
-  0%   { opacity: 0; transform: translateY(-0.85em) scale(0.85); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edl-alterna-inv {
-  0%   { opacity: 0; transform: translateY(0.85em) scale(0.85); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edl-empuja {
-  0%   { opacity: 0; transform: translateX(-0.6em) scaleX(1.6); filter: blur(6px); }
-  60%  { opacity: 1; transform: translateX(0.05em) scaleX(0.96); filter: blur(0); }
-  100% { opacity: 1; transform: none; }
-}
-
-/* ==========================================================
-   MODO EDIT · TANDA 5 — frases palabra a palabra
-   ========================================================== */
-.ed-desenfoca .ed-pal { animation-name: edp-desenfoca; animation-duration: 0.7s; animation-timing-function: ease-out; }
-.ed-zoomsuave .ed-pal { animation-name: edp-zoomsuave; animation-duration: 0.75s; animation-timing-function: cubic-bezier(0.16, 0.8, 0.3, 1); }
-.ed-nieve .ed-pal     { animation-name: edp-nieve; animation-duration: 1.1s; animation-timing-function: cubic-bezier(0.25, 0.9, 0.35, 1); }
-.ed-brisa .ed-pal     { animation-name: edp-brisa; animation-duration: 0.95s; animation-timing-function: ease-out; }
-.ed-tinta .ed-pal     { animation-name: edp-tinta; animation-duration: 0.8s; animation-timing-function: ease-out; }
-.ed-orbita .ed-pal    { animation-name: edp-orbita; animation-duration: 0.75s; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
-.ed-chispa .ed-pal    { animation-name: edp-chispa; animation-duration: 0.6s; }
-.ed-goteo .ed-pal     { animation-name: edp-goteo; animation-duration: 0.7s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-.ed-espejo .ed-pal    { animation-name: edp-espejo; animation-duration: 0.7s; transform-origin: center bottom; }
-.ed-tarjeta .ed-pal   { animation-name: edp-tarjeta; animation-duration: 0.65s; transform-origin: center center; }
-.ed-estela .ed-pal    { animation-name: edp-estela; animation-duration: 0.6s; }
-.ed-recorta .ed-pal   { animation-name: edp-recorta; animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1); }
-.ed-pulso .ed-pal     { animation-name: edp-pulso; animation-duration: 0.7s; }
-.ed-empujon .ed-pal   { animation-name: edp-empujon; animation-duration: 0.5s; }
-.ed-persianas .ed-pal { animation-name: edp-persianas; animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1); }
-
-@keyframes edp-desenfoca {
-  0%   { opacity: 0; transform: scale(1.18); filter: blur(12px); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0); }
-}
-@keyframes edp-zoomsuave {
-  0%   { opacity: 0; transform: scale(1.09) translateY(0.1em); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edp-nieve {
-  0%   { opacity: 0; transform: translateY(-1.1em) translateX(calc(var(--sx, 1) * 0.35em)) rotate(calc(var(--sx, 1) * -8deg)); }
-  70%  { opacity: 1; }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edp-brisa {
-  0%   { opacity: 0; transform: translateX(calc(var(--sx, 1) * 0.7em)) rotate(calc(var(--sx, 1) * 5deg)); }
-  55%  { opacity: 1; transform: translateX(calc(var(--sx, 1) * -0.12em)) rotate(calc(var(--sx, 1) * -1.5deg)); }
-  80%  { transform: translateX(calc(var(--sx, 1) * 0.04em)); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edp-tinta {
-  0%   { opacity: 0; transform: scale(0.7); filter: blur(10px) saturate(2.4); }
-  45%  { opacity: 1; transform: scale(1.06); filter: blur(2px) saturate(1.6); }
-  100% { opacity: 1; transform: scale(1); filter: blur(0) saturate(1); }
-}
-@keyframes edp-orbita {
-  0%   { opacity: 0; transform: translate(calc(var(--sx, 1) * 1.1em), 0.7em) rotate(calc(var(--sx, 1) * 26deg)) scale(0.8); }
-  60%  { opacity: 1; transform: translate(calc(var(--sx, 1) * -0.1em), -0.08em) rotate(calc(var(--sx, 1) * -4deg)) scale(1.03); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edp-chispa {
-  /* el final es explícito a propósito: con `inherit` el color/sombra
-     resultantes dependían del contexto y quedaban distintos por línea */
-  0%   { opacity: 0; transform: scale(0.85); color: #fff; text-shadow: 0 0 22px #fff; }
-  30%  { opacity: 1; transform: scale(1.1); color: #fff; text-shadow: 0 0 26px #fff, 0 0 40px var(--accent-glow); }
-  100% { opacity: 1; transform: scale(1); color: var(--text); text-shadow: none; }
-}
-@keyframes edp-goteo {
-  0%   { opacity: 0; transform: translateY(-0.9em) scale(0.8, 1.3); }
-  55%  { opacity: 1; transform: translateY(0) scale(1.16, 0.84); }
-  75%  { transform: scale(0.95, 1.05); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edp-espejo {
-  0%   { opacity: 0; transform: scaleY(-1) translateY(0.5em); filter: blur(3px); }
-  60%  { opacity: 1; transform: scaleY(1.12) translateY(0); filter: blur(0); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edp-tarjeta {
-  0%   { opacity: 0; transform: perspective(600px) rotateX(88deg) translateY(-0.3em); }
-  65%  { opacity: 1; transform: perspective(600px) rotateX(-12deg); }
-  100% { opacity: 1; transform: perspective(600px) rotateX(0); }
-}
-@keyframes edp-estela {
-  0% {
-    opacity: 0;
-    transform: translateX(calc(var(--sx, 1) * 1.2em));
-    text-shadow: calc(var(--sx, 1) * -0.35em) 0 var(--accent-dim, var(--accent)),
-                 calc(var(--sx, 1) * -0.7em) 0 rgba(0, 0, 0, 0.3);
-  }
-  60% { opacity: 1; }
-  100% { opacity: 1; transform: none; text-shadow: none; }
-}
-@keyframes edp-recorta {
-  0%   { opacity: 1; clip-path: inset(0 100% 0 0); transform: translateX(-0.12em); }
-  100% { opacity: 1; clip-path: inset(0 -8% 0 -8%); transform: none; }
-}
-@keyframes edp-pulso {
-  0%   { opacity: 0; transform: scale(0.7); }
-  35%  { opacity: 1; transform: scale(1.16); }
-  52%  { transform: scale(0.96); }
-  70%  { transform: scale(1.08); }
-  85%  { transform: scale(0.99); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edp-empujon {
-  0%   { opacity: 0; transform: translateX(calc(var(--sx, 1) * 1.4em)) scaleX(1.5); filter: blur(8px); }
-  55%  { opacity: 1; transform: translateX(calc(var(--sx, 1) * -0.1em)) scaleX(0.94); filter: blur(0); }
-  100% { opacity: 1; transform: none; }
-}
-@keyframes edp-persianas {
-  0%   { opacity: 0; clip-path: polygon(0 0,100% 0,100% 0,0 0, 0 33%,100% 33%,100% 33%,0 33%, 0 66%,100% 66%,100% 66%,0 66%); }
-  100% { opacity: 1; clip-path: polygon(0 0,100% 0,100% 33%,0 33%, 0 33%,100% 33%,100% 66%,0 66%, 0 66%,100% 66%,100% 100%,0 100%); }
-}
-
-/* ── ed-marcador: rotulador que subraya al llegar la palabra ── */
-.ed-marcador .ed-pal {
-  position: relative;
-  animation-name: edp-zoomsuave;
-  animation-duration: 0.5s;
-}
-.ed-marcador .ed-pal::after {
-  content: '';
-  position: absolute;
-  left: -0.06em;
-  right: -0.06em;
-  bottom: 0.02em;
-  height: 0.34em;
-  background: var(--accent);
-  opacity: 0.35;
-  transform-origin: left center;
-  transform: scaleX(0) skewX(-12deg);
-  animation: edp-marcador 0.45s cubic-bezier(0.76, 0, 0.24, 1) calc(var(--d, 0ms) + 120ms) both;
-  z-index: -1;
-}
-@keyframes edp-marcador {
-  from { transform: scaleX(0) skewX(-12deg); }
-  to   { transform: scaleX(1) skewX(-12deg); }
-}
 
 /* ==========================================================
    AMBIENTE REACTIVO — luces de fondo al ritmo (js/ambient.js)
@@ -4491,75 +3892,4 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   .la-destellos i { filter: none; }
 }
 
-/* ==========================================================
-   ed-apila — estilo de los edits de TikTok (referencia del usuario)
-   Filas que se acumulan, palabras que asoman en gris y se asientan
-   a su color. Clave del look: NADA se mueve y NO hay glow.
-   ========================================================== */
-.ed-apila {
-  font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif;
-  font-weight: 900;
-  line-height: 1.14;
-  text-align: center;
-  letter-spacing: -0.005em;
-  text-shadow: none;          /* plano a propósito: el glow lo ensucia */
-  padding: 0 4%;
-}
-.ed-apila-fila { display: block; }
-/* Alternancia fila sí, fila no. Los DOS colores salen de la paleta viva de
-   la app: el acento del momento (cambia con la carátula si está en auto) y
-   el color de texto de las letras. Nada fijo: el amarillo/blanco del vídeo
-   de referencia era solo su tema. */
-.ed-apila-fila.acento { color: var(--accent); font-style: italic; }
-.ed-apila-fila.claro  { color: var(--text); font-style: normal; }
 
-.ed-apila .ed-pal {
-  margin: 0 0.13em;
-  animation-name: edp-apila;
-  animation-duration: 0.42s;
-  animation-timing-function: ease-out;
-}
-@keyframes edp-apila {
-  /* asoma apagada y se enciende a su color; grayscale desatura el acento
-     y la opacidad hace el resto en las filas blancas */
-  0%   { opacity: 0;    filter: grayscale(1) brightness(1.3); }
-  35%  { opacity: 0.55; filter: grayscale(1) brightness(1.3); }
-  100% { opacity: 1;    filter: none; }
-}
-
-/* ==========================================================
-   MODO EDIT · TANDA 5 — cámaras
-   ========================================================== */
-.ed-stack.edcam-empuja   { animation-name: edcam-empuja; }
-.ed-stack.edcam-orbita   { animation-name: edcam-orbita; }
-.ed-stack.edcam-inclina  { animation-name: edcam-inclina; }
-.ed-stack.edcam-flota    { animation-name: edcam-flota; }
-.ed-stack.edcam-aleja    { animation-name: edcam-aleja; }
-.ed-stack.edcam-diagonal { animation-name: edcam-diagonal; }
-
-@keyframes edcam-empuja {
-  0%   { transform: scale(0.94); }
-  35%  { transform: scale(1.035); }
-  100% { transform: scale(1.01); }
-}
-@keyframes edcam-orbita {
-  0%   { transform: perspective(1000px) rotateY(-5deg) rotateX(2deg) scale(1.02); }
-  100% { transform: perspective(1000px) rotateY(5deg) rotateX(-1.5deg) scale(1.04); }
-}
-@keyframes edcam-inclina {
-  0%   { transform: rotate(-2.4deg) scale(1.05); }
-  100% { transform: rotate(0.4deg) scale(1.01); }
-}
-@keyframes edcam-flota {
-  0%   { transform: translateY(1.2%) scale(1.015); }
-  50%  { transform: translateY(-1%) scale(1.03); }
-  100% { transform: translateY(0.4%) scale(1.02); }
-}
-@keyframes edcam-aleja {
-  0%   { transform: scale(1.09); }
-  100% { transform: scale(0.99); }
-}
-@keyframes edcam-diagonal {
-  0%   { transform: translate(-1.6%, 1.4%) scale(1.05); }
-  100% { transform: translate(1.4%, -1.2%) scale(1.02); }
-}

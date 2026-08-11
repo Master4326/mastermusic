@@ -4,7 +4,7 @@
    y se pueda instalar en celular y PC.
    Sube el número de CACHE cuando cambies archivos del shell.
    ========================================================== */
-const CACHE = 'mastermusic-v47';
+const CACHE = 'mastermusic-v58';
 
 // Archivos locales que forman la app. Las pistas de música del
 // usuario NO se cachean aquí: viven en IndexedDB (ver js/db.js).
@@ -13,6 +13,7 @@ const SHELL = [
   './index.html',
   './manifest.json',
   './css/style.css',
+  './css/edit-fx.css',
   './js/db.js',
   './js/lyrics.js',
   './js/spotify.js',

@@ -18,6 +18,10 @@
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
 
   <link rel="stylesheet" href="css/style.css" />
+  <!-- Catálogo de efectos del modo edit. Va DESPUÉS a propósito, y es seguro:
+       ninguna regla de style.css toca esas clases, así que no hay empates de
+       cascada que dependan del orden entre los dos archivos. -->
+  <link rel="stylesheet" href="css/edit-fx.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- Nunito 900 (+cursiva) es la tipografía redondeada gruesa que usan los
@@ -70,7 +74,12 @@
         </div>
 
         <div class="track-info">
-          <div class="ti-title" id="npTitle">Sin canción</div>
+          <!-- el EQ va FUERA de #npTitle: app.js escribe textContent ahí
+               y se lo llevaría por delante -->
+          <div class="ti-title-row">
+            <span class="ti-eq" aria-hidden="true"><i></i><i></i><i></i></span>
+            <div class="ti-title" id="npTitle">Sin canción</div>
+          </div>
           <div class="ti-artist" id="npArtist">— ningún artista —</div>
           <div class="ti-album" id="npAlbum"></div>
         </div>
@@ -114,7 +123,6 @@
                 <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.6-.22l-2.39.96a7.06 7.06 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.63.94l-2.39-.96a.49.49 0 0 0-.6.22L2.69 8.86a.49.49 0 0 0 .12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.21.37.3.6.22l2.39-.96c.5.37 1.04.7 1.63.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.63-.94l2.39.96c.23.08.48 0 .6-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/>
               </svg>
             </button>
-            <span class="status-dot"><span class="dot"></span> online</span>
           </span>
         </div>
 
@@ -138,24 +146,31 @@
             <span class="la-corner tl"></span><span class="la-corner tr"></span>
             <span class="la-corner bl"></span><span class="la-corner br"></span>
           </div>
-          <div class="lyrics-body" id="lyricsBody">
-            <!-- Primer arranque: en vez de un mensaje seco, las dos formas
-                 de meter música. Lo sustituye lyrics.js al sonar algo. -->
-            <div class="first-run">
-              <h4>▒ MASTER MUSIC ▒</h4>
-              <div>aquí saldrá la letra, sincronizada con la canción</div>
-              <div class="fr-ways">
-                <div class="fr-way">
-                  <b>arrastra tus mp3</b>
-                  suéltalos en la ventana
-                </div>
-                <div class="fr-way">
-                  <b>o conecta spotify</b>
-                  en config ⚙ · tecla S
-                </div>
+          <!-- ESTADO EN REPOSO · vive FUERA de #lyricsBody a propósito:
+               el modo edit oculta #lyricsBody, y antes esto dejaba el panel
+               completamente en blanco cuando no sonaba nada. Aquí se ve en
+               los dos modos. Lo apaga lyrics.js al llegar una canción. -->
+          <div class="lyrics-idle" id="lyricsIdle">
+            <div class="li-eq" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <h4 class="li-mark" data-txt="MASTER MUSIC">MASTER MUSIC</h4>
+            <p class="li-sub">la letra aparecerá aquí, sincronizada al segundo</p>
+            <div class="li-ways">
+              <div class="li-way">
+                <span class="li-ico" aria-hidden="true">♫</span>
+                <b>arrastra tus mp3</b>
+                <em>suéltalos en la ventana</em>
+              </div>
+              <div class="li-way">
+                <span class="li-ico" aria-hidden="true">◈</span>
+                <b>o conecta spotify</b>
+                <em>en config ⚙ · tecla S</em>
               </div>
             </div>
+            <p class="li-tip" id="lyricsIdleTip"></p>
           </div>
+          <div class="lyrics-body" id="lyricsBody"></div>
           <!-- MODO EDIT: una sola línea gigante con efectos, estilo edit de TikTok -->
           <div class="lyrics-edit" id="lyricsEdit" hidden></div>
         </div>
@@ -295,7 +310,7 @@
           <div class="settings-block">
             <h3>~ fondo ~</h3>
             <div class="bg-options">
-              <label class="radio-row">
+              <label class="radio-row"> 
                 <input type="radio" name="bgMode" value="auto" id="bgAuto" checked />
                 <span>auto (color de la carátula)</span>
               </label>
@@ -488,7 +503,27 @@
   <!-- MODO CINE: letra gigante sobre la carátula difuminada (opcional) -->
   <div class="cinema" id="cinema" hidden>
     <div class="cinema-bg" id="cinemaBg"></div>
-    <div class="cinema-veil"></div>
+    <div class="cinema-veil" id="cinemaVeil"></div>
+
+    <!-- AURA estilo Apple Music: manchas de color sacadas de la carátula que
+         se mueven despacio y respiran con la canción. Sustituye al estrobo y
+         a las ondas por bombo, que daban flashazos en vez de ambiente. -->
+    <div class="cinema-aura" id="cinemaAura" aria-hidden="true">
+      <span class="au-blob b1"></span>
+      <span class="au-blob b2"></span>
+      <span class="au-blob b3"></span>
+      <span class="au-blob b4"></span>
+    </div>
+
+    <!-- Capa reactiva: destellos con los platillos (lo pinta cinema.js) -->
+    <div class="cinema-fx" id="cinemaFx" aria-hidden="true">
+      <div class="cin-destellos" id="cinDestellos"></div>
+    </div>
+
+    <!-- Acabado de película: grano animado + viñeta. Puro CSS, sobre todo. -->
+    <div class="cinema-grano" aria-hidden="true"></div>
+    <div class="cinema-vineta" aria-hidden="true"></div>
+
     <button class="cinema-close" id="cinemaClose" title="Salir del modo cine (Esc)">✕</button>
     <div class="cinema-head">
       <div class="cinema-cover" id="cinemaCover"></div>
@@ -498,14 +533,52 @@
       </div>
     </div>
     <div class="cinema-body">
-      <div class="cinema-disc" id="cinemaDisc"></div>
+      <!-- el disco gasta su transform en el giro, así que el latido va en
+           el envoltorio (misma razón que las notas del panel normal) -->
+      <div class="cinema-disc-wrap" id="cinemaDiscWrap">
+        <!-- vinilo de verdad: pasta negra con surcos, y la carátula SOLO en
+             la etiqueta central (antes la portada cubría el disco entero con
+             los surcos encima y quedaba embarrado) -->
+        <div class="cinema-disc" id="cinemaDisc">
+          <span class="cin-brillo" aria-hidden="true"></span>
+          <span class="cin-label" id="cinemaLabel"></span>
+        </div>
+        <!-- brazo con geometría de tocadiscos: pivote fuera del plato y
+             recorrido real de fuera hacia dentro según avanza la canción -->
+        <div class="cinema-brazo" id="cinemaBrazo" aria-hidden="true">
+          <span class="br-base"></span>
+          <span class="br-arm"><i class="br-head"></i></span>
+        </div>
+      </div>
       <div class="cinema-stage" id="cinemaStage">
+        <div class="cinema-clave" id="cinemaClave" aria-hidden="true"></div>
+        <div class="cinema-ghost prev" id="cinemaPrev" aria-hidden="true"></div>
+        <div class="cinema-ghost next" id="cinemaNext" aria-hidden="true"></div>
         <!-- aquí se muda #lyricsEdit mientras el cine está abierto -->
       </div>
       <div class="cinema-msg" id="cinemaMsg" hidden></div>
+      <!-- cuenta de los huecos instrumentales, en grande -->
+      <div class="cinema-gap" id="cinemaGap" hidden aria-hidden="true"><i></i><i></i><i></i></div>
     </div>
+
+    <!-- Controles: asoman al mover el ratón y se esconden solos -->
+    <div class="cinema-ctl" id="cinemaCtl">
+      <span class="cin-time" id="cinTimeCur">0:00</span>
+      <button class="cin-btn" id="cinPrev" title="Anterior">
+        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><rect x="4" y="4" width="2.6" height="16"/></svg>
+      </button>
+      <button class="cin-btn cin-play" id="cinPlay" title="Reproducir / pausa (espacio)">
+        <svg viewBox="0 0 24 24" fill="currentColor" id="cinPlayIcon"><polygon points="7 4 20 12 7 20 7 4"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor" id="cinPauseIcon" hidden><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+      <button class="cin-btn" id="cinNext" title="Siguiente">
+        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><rect x="17.4" y="4" width="2.6" height="16"/></svg>
+      </button>
+      <span class="cin-time" id="cinTimeTot">0:00</span>
+    </div>
+
     <!-- Onda de progreso: espectro que baila + porción reproducida en acento -->
-    <canvas class="cinema-wave" id="cinemaWave" title="Clic para saltar a ese punto"></canvas>
+    <canvas class="cinema-wave" id="cinemaWave" title="Clic o arrastra para saltar"></canvas>
   </div>
 
   <!-- DROP OVERLAY -->
@@ -517,21 +590,24 @@
   </div>
 
 
-  <script src="js/vendor/jsmediatags.min.js"></script>
-  <script src="js/db.js"></script>
-  <script src="js/lyrics.js"></script>
-  <script src="js/spotify.js"></script>
-  <script src="js/library.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/visualizer.js"></script>
+  <!-- Todos con defer: el navegador pinta la ventana ANTES de ejecutar
+       ~230 KB de JS, y defer conserva este orden exacto de ejecución
+       (que sí importa: beat.js depende del visualizador, ambient.js de beat). -->
+  <script defer src="js/vendor/jsmediatags.min.js"></script>
+  <script defer src="js/db.js"></script>
+  <script defer src="js/lyrics.js"></script>
+  <script defer src="js/spotify.js"></script>
+  <script defer src="js/library.js"></script>
+  <script defer src="js/app.js"></script>
+  <script defer src="js/visualizer.js"></script>
   <!-- beat.js va DESPUÉS del visualizador (le pide el analizador crudo) y
        ANTES de ambient.js, que solo pinta lo que este detecta -->
-  <script src="js/beat.js"></script>
-  <script src="js/seven.js"></script>
-  <script src="js/settings.js"></script>
-  <script src="js/cinema.js"></script>
-  <script src="js/colors.js"></script>
-  <script src="js/ambient.js"></script>
+  <script defer src="js/beat.js"></script>
+  <script defer src="js/seven.js"></script>
+  <script defer src="js/settings.js"></script>
+  <script defer src="js/cinema.js"></script>
+  <script defer src="js/colors.js"></script>
+  <script defer src="js/ambient.js"></script>
 
   <!-- Registro del Service Worker (solo bajo http/https, no file://) -->
   <script>
