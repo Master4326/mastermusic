@@ -402,12 +402,71 @@
     if (window.SpotifyModule) window.SpotifyModule.connect();
   });
 
+  /* ---- Posición y salto, sin que cada módulo repita el desvío a Spotify ----
+     Con Spotify Connect el audio NO pasa por el navegador: la posición la
+     lleva el reloj interpolado de spotify.js, no `audio.currentTime`. Antes
+     cada módulo nuevo tenía que acordarse de eso; ahora se pregunta aquí. */
+  const position = () => {
+    if (spotifyActive() && window.SpotifyModule.position) return window.SpotifyModule.position();
+    return audio.currentTime || 0;
+  };
+
+  const duration = () => {
+    if (state.currentTrack && state.currentTrack.duration) return state.currentTrack.duration;
+    return audio.duration || 0;
+  };
+
+  const playing = () => {
+    if (spotifyActive() && window.SpotifyModule.playing) return window.SpotifyModule.playing();
+    return !audio.paused && !!audio.src;
+  };
+
+  const seekTo = (sec) => {
+    const dur = duration();
+    const s = Math.max(0, dur ? Math.min(dur, sec) : sec);
+    if (spotifyActive()) { window.SpotifyModule.seek(s * 1000); return; }
+    if (audio.duration) audio.currentTime = s;
+  };
+
+  /* ---- Aviso de cambio de canción ----
+     La sesión de medios y el mini flotante necesitan enterarse de que cambió
+     la pista. En vez de que cada uno monte su propio temporizador (y su
+     propia comparación), hay UNO que compara la firma y avisa a todos.
+     La firma incluye la carátula porque el sistema operativo la muestra. */
+  const trackSubs = [];
+  let trackFirma = null;
+  const revisarTrack = () => {
+    const t = state.currentTrack;
+    const firma = t ? `${t.id}|${t.name}|${t.artist || ''}|${t.cover || ''}` : '';
+    if (firma === trackFirma) return;
+    trackFirma = firma;
+    trackSubs.forEach((fn) => { try { fn(t); } catch (err) { console.warn('onTrack:', err); } });
+  };
+  setInterval(revisarTrack, 500);
+
   // ---- Public API (usado por spotify.js / visualizer.js / seven.js) ----
   window.PlayerCore = {
     state,
     audio,
     addFiles,
     playTrackById,
+    // Control central: los módulos nuevos (sesión de medios, mini flotante,
+    // modo cine) mandan por aquí y el desvío a Spotify se resuelve solo.
+    togglePlay,
+    next: playNext,
+    prev: playPrev,
+    seek: seekTo,
+    setVolume,
+    position,
+    duration,
+    playing,
+    isSpotify: () => !!spotifyActive(),
+    formatTime,
+    onTrack: (fn) => {
+      if (typeof fn !== 'function') return;
+      trackSubs.push(fn);
+      if (state.currentTrack) { try { fn(state.currentTrack); } catch (err) { console.warn('onTrack:', err); } }
+    },
     setUser: () => {},   // sin panel de usuario visible; se mantiene por compatibilidad
     setSpotifyConnected: (connected) => {
       el.spotifyConnectBtn.classList.toggle('connected', connected);

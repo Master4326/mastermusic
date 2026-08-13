@@ -32,6 +32,10 @@
     // Si tu sesión es anterior a esto, desconecta y vuelve a conectar.
     'user-read-recently-played',
     'user-top-read',
+    /* NO se pide `user-library-modify`: el ❤ se retiró porque Spotify
+       responde 403 a las apps en modo desarrollo aunque lo concedas, y
+       pedir un permiso que no se usa solo asusta en la pantalla de
+       consentimiento ("Agregar y eliminar elementos en Tu biblioteca"). */
   ].join(' ');
 
   // -------- PKCE helpers --------
@@ -136,6 +140,8 @@
     if (!res.ok) return false;
     const data = await res.json();
     saveTokens(data);
+    // limpieza de la marca que dejó el ❤ retirado (sesiones anteriores)
+    try { localStorage.removeItem('mm_like_bloqueado'); } catch (x) {}
     return true;
   };
 
@@ -194,7 +200,12 @@
       const txt = await res.text();
       throw new Error(`Spotify API ${res.status}: ${txt}`);
     }
-    return res.json();
+    /* Cuerpo vacío con 200: le pasa a PUT/DELETE /me/tracks (guardar y quitar
+       de "Tus me gusta"), que responden OK sin JSON. res.json() reventaría
+       ahí y el corazón parecería fallar habiendo funcionado. */
+    const txt = await res.text();
+    if (!txt) return null;
+    try { return JSON.parse(txt); } catch (e) { return null; }
   };
 
   // -------- Polling current playback --------
@@ -363,6 +374,13 @@
     catch (e) { setStatus('✕ no se pudo adelantar en Spotify'); }
   };
 
+  /* Aquí vivieron estaGuardada()/guardar(), el ❤ de "Tus me gusta".
+     Retirados el 2026-08-12: `PUT /me/tracks` devuelve **403 Forbidden** a
+     secas a las apps en modo desarrollo, con el permiso `user-library-modify`
+     concedido y todo (verificado en vivo tras reconectar). Es el mismo muro
+     que tapa `/playlists/{id}/tracks`. No reimplementar: el botón no puede
+     funcionar hasta que Spotify cambie las reglas. */
+
   const formatTime = (s) => {
     if (!isFinite(s) || s < 0) return '0:00';
     const m = Math.floor(s / 60);
@@ -390,19 +408,70 @@
     if (hint) hint.hidden = show;
   };
 
-  const renderResults = () => {
+  /* -------- Últimas búsquedas --------
+     Volver a una búsqueda de hace un minuto era volver a teclearla entera.
+     Se guardan 8, sin repetir y con la más reciente delante. */
+  const CLAVE_REC = 'mm_busquedas';
+  const MAX_REC = 8;
+
+  const leerRecientes = () => {
+    try {
+      const v = JSON.parse(localStorage.getItem(CLAVE_REC) || '[]');
+      return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, MAX_REC) : [];
+    } catch (e) { return []; }
+  };
+
+  const anotarReciente = (q) => {
+    const t = q.trim();
+    if (t.length < 2) return;
+    const lista = leerRecientes().filter((x) => x.toLowerCase() !== t.toLowerCase());
+    lista.unshift(t);
+    try { localStorage.setItem(CLAVE_REC, JSON.stringify(lista.slice(0, MAX_REC))); } catch (e) {}
+    pintarRecientes();
+  };
+
+  const pintarRecientes = () => {
+    const caja = document.getElementById('spotifyRecientes');
+    if (!caja) return;
+    const lista = leerRecientes();
+    caja.hidden = !lista.length;
+    if (!lista.length) { caja.innerHTML = ''; return; }
+    caja.innerHTML = '<span class="sp-rec-tit">últimas:</span>'
+      + lista.map((q) => `<button class="sp-rec" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`).join('')
+      + '<button class="sp-rec sp-rec-borrar" data-borrar="1" title="Borrar el historial">✕</button>';
+  };
+
+  // Esqueletos: mejor que dejar la lista vacía mientras Spotify contesta
+  const pintarCargando = () => {
+    const list = document.getElementById('spotifyResults');
+    if (!list) return;
+    list.innerHTML = Array.from({ length: 5 }, () => `
+      <li class="skel">
+        <div class="skel-box"></div>
+        <div class="skel-lines"><div class="skel-line"></div><div class="skel-line short"></div></div>
+      </li>`).join('');
+  };
+
+  const renderResults = (consulta) => {
     const list = document.getElementById('spotifyResults');
     if (!list) return;
     if (!searchResults.length) {
-      list.innerHTML = '<li class="sp-empty">▒ sin resultados ▒</li>';
+      list.innerHTML = consulta
+        ? `<li class="sp-empty">▒ nada para «${escapeHtml(consulta)}» ▒<br>
+             <span class="sp-empty-tip">prueba con el nombre del artista, o con menos palabras</span></li>`
+        : `<li class="sp-empty sp-empty-inicio">
+             <span class="sp-empty-ico">♫</span>
+             <b>busca lo que quieras oír</b>
+             <span class="sp-empty-tip">canción, artista o las dos cosas · <kbd>F</kbd> abre esto desde cualquier sitio</span>
+           </li>`;
       return;
     }
     list.innerHTML = searchResults.map((t, i) => `
-      <li class="sp-result" data-idx="${i}">
+      <li class="sp-result" data-idx="${i}" tabindex="0">
         <div class="sp-thumb" ${t.cover ? `style="background-image:url('${t.cover}')"` : ''}>${t.cover ? '' : '♪'}</div>
         <div class="sp-meta">
           <div class="sp-name">${escapeHtml(t.name)}</div>
-          <div class="sp-artist">${escapeHtml(t.artist)}</div>
+          <div class="sp-artist">${escapeHtml(t.artist)}${t.album ? ` <span class="sp-alb">· ${escapeHtml(t.album)}</span>` : ''}</div>
         </div>
         <div class="sp-dur">${formatTime(t.duration)}</div>
         <button class="sp-play" title="Reproducir">▶</button>
@@ -410,13 +479,22 @@
     `).join('');
   };
 
+  /* Secuencia contra respuestas cruzadas: al teclear rápido salen varias
+     peticiones y la lenta puede contestar DESPUÉS de la nueva, dejando en
+     pantalla los resultados de lo que ya no está escrito. Misma solución
+     que en lyrics.js. */
+  let seqBusqueda = 0;
+
   const doSearch = async (query) => {
     const q = query.trim();
-    if (!q) { searchResults = []; renderResults(); return; }
+    const mia = ++seqBusqueda;
+    if (!q) { searchResults = []; renderResults(''); return; }
+    pintarCargando();
     try {
       // limit máx. 10: desde feb-2026 Spotify limita las búsquedas de apps
       // en development mode a 10 resultados (más devuelve 400 "Invalid limit").
       const data = await api('/search?type=track&limit=10&q=' + encodeURIComponent(q));
+      if (mia !== seqBusqueda) return;
       const items = (data && data.tracks && data.tracks.items) || [];
       searchResults = items.map(it => ({
         id: 'sp:' + it.id,
@@ -429,8 +507,10 @@
         preview: it.preview_url || null,
         spotify: true,
       }));
-      renderResults();
+      renderResults(q);
+      if (searchResults.length) anotarReciente(q);
     } catch (e) {
+      if (mia !== seqBusqueda) return;
       searchResults = [];
       const list = document.getElementById('spotifyResults');
       if (!list) return;
@@ -520,22 +600,78 @@
 
   const wireSearch = () => {
     const input = document.getElementById('spotifySearchInput');
+    const limpiar = document.getElementById('spotifyClear');
+
     if (input && !input._wired) {
       input._wired = true;
+      const refrescarX = () => { if (limpiar) limpiar.hidden = !input.value; };
       input.addEventListener('input', () => {
+        refrescarX();
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => doSearch(input.value), 350);
       });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();      // que no cierre el cine ni ningún panel
+          if (input.value) { input.value = ''; refrescarX(); doSearch(''); }
+          else input.blur();
+        } else if (e.key === 'Enter') {
+          clearTimeout(searchTimer);
+          doSearch(input.value);
+        }
+      });
+      refrescarX();
     }
+
+    if (limpiar && !limpiar._wired) {
+      limpiar._wired = true;
+      limpiar.addEventListener('click', () => {
+        input.value = '';
+        limpiar.hidden = true;
+        doSearch('');
+        input.focus();
+      });
+    }
+
+    const recientes = document.getElementById('spotifyRecientes');
+    if (recientes && !recientes._wired) {
+      recientes._wired = true;
+      recientes.addEventListener('click', (e) => {
+        const btn = e.target.closest('.sp-rec');
+        if (!btn) return;
+        if (btn.dataset.borrar) {
+          try { localStorage.removeItem(CLAVE_REC); } catch (x) {}
+          pintarRecientes();
+          return;
+        }
+        input.value = btn.dataset.q;
+        if (limpiar) limpiar.hidden = false;
+        clearTimeout(searchTimer);
+        doSearch(btn.dataset.q);
+      });
+      pintarRecientes();
+    }
+
     const list = document.getElementById('spotifyResults');
     if (list && !list._wired) {
       list._wired = true;
-      list.addEventListener('click', (e) => {
-        const row = e.target.closest('.sp-result');
-        if (!row) return;
+      const lanzar = (row) => {
         const t = searchResults[parseInt(row.dataset.idx, 10)];
         if (t) playTrack(t);
+      };
+      list.addEventListener('click', (e) => {
+        const row = e.target.closest('.sp-result');
+        if (row) lanzar(row);
       });
+      // con teclado: las filas son focusables, Enter reproduce
+      list.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const row = e.target.closest('.sp-result');
+        if (!row) return;
+        e.preventDefault();
+        lanzar(row);
+      });
+      renderResults('');
     }
   };
 
@@ -601,6 +737,16 @@
     connect, api, search: doSearch, playTrack, playContext, isLoggedIn,
     togglePlay: spTogglePlay, next: spNext, prev: spPrev, seek: spSeek,
     setVolume: spSetVolume,
+    /* Posición interpolada: el mismo reloj que mueve la barra y la letra
+       entre poll y poll. Sin esto, quien preguntara por el minuto actual con
+       Spotify Connect recibiría el 0 del <audio> local, que está parado. */
+    position: () => {
+      if (!progStamp) return progBase;
+      if (!lastIsPlaying) return progBase;
+      const sec = progBase + (performance.now() - progStamp) / 1000;
+      return progDur ? Math.min(progDur, sec) : sec;
+    },
+    playing: () => lastIsPlaying,
   };
 
   // Wait for PlayerCore to be ready

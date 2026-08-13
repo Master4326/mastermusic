@@ -61,7 +61,20 @@
     idleOn = !!on;
     lyricsIdle.hidden = !idleOn;
     // mientras el reposo manda, ninguna de las dos vistas ocupa sitio
-    if (idleOn) { lyricsBody.hidden = true; lyricsEdit.hidden = true; }
+    if (idleOn) { lyricsBody.hidden = true; lyricsEdit.hidden = true; setNcs(false); }
+  };
+
+  /* ---- Escena de las canciones sin letra (estilo NCS, js/ncs.js) ----
+     Vive fuera de las dos vistas por la misma razón que el reposo. Devuelve
+     false si el módulo no cargó, y entonces se cae al cartel de texto de
+     siempre: una canción sin letra nunca debe dejar el panel en blanco. */
+  let ncsOn = false;
+  const setNcs = (on) => {
+    const S = window.NcsScene;
+    if (on && !S) return false;
+    ncsOn = !!on;
+    if (S) { if (ncsOn) S.mostrar(); else S.ocultar(); }
+    return true;
   };
 
   setIdle(true);   // arranque: aún no hay canción
@@ -112,22 +125,42 @@
   let gapMap = new Map();      // idx de la línea anterior → nodo contador
   let gapAct = null;
 
-  const setEmpty = (msg) => {
+  const limpiarLetra = () => {
     parsedLines = [];
     activeIdx = -1;
-    // el innerHTML de abajo desconecta los nodos: suelta también las cachés
+    // el innerHTML de quien llame desconecta los nodos: suelta las cachés
     lineNodes = [];
     gapMap = new Map();
     gapAct = null;
+  };
+
+  /* Mensajes de paso ("buscando…", "sin conexión…"): estos SÍ son texto,
+     duran un instante y hay que poder leerlos. */
+  const setEmpty = (msg) => {
+    limpiarLetra();
+    setNcs(false);
     lyricsBody.innerHTML = `<p class="lyrics-empty">${msg}</p>`;
     lyricsEdit.innerHTML = `<p class="lyrics-empty">${msg}</p>`;
   };
 
+  /* Canción sin letra en LRClib. Antes se quedaba un cartel de texto plano
+     en medio del panel; ahora se enciende la escena NCS: la carátula en
+     círculo, su anillo de progreso y el espectro bailando con la música. */
+  const setSinLetra = () => {
+    limpiarLetra();
+    if (!setNcs(true)) { setEmpty('No se encontró letra para esta canción.'); return; }
+    lyricsBody.innerHTML = '';
+    lyricsEdit.innerHTML = '';
+    lyricsBody.classList.remove('sync');
+    applyMode();          // reparte el hidden: con la escena encendida, ninguna vista ocupa sitio
+  };
+
   const renderLines = () => {
     if (!parsedLines.length) {
-      setEmpty('No se encontró letra para esta canción.');
+      setSinLetra();
       return;
     }
+    setNcs(false);          // hay letra: la escena NCS se retira
     const conTiempos = parsedLines[0].time >= 0;
     // sin tiempos no hay karaoke posible: la clase apaga el teñido palabra a
     // palabra para que la letra plana no se quede toda apagada
@@ -358,7 +391,7 @@
     // Caché primero: letra al instante si esta canción ya se buscó antes
     const cached = cacheGet(key);
     if (cached) {
-      if (cached.notFound) setEmpty('No se encontró letra para esta canción.');
+      if (cached.notFound) setSinLetra();
       else apply(cached);
       prefetchNext();
       return;
@@ -371,7 +404,7 @@
       if (!isCurrent()) return;
       cachePut(key, lyricsData);
       if (lyricsData) apply(lyricsData);
-      else setEmpty('No se encontró letra para esta canción.');
+      else setSinLetra();
       prefetchNext();
     } catch (e) {
       if (e && e.name === 'AbortError') return;   // reemplazada por otra canción: no tocar nada
@@ -390,18 +423,20 @@
   };
 
   const apply = (data) => {
-    if (!data) return setEmpty('No se encontró letra.');
+    if (!data) return setSinLetra();
     if (data.syncedLyrics) {
       parsedLines = parseLRC(data.syncedLyrics);
       renderLines();
     } else if (data.plainLyrics) {
+      setNcs(false);        // hay letra (aunque sin tiempos): la escena se retira
       parsedLines = data.plainLyrics.split(/\r?\n/).map(t => ({ time: -1, text: t }));
       lyricsBody.innerHTML = parsedLines
-        .map(l => `<div class="lyric-line">${l.text || '♪'}</div>`)
+        .map(l => `<div class="lyric-line">${escHtml(l.text) || '♪'}</div>`)
         .join('');
       lyricsEdit.innerHTML = '<p class="lyrics-empty">Esta letra no está sincronizada — el modo edit necesita tiempos. Usa la vista ≡ lista.</p>';
+      applyMode();          // la escena podía estar encendida: reparte el hidden
     } else {
-      setEmpty('No se encontró letra.');
+      setSinLetra();
     }
   };
 
@@ -1522,9 +1557,11 @@
 
   /* ── alternar lista ↔ edit ── */
   const applyMode = () => {
-    // en reposo mandan ni lista ni edit: se ve el panel de bienvenida
-    lyricsBody.hidden = idleOn || editMode;
-    lyricsEdit.hidden = idleOn || !editMode;
+    /* Ni lista ni edit cuando manda una escena de las que van por fuera:
+       el reposo (sin canción) o la escena NCS (canción sin letra). */
+    const fuera = idleOn || ncsOn;
+    lyricsBody.hidden = fuera || editMode;
+    lyricsEdit.hidden = fuera || !editMode;
     modeBtn.textContent = editMode ? '≡' : '✦';
     modeBtn.title = editMode ? 'Volver a vista lista' : 'Modo edit (letra animada)';
     modeBtn.classList.toggle('on', editMode);
@@ -1988,6 +2025,12 @@
     // Estado de sincronización (lo consume el modo cine)
     getSync: () => ({ lines: parsedLines, idx: activeIdx }),
     isEditMode: () => editMode,
+    // ¿está puesta la escena de canción sin letra? (la consulta el cine)
+    sinLetra: () => ncsOn,
+    /* Reparte otra vez el hidden de las dos vistas. Existe para que el cine
+       no tenga que re-deducir la regla al cerrarse: la condición (reposo,
+       escena NCS, modo elegido) vive en un solo sitio. */
+    refreshMode: () => applyMode(),
     // El modo cine fuerza el render tipo edit sin cambiar la preferencia
     forceEdit: (on) => {
       forceEdit = !!on;

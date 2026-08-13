@@ -538,12 +538,15 @@
     // devuelve #lyricsEdit a su sitio y restaura su visibilidad según el modo
     slot.parentNode.insertBefore(lyricsEdit, slot);
     slot.remove();
-    const editMode = window.LyricsModule && window.LyricsModule.isEditMode
-      ? window.LyricsModule.isEditMode() : false;
-    lyricsEdit.hidden = !editMode;
-    if (window.LyricsModule && window.LyricsModule.forceEdit) {
-      window.LyricsModule.forceEdit(false);
-    }
+    const LM = window.LyricsModule;
+    if (LM && LM.forceEdit) LM.forceEdit(false);
+    /* Quién se ve al volver lo decide el módulo de letras: si además de la
+       preferencia hay una escena por fuera (reposo, o canción sin letra),
+       ninguna de las dos vistas debe ocupar sitio. Antes se decidía aquí
+       con `!editMode` y al cerrar sobre una canción sin letra reaparecía
+       un #lyricsEdit vacío encima de la escena. */
+    if (LM && LM.refreshMode) LM.refreshMode();
+    else lyricsEdit.hidden = !(LM && LM.isEditMode && LM.isEditMode());
     // se oculta al terminar el fundido, no en seco
     clearTimeout(cerrando);
     cerrando = setTimeout(() => {
@@ -554,6 +557,13 @@
   if (openBtn) openBtn.addEventListener('click', openCinema);
   if (closeBtn) closeBtn.addEventListener('click', closeCinema);
   document.addEventListener('keydown', (e) => {
-    if (e.code === 'Escape' && open) closeCinema();
+    if (e.code !== 'Escape' || !open) return;
+    closeCinema();
   });
+
+  window.CinemaModule = {
+    abrir: openCinema,
+    cerrar: closeCinema,
+    esta: () => open,
+  };
 })();

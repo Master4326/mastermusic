@@ -3603,6 +3603,209 @@ body.reduce-motion .li-way::after { opacity: 0; }
    más arriba en este archivo, que va fuera de las dos vistas.) */
 
 /* ==========================================================
+   ESCENA SIN LETRA — estilo NCS  (js/ncs.js)
+   Antes, una canción sin letra en LRClib dejaba un cartel de texto
+   plano en medio del panel. Ahora sale la carátula en círculo con su
+   anillo de progreso y un espectro circular que baila con la música.
+   Va FUERA de #lyricsBody y #lyricsEdit (se ve en los dos modos).
+   ========================================================== */
+.lyrics-ncs {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 1.4cqh, 26px);
+  padding: 20px 16px;
+  text-align: center;
+  pointer-events: none;      /* no hay nada que pulsar: no roba clics */
+  animation: ncs-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.lyrics-ncs[hidden] { display: none; }
+@keyframes ncs-in {
+  from { opacity: 0; transform: scale(0.94); filter: blur(6px); }
+  to   { opacity: 1; transform: scale(1); filter: none; }
+}
+
+/* La escala de TODA la escena cuelga del font-size del anillo: las medidas
+   de dentro van en em, así el conjunto crece con la ventana de una pieza.
+   El tope por altura evita que el disco se coma los títulos en apaisado. */
+.ncs-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 4.7em;
+  height: 4.7em;
+  flex: 0 0 auto;
+  font-size: min(clamp(44px, 9.5cqw, 88px), 12.5cqh);
+}
+
+/* riel del anillo de progreso: token de la paleta, sin colores fijos */
+.ncs-riel {
+  position: absolute;
+  inset: 0;
+  margin: auto;              /* el JS escribe transform en otros nodos: nunca translate */
+  width: 2.78em;
+  height: 2.78em;
+  border: 0.06em solid var(--border-pixel);
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+/* Anillo de progreso: el sector recorrido en acento. El conic-gradient se
+   recorta a una tira con mask, así queda aro y no tarta. */
+.ncs-prog {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 2.78em;
+  height: 2.78em;
+  border-radius: 50%;
+  background: conic-gradient(from -90deg,
+    var(--accent) calc(var(--p, 0) * 360deg), transparent 0);
+  -webkit-mask-image: radial-gradient(closest-side, transparent calc(100% - 0.075em), #000 calc(100% - 0.07em));
+  mask-image: radial-gradient(closest-side, transparent calc(100% - 0.075em), #000 calc(100% - 0.07em));
+  filter: drop-shadow(0 0 6px var(--accent-glow));
+}
+
+/* el disco gasta su transform en el giro → el latido va en el envoltorio */
+.ncs-disco-wrap {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 2.42em;
+  height: 2.42em;
+  will-change: transform;
+}
+.ncs-disco {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--bg-panel-2);
+  box-shadow:
+    0 0 0 0.035em var(--accent-dim),
+    0 0 1.1em rgba(0, 0, 0, 0.55) inset,
+    0 0.06em 0.5em rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  /* Gira solo mientras suena. Se pausa con animation-play-state, no quitando
+     la animación: así se queda en el ángulo donde estaba en vez de saltar a
+     cero al pausar (mismo patrón que el vinilo del cine). */
+  animation: ncs-spin 26s linear infinite;
+  animation-play-state: paused;
+}
+body.playing .ncs-disco { animation-play-state: running; }
+@keyframes ncs-spin { to { transform: rotate(360deg); } }
+/* reflejo especular: contra-giro exacto para que se quede quieto mientras la
+   carátula rueda debajo — el truco que hace que el giro se lea (como el cine) */
+.ncs-brillo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(125deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.03) 34%,
+    transparent 52%);
+  pointer-events: none;
+  animation: ncs-spin-inv 26s linear infinite;
+  animation-play-state: paused;
+}
+body.playing .ncs-brillo { animation-play-state: running; }
+@keyframes ncs-spin-inv { to { transform: rotate(-360deg); } }
+/* sin carátula (mp3 sin portada) el círculo no se queda vacío */
+.ncs-nota-ico {
+  font-size: 0.9em;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 0.18em var(--accent-glow);
+  opacity: 0;
+}
+.lyrics-ncs.sin-portada .ncs-nota-ico { opacity: 0.8; }
+
+/* ---- Espectro circular: el envoltorio fija el ángulo, la barra crece
+        hacia afuera con scaleY (origen en el borde interior). Solo GPU. ---- */
+.ncs-rad {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.ncs-rad i {
+  position: absolute;
+  left: -0.022em;
+  bottom: 1.52em;            /* radio interior: justo fuera del anillo de progreso */
+  width: 0.044em;
+  height: 0.34em;
+  background: var(--accent);
+  box-shadow: 0 0 0.09em var(--accent-glow);
+  border-radius: 0.03em;
+  transform: scaleY(0.12);
+  transform-origin: center bottom;
+  will-change: transform;
+}
+/* sin FFT real (Spotify Connect sin ◈) el anillo respira solo: mejor eso que
+   48 barras congeladas, que parecen la app colgada */
+.lyrics-ncs:not(.live) .ncs-rad i {
+  animation: ncs-eqidle 1.5s ease-in-out infinite alternate;
+}
+@keyframes ncs-eqidle {
+  from { transform: scaleY(0.12); }
+  to   { transform: scaleY(0.85); }
+}
+
+/* ---- Títulos ---- */
+.ncs-meta {
+  max-width: min(90%, 44ch);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ncs-titulo {
+  font-family: 'VT323', monospace;
+  font-size: clamp(20px, 2.9cqw, 40px);
+  line-height: 1.1;
+  letter-spacing: 1px;
+  color: var(--text);
+  text-shadow: 0 0 0.5em var(--accent-glow);
+  overflow-wrap: anywhere;
+}
+.ncs-artista {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(11px, 1.3cqw, 17px);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.9;
+}
+.ncs-nota {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 48ch;
+}
+.ncs-nota::before { content: '▸ '; color: var(--accent-dim); }
+
+/* «menos movimiento»: la escena SIGUE (es contenido, no adorno), pero
+   quieta. El anillo de progreso se queda: es información. */
+body.reduce-motion .lyrics-ncs { animation: none; }
+body.reduce-motion .ncs-disco,
+body.reduce-motion .ncs-brillo { animation: none; }
+body.reduce-motion .lyrics-ncs:not(.live) .ncs-rad i { animation: none; }
+
+@media (max-width: 760px) {
+  /* el drop-shadow del aro y el glow por barra se notan en un móvil */
+  .ncs-prog { filter: none; }
+  .ncs-rad i { box-shadow: none; }
+}
+
+/* ==========================================================
    MODO EDIT · TANDA 5 — títulos de fila completa
    Regla del proyecto: NUNCA animar propiedades de layout
    (letter-spacing, width, font-size…). Solo transform, opacity,
@@ -3668,10 +3871,28 @@ body.reduce-motion .li-way::after { opacity: 0; }
 }
 /* Con «menos movimiento» el JS ya las apaga; esto las deja fuera del todo */
 body.reduce-motion .ambient { display: none; }
-/* En pantallas pequeñas el desenfoque grande cuesta caro */
+
+/* ==========================================================
+   RECORTES DE MÓVIL (clase `perf-movil`, la pone js/perf.js)
+
+   Por qué por CLASE y no solo por media query: lo que decide no es el
+   ancho de la ventana sino el aparato — un teléfono en horizontal pasa de
+   760 px y sigue teniendo la GPU de un teléfono. La media query se queda
+   como respaldo para navegadores donde no corriera el JS.
+
+   El desenfoque es lo más caro que hay aquí: su coste sube con el CUADRADO
+   del radio, así que bajar de 70 a 26 px no es «un poco menos», es ~7 veces
+   menos trabajo por cada frame en que esa capa se recompone.
+   ========================================================== */
 @media (max-width: 760px) {
   .amb-blob { filter: blur(46px); }
 }
+body.perf-movil .amb-blob { filter: blur(26px); }
+/* dos focos en vez de tres: el tercero es el más pequeño y el que menos
+   se nota, y cada uno es una capa a pantalla completa que componer */
+body.perf-movil .amb-blob.b3 { display: none; }
+body.perf-bajo .amb-blob { filter: blur(18px); }
+body.perf-bajo .amb-blob.b2 { display: none; }
 
 /* ==========================================================
    FONDO REACTIVO DEL PANEL DE LA LETRA
@@ -3688,6 +3909,14 @@ body.reduce-motion .ambient { display: none; }
   opacity: 0;
   will-change: transform, opacity;
   transition: opacity .8s ease-out;
+}
+/* En el móvil el JS deja de escalarla en cada frame (rehacer un desenfoque
+   grande por frame es carísimo): se queda fija, con menos radio y un poco
+   de escala puesta desde aquí para que siga cubriendo el panel. */
+body.perf-movil .la-cover {
+  filter: blur(20px) saturate(1.4);
+  transform: scale(1.1);
+  will-change: opacity;
 }
 
 /* 2 · ecualizador fantasma pegado al borde inferior */
@@ -3844,6 +4073,33 @@ body.reduce-motion .ambient { display: none; }
 }
 .la-destellos i::after { transform: rotate(90deg); }
 
+/* ==========================================================
+   MÓVIL · nada de `will-change` en lo que se multiplica
+
+   Esto es lo que más pesaba y no se veía venir. `will-change` promueve el
+   elemento a su PROPIA capa de GPU, y estaba puesto de forma permanente en
+   selectores que no son un elemento sino muchos: cada verso de la canción
+   (60-80 en un tema), 22 barras del ecualizador, 28 del círculo, 34
+   destellos, hasta 40 notas saltarinas. En un PC sobra memoria de vídeo y
+   ni se nota; en un teléfono son cientos de capas que el compositor tiene
+   que guardar y mezclar — y cuando no le caben, las tira y las rehace. Eso
+   es exactamente el tirón que se siente cada pocos segundos.
+
+   `will-change` sirve para avisar de UNA animación que va a empezar ya, no
+   como adorno permanente. Los pocos elementos únicos (los focos, la
+   carátula, el marco, el estrobo) lo conservan: ahí sí ayuda.
+   ========================================================== */
+body.perf-movil .lyrics-body .lyric-line,
+body.perf-movil .la-note,
+body.perf-movil .la-note i,
+body.perf-movil .la-eq i,
+body.perf-movil .la-circular i,
+body.perf-movil .la-saltarinas i,
+body.perf-movil .la-destellos i,
+body.perf-movil .ncs-rad i {
+  will-change: auto;
+}
+
 /* 7 · el golpetazo del drop: el FONDO se sacude y destella, el texto no.
    Sacudir la letra la vuelve ilegible justo en el momento más bonito. */
 /* Contenido a propósito: el drop tiene que notarse, no marear. La sacudida
@@ -3893,3 +4149,171 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
 }
 
 
+
+/* ==========================================================
+   TANDA 8 · lo que queda: la búsqueda rediseñada
+   Aquí vivieron el ❤ «me gusta», el menú ⋯ (tarjeta para compartir, mini
+   flotante, grabación) y el temporizador de sueño. Todo retirado: el menú
+   porque el usuario no lo quería, y el corazón porque la API responde 403
+   a las apps en modo desarrollo. La barra se queda con volumen, ✦ y ⛶.
+   No reintroducir.
+   Recordatorio de la casa: nada de filtros identidad (blur(0),
+   brightness(1)) — si tiene que quedar nítido es `filter: none`,
+   o el text-shadow se corta contra la región del filtro.
+   ========================================================== */
+
+/* ---------- Búsqueda rediseñada ---------- */
+.search-row { position: relative; }
+.sp-limpiar {
+  position: absolute;
+  right: 4px; top: 50%;
+  transform: translateY(-50%);
+  width: 22px; height: 22px;
+  font-family: 'VT323', monospace;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+.sp-limpiar:hover { color: var(--accent); }
+.sp-recientes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 9px;
+}
+.sp-rec-tit {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+.sp-rec {
+  max-width: 148px;
+  padding: 3px 8px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-rec:hover { color: var(--accent); border-color: var(--accent-dim); }
+.sp-rec-borrar { color: var(--text-muted); padding: 3px 6px; }
+.sp-rec-borrar:hover { color: var(--magenta); border-color: var(--magenta); }
+/* el álbum, atenuado detrás del artista: da contexto sin robar la línea */
+.sp-alb { color: var(--text-muted); }
+.sp-empty-inicio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 34px 16px;
+  line-height: 1.5;
+}
+.sp-empty-ico {
+  font-size: 34px;
+  color: var(--accent);
+  text-shadow: 0 0 16px var(--accent-glow);
+  opacity: 0.75;
+}
+.sp-empty-inicio b {
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+.sp-empty-tip {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sp-empty-tip kbd {
+  padding: 0 4px;
+  color: var(--text-dim);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-dark);
+}
+
+/* ==========================================================
+   MÓVIL VERTICAL — repaso completo (tanda 8)
+   Lo que estaba mal: en un teléfono .main-grid pasaba a una columna CON
+   scroll y el panel de la letra llevaba `min-height: 340px`. Resultado:
+   había que desplazar la página para leer el estribillo, y la cabecera
+   (carátula + espectro) se quedaba con la mitad de la pantalla.
+   Aquí la letra manda y cada zona ocupa lo suyo, sin scroll de página.
+   ========================================================== */
+@media (orientation: portrait) and (max-width: 760px) {
+  .main-grid {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;             /* el que scrollea es el panel, no la app */
+  }
+  .left-panel { flex: 0 0 auto; }
+  .right-panel { flex: 1 1 auto; min-height: 0; }
+  .visualizer-frame { min-height: 46px; max-height: 58px; }
+
+  /* El volumen dejaba de caber: iba en posición absoluta a la derecha y con
+     ❤ ✦ ⛶ ⋯ se montaba encima del botón de siguiente. En vertical entra en
+     la fila como uno más y, si no cabe, la fila reparte en dos renglones. */
+  .volume-ctl {
+    position: static;
+    transform: none;
+    margin-left: 2px;
+  }
+  .controls-row { flex-wrap: wrap; row-gap: 6px; }
+
+  /* Objetivos de toque: por debajo de ~38px el pulgar falla */
+  .tab {
+    min-height: 38px;
+    padding: 8px 12px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .side-btn { min-width: 36px; height: 34px; }
+  .lib-chip, .sp-rec { min-height: 32px; }
+
+  /* Muesca y barra de gestos: sin esto el reloj de la barra de estado cae
+     debajo del indicador de inicio y no se lee. El <meta viewport> ya trae
+     viewport-fit=cover, pero nadie leía los env() todavía. */
+  body {
+    padding: 6px;
+    padding-top: max(6px, env(safe-area-inset-top));
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+  .window {
+    resize: none;                 /* el tirador de redimensionar estorba al dedo */
+    height: calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+
+/* Teléfono bajito, o con el teclado abierto: lo primero que sobra es el
+   espectro, y la carátula puede encoger. La letra no se toca. */
+@media (orientation: portrait) and (max-height: 640px) {
+  .visualizer-frame { display: none; }
+  .cover-frame { width: 88px; }
+  .main-grid { gap: 8px; padding: 8px; }
+  .playback-bar { padding: 6px 10px; }
+}
+
+/* Teléfono en horizontal: una sola columna dejaba la letra en una rendija
+   de tres renglones. Con dos columnas estrechas se lee de verdad — es la
+   postura en la que se ve una letra acompañando la música. */
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 1000px) {
+  .main-grid {
+    display: grid;
+    grid-template-columns: clamp(110px, 22vw, 190px) 1fr;
+    gap: 8px;
+    padding: 8px;
+    overflow: hidden;
+  }
+  .left-panel { flex-direction: column; flex-wrap: nowrap; gap: 6px; }
+  .cover-frame { width: 100%; }
+  .visualizer-frame { display: none; }
+  .right-panel { flex: 1 1 auto; min-height: 0; }
+  .track-info { flex: 0 0 auto; }
+  .playback-bar { padding: 4px 10px; gap: 4px; }
+  .status-bar { display: none; }   /* 24 px que valen más para la letra */
+  .tab { min-height: 32px; padding: 5px 10px; }
+}

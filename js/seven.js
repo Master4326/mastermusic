@@ -473,8 +473,17 @@
     return t ? t.dataset.tab : '';
   };
 
+  /* NO se esconde con pantalla táctil, y es un fallo que costó entender:
+     con ratón, el `pointermove` la despierta ANTES de que llegue el clic,
+     así que siempre está ahí cuando pulsas. Con el dedo no hay movimiento
+     previo — el primer toque solo la saca (y cae sobre la letra, no sobre
+     el botón), y hay que tocar otra vez. Se ve exactamente como «los
+     botones de configuración no funcionan», que es lo que reportó el
+     usuario. En el móvil la barra se queda quieta y visible. */
+  const puedeEsconderse = () => !(window.MMPerf && window.MMPerf.tactil());
+
   const ocultarTabs = () => {
-    if (!tabBar || tabActiva() !== 'lyrics') return;
+    if (!tabBar || tabActiva() !== 'lyrics' || !puedeEsconderse()) return;
     // el mouse está justo encima (p. ej. a punto de pulsar el engranaje):
     // esconderla bajo el cursor sería una trampa — se re-arma y ya
     if (tabBar.matches(':hover')) { armarTabs(); return; }
@@ -492,9 +501,11 @@
   };
 
   // mouse, toque o teclado: cualquiera la despierta (mismo trío que el cine)
-  ['pointermove', 'pointerdown', 'keydown'].forEach((ev) =>
-    document.addEventListener(ev, despertarTabs, { passive: true }));
-  armarTabs();
+  if (puedeEsconderse()) {
+    ['pointermove', 'pointerdown', 'keydown'].forEach((ev) =>
+      document.addEventListener(ev, despertarTabs, { passive: true }));
+    armarTabs();
+  }
 
   let coverFirma = null;
   const updateCover = () => {
@@ -822,8 +833,9 @@
       const tab = document.getElementById('tab-lyrics');
       if (!tab || !tab.classList.contains('active')) return;
       const e = typeof window.MM_ENERGIA === 'number' ? window.MM_ENERGIA : 0.35;
-      // 1 nota cada ~2.8s en calma → cada ~0.7s a tope
-      tocaNota += 0.25 + e * 0.75;
+      // 1 nota cada ~2.8s en calma → cada ~0.7s a tope (la mitad en móvil:
+      // cada nota es un nodo que nace, se anima y muere)
+      tocaNota += (0.25 + e * 0.75) * (window.MMPerf && window.MMPerf.movil() ? 0.5 : 1);
       if (tocaNota < 1) return;
       tocaNota = 0;
       spawnNote();

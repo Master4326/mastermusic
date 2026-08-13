@@ -170,6 +170,30 @@
             </div>
             <p class="li-tip" id="lyricsIdleTip"></p>
           </div>
+          <!-- ESCENA SIN LETRA (estilo NCS) · también FUERA de las dos vistas,
+               por la misma razón que el reposo. Sale cuando LRClib no tiene
+               la letra de la canción: carátula en círculo, anillo de progreso
+               y espectro circular que baila. La gobierna js/ncs.js. -->
+          <div class="lyrics-ncs" id="lyricsNcs" hidden>
+            <div class="ncs-ring" id="ncsAnillo" aria-hidden="true">
+              <span class="ncs-riel"></span>
+              <div class="ncs-prog" id="ncsProg"></div>
+              <!-- el disco gasta su transform en el giro, así que el latido
+                   va en el envoltorio (misma razón que el vinilo del cine) -->
+              <div class="ncs-disco-wrap" id="ncsDiscoWrap">
+                <div class="ncs-disco" id="ncsDisco">
+                  <span class="ncs-brillo"></span>
+                  <span class="ncs-nota-ico">♪</span>
+                </div>
+              </div>
+              <!-- las barras radiales las añade js/ncs.js -->
+            </div>
+            <div class="ncs-meta">
+              <h4 class="ncs-titulo" id="ncsTitulo"></h4>
+              <p class="ncs-artista" id="ncsArtista"></p>
+            </div>
+            <p class="ncs-nota" id="ncsNota"></p>
+          </div>
           <div class="lyrics-body" id="lyricsBody"></div>
           <!-- MODO EDIT: una sola línea gigante con efectos, estilo edit de TikTok -->
           <div class="lyrics-edit" id="lyricsEdit" hidden></div>
@@ -182,8 +206,12 @@
             <div class="sp-search-head">♫ buscar en spotify</div>
             <div class="search-row">
               <span class="prompt">♫</span>
-              <input type="text" id="spotifySearchInput" placeholder="canción o artista..." class="retro-input" />
+              <input type="text" id="spotifySearchInput" placeholder="canción o artista..." class="retro-input"
+                autocomplete="off" spellcheck="false" />
+              <button class="sp-limpiar" id="spotifyClear" title="Borrar (Esc)" hidden>✕</button>
             </div>
+            <!-- últimas búsquedas: volver a una es un clic, no re-teclearla -->
+            <div class="sp-recientes" id="spotifyRecientes" hidden></div>
             <ul class="track-list sp-results" id="spotifyResults"></ul>
           </div>
         </div>
@@ -231,6 +259,11 @@
                 <span class="bracket">[</span> conectar spotify <span class="bracket">]</span>
               </button>
             </div>
+            <p class="set-hint">
+              el corazón ♥ de la barra guarda la canción en <b>tus me gusta</b>.
+              si te dice que no tiene permiso, desconecta y vuelve a conectar:
+              tu sesión es anterior al permiso que hace falta para escribir.
+            </p>
           </div>
 
           <div class="settings-block">
@@ -391,7 +424,7 @@
               <kbd>B</kbd><span>biblioteca</span>
               <kbd>Q</kbd><span>cola</span>
               <kbd>S</kbd><span>configuración</span>
-              <kbd>esc</kbd><span>salir del modo cine</span>
+              <kbd>esc</kbd><span>cerrar panel / salir del modo cine</span>
             </div>
           </div>
 
@@ -481,10 +514,16 @@
               </g>
             </svg>
           </button>
+          <!-- Aquí hubo un ❤ para guardar en "Tus me gusta". Retirado: la API
+               responde 403 Forbidden a las apps en modo desarrollo aunque el
+               permiso esté concedido, así que el botón no podía funcionar. -->
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" title="Modo edit (letra animada)">✦</button>
           <!-- ⚗ Lab de efectos DESACTIVADO por ahora (quitar "hidden" para reactivar; el código en lyrics.js queda intacto) -->
           <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn" title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
           <button class="ctrl-btn vol-btn side-btn" id="cinemaBtn" title="Modo cine: letra animada + carátula girando (Esc para salir)">⛶</button>
+          <!-- Aquí vivió un menú ⋯ con tarjeta para compartir / mini flotante /
+               grabar / temporizador. Retirado a petición del usuario: la barra
+               se queda con volumen, ✦ y ⛶. No reintroducir. -->
         </div>
       </div>
     </div>
@@ -593,6 +632,9 @@
   <!-- Todos con defer: el navegador pinta la ventana ANTES de ejecutar
        ~230 KB de JS, y defer conserva este orden exacto de ejecución
        (que sí importa: beat.js depende del visualizador, ambient.js de beat). -->
+  <!-- perf.js va PRIMERO: decide la carga (cuántos elementos, cuántos fps,
+       resolución del canvas) y todos los demás módulos lo consultan. -->
+  <script defer src="js/perf.js"></script>
   <script defer src="js/vendor/jsmediatags.min.js"></script>
   <script defer src="js/db.js"></script>
   <script defer src="js/lyrics.js"></script>
@@ -608,6 +650,10 @@
   <script defer src="js/cinema.js"></script>
   <script defer src="js/colors.js"></script>
   <script defer src="js/ambient.js"></script>
+  <!-- escena de las canciones sin letra: solo pinta, lee beat.js igual que ambient -->
+  <script defer src="js/ncs.js"></script>
+  <!-- Carátula y mandos en el sistema (overlay de Windows, auriculares). -->
+  <script defer src="js/mediasession.js"></script>
 
   <!-- Registro del Service Worker (solo bajo http/https, no file://) -->
   <script>

@@ -48,7 +48,12 @@
   let W = 0, H = 0, dpr = 1;
   const sizeCanvas = () => {
     const rect = canvas.getBoundingClientRect();
-    dpr = Math.max(1, window.devicePixelRatio || 1);
+    /* TOPE de resolución. Un teléfono moderno da devicePixelRatio 3, así
+       que un canvas de 380×120 CSS pasaba a 1140×360 píxeles reales: nueve
+       veces los píxeles a rellenar 60 veces por segundo. Con 1.5 las barras
+       siguen viéndose nítidas y cuesta la cuarta parte. */
+    const tope = window.MMPerf && window.MMPerf.movil() ? 1.5 : 2;
+    dpr = Math.min(tope, Math.max(1, window.devicePixelRatio || 1));
     W = Math.max(120, Math.floor(rect.width));
     H = Math.max(60, Math.floor(rect.height));
     canvas.width = Math.floor(W * dpr);
@@ -340,9 +345,11 @@
     const playing = !!(live && vals);
 
     /* Sin señal lo que se ve es la onda de respaldo, que es lenta y suave:
-       a 30 fps se ve idéntica y cuesta la mitad. Con música real, los 60. */
+       a 30 fps se ve idéntica y cuesta la mitad. Con música real, los 60
+       — salvo en el móvil, donde 30 son los que hay para todo. */
     const t0 = ts || performance.now();
-    if (!playing && t0 - ultimoFrame < 33) return;
+    const minMs = window.MMPerf && window.MMPerf.movil() ? 33 : (playing ? 0 : 33);
+    if (t0 - ultimoFrame < minMs) return;
     ultimoFrame = t0;
 
     haySenal = playing;

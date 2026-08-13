@@ -41,15 +41,33 @@
   const previo = ['', '', ''];
   let raf = null;
 
+  /* Cuántos elementos vivos, según el aparato (ver js/perf.js). En un
+     teléfono estos tres corros sumaban 84 escrituras de estilo por frame
+     a 60 fps: 5.040 por segundo solo para el fondo de la letra. */
+  const P = () => window.MMPerf;
+  const cuantos = (n) => (P() ? P().cuantos(n) : n);
+  const enMovil = () => !!(P() && P().movil());
+
+  /* Memo colgado del PROPIO elemento. Ojo: no vale un diccionario con
+     clave `id + prop` — estas barras son <i> sin id y compartirían
+     entrada, que es el fallo que ya cazamos en ncs.js. */
+  const escribir = (el, prop, valor) => {
+    if (!el) return;
+    const k = '_mm_' + prop;
+    if (el[k] === valor) return;
+    el[k] = valor;
+    el.style[prop] = valor;
+  };
+
   /* ---------- Ecualizador circular alrededor de la letra ---------- */
-  const NCIRC = 28;
+  const NCIRC = cuantos(28);
   const circulares = [];
   if (laCircular) {
     for (let k = 0; k < NCIRC; k++) circulares.push(laCircular.appendChild(document.createElement('i')));
   }
 
   /* ---------- Ecualizador fantasma del borde inferior ---------- */
-  const NBARRAS = 22;
+  const NBARRAS = cuantos(22);
   const barras = [];
   const alturas = new Array(NBARRAS).fill(0);
   if (laEq) {
@@ -77,7 +95,7 @@
      basura que el navegador acaba recogiendo con un tirón, justo lo
      que no queremos en algo que va a 60 fps.
      ========================================================== */
-  const NDEST = 34;
+  const NDEST = cuantos(34);
   const destellos = [];
   if (laDestellos) {
     for (let k = 0; k < NDEST; k++) {
@@ -126,12 +144,16 @@
     if (ahora - ultimoSalto < 110) return;
     // los golpes flojos no mueven a nadie; los gordos sacan a todo el mundo
     if (Math.random() > 0.2 + energia * 0.45 + fuerza * 0.4) return;
-    const aforo = 12 + Math.round(energia * 28);
+    /* El aforo se recorta en el móvil. El usuario las pidió expresamente
+       «a puñados, frenéticas» (y así siguen en el PC), pero cada una es un
+       nodo que se crea, se anima y se destruye: a 7 por segundo es justo
+       el tipo de basura que el teléfono acaba recogiendo con un tirón. */
+    const aforo = cuantos(12 + Math.round(energia * 28));
     if (laSaltarinas.children.length >= aforo) return;
     ultimoSalto = ahora;
 
     const alto = laSaltarinas.clientHeight || 260;
-    const base = 1.5 + energia * 4 + fuerza * 2.5;
+    const base = (1.5 + energia * 4 + fuerza * 2.5) * (enMovil() ? 0.5 : 1);
     const cuantas = Math.max(1, Math.min(aforo - laSaltarinas.children.length,
       Math.round(base * (0.6 + Math.random() * 0.8))));
     for (let k = 0; k < cuantas; k++) {
@@ -260,7 +282,7 @@
 
     // marco de luz: presencia en el borde + latido del golpe
     if (laMarco) {
-      laMarco.style.opacity = (0.04 + e * 0.12 + graves * 0.15 + boom * 0.17).toFixed(3);
+      escribir(laMarco, 'opacity', (0.04 + e * 0.12 + graves * 0.15 + boom * 0.17).toFixed(2));
     }
     /* Destello: cuadrático a propósito, así solo se ve en el pico del
        golpe y no como una niebla permanente encima de la letra.
@@ -268,7 +290,7 @@
        tiene que notarse es la diferencia entre un toque y un drop, no lo
        fuerte que da el fogonazo. */
     if (laEstrobo) {
-      laEstrobo.style.opacity = (boom * boom * 0.17 * (0.4 + e) + m.caja * m.cajaFuerza * 0.03).toFixed(3);
+      escribir(laEstrobo, 'opacity', (boom * boom * 0.17 * (0.4 + e) + m.caja * m.cajaFuerza * 0.03).toFixed(2));
     }
 
     /* Respiración del contenido. Sigue siendo sutil (≤3.5%) porque más que
@@ -276,39 +298,56 @@
        El `anticipo` es el truco fino: en el último suspiro antes del bombo
        previsto el texto se encoge un pelo, y por contraste el golpe se
        siente el doble. Solo cuando el tempo es fiable. */
-    const resp = 1 + (graves * 0.005 + boom * 0.015) * (0.4 + e) - m.anticipo * 0.0035;
-    const t = `scale(${resp.toFixed(4)})`;
-    if (lyricsEdit) lyricsEdit.style.transform = t;
-    if (lyricsBody) lyricsBody.style.transform = t;
+    /* En el móvil NO se respira. Escalar #lyricsEdit y #lyricsBody obliga a
+       RE-RASTERIZAR toda la letra —tipografía gigante con sombras— en cada
+       frame, y ese 1,5 % que casi no se ve es de lo más caro que hacía la
+       app en un teléfono. En PC se queda tal cual. */
+    if (!enMovil()) {
+      const resp = 1 + (graves * 0.005 + boom * 0.015) * (0.4 + e) - m.anticipo * 0.0035;
+      const t = `scale(${resp.toFixed(4)})`;
+      escribir(lyricsEdit, 'transform', t);
+      escribir(lyricsBody, 'transform', t);
+    }
 
     // suelo synthwave: corre más rápido cuanto más movida va la canción
     if (laSuelo) {
-      desplazSuelo = (desplazSuelo + 0.6 + e * 3.4 + boom * 3.5) % 30;
-      laSuelo.style.backgroundPosition = `0 0, 0 ${desplazSuelo.toFixed(1)}px`;
-      laSuelo.style.opacity = (Math.max(0, e - 0.28) * 0.4 + boom * 0.06).toFixed(3);
+      /* El desplazamiento repinta el degradado entero en cada frame. En el
+         móvil el suelo se queda quieto: sigue estando (da el aire
+         synthwave) pero sin repintarse. */
+      if (!enMovil()) {
+        desplazSuelo = (desplazSuelo + 0.6 + e * 3.4 + boom * 3.5) % 30;
+        laSuelo.style.backgroundPosition = `0 0, 0 ${desplazSuelo.toFixed(1)}px`;
+      }
+      escribir(laSuelo, 'opacity', (Math.max(0, e - 0.28) * 0.4 + boom * 0.06).toFixed(2));
     }
 
     // ecualizador circular: envuelve la letra sin taparla
     if (laCircular) {
-      laCircular.style.opacity = (Math.max(0, e - 0.22) * 0.45 + bri * 0.09).toFixed(3);
+      escribir(laCircular, 'opacity', (Math.max(0, e - 0.22) * 0.45 + bri * 0.09).toFixed(2));
       for (let k = 0; k < NCIRC; k++) {
         const b = bandaDe(m, Math.abs(NCIRC / 2 - k) / (NCIRC / 2));
         const ang = (k / NCIRC) * 360;
-        circulares[k].style.transform =
-          `rotate(${ang.toFixed(1)}deg) translateY(-150%) scaleY(${(0.25 + b * 1.5).toFixed(3)})`;
+        /* Dos decimales en la escala: a simple vista es lo mismo y el memo
+           se salta la mayoría de las escrituras (una barra quieta no
+           cambia de valor). */
+        escribir(circulares[k], 'transform',
+          `rotate(${ang.toFixed(1)}deg) translateY(-150%) scaleY(${(0.25 + b * 1.5).toFixed(2)})`);
       }
     }
-    // carátula: zoom lento que respira con los graves
-    if (laCover && portadaActual) {
-      laCover.style.transform = `scale(${(1.08 + graves * 0.1 + boom * 0.03).toFixed(3)})`;
-      laCover.style.opacity = (0.1 + graves * 0.1).toFixed(3);
+    /* Carátula de fondo: lleva blur(42px). Cambiarle el `scale` en cada
+       frame obliga al navegador a rehacer el desenfoque de una imagen
+       grande — carísimo en un teléfono. Allí se queda fija (sigue
+       viéndose, sin latir). */
+    if (laCover && portadaActual && !enMovil()) {
+      escribir(laCover, 'transform', `scale(${(1.08 + graves * 0.1 + boom * 0.03).toFixed(3)})`);
+      escribir(laCover, 'opacity', (0.1 + graves * 0.1).toFixed(2));
     }
     // ecualizador fantasma: una barra por banda, solo scaleY
     if (barras.length) {
       for (let k = 0; k < NBARRAS; k++) {
         const v = bandaDe(m, k / (NBARRAS - 1));
         alturas[k] += (v - alturas[k]) * (v > alturas[k] ? 0.5 : 0.12);
-        barras[k].style.transform = `scaleY(${(0.03 + alturas[k] * 0.97).toFixed(3)})`;
+        escribir(barras[k], 'transform', `scaleY(${(0.03 + alturas[k] * 0.97).toFixed(2)})`);
       }
     }
   };
@@ -341,9 +380,17 @@
   const apagar = () => { focos.forEach((f, k) => pintar(f, k, 1, 0)); };
 
   /* ---------- Bucle ---------- */
+  /* En el móvil pinta a 30 fps. Se sigue pidiendo el frame (así el ritmo lo
+     marca el navegador y no un temporizador que se desincroniza), pero uno
+     de cada dos se salta: la mitad de trabajo y en luces de fondo no se
+     distingue. Los GOLPES no se pierden — beat.js los detecta en su propio
+     bucle y lo que aquí llega es la envolvente ya calculada. */
+  const relojPintado = { ultimo: 0 };
+
   const bucle = () => {
     raf = requestAnimationFrame(bucle);
     if (document.hidden) return;
+    if (window.MMPerf && window.MMPerf.salta(relojPintado, performance.now())) return;
 
     // el ajuste de movimiento manda: si el usuario (o su sistema) pide
     // menos movimiento, las luces se quedan quietas
