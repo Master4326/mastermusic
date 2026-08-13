@@ -54,7 +54,34 @@
   document.addEventListener('DOMContentLoaded', marcar);
   marcar();   // por si algún módulo arranca antes de DOMContentLoaded
 
+  /* ---------- Suavizados que no dependen de los fps ----------
+
+     Media app está escrita con la forma `x += (objetivo - x) * k`, y esa
+     `k` se aplica UNA VEZ POR FRAME. Todas se afinaron a 60 Hz, así que en
+     un monitor de 165 Hz corren 2,75 veces más seguido: las barras caen
+     casi tres veces más rápido de lo previsto y el ambiente se vuelve
+     nervioso. En un móvil a 30 fps pasa lo contrario, va todo espeso.
+
+     La conversión correcta de un suavizado exponencial a otro paso de
+     tiempo es `k' = 1 - (1-k)^(dt/dt60)`. Así 0.12 significa lo mismo a
+     30, 60, 144 o 240 Hz: el mismo tiempo real de caída.
+
+     El `dt` se recorta a 100 ms: al volver de otra pestaña puede llegar un
+     salto enorme y sin tope el suavizado daría un tirón en vez de una
+     transición. */
+  const DT60 = 1000 / 60;
+  const k = (k60, dtMs) => {
+    if (!(k60 > 0)) return 0;
+    if (k60 >= 1) return 1;
+    const dt = Math.min(100, Math.max(1, dtMs || DT60));
+    if (Math.abs(dt - DT60) < 1.5) return k60;    // ya vamos a 60: sin cuentas
+    return 1 - Math.pow(1 - k60, dt / DT60);
+  };
+
   window.MMPerf = {
+    k,
+    // cuántos frames de 60 Hz caben en dt (para ventanas de historia)
+    frames60: (dtMs) => Math.min(100, Math.max(1, dtMs || DT60)) / DT60,
     movil: () => movil,
     bajo: () => bajo,
     tactil: () => tactil,

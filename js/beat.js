@@ -48,7 +48,15 @@
     { id: 'brillo',    lo: 4500, hi: 13000, ref: 45  },
   ];
 
-  const HIST = 60;    // frames de historia para el umbral (~1 s a 60 fps)
+  /* Historia del umbral: 60 MUESTRAS que tienen que cubrir ~1 segundo.
+     Estaba escrito en frames, así que en un monitor de 165 Hz esos 60
+     frames son 0,36 s y el umbral se adaptaba casi tres veces más rápido
+     de lo afinado. Se sigue analizando CADA frame (los golpes no se
+     pierden), pero a la historia solo entra una muestra cada ~16,7 ms:
+     así la ventana dura lo mismo a 30, 60 o 165 Hz. */
+  const HIST = 60;
+  const PASO_HIST = 1000 / 60;
+  let ultimaMuestra = 0;
   const TAPA = 18;    // dB: tope de subida por bin. Sin tope, un bin que
                       // sale del silencio se lleva él solo la decisión.
   const SUELO = -140; // dB para los bins mudos (getFloatFrequencyData da -Infinity)
@@ -208,6 +216,11 @@
 
   /* ---------- Un frame con señal real ---------- */
   const conAudio = (an, ahora) => {
+    /* Una muestra a la historia cada ~16,7 ms de RELOJ, no cada frame:
+       así los 60 huecos cubren siempre un segundo, vaya la pantalla a 60
+       o a 165 Hz. El análisis y la detección de golpes siguen corriendo
+       en todos los frames. */
+    const tocaMuestra = ahora - ultimaMuestra >= PASO_HIST;
     const bins = an.frequencyBinCount;
     const V = window.VisualizerModule;
     const sr = (V && V.getSampleRate ? V.getSampleRate() : 44100) || 44100;
@@ -277,10 +290,11 @@
         b.fuerza = clamp(rel * 0.26 + abs * 0.30 + alto * 0.44, 0.08, 1);
         b.pulso = 1;
       }
-      empujar(b, fl);
+      if (tocaMuestra) empujar(b, fl);
       b.pulso *= 0.86;
       b.tasa += ((b.ahora ? 60 : 0) - b.tasa) * 0.04;   // golpes/s suavizado
     }
+    if (tocaMuestra) ultimaMuestra = ahora;
     prevDb.set(dbBuf);
 
     marco.nivel = nivelGlobal;

@@ -38,6 +38,12 @@
     return a;
   };
 
+  /* Suavizados en TIEMPO REAL, no por frame: la misma caída se ve igual a
+     30, 60 o 165 Hz. Ver la explicación larga en js/perf.js. */
+  const K = (k60, dt) => (window.MMPerf ? window.MMPerf.k(k60, dt) : k60);
+  const F60 = (dt) => (window.MMPerf ? window.MMPerf.frames60(dt) : 1);
+  const DT_NOMINAL = 1000 / 60;
+
   const NUM_BARS = 64;
   const FFT_SIZE = 2048;
   const smooth  = new Array(NUM_BARS).fill(0);
@@ -498,7 +504,14 @@
     const t0 = ts || performance.now();
     const minMs = window.MMPerf && window.MMPerf.movil() ? 33 : (playing ? 0 : 33);
     if (t0 - ultimoFrame < minMs) return;
+    /* Tiempo real transcurrido desde el frame que SÍ se pintó (no desde el
+       anterior sin más): con el tope de 30 fps del móvil, contar mal aquí
+       haría que el suavizado se aplicara a medias. */
+    const dt = ultimoFrame ? t0 - ultimoFrame : DT_NOMINAL;
     ultimoFrame = t0;
+    const kSube = K(0.5, dt);
+    const kBaja = K(0.12, dt);
+    const fr = F60(dt);
 
     haySenal = playing;
     if (!vals) vals = idleSpectrum();
@@ -511,10 +524,10 @@
       for (let i = 0; i < NUM_BARS; i++) {
         const target = vals[i];
         const s = smooth[i];
-        smooth[i] = target > s ? s + (target - s) * 0.5 : s + (target - s) * 0.12;
+        smooth[i] = s + (target - s) * (target > s ? kSube : kBaja);
         const v = smooth[i];
         if (v > peaks[i]) { peaks[i] = v; peakVel[i] = 0; }
-        else { peakVel[i] += 0.0009; peaks[i] = Math.max(v, peaks[i] - peakVel[i]); }
+        else { peakVel[i] += 0.0009 * fr; peaks[i] = Math.max(v, peaks[i] - peakVel[i] * fr); }
       }
       updateMiniEq(playing);
       return;
@@ -539,14 +552,14 @@
       const target = vals[i];
       const s = smooth[i];
       // ataque rápido, caída lenta
-      smooth[i] = target > s ? s + (target - s) * 0.5 : s + (target - s) * 0.12;
+      smooth[i] = s + (target - s) * (target > s ? kSube : kBaja);
       const v = smooth[i];
       const bh = Math.max(1.5, v * maxBar);
       const x = i * (barW + gap);
 
       // pico que cae
       if (v > peaks[i]) { peaks[i] = v; peakVel[i] = 0; }
-      else { peakVel[i] += 0.0009; peaks[i] = Math.max(v, peaks[i] - peakVel[i]); }
+      else { peakVel[i] += 0.0009 * fr; peaks[i] = Math.max(v, peaks[i] - peakVel[i] * fr); }
 
       // barra superior con degradado + glow
       const grad = ctx.createLinearGradient(0, center - bh, 0, center);

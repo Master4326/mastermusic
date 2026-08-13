@@ -569,9 +569,36 @@
     });
   }
 
-  // ---------- Status bar ----------
+  /* ---------- Barra de estado ----------
+     En REPOSO decía «▣ listo», que no informa de nada: es el mismo texto
+     con la app recién abierta, sonando una canción o en pausa. Ahora el
+     reposo es lo que está sonando — que es lo que uno espera leer ahí, y
+     además resuelve el caso de la marquesina: si el título de arriba está
+     rodando y no lo pillaste entero, aquí está completo.
+     Los mensajes de aviso siguen mandando durante sus 4 segundos; al
+     agotarse se vuelve a lo que suene EN ESE MOMENTO, no a lo que sonaba
+     cuando salió el mensaje. */
   const statusText = document.getElementById('statusText');
   let statusTimeout = null;
+
+  const textoReposo = () => {
+    const pc = window.PlayerCore;
+    const t = pc && pc.state && pc.state.currentTrack;
+    if (!t) return '▣ listo';
+    const titulo = (t.title || t.name || '').trim();
+    if (!titulo) return '▣ listo';
+    const artista = (t.artist || '').trim();
+    // isPlaying cubre los dos motores: el <audio> local y Spotify Connect
+    const sonando = !!(pc.state.isPlaying || (pc.audio && !pc.audio.paused));
+    return `${sonando ? '▶' : '❙❙'} ${titulo}${artista ? ' — ' + artista : ''}`;
+  };
+
+  const pintarReposo = () => {
+    if (statusTimeout) return;        // hay un aviso en pantalla: no se pisa
+    const txt = textoReposo();
+    if (statusText.textContent !== txt) statusText.textContent = txt;
+  };
+
   const updateStatus = (msg) => {
     statusText.textContent = msg;
     // Reinicia el flicker retro de entrada
@@ -579,9 +606,27 @@
     void statusText.offsetWidth;
     statusText.classList.add('flash');
     clearTimeout(statusTimeout);
-    statusTimeout = setTimeout(() => { statusText.textContent = '▣ listo'; }, 4000);
+    statusTimeout = setTimeout(() => {
+      statusTimeout = null;
+      statusText.textContent = textoReposo();
+    }, 4000);
   };
   window.SevenStatus = updateStatus;
+
+  /* Se repinta al cambiar de canción y al dar a play/pausa. El sondeo de
+     respaldo es porque `isPlaying` lo mueven dos motores distintos y no
+     todos avisan; es una comparación de cadenas cada segundo, nada. */
+  const engancharReposo = () => {
+    const pc = window.PlayerCore;
+    if (!pc || !pc.onTrack) { setTimeout(engancharReposo, 300); return; }
+    pc.onTrack(pintarReposo);
+    if (pc.audio) {
+      ['play', 'pause', 'ended'].forEach((ev) => pc.audio.addEventListener(ev, pintarReposo));
+    }
+    setInterval(pintarReposo, 1000);
+    pintarReposo();
+  };
+  engancharReposo();
 
   // ---------- Render track list into Library tab ----------
   const renderRetroTrackList = () => {

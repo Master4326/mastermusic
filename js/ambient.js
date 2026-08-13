@@ -45,6 +45,10 @@
      teléfono estos tres corros sumaban 84 escrituras de estilo por frame
      a 60 fps: 5.040 por segundo solo para el fondo de la letra. */
   const P = () => window.MMPerf;
+  /* Suavizado en tiempo real: la misma caída a 30, 60 o 165 Hz.
+     dtAmb lo pone el bucle en cada pasada (ver js/perf.js). */
+  let dtAmb = 1000 / 60;
+  const K = (k60) => (P() ? P().k(k60, dtAmb) : k60);
   const cuantos = (n) => (P() ? P().cuantos(n) : n);
   const enMovil = () => !!(P() && P().movil());
 
@@ -315,7 +319,7 @@
          móvil el suelo se queda quieto: sigue estando (da el aire
          synthwave) pero sin repintarse. */
       if (!enMovil()) {
-        desplazSuelo = (desplazSuelo + 0.6 + e * 3.4 + boom * 3.5) % 30;
+        desplazSuelo = (desplazSuelo + (0.6 + e * 3.4 + boom * 3.5) * (P() ? P().frames60(dtAmb) : 1)) % 30;
         laSuelo.style.backgroundPosition = `0 0, 0 ${desplazSuelo.toFixed(1)}px`;
       }
       escribir(laSuelo, 'opacity', (Math.max(0, e - 0.28) * 0.4 + boom * 0.06).toFixed(2));
@@ -354,7 +358,7 @@
     if (barras.length) {
       for (let k = 0; k < NBARRAS; k++) {
         const v = bandaDe(m, k / (NBARRAS - 1));
-        alturas[k] += (v - alturas[k]) * (v > alturas[k] ? 0.5 : 0.12);
+        alturas[k] += (v - alturas[k]) * (v > alturas[k] ? K(0.5) : K(0.12));
         escribir(barras[k], 'transform', `scaleY(${(0.03 + alturas[k] * 0.97).toFixed(2)})`);
       }
     }
@@ -395,10 +399,17 @@
      bucle y lo que aquí llega es la envolvente ya calculada. */
   const relojPintado = { ultimo: 0 };
 
+  let ultimoPintado = 0;
+
   const bucle = () => {
     raf = requestAnimationFrame(bucle);
     if (document.hidden) return;
-    if (window.MMPerf && window.MMPerf.salta(relojPintado, performance.now())) return;
+    const ahoraMs = performance.now();
+    if (window.MMPerf && window.MMPerf.salta(relojPintado, ahoraMs)) return;
+    /* Tiempo desde el frame que SÍ se pintó: con el tope de 30 fps del
+       móvil, medir contra el frame anterior a secas daría la mitad. */
+    dtAmb = ultimoPintado ? ahoraMs - ultimoPintado : 1000 / 60;
+    ultimoPintado = ahoraMs;
 
     // el ajuste de movimiento manda: si el usuario (o su sistema) pide
     // menos movimiento, las luces se quedan quietas
