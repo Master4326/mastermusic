@@ -15,6 +15,14 @@
     rows:   { key: 'mm_rows',       def: 'normal' },
     motion: { key: 'mm_motion',     def: 'auto' },
     lyrics: { key: 'mm_lyrics_size', def: 'm' },
+    /* Permiso para que el espectro escuche por el micrófono. APAGADO por
+       defecto y con razón: mientras el micrófono está abierto, Android y
+       iOS ponen todo el audio del aparato en modo llamada y la música se
+       oye más bajita. No hay forma de evitarlo desde una web. Solo vale la
+       pena si la música suena en OTRO aparato — y eso solo lo sabe el
+       usuario, así que lo decide él. La lee js/visualizer.js directamente
+       de localStorage: mismo nombre y mismo formato, sin traducciones. */
+    mic:    { key: 'mm_mic', def: 'off' },
     // La intensidad del modo edit NO es un ajuste: lyrics.js la deduce sola
     // del ritmo de cada línea y de los graves (ver intensidadAuto).
   };
@@ -73,6 +81,13 @@
       aplicarMovimiento();
     } else if (id === 'lyrics') {
       root.style.setProperty('--lyrics-scale', String(LYRICS_SCALE[v] || 1));
+    } else if (id === 'mic') {
+      /* Se le avisa al visualizador para que enseñe o esconda el botón ◈
+         sin recargar — y sobre todo para que SUELTE el micrófono en el
+         acto si lo acaban de apagar. */
+      if (window.VisualizerModule && window.VisualizerModule.refrescarSync) {
+        window.VisualizerModule.refrescarSync();
+      }
     }
   };
 

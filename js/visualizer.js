@@ -187,10 +187,32 @@
      después de su primer uso. */
   const puedePantalla = !!(navigator.mediaDevices &&
     typeof navigator.mediaDevices.getDisplayMedia === 'function');
-  const puedeMic = !!(navigator.mediaDevices &&
+  const hayMic = !!(navigator.mediaDevices &&
     typeof navigator.mediaDevices.getUserMedia === 'function');
-  const porMic = () => !puedePantalla && puedeMic;
-  const puedeCapturar = puedePantalla || puedeMic;
+
+  /* ⚠ EL MICRÓFONO VA APAGADO POR DEFECTO, y no es un capricho.
+
+     En cuanto una página abre el micrófono, Android y iOS cambian TODO el
+     audio del aparato al modo de llamada: bajan el volumen, aplican
+     procesado de voz y en algunos móviles lo mandan al auricular. Es
+     decisión del sistema operativo, no del navegador, y **desde una página
+     web no hay forma de evitarlo**: no existe ninguna API que diga «abre el
+     micro pero no toques la salida». El usuario lo describió exacto: «la
+     música se pone como si estuviera en una llamada, bajito».
+
+     Solo hay UN caso en que no molesta: que la música NO suene en este
+     teléfono (Spotify mandando a un parlante, a la tele, a otro equipo).
+     Ahí el bajón no le pasa a nada que estés oyendo y el micrófono capta
+     el altavoz de verdad, con graves. Como no hay manera fiable de
+     detectar ese caso —Spotify dice el nombre del aparato, no si es ESTE—,
+     lo decide el usuario en Ajustes. Apagado por defecto. */
+  const micPermitido = () => {
+    try { return localStorage.getItem('mm_mic') === 'on'; } catch (_) { return false; }
+  };
+  // funciones, no constantes: el ajuste se puede cambiar sin recargar
+  const puedeMic = () => hayMic && micPermitido();
+  const porMic = () => !puedePantalla && puedeMic();
+  const puedeCapturar = () => puedePantalla || puedeMic();
 
   /* Con un mp3 tuyo sonando, la señal DIRECTA gana a la del micrófono:
      no lleva ruido de la habitación, no llega tarde y trae los graves de
@@ -267,18 +289,25 @@
   const setStatus = (msg) => { if (window.SevenStatus) window.SevenStatus(msg); };
   const syncBtn = document.getElementById('vizSyncBtn');
 
-  if (syncBtn) {
-    syncBtn.hidden = !puedeCapturar;
+  const pintarBotonSync = () => {
+    if (!syncBtn) return;
+    syncBtn.hidden = !puedeCapturar();
     if (porMic()) {
       /* Que se sepa QUÉ hace antes de pulsarlo. Pedir el micrófono sin
          avisar, en una app de música, es de las cosas que más mosquean. */
       syncBtn.textContent = '◈ oír';
       syncBtn.dataset.modo = 'mic';
       syncBtn.title = 'Escuchar por el micrófono para que el espectro siga la música. ' +
-        'Ponla por el altavoz (con audífonos no hay nada que oír). ' +
-        'El sonido se analiza al vuelo: no se graba ni se envía a ningún sitio.';
+        'Solo tiene sentido si suena en OTRO aparato: si suena en este teléfono, ' +
+        'el sistema baja el volumen como en una llamada.';
+    } else {
+      syncBtn.textContent = '◈ sync';
+      delete syncBtn.dataset.modo;
+      syncBtn.title = 'Sincronizar el espectro con el audio del sistema — ideal para Spotify. ' +
+        'Comparte tu pantalla marcando "compartir audio del sistema".';
     }
-  }
+  };
+  pintarBotonSync();
 
   const stopCapture = () => {
     if (capStream) capStream.getTracks().forEach(t => { t.onended = null; t.stop(); });
@@ -387,7 +416,7 @@
       setStatus(porMic() ? '◈ micrófono apagado' : '◈ sync desactivado');
       return;
     }
-    if (!puedeCapturar) {
+    if (!puedeCapturar()) {
       setStatus('✕ este navegador no puede capturar audio');
       return;
     }
@@ -560,6 +589,8 @@
     isConnected: () => haySenal,
     // ¿está activa la captura del audio del sistema?
     haySync: () => !!capStream,
+    // lo llama js/settings.js al cambiar el permiso del micrófono
+    refrescarSync: () => { pintarBotonSync(); if (capStream && !puedeCapturar()) stopCapture(); },
     /* Nodo CRUDO para el detector de ritmo. Nadie más debería usarlo:
        sus datos son el espectro sin suavizar, feo de dibujar. */
     getDetector: () => {
