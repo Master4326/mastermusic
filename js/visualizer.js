@@ -169,16 +169,53 @@
     if (!document.hidden && audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
   });
 
-  const isLive = () => {
-    // Modo sync: el espectro viene del audio del sistema (Spotify u otro)
-    if (capAnalyser && audioCtx && audioCtx.state === 'running') return true;
+  /* DOS CAMINOS para oír lo que suena fuera del navegador:
+
+     · Escritorio → `getDisplayMedia`: compartes la pantalla marcando
+       «compartir el audio del sistema». Señal limpia y directa.
+     · Móvil → `getUserMedia`: el MICRÓFONO. Compartir pantalla no existe
+       en los navegadores de teléfono, ni en Android ni en iPhone, así que
+       la única forma de que el espectro siga a Spotify es que el teléfono
+       ESCUCHE lo que sale por el altavoz. Mismo principio que usa Shazam.
+
+     Da igual de dónde venga: la captura monta un MediaStreamSource y al
+     analizador el origen del flujo le da exactamente igual.
+
+     Se comprueba si cada método EXISTE, en vez de deducirlo del tamaño de
+     pantalla: ese es el dato de verdad. Y va aquí arriba, antes de quien
+     lo consulta, para no dejar la trampa de una constante declarada
+     después de su primer uso. */
+  const puedePantalla = !!(navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getDisplayMedia === 'function');
+  const puedeMic = !!(navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getUserMedia === 'function');
+  const porMic = () => !puedePantalla && puedeMic;
+  const puedeCapturar = puedePantalla || puedeMic;
+
+  /* Con un mp3 tuyo sonando, la señal DIRECTA gana a la del micrófono:
+     no lleva ruido de la habitación, no llega tarde y trae los graves de
+     verdad (el altavoz de un teléfono casi no tiene). Con la captura de
+     pantalla del escritorio no hace falta distinguir: esa señal ya es el
+     audio del sistema, tan buena como la directa. */
+  const localSonando = () => {
     const a = window.PlayerCore && window.PlayerCore.audio;
-    return !!(analyser && connected && a && !a.paused && !a.ended && audioCtx && audioCtx.state === 'running');
+    return !!(analyser && connected && a && !a.paused && !a.ended);
+  };
+  const fuente = () => {
+    if (capAnalyser && !(porMic() && localSonando())) return capAnalyser;
+    return analyser;
+  };
+
+  const isLive = () => {
+    if (!audioCtx || audioCtx.state !== 'running') return false;
+    // Modo sync: el espectro viene del audio del sistema (Spotify u otro)
+    if (capAnalyser && !(porMic() && localSonando())) return true;
+    return localSonando();
   };
 
   // ---- Magnitudes del espectro (bandas log) ----
   const computeSpectrum = () => {
-    (capAnalyser || analyser).getByteFrequencyData(freqData);
+    fuente().getByteFrequencyData(freqData);
     const bins = freqData.length;
     let sum = 0;
     for (let i = 0; i < bins; i++) sum += freqData[i];
@@ -230,14 +267,18 @@
   const setStatus = (msg) => { if (window.SevenStatus) window.SevenStatus(msg); };
   const syncBtn = document.getElementById('vizSyncBtn');
 
-  /* getDisplayMedia NO EXISTE en los navegadores de móvil: compartir
-     pantalla es cosa de escritorio. Un botón que no puede funcionar no
-     debe estar ahí — que el usuario lo pulse y no pase nada es peor que no
-     verlo (le pasó ya con el ❤ de Spotify). Se comprueba de verdad si el
-     método existe en vez de suponerlo por el tamaño de pantalla. */
-  const puedeCapturar = !!(navigator.mediaDevices &&
-    typeof navigator.mediaDevices.getDisplayMedia === 'function');
-  if (syncBtn && !puedeCapturar) syncBtn.hidden = true;
+  if (syncBtn) {
+    syncBtn.hidden = !puedeCapturar;
+    if (porMic()) {
+      /* Que se sepa QUÉ hace antes de pulsarlo. Pedir el micrófono sin
+         avisar, en una app de música, es de las cosas que más mosquean. */
+      syncBtn.textContent = '◈ oír';
+      syncBtn.dataset.modo = 'mic';
+      syncBtn.title = 'Escuchar por el micrófono para que el espectro siga la música. ' +
+        'Ponla por el altavoz (con audífonos no hay nada que oír). ' +
+        'El sonido se analiza al vuelo: no se graba ni se envía a ningún sitio.';
+    }
+  }
 
   const stopCapture = () => {
     if (capStream) capStream.getTracks().forEach(t => { t.onended = null; t.stop(); });
@@ -252,17 +293,31 @@
      mueva el código. */
   let ultimoMotivo = '';
 
+  /* Los tres «false» son OBLIGATORIOS, sobre todo con el micrófono: la
+     cancelación de eco existe para BORRAR lo que sale por el altavoz del
+     propio aparato… que aquí es justo lo que queremos oír. Con ellos
+     puestos el navegador se come la música y el espectro se queda plano.
+     Es el error clásico de capturar audio por micrófono. */
+  const CRUDO = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+
+  const pedirFlujo = () => {
+    if (puedePantalla) {
+      return navigator.mediaDevices.getDisplayMedia({
+        video: true, audio: CRUDO, systemAudio: 'include',
+      });
+    }
+    return navigator.mediaDevices.getUserMedia({ audio: CRUDO });
+  };
+
   const startCapture = async () => {
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-        systemAudio: 'include',
-      });
+      const stream = await pedirFlujo();
       const audioTrack = stream.getAudioTracks()[0];
       if (!audioTrack) {
         stream.getTracks().forEach(t => t.stop());
-        ultimoMotivo = '✕ no se compartió audio — marca "compartir audio del sistema"';
+        ultimoMotivo = porMic()
+          ? '✕ el micrófono no dio señal'
+          : '✕ no se compartió audio — marca "compartir audio del sistema"';
         return false;
       }
       // No necesitamos el video: liberarlo ahorra recursos, pero mantenemos
@@ -292,11 +347,18 @@
          verdad y el usuario puede hacer algo con esa información. */
       stopCapture();
       const n = (e && e.name) || '';
-      if (n === 'NotAllowedError') ultimoMotivo = '';   // lo canceló él: sin ruido
-      else if (n === 'NotSupportedError' || n === 'TypeError') {
-        ultimoMotivo = '✕ este navegador no deja compartir el audio del sistema';
+      if (n === 'NotAllowedError') {
+        // lo canceló él (o denegó el permiso): con el micrófono conviene
+        // decirlo, porque el navegador recuerda el «no» y no vuelve a preguntar
+        ultimoMotivo = porMic()
+          ? '✕ sin permiso de micrófono. Se cambia en el candado 🔒 de la barra de direcciones'
+          : '';
+      } else if (n === 'NotSupportedError' || n === 'TypeError') {
+        ultimoMotivo = '✕ este navegador no deja capturar el audio';
       } else if (n === 'NotFoundError') {
-        ultimoMotivo = '✕ no se encontró nada que compartir';
+        ultimoMotivo = porMic() ? '✕ no se encontró micrófono' : '✕ no se encontró nada que compartir';
+      } else if (n === 'NotReadableError') {
+        ultimoMotivo = '✕ el micrófono lo está usando otra app';
       } else {
         ultimoMotivo = '✕ no se pudo capturar el audio' + (n ? ' (' + n + ')' : '');
       }
@@ -304,22 +366,48 @@
     }
   };
 
+  /* Con el micrófono, en segundo plano se SUELTA. Estando la pestaña
+     oculta el análisis no corre igualmente (el rAF se congela), así que
+     dejarlo abierto solo gastaría batería y mantendría el aviso de
+     «micrófono en uso» por nada. Al volver se reengancha solo: el permiso
+     ya está dado, no vuelve a preguntar. */
+  let micEnPausa = false;
+
+  const activarSync = async () => {
+    ultimoMotivo = '';
+    const ok = await startCapture();
+    if (syncBtn) syncBtn.classList.toggle('active', ok);
+    return ok;
+  };
+
   if (syncBtn) syncBtn.addEventListener('click', async () => {
     if (capStream) {
+      micEnPausa = false;
       stopCapture();
-      setStatus('◈ sync desactivado');
+      setStatus(porMic() ? '◈ micrófono apagado' : '◈ sync desactivado');
       return;
     }
     if (!puedeCapturar) {
-      setStatus('✕ compartir el audio del sistema solo funciona en computador');
+      setStatus('✕ este navegador no puede capturar audio');
       return;
     }
-    ultimoMotivo = '';
-    const ok = await startCapture();
-    syncBtn.classList.toggle('active', ok);
-    if (ok) setStatus('◈ espectro sincronizado con el audio del sistema');
-    else if (ultimoMotivo) setStatus(ultimoMotivo);
+    const ok = await activarSync();
+    if (ok) {
+      setStatus(porMic()
+        ? '◈ escuchando por el micrófono — ponla por el altavoz'
+        : '◈ espectro sincronizado con el audio del sistema');
+    } else if (ultimoMotivo) setStatus(ultimoMotivo);
     else setStatus('✕ sync cancelado');
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (!porMic()) return;
+    if (document.hidden) {
+      if (capStream) { micEnPausa = true; stopCapture(); }
+    } else if (micEnPausa) {
+      micEnPausa = false;
+      activarSync();
+    }
   });
 
   // ---- Mini-EQ de la barra de estado: baila con el espectro real ----
@@ -475,7 +563,8 @@
     /* Nodo CRUDO para el detector de ritmo. Nadie más debería usarlo:
        sus datos son el espectro sin suavizar, feo de dibujar. */
     getDetector: () => {
-      const a = capDet || detAnalyser;
+      // misma preferencia que el espectro: lo directo gana al micrófono
+      const a = (capDet && !(porMic() && localSonando())) ? capDet : detAnalyser;
       if (!a || !audioCtx || audioCtx.state !== 'running') return null;
       return a;
     },

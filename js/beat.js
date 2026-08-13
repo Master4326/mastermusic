@@ -404,7 +404,10 @@
     if (!avisado && !conSync && hayBoton && !hayBoton.hidden &&
         desdeSinSenal > 60 * 25 && window.SevenStatus) {
       avisado = true;
-      window.SevenStatus('◈ actívalo para que el fondo vaya al ritmo real');
+      // en el móvil el botón escucha por el micrófono: el consejo cambia
+      window.SevenStatus(hayBoton.dataset.modo === 'mic'
+        ? '◈ actívalo y pon la música por el altavoz: el fondo irá al ritmo real'
+        : '◈ actívalo para que el fondo vaya al ritmo real');
     }
   };
 
