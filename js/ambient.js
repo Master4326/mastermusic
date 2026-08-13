@@ -336,11 +336,19 @@
     }
     /* Carátula de fondo: lleva blur(42px). Cambiarle el `scale` en cada
        frame obliga al navegador a rehacer el desenfoque de una imagen
-       grande — carísimo en un teléfono. Allí se queda fija (sigue
-       viéndose, sin latir). */
-    if (laCover && portadaActual && !enMovil()) {
-      escribir(laCover, 'transform', `scale(${(1.08 + graves * 0.1 + boom * 0.03).toFixed(3)})`);
-      escribir(laCover, 'opacity', (0.1 + graves * 0.1).toFixed(2));
+       grande — carísimo en un teléfono, y allí no se hace.
+       La OPACIDAD sí se escribe siempre: una capa ya desenfocada cambia de
+       opacidad en el compositor, sin volver a rasterizar nada, o sea que
+       es barata. Y es imprescindible: `.la-cover` nace con `opacity: 0`
+       en el CSS, así que saltarse esta línea dejaba el fondo invisible —
+       fue justo lo que rompió la v65 en el móvil. */
+    if (laCover && portadaActual) {
+      if (!enMovil()) {
+        escribir(laCover, 'transform', `scale(${(1.08 + graves * 0.1 + boom * 0.03).toFixed(3)})`);
+      }
+      // en móvil, algo más de presencia: sin el zoom que la hace respirar
+      // se queda plana y con 0.1 apenas se distingue del fondo
+      escribir(laCover, 'opacity', ((enMovil() ? 0.17 : 0.1) + graves * 0.1).toFixed(2));
     }
     // ecualizador fantasma: una barra por banda, solo scaleY
     if (barras.length) {

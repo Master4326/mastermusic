@@ -473,26 +473,22 @@
     return t ? t.dataset.tab : '';
   };
 
-  /* NO se esconde con pantalla táctil, y es un fallo que costó entender:
-     con ratón, el `pointermove` la despierta ANTES de que llegue el clic,
-     así que siempre está ahí cuando pulsas. Con el dedo no hay movimiento
-     previo — el primer toque solo la saca (y cae sobre la letra, no sobre
-     el botón), y hay que tocar otra vez. Se ve exactamente como «los
-     botones de configuración no funcionan», que es lo que reportó el
-     usuario. En el móvil la barra se queda quieta y visible. */
-  const puedeEsconderse = () => !(window.MMPerf && window.MMPerf.tactil());
+  const tactil = () => !!(window.MMPerf && window.MMPerf.tactil());
 
   const ocultarTabs = () => {
-    if (!tabBar || tabActiva() !== 'lyrics' || !puedeEsconderse()) return;
-    // el mouse está justo encima (p. ej. a punto de pulsar el engranaje):
-    // esconderla bajo el cursor sería una trampa — se re-arma y ya
-    if (tabBar.matches(':hover')) { armarTabs(); return; }
+    if (!tabBar || tabActiva() !== 'lyrics') return;
+    /* Con ratón: si el cursor está justo encima (a punto de pulsar el
+       engranaje), esconderla sería una trampa — se re-arma y ya. En táctil
+       no existe el hover, y además la barra deja un tirador visible, así
+       que no hace falta esta cortesía. */
+    if (!tactil() && tabBar.matches(':hover')) { armarTabs(); return; }
     tabBar.classList.add('se-esconde');
   };
 
   const armarTabs = () => {
     clearTimeout(tabsTimer);
-    tabsTimer = setTimeout(ocultarTabs, 2500);
+    // con el dedo se tarda más en apuntar que con el ratón
+    tabsTimer = setTimeout(ocultarTabs, tactil() ? 4000 : 2500);
   };
 
   const despertarTabs = () => {
@@ -500,8 +496,21 @@
     armarTabs();
   };
 
-  // mouse, toque o teclado: cualquiera la despierta (mismo trío que el cine)
-  if (puedeEsconderse()) {
+  if (tactil()) {
+    /* Solo el TIRADOR la despierta. Si la despertara cualquier toque, leer
+       la letra la haría saltar cada vez que rozas la pantalla; y como el
+       tirador está a la vista, ningún toque se pierde buscándola.
+       Mientras está recogida las pestañas llevan `visibility: hidden`, así
+       que este toque no puede activar por error el botón de debajo. */
+    if (tabBar) {
+      tabBar.addEventListener('pointerdown', () => {
+        if (tabBar.classList.contains('se-esconde')) despertarTabs();
+        else armarTabs();
+      }, { passive: true });
+    }
+    armarTabs();
+  } else {
+    // mouse o teclado: cualquiera la despierta (mismo trío que el cine)
     ['pointermove', 'pointerdown', 'keydown'].forEach((ev) =>
       document.addEventListener(ev, despertarTabs, { passive: true }));
     armarTabs();

@@ -41,15 +41,18 @@
   // en luces de fondo (en el canvas del espectro tampoco).
   const msFrame = () => (movil ? 33 : 0);
 
-  document.addEventListener('DOMContentLoaded', () => {
+  /* `perf-tactil` va aparte de `perf-movil` a propósito: una ventana
+     estrecha de escritorio es «móvil» para la carga de trabajo (conviene
+     recortar), pero tiene ratón — y lo que se toca con el dedo necesita
+     otras reglas (objetivos grandes, nada que dependa del hover). */
+  const marcar = () => {
+    if (!document.body) return;
     document.body.classList.toggle('perf-movil', movil);
     document.body.classList.toggle('perf-bajo', bajo);
-  });
-  // por si algún módulo arranca antes de DOMContentLoaded
-  if (document.body) {
-    document.body.classList.toggle('perf-movil', movil);
-    document.body.classList.toggle('perf-bajo', bajo);
-  }
+    document.body.classList.toggle('perf-tactil', tactil);
+  };
+  document.addEventListener('DOMContentLoaded', marcar);
+  marcar();   // por si algún módulo arranca antes de DOMContentLoaded
 
   window.MMPerf = {
     movil: () => movil,

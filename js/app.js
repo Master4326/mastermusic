@@ -374,7 +374,24 @@
   });
   el.volumeBar.addEventListener('lostpointercapture', () => el.volumeCtl.classList.remove('dragging'));
 
-  el.volBtn.addEventListener('click', () => setVolume(state.volume > 0 ? 0 : lastNonZeroVol));
+  /* Con ratón el botón silencia (la barra ya se despliega sola al pasar
+     por encima). Con el dedo NO hay hover, así que la barra no aparecía
+     nunca: ahí el botón la abre. Silenciar sin querer, sin barra a la
+     vista que lo explique, es de las cosas que más parecen una app rota:
+     con el dedo se baja arrastrando hasta el cero. */
+  el.volBtn.addEventListener('click', () => {
+    if (window.MMPerf && window.MMPerf.tactil()) {
+      el.volumeCtl.classList.toggle('abierta');
+      return;
+    }
+    setVolume(state.volume > 0 ? 0 : lastNonZeroVol);
+  });
+
+  // tocar fuera la cierra (si no, se queda flotando encima de los botones)
+  document.addEventListener('pointerdown', (e) => {
+    if (!el.volumeCtl.classList.contains('abierta')) return;
+    if (!e.target.closest('.volume-ctl')) el.volumeCtl.classList.remove('abierta');
+  }, { passive: true });
 
   // Rueda del mouse sobre el control = subir/bajar de a 5%
   el.volumeCtl.addEventListener('wheel', (e) => {
@@ -469,6 +486,12 @@
     },
     setUser: () => {},   // sin panel de usuario visible; se mantiene por compatibilidad
     setSpotifyConnected: (connected) => {
+      /* Se marca en el <body> porque el móvil lo necesita: allí el volumen
+         de la app se oculta (para eso están los botones del teléfono),
+         PERO con Spotify Connect el volumen que importa es el del aparato
+         remoto, y ese los botones físicos no lo tocan. Con esta clase el
+         CSS lo devuelve solo cuando de verdad hace falta. */
+      document.body.classList.toggle('spotify-conectado', !!connected);
       el.spotifyConnectBtn.classList.toggle('connected', connected);
       el.spotifyConnectBtn.innerHTML = connected
         ? `<span class="bracket">[</span> spotify conectado <span class="bracket">]</span>`

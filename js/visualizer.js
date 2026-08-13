@@ -230,12 +230,27 @@
   const setStatus = (msg) => { if (window.SevenStatus) window.SevenStatus(msg); };
   const syncBtn = document.getElementById('vizSyncBtn');
 
+  /* getDisplayMedia NO EXISTE en los navegadores de móvil: compartir
+     pantalla es cosa de escritorio. Un botón que no puede funcionar no
+     debe estar ahí — que el usuario lo pulse y no pase nada es peor que no
+     verlo (le pasó ya con el ❤ de Spotify). Se comprueba de verdad si el
+     método existe en vez de suponerlo por el tamaño de pantalla. */
+  const puedeCapturar = !!(navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getDisplayMedia === 'function');
+  if (syncBtn && !puedeCapturar) syncBtn.hidden = true;
+
   const stopCapture = () => {
     if (capStream) capStream.getTracks().forEach(t => { t.onended = null; t.stop(); });
     try { if (capSource) capSource.disconnect(); } catch (e) {}
     capStream = null; capSource = null; capAnalyser = null; capDet = null;
     if (syncBtn) syncBtn.classList.remove('active');
   };
+
+  /* Por qué falló el último intento. Se declara ANTES de quien lo escribe:
+     con `let` después, aunque en la práctica funcione (se asigna al
+     ejecutar, no al definir), queda una trampa esperando a cualquiera que
+     mueva el código. */
+  let ultimoMotivo = '';
 
   const startCapture = async () => {
     try {
@@ -247,7 +262,7 @@
       const audioTrack = stream.getAudioTracks()[0];
       if (!audioTrack) {
         stream.getTracks().forEach(t => t.stop());
-        setStatus('✕ no se compartió audio — marca "compartir audio del sistema"');
+        ultimoMotivo = '✕ no se compartió audio — marca "compartir audio del sistema"';
         return false;
       }
       // No necesitamos el video: liberarlo ahorra recursos, pero mantenemos
@@ -272,8 +287,19 @@
       stream.getTracks().forEach(t => { t.onended = () => { stopCapture(); setStatus('◈ sync desactivado'); }; });
       return true;
     } catch (e) {
-      // el usuario canceló el diálogo de compartir, o falló la captura
+      /* Antes CUALQUIER fallo salía como «sync cancelado», que es mentira
+         la mitad de las veces. El nombre del error dice qué pasó de
+         verdad y el usuario puede hacer algo con esa información. */
       stopCapture();
+      const n = (e && e.name) || '';
+      if (n === 'NotAllowedError') ultimoMotivo = '';   // lo canceló él: sin ruido
+      else if (n === 'NotSupportedError' || n === 'TypeError') {
+        ultimoMotivo = '✕ este navegador no deja compartir el audio del sistema';
+      } else if (n === 'NotFoundError') {
+        ultimoMotivo = '✕ no se encontró nada que compartir';
+      } else {
+        ultimoMotivo = '✕ no se pudo capturar el audio' + (n ? ' (' + n + ')' : '');
+      }
       return false;
     }
   };
@@ -284,11 +310,16 @@
       setStatus('◈ sync desactivado');
       return;
     }
+    if (!puedeCapturar) {
+      setStatus('✕ compartir el audio del sistema solo funciona en computador');
+      return;
+    }
+    ultimoMotivo = '';
     const ok = await startCapture();
     syncBtn.classList.toggle('active', ok);
-    setStatus(ok
-      ? '◈ espectro sincronizado con el audio del sistema'
-      : '✕ sync cancelado');
+    if (ok) setStatus('◈ espectro sincronizado con el audio del sistema');
+    else if (ultimoMotivo) setStatus(ultimoMotivo);
+    else setStatus('✕ sync cancelado');
   });
 
   // ---- Mini-EQ de la barra de estado: baila con el espectro real ----

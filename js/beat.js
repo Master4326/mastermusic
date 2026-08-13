@@ -351,7 +351,9 @@
     if (btnSync === undefined) {
       btnSync = document.getElementById ? document.getElementById('vizSyncBtn') : null;
     }
-    if (!btnSync) return;
+    // en el móvil el botón está oculto (compartir pantalla es de
+    // escritorio): no tiene sentido pedirle atención a algo que no está
+    if (!btnSync || btnSync.hidden) return;
     sugerido = on;
     btnSync.classList.toggle('sugerido', on);
   };
@@ -395,7 +397,12 @@
     const V = window.VisualizerModule;
     const conSync = !!(V && V.haySync && V.haySync());
     sugerirSync(!conSync && desdeSinSenal > 60 * 12);
-    if (!avisado && !conSync && desdeSinSenal > 60 * 25 && window.SevenStatus) {
+    /* El consejo solo sirve donde ◈ existe. En el móvil no hay forma de
+       capturar el audio del sistema, así que decirle que lo active sería
+       mandarlo a buscar un botón que no está. */
+    const hayBoton = document.getElementById && document.getElementById('vizSyncBtn');
+    if (!avisado && !conSync && hayBoton && !hayBoton.hidden &&
+        desdeSinSenal > 60 * 25 && window.SevenStatus) {
       avisado = true;
       window.SevenStatus('◈ actívalo para que el fondo vaya al ritmo real');
     }

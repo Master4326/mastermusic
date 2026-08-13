@@ -404,12 +404,27 @@ body.reduce-motion .ti-desborda {
   position: relative;
   display: flex;
   align-items: stretch;
+  /* El marco RECORTA. Sin esto, el <canvas> puede pintarse más grande que
+     su marco (tiene tamaño intrínseco propio: los atributos width/height
+     en píxeles del aparato, que en un móvil son el triple) y desbordar
+     sobre lo que haya debajo. En vertical, eso era encima de los botones
+     de reproducción. */
+  overflow: hidden;
 }
 #visualizer {
   width: 100%;
   height: 100%;
   display: block;
   image-rendering: auto;
+  /* Como elemento flexible, que pueda encoger por debajo de su tamaño
+     intrínseco: sin esto el mínimo automático es el tamaño del canvas. */
+  min-width: 0;
+  min-height: 0;
+  /* No tiene ni un solo listener: dibuja y ya. Que además NUNCA pueda
+     quedarse con un toque destinado a otra cosa — si por lo que sea vuelve
+     a desbordar, el dedo lo atraviesa. El botón ◈ sync es hermano suyo, no
+     hijo, así que sigue pulsándose. */
+  pointer-events: none;
 }
 
 /* ==========================================================
@@ -440,6 +455,7 @@ body.reduce-motion .ti-desborda {
      de sobra su alto real incluso con la tipografía fluida al máximo. */
   max-height: 90px;
   overflow: hidden;
+  position: relative;            /* para el tirador táctil (::after) */
   transition: max-height 0.35s ease-out, opacity 0.3s ease-out,
               padding 0.35s ease-out, border-bottom-width 0.35s ease-out;
 }
@@ -452,6 +468,44 @@ body.reduce-motion .ti-desborda {
   pointer-events: none;
 }
 body.reduce-motion .tab-bar { transition: none; }
+
+/* ==========================================================
+   TÁCTIL · la barra se esconde, pero deja un TIRADOR
+
+   Con ratón, el `pointermove` despierta la barra antes de que llegue el
+   clic: siempre está ahí cuando pulsas. Con el dedo no hay movimiento
+   previo — al colapsarla a 0 el toque que la despertaba caía sobre la
+   letra, y había que tocar dos veces. Eso es lo que el usuario reportó
+   como «los botones de configuración no funcionan».
+
+   Solución: en táctil no desaparece del todo, se queda un tirador de
+   22 px que SÍ se puede tocar. Ningún toque se pierde, porque el sitio
+   donde hay que tocar está a la vista. Las pestañas se ocultan de verdad
+   (visibility) mientras tanto: una fila de botones a medio ver que no
+   responden es peor que no verlos.
+   ========================================================== */
+body.perf-tactil .tab-bar.se-esconde {
+  max-height: 22px;
+  opacity: 1;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom-width: 2px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+body.perf-tactil .tab-bar.se-esconde > * { visibility: hidden; }
+body.perf-tactil .tab-bar.se-esconde::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 3px;
+  margin: -1px 0 0 -23px;
+  background: var(--border-light);
+  box-shadow: 0 0 6px var(--accent-glow);
+  border-radius: 2px;
+}
 .tab {
   padding: 4px 12px;
   color: var(--text-dim);
@@ -2758,6 +2812,38 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
   .volume-ctl .volume-bar,
   .volume-ctl #volBtn { display: none; }
 
+  /* …SALVO con Spotify Connect. Ahí el volumen que suena es el del aparato
+     remoto (el altavoz, la tele, el otro móvil) y los botones físicos del
+     teléfono no lo tocan: sin este control no hay forma de bajarlo desde
+     la app. Vuelve solo la bocina, que además hace de silenciar. */
+  body.spotify-conectado .volume-ctl #volBtn { display: flex; }
+
+  /* En táctil no hay hover, así que la barra no se desplegaba nunca: el
+     botón la abre. Y sale FLOTANDO por encima de la fila, no dentro, para
+     no robarle sitio a los botones ni empujarlos a otro renglón. */
+  body.perf-tactil .volume-ctl.abierta .volume-bar {
+    display: block;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    width: 168px;
+    opacity: 1;
+    margin-right: 0;
+    padding: 12px 10px;          /* franja gorda: se arrastra con el pulgar */
+    background: var(--bg-panel);
+    border: 2px solid var(--border-pixel);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+    z-index: 40;
+  }
+  body.perf-tactil .volume-ctl.abierta .vol-pct {
+    display: block;
+    position: absolute;
+    bottom: calc(100% + 44px);
+    right: 4px;
+    opacity: 0.9;
+    z-index: 41;
+  }
+
   /* En táctil no hay hover: mostrar siempre el botón de borrar */
   .tr-del { opacity: 1; }
 
@@ -3887,6 +3973,19 @@ body.reduce-motion .ambient { display: none; }
 @media (max-width: 760px) {
   .amb-blob { filter: blur(46px); }
 }
+/* Pulido táctil que faltaba por completo (0 reglas de esto en todo el CSS):
+   · `touch-action: manipulation` quita el retardo de ~300 ms que el
+     navegador espera por si el toque era un doble toque para ampliar. Sin
+     esto TODO responde tarde y la app se siente pesada aunque vaya fluida.
+     Sigue permitiendo desplazar y hacer pinza para ampliar: solo se pierde
+     el doble-toque-para-ampliar, que en una app de música no hace falta.
+   · el recuadro gris de sistema al pulsar no pega con nada de esta app; los
+     botones ya tienen su propio :active. */
+body.perf-tactil {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body.perf-movil .amb-blob { filter: blur(26px); }
 /* dos focos en vez de tres: el tercero es el más pequeño y el que menos
    se nota, y cada uno es una capa a pantalla completa que componer */
@@ -4262,7 +4361,41 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
     transform: none;
     margin-left: 2px;
   }
-  .controls-row { flex-wrap: wrap; row-gap: 6px; }
+  /* ---------- La fila de botones, para el dedo ----------
+     Estaba con `flex-wrap: wrap`: en cuanto los 7 botones no cabían, los
+     últimos saltaban a un segundo renglón que la ventana recortaba — se
+     PERDÍAN. Y median 32×26 px, menos de la mitad del objetivo de toque
+     recomendado, de ahí el «no dejan dar».
+     Ahora: un solo renglón que siempre cabe, botones de 42 px (46 el de
+     play, que es el que más se usa) y el reparto lo hace el hueco, no el
+     azar del wrap. */
+  .controls-row {
+    flex-wrap: nowrap;
+    gap: clamp(2px, 1.4vw, 10px);
+    padding: 0 2px;
+  }
+  /* El alto (42px) es intocable: es lo que decide si el pulgar acierta.
+     El ancho puede encoger — con Spotify Connect aparece un botón más
+     (el volumen del aparato remoto) y en un teléfono de 320px salen 8;
+     con un mínimo de 40px la fila se desbordaba y volvíamos al problema
+     de siempre. Calculado: a 320px salen 32px de ancho, justo el mínimo. */
+  .controls-row .ctrl-btn {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 32px;
+    max-width: 58px;
+    height: 42px;
+  }
+  .controls-row .volume-ctl { flex: 0 0 auto; }
+  .controls-row .play-btn {
+    flex: 1.35 1 0;
+    max-width: 76px;
+    height: 46px;
+  }
+  .ctrl-btn svg { width: 46%; height: 46%; }
+  .play-btn svg { width: 50%; height: 50%; }
+  /* el ✦ y el ⛶ son glifos, no SVG: que no se queden enanos */
+  .side-btn { font-size: 19px; }
 
   /* Objetivos de toque: por debajo de ~38px el pulgar falla */
   .tab {
@@ -4285,7 +4418,30 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   .window {
     resize: none;                 /* el tirador de redimensionar estorba al dedo */
     height: calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    /* Los dos topes de escritorio hacían daño aquí y explican por qué los
+       botones de abajo quedaban fuera de alcance:
+       · `min-height: 420px` obliga a la ventana a ser MÁS ALTA que la
+         pantalla en un teléfono bajito o con la barra del navegador
+         asomando — y lo que sobra por abajo es justo la fila de botones.
+       · `max-height` iba en `vh`, que en un móvil es el viewport GRANDE
+         (el de la barra oculta), así que nunca recortaba nada.
+       La altura la fija `height` en dvh, que sí sigue a la barra del
+       navegador cuando aparece y desaparece. */
+    min-height: 0;
+    max-height: none;
   }
+
+  /* La fila de controles y la barra de estado son intocables: pase lo que
+     pase con el contenido de arriba, se pintan por encima y conservan su
+     sitio. Antes cualquier desbordamiento de la zona de la carátula caía
+     justo sobre los botones. */
+  .playback-bar,
+  .status-bar {
+    position: relative;
+    z-index: 3;
+    flex: 0 0 auto;
+  }
+  .main-grid { min-height: 0; }
 }
 
 /* Teléfono bajito, o con el teclado abierto: lo primero que sobra es el
