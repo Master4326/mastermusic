@@ -451,8 +451,14 @@
   25%  { opacity: 1; filter: brightness(3.4) saturate(0.2); }
   50%  { opacity: 0.5; filter: brightness(2); }
   100% { opacity: 0; filter: none; }
-}@keyframes sal-encoge {
-  to { opacity: 0; transform: scale(0.5) translateY(-0.3em); letter-spacing: normal; filter: blur(4px); }
+}/* ARREGLADO: llevaba `letter-spacing: normal` en el fotograma final. Como
+   no hay `from`, interpolaba desde el tracking que tuviera la línea hasta 0,
+   así que al salir las letras se APELMAZABAN unas contra otras — y además
+   animar letter-spacing reflowea el texto entero en cada frame, que es
+   justo la regla que este proyecto se puso tras el tirón de ed-susurro. El
+   `scale(0.5)` ya da la sensación de encogerse, sin tocar el layout. */
+@keyframes sal-encoge {
+  to { opacity: 0; transform: scale(0.5) translateY(-0.3em); filter: blur(4px); }
 }/* ── cámaras nuevas ── */
 .edcam-dolly   { animation: edcam-dolly 6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }.edcam-tiembla { animation: edcam-tiembla 0.5s steps(2, end) infinite; }.edcam-vaiven  { animation: edcam-vaiven 3.2s ease-in-out infinite; }@keyframes edcam-dolly {                /* acercamiento con leve giro, muy cine */
   from { transform: scale(0.96) rotate(0.6deg); }
@@ -504,8 +510,16 @@
   0%   { opacity: 0; transform: translate(var(--rx, 2em), var(--ry, -1em)) rotate(var(--rr, 90deg)) scale(1.6); filter: blur(4px); }
   70%  { opacity: 1; transform: translate(0, 0) rotate(0) scale(1.05); filter: none; }
   100% { opacity: 1; transform: none; }
-}@keyframes edl-descifra {               /* decode: de tenue revuelta a fija con flash */
-  0%   { opacity: 0.4; filter: blur(1.5px); }
+}/* decode: la letra entra revuelta y se fija con un flash.
+   ARREGLADO: arrancaba en `opacity: 0.4`, y como la regla lleva
+   `animation-fill-mode: both`, ese 0% se pinta TAMBIÉN durante el retraso de
+   cada letra — o sea que la frase entera aparecía de golpe, tenue, desde el
+   primer fotograma, y no quedaba revelado ninguno. Empezando en 0 cada letra
+   espera su turno y la cascada se ve. El 15% la enciende enseguida para que
+   siga habiendo tiempo de verla revolverse (eso lo hace edScramble en JS). */
+@keyframes edl-descifra {
+  0%   { opacity: 0; filter: blur(2px); }
+  15%  { opacity: 1; }
   60%  { opacity: 1; text-shadow: 0 0 14px currentColor, 0 0 40px currentColor; }
   100% { opacity: 1; filter: none; }
 }/* ── frases palabra a palabra nuevas ── */
@@ -872,9 +886,17 @@
   18%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
   80%  { opacity: 1; transform: translate(-50%, -50%) scale(0.96); }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-}@keyframes edl-tetris {
-  0%   { opacity: 0; transform: translateY(-2.8em); }
-  12%  { opacity: 1; }
+}/* tetris: la letra encaja a saltos duros, como una pieza que cae.
+   ARREGLADO: caía desde 2,8em con `steps(5)`, o sea saltos de 0,56em — las
+   letras se quedaban colgadas MUY por encima de su renglón, sueltas y a
+   alturas distintas, y parecía rota más que dura. Desde 1em los cinco saltos
+   son cortos: se sigue viendo el escalón (que es la gracia) pero la letra
+   nunca se despega de su renglón. Se queda invisible SOLO el primer paso y
+   entra ya cerca de su sitio — quitarle del todo el `opacity: 0` fue peor:
+   se veía el recorrido entero y las letras parecían flotar sueltas arriba. */
+@keyframes edl-tetris {
+  0%   { opacity: 0; transform: translateY(-1em); }
+  20%  { opacity: 1; transform: translateY(-0.6em); }
   100% { opacity: 1; transform: translateY(0); }
 }/* ed-diagonal: filas alineadas de esquina a esquina */
 .ed-titulo.ed-diagonal { animation-name: ed-diagonal; animation-duration: 0.55s; }@keyframes ed-diagonal {

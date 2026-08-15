@@ -975,13 +975,18 @@ body.reduce-motion .lyric-gap i { transition: none; }
 #tab-lyrics .lyrics-body,
 .lyrics-edit { position: relative; z-index: 2; }
 
+/* Corchetes de esquina del panel de la letra. ANTES latían de 0.2 a 0.75 con
+   un resplandor cada 3,2 s: al encenderse los cuatro a la vez se leen como un
+   CUADRADO que aparece y desaparece por detrás del texto, y eso es lo que
+   molestaba. Ahora son un marco quieto y tenue — decoración de fondo, no algo
+   que pida atención. Va en la línea de la regla ya asentada aquí: el ambiente
+   cambia de carácter despacio, no parpadea. */
 .la-corner {
   position: absolute;
   width: clamp(18px, 2.4cqw, 34px);
   height: clamp(18px, 2.4cqw, 34px);
-  border: 2px solid var(--accent);
-  opacity: 0.35;
-  animation: la-pulse 3.2s ease-in-out infinite;
+  border: 1px solid var(--accent);
+  opacity: 0.14;
 }
 .la-corner.tl { top: 6px;    left: 6px;  border-right: 0; border-bottom: 0; }
 .la-corner.tr { top: 6px;    right: 6px; border-left: 0;  border-bottom: 0; animation-delay: 0.8s; }

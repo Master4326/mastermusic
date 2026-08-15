@@ -896,6 +896,31 @@
     return tam.map(t => Math.max(20, t * esc));
   };
 
+  /* Ajuste MEDIDO del ancho. `edTamanos` estima con un ancho de carácter fijo
+     (0.58em): no sabe que la palabra destacada va a 1,55em, ni que va en
+     cursiva, ni cuánto ocupa de verdad la tipografía. Cuando se queda corta la
+     fila se sale del panel y, como `.lyrics-edit` recorta, la última palabra
+     aparece PARTIDA por la mitad. Aquí ya está todo en el DOM, así que se
+     mide: si sobresale se baja el tamaño hasta que entre, y si cabe no se
+     toca nada. Corre una vez por verso (no por frame) y como mucho 4 vueltas.
+     Va en un rAF porque en el momento de crear el stack todavía está vacío. */
+  const ajustarAncho = (stack) => {
+    if (!stack || !stack.isConnected) return;
+    const max = stack.clientWidth;
+    if (!max) return;
+    stack.querySelectorAll('.ed-titulo, .ed-frase').forEach((fila) => {
+      let vueltas = 0;
+      while (fila.scrollWidth > max + 1 && vueltas < 4) {
+        const px = parseFloat(getComputedStyle(fila).fontSize) || 20;
+        const factor = Math.max(0.62, max / fila.scrollWidth);
+        const nuevo = Math.max(12, px * factor);
+        if (nuevo >= px) break;          // ya no se puede encoger más: se deja
+        fila.style.fontSize = nuevo.toFixed(1) + 'px';
+        vueltas++;
+      }
+    });
+  };
+
   // Con «menos movimiento» los adornos de golpe se quedan fuera; el texto no.
   const calma = () => !!(window.MMSettings && window.MMSettings.reduceMotion());
 
@@ -1271,6 +1296,8 @@
     stack.style.setProperty('--top', ED_TOPS[semilla(ci, 7, ED_TOPS.length)] + '%');
     stack.style.setProperty('--tilt', (semilla(ci, 11, 7) - 3) + 'deg');
     lyricsEdit.appendChild(stack);
+    // El stack todavía está vacío: se mide cuando las ramas lo hayan llenado.
+    requestAnimationFrame(() => ajustarAncho(stack));
 
     // ¿línea instrumental? (solo ♪/♫ o puntos): escena viva en vez de título
     if (/^[♪♫♩♬\s·.…*\-]+$/.test(text)) {
