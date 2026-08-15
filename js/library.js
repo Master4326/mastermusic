@@ -144,7 +144,9 @@
         <div class="sp-artist">${escapeHtml(t.artist)}${t.unplayable ? ' · no disponible' : ''}</div>
       </div>
       <div class="sp-dur">${formatTime(t.duration)}</div>
-      ${t.unplayable ? '<span class="sp-dur">✕</span>' : '<button class="sp-play" title="Reproducir">▶</button>'}
+      ${t.unplayable ? '<span class="sp-dur">✕</span>'
+        : `<button class="sp-queue" title="Añadir a la cola">＋</button>
+           <button class="sp-play" title="Reproducir ahora">▶</button>`}
     </li>`;
 
   // Las playlists van en rejilla de portadas, como la biblioteca de Spotify
@@ -526,6 +528,16 @@
       if (!row) return;
       const item = currentRows()[parseInt(row.dataset.idx, 10)];
       if (!item) return;
+      /* El ＋ encola sin interrumpir lo que suena. Va antes de todo lo demás
+         porque la fila entera reproduce: si no se corta aquí, encolar
+         reproduciría también, que es justo lo contrario de encolar. */
+      if (e.target.closest('.sp-queue')) {
+        e.stopPropagation();
+        if (window.SpotifyModule && window.SpotifyModule.queue) {
+          window.SpotifyModule.queue(item.uri, item.name);
+        }
+        return;
+      }
       if (!view.detail && COLS[view.col].kind === 'playlist') {
         // ▶ reproduce la playlist entera; el resto de la fila la abre
         if (e.target.closest('.sp-play')) playAllPlaylist(item);

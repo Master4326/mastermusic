@@ -299,16 +299,47 @@
   el.playBtn.addEventListener('click', togglePlay);
   el.nextBtn.addEventListener('click', playNext);
   el.prevBtn.addEventListener('click', playPrev);
-  el.shuffleBtn.addEventListener('click', () => {
-    state.shuffle = !state.shuffle;
+  /* ---------- Aleatorio y repetir ----------
+     Antes estos dos botones solo cambiaban una variable de aquí. Con
+     reproducción local está bien —la cola es nuestra—, pero con Spotify
+     Connect quien decide es Spotify: el botón se encendía y la reproducción
+     seguía igual. Ahora se manda a la API, y si la petición falla el botón
+     VUELVE a como estaba: un control que miente es peor que no tenerlo. */
+  const MODO_SP = { off: 'off', all: 'context', one: 'track' };
+  const MODO_LOCAL = { off: 'off', context: 'all', track: 'one' };
+
+  const pintarShuffle = () => {
     el.shuffleBtn.classList.toggle('active', state.shuffle);
-  });
-  el.repeatBtn.addEventListener('click', () => {
-    const next = { off: 'all', all: 'one', one: 'off' };
-    state.repeat = next[state.repeat];
+  };
+  const pintarRepeat = () => {
     el.repeatBtn.classList.toggle('active', state.repeat !== 'off');
     el.repeatBtn.classList.toggle('repeat-one', state.repeat === 'one');
     el.repeatBtn.title = { off: 'Repetir', all: 'Repetir todo', one: 'Repetir una' }[state.repeat];
+  };
+
+  const setShuffle = (on) => {
+    const antes = state.shuffle;
+    state.shuffle = !!on;
+    pintarShuffle();
+    if (spotifyActive() && window.SpotifyModule.setShuffle) {
+      window.SpotifyModule.setShuffle(state.shuffle)
+        .catch(() => { state.shuffle = antes; pintarShuffle(); });
+    }
+  };
+
+  const setRepeat = (modo) => {
+    const antes = state.repeat;
+    state.repeat = modo;
+    pintarRepeat();
+    if (spotifyActive() && window.SpotifyModule.setRepeat) {
+      window.SpotifyModule.setRepeat(MODO_SP[modo])
+        .catch(() => { state.repeat = antes; pintarRepeat(); });
+    }
+  };
+
+  el.shuffleBtn.addEventListener('click', () => setShuffle(!state.shuffle));
+  el.repeatBtn.addEventListener('click', () => {
+    setRepeat({ off: 'all', all: 'one', one: 'off' }[state.repeat]);
   });
 
   // Progress bar seek
@@ -357,6 +388,41 @@
     paintVolume();
     syncSpotifyVolume();
   };
+
+  /* Igual que setVolume pero SIN devolvérselo a Spotify: este valor VIENE de
+     Spotify. Pasar por setVolume armaría un ida y vuelta (lo recibo, lo
+     reenvío, me lo confirman, lo reenvío…). */
+  const adoptVolume = (v) => {
+    v = Math.max(0, Math.min(1, v));
+    state.volume = v;
+    audio.volume = v;
+    if (v > 0) lastNonZeroVol = v;
+    localStorage.setItem('mm_volume', String(v));
+    paintVolume();
+  };
+
+  /* El estado real llega del sondeo de spotify.js. Sirve para que los botones
+     se enteren de lo que pasa FUERA de la app: si pones aleatorio desde el
+     móvil, aquí se enciende solo. Se pinta directamente, sin pasar por los
+     manejadores del clic, así que esto no puede rebotar en otra petición. */
+  window.addEventListener('mm:spotify-modes', (e) => {
+    const d = e.detail || {};
+    if (typeof d.shuffle === 'boolean' && d.shuffle !== state.shuffle) {
+      state.shuffle = d.shuffle;
+      pintarShuffle();
+    }
+    const local = MODO_LOCAL[d.repeat];
+    if (local && local !== state.repeat) {
+      state.repeat = local;
+      pintarRepeat();
+    }
+    /* El volumen del aparato se adopta SOLO al cambiar de dispositivo, no en
+       cada sondeo: si se adoptara siempre, arrastrar la barra pelearía cada
+       2 s contra la respuesta del sondeo anterior y el tirador saltaría. */
+    if (d.deviceChanged && d.device && typeof d.device.volume_percent === 'number') {
+      adoptVolume(d.device.volume_percent / 100);
+    }
+  });
 
   const volFromEvent = (e) => {
     const rect = el.volumeBar.getBoundingClientRect();
@@ -474,6 +540,8 @@
     prev: playPrev,
     seek: seekTo,
     setVolume,
+    setShuffle,
+    setRepeat,      // 'off' | 'all' | 'one'
     position,
     duration,
     playing,

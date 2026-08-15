@@ -65,19 +65,26 @@
     }, 0);
   };
 
-  // Derives 4 border shades (hi / light / pixel / dark) from a base accent color.
-  // Result is desaturated towards a darker base so borders feel like frames, not glows.
+  /* Saca los 4 tonos de borde (hi / light / pixel / dark) del acento, apagado
+     hacia el fondo para que los bordes parezcan marcos y no neones.
+
+     Ese "hacia el fondo" antes era un azul marino FIJO. Con el acento cyan de
+     fábrica no se notaba, pero en cuanto el acento sale de la carátula el
+     marino tiraba de todos los bordes hacia el azul: con un acento dorado los
+     marcos salían verdosos y sucios, peleados con el resto de la ventana.
+     Ahora se apagan hacia el color de panel que esté puesto, así que los
+     bordes pertenecen a la misma paleta que todo lo demás. */
+  let baseMarcos = { r: 26, g: 31, b: 74 };  // marino de arranque, hasta la 1ª carátula
+
   const applyBordersFromAccent = (hex) => {
     let rgb;
     try { rgb = hexToRgb(hex); } catch (e) { return; }
-    // Mix accent with a deep navy for a "pixel border" feel
     const mix = (c1, c2, t) => ({
       r: c1.r * (1 - t) + c2.r * t,
       g: c1.g * (1 - t) + c2.g * t,
       b: c1.b * (1 - t) + c2.b * t,
     });
-    const base = { r: 26, g: 31, b: 74 }; // navy
-    const mid = mix(rgb, base, 0.55);
+    const mid = mix(rgb, baseMarcos, 0.55);
     root.style.setProperty('--border-hi',    rgbToHex(mix(rgb, { r: 255, g: 255, b: 255 }, 0.35))); // bright highlight
     root.style.setProperty('--border-light', rgbToHex(mid));
     root.style.setProperty('--border-pixel', rgbToHex(mix(mid, { r: 0, g: 0, b: 0 }, 0.25)));
@@ -108,6 +115,28 @@
     applyTheme('cyan');
   };
 
+  /* ---------- Escalera de texto desde la carátula ----------
+     --text-dim y --text-muted eran fijos: el lavanda de fábrica se quedaba
+     puesto aunque el resto de la ventana cambiara de color, y sobre una
+     carátula en blanco y negro el nombre del disco cantaba en AZUL. Ahora
+     los tres tonos de texto salen de la misma paleta que todo lo demás,
+     salvo que el usuario haya elegido su propio color de texto. */
+  let textMode = localStorage.getItem(STORAGE_KEYS.TEXT) ? 'manual' : 'auto';
+
+  const applyTextFromCover = (text, dim, muted) => {
+    if (textMode !== 'auto') return;
+    root.style.setProperty('--text', text);
+    root.style.setProperty('--text-dim', dim);
+    root.style.setProperty('--text-muted', muted);
+  };
+
+  const resetTextFromCover = () => {
+    if (textMode !== 'auto') return;
+    root.style.removeProperty('--text');
+    root.style.removeProperty('--text-dim');
+    root.style.removeProperty('--text-muted');
+  };
+
   const applyBgManual = (hex) => {
     body.classList.add('bg-manual');
     root.style.setProperty('--dyn-1', lighten(hex, 0.15));
@@ -127,6 +156,11 @@
   const applyPanelsFromBase = (hex) => {
     let baseRgb;
     try { baseRgb = hexToRgb(hex); } catch (e) { return; }
+    /* Los marcos se apagan hacia ESTE color. Se guarda en vez de leerlo del
+       CSS porque --bg-panel-2 va con transición: al pedirlo justo después de
+       ponerlo, getComputedStyle devuelve todavía el valor viejo y los bordes
+       se quedarían una canción por detrás. */
+    baseMarcos = baseRgb;
 
     // Detect if base is very light → use dark shades instead of light
     const lum = (baseRgb.r + baseRgb.g + baseRgb.b) / 3;
@@ -164,6 +198,7 @@
   };
 
   const resetPanels = () => {
+    baseMarcos = { r: 26, g: 31, b: 74 };
     root.style.removeProperty('--bg-window');
     root.style.removeProperty('--bg-panel');
     root.style.removeProperty('--bg-panel-2');
@@ -171,15 +206,30 @@
   };
 
   // Expose for colors.js to call when auto-extracting from cover
-  window.MasterColors = { applyPanelsFromBase, resetPanels, applyAccentFromCover, resetAccentFromCover };
+  window.MasterColors = {
+    applyPanelsFromBase, resetPanels,
+    applyAccentFromCover, resetAccentFromCover,
+    applyTextFromCover, resetTextFromCover,
+  };
 
   // Color math helpers
+  /* Acepta '#rrggbb' Y 'rgb(r, g, b)'. Lo segundo no era un capricho: --accent
+     está registrado con @property para poder fundirlo, y un custom property
+     registrado como <color> SIEMPRE se lee resuelto como rgb(...) desde
+     getComputedStyle. applyTheme() lo leía así y se lo pasaba a esta función,
+     que sacaba NaN de 'rg' y dejaba los cuatro bordes en '#NaNNaNNaN' —
+     inválido, o sea sin borde— hasta que entrara la primera carátula. */
   const hexToRgb = (hex) => {
-    const c = hex.replace('#', '');
+    const s = String(hex).trim();
+    if (s.startsWith('rgb')) {
+      const m = s.match(/[\d.]+/g) || [];
+      return { r: +m[0] || 0, g: +m[1] || 0, b: +m[2] || 0 };
+    }
+    const c = s.replace('#', '');
     return {
-      r: parseInt(c.substr(0, 2), 16),
-      g: parseInt(c.substr(2, 2), 16),
-      b: parseInt(c.substr(4, 2), 16),
+      r: parseInt(c.substr(0, 2), 16) || 0,
+      g: parseInt(c.substr(2, 2), 16) || 0,
+      b: parseInt(c.substr(4, 2), 16) || 0,
     };
   };
   const rgbToHex = ({ r, g, b }) => '#' + [r, g, b].map(v =>
@@ -283,18 +333,23 @@
   // Text color presets + custom
   const textPresets = document.querySelectorAll('.text-preset');
   const customText = document.getElementById('customText');
+  /* Elegir color de texto a mano congela la escalera automática: a partir de
+     aquí manda el usuario y la carátula ya no toca --text-dim/--text-muted. */
+  const setTextManual = (hex) => {
+    textMode = 'manual';
+    applyText(hex);
+    root.style.removeProperty('--text-dim');
+    root.style.removeProperty('--text-muted');
+    localStorage.setItem(STORAGE_KEYS.TEXT, hex);
+  };
   textPresets.forEach(b => {
     b.addEventListener('click', () => {
       const hex = b.dataset.text;
-      applyText(hex);
+      setTextManual(hex);
       customText.value = hex;
-      localStorage.setItem(STORAGE_KEYS.TEXT, hex);
     });
   });
-  customText.addEventListener('input', (e) => {
-    applyText(e.target.value);
-    localStorage.setItem(STORAGE_KEYS.TEXT, e.target.value);
-  });
+  customText.addEventListener('input', (e) => setTextManual(e.target.value));
 
   // Lyrics offset slider
   const offsetSlider = document.getElementById('offsetSlider');
@@ -336,12 +391,19 @@
     root.style.removeProperty('--accent-glow');
     root.style.removeProperty('--accent-dim');
     root.style.removeProperty('--text');
+    root.style.removeProperty('--text-dim');
+    root.style.removeProperty('--text-muted');
     root.style.removeProperty('--dyn-1');
     root.style.removeProperty('--dyn-2');
     resetPanels();
     accentMode = 'auto'; // por defecto el acento sigue a la carátula
+    textMode = 'auto';   // y el texto también
     if (lastCoverAccent) applyAccent(lastCoverAccent);
     else applyTheme('cyan');
+    // Repinta la paleta entera desde la carátula que suena ahora mismo:
+    // si no, el fondo y la escalera de texto se quedaban en los de fábrica
+    // hasta la siguiente canción.
+    if (window.CoverColors) window.CoverColors.refresh();
     updateActiveSwatch('auto');
     bgAuto.checked = true;
     customAccent.value = '#5ce1e6';
@@ -590,6 +652,9 @@
     const artista = (t.artist || '').trim();
     // isPlaying cubre los dos motores: el <audio> local y Spotify Connect
     const sonando = !!(pc.state.isPlaying || (pc.audio && !pc.audio.paused));
+    /* El nombre del aparato NO va aquí: lo enseña el chip #devChip, que
+       además deja cambiarlo. Ponerlo en los dos sitios lo duplicaba, y este
+       texto es `aria-live`: cada aviso volvería a cantar el dispositivo. */
     return `${sonando ? '▶' : '❙❙'} ${titulo}${artista ? ' — ' + artista : ''}`;
   };
 
@@ -762,6 +827,13 @@
     const tab = document.getElementById('tab-queue');
     if (tab && tab.classList.contains('active')) renderQueue();
   }, 2500);
+
+  /* Para que encolar una canción se vea al momento en vez de esperar hasta
+     2,5 s al siguiente refresco. Solo repinta si la cola está a la vista. */
+  window.SevenQueueRefresh = () => {
+    const tab = document.getElementById('tab-queue');
+    if (tab && tab.classList.contains('active')) renderQueue();
+  };
 
   // ---------- Tamaño de la ventana (redimensionable + maximizar) ----------
   const winEl = document.querySelector('.window');

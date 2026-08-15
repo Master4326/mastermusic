@@ -20,9 +20,19 @@
   const REDIRECT_URI = window.location.origin.replace('//localhost', '//127.0.0.1')
     + window.location.pathname.replace(/index\.html$/, '');
   const SCOPES = [
-    'user-read-private',
-    'user-read-email',
-    'user-read-currently-playing',
+    /* Aquí se pedían `user-read-private`, `user-read-email` y
+       `user-read-currently-playing`. Los tres fuera:
+       - private/email: NINGÚN código los leía. Y desde las reglas de
+         feb-2026 `/me` ya ni devuelve email, country ni product, así que
+         pedirlos era regalar dos líneas de miedo en la pantalla de
+         consentimiento ("tu dirección de correo", "tus datos de suscripción")
+         a cambio de nada. `loadUser` solo usa display_name/id/images, que
+         vienen igual sin permiso alguno.
+       - currently-playing: era para `/me/player/currently-playing`, que ya
+         no se llama — el sondeo pide `/me/player`, que va con
+         `user-read-playback-state` (el de abajo).
+       Quitar permisos NO rompe las sesiones ya abiertas: el token que tengas
+       simplemente lleva más de los que hacen falta. */
     'user-read-playback-state',
     'user-modify-playback-state',
     'playlist-read-private',
@@ -213,6 +223,36 @@
   let lastTrackId = null;
   let lastIsPlaying = false;   // último estado conocido (lo refresca el polling)
 
+  /* Aparato y modos, que ANTES no se sabían. El sondeo pedía
+     `/me/player/currently-playing`, que devuelve la pista y poco más;
+     `/me/player` cuesta exactamente lo mismo —una petición cada 2 s— y
+     además trae el dispositivo activo, su volumen real y el estado de
+     aleatorio/repetir. Sin eso, los botones de aleatorio y repetir no tenían
+     forma de saber cómo estaba Spotify de verdad. */
+  let lastDevice = null;       // {id, name, type, volume_percent} o null
+  let lastShuffle = null;      // true/false; null = todavía no se sabe
+  let lastRepeat = null;       // 'off' | 'context' | 'track'
+
+  /* Avisa UNA vez por cambio, no en cada sondeo. Quien pinta los botones
+     escucha este evento; nadie llama al manejador del clic, así que pintar
+     desde aquí no puede disparar una petición de vuelta. */
+  const leerModos = (data) => {
+    const dev = data.device || null;
+    const sh = typeof data.shuffle_state === 'boolean' ? data.shuffle_state : null;
+    const rp = data.repeat_state || null;
+    const idAntes = lastDevice ? lastDevice.id : null;
+    const idAhora = dev ? dev.id : null;
+    const cambioDev = idAhora !== idAntes;
+    if (!cambioDev && sh === lastShuffle && rp === lastRepeat) return;
+    lastDevice = dev;
+    lastShuffle = sh;
+    lastRepeat = rp;
+    window.dispatchEvent(new CustomEvent('mm:spotify-modes', {
+      detail: { shuffle: sh, repeat: rp, device: dev, deviceChanged: cambioDev },
+    }));
+    if (cambioDev) pintarChipAparato();
+  };
+
   // El polling llega cada 2s; entre poll y poll interpolamos con un reloj
   // local para que la letra y la barra avancen suaves a 60fps en vez de
   // dar saltos de 2 segundos.
@@ -243,8 +283,11 @@
     const poll = async () => {
       try {
         const t0 = performance.now();
-        const data = await api('/me/player/currently-playing');
+        const data = await api('/me/player');
         const t1 = performance.now();
+        // Los modos se leen aunque no haya pista sonando: puede haber un
+        // aparato despierto y en pausa, y el aleatorio sigue teniendo estado.
+        if (data) leerModos(data);
         if (data && data.item) {
           const it = data.item;
           const track = {
@@ -323,6 +366,12 @@
     pollTimer = null;
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     progStamp = 0;
+    // Sin sondeo no se sabe nada del aparato: dejarlo puesto haría que la
+    // barra de estado siguiera diciendo dónde suena algo que ya no suena.
+    lastDevice = null;
+    lastShuffle = null;
+    lastRepeat = null;
+    pintarChipAparato();
   };
 
   // -------- Controles de reproducción (Spotify Connect) --------
@@ -361,6 +410,79 @@
     pct = Math.max(0, Math.min(100, Math.round(pct)));
     try { await api('/me/player/volume?volume_percent=' + pct, { method: 'PUT' }); }
     catch (e) { /* algunos dispositivos no aceptan volumen remoto; silencioso */ }
+  };
+
+  /* Aleatorio y repetir en el aparato de verdad. Hasta ahora estos dos
+     botones SOLO cambiaban una variable de app.js: con Spotify Connect se
+     encendían y la reproducción seguía exactamente igual. Los dos LANZAN el
+     error a propósito — quien pulsó necesita saber que no se aplicó para
+     devolver el botón a su sitio, que es peor mentira que no tenerlo. */
+  const spSetShuffle = async (on) => {
+    try {
+      await api('/me/player/shuffle?state=' + (on ? 'true' : 'false'), { method: 'PUT' });
+      lastShuffle = !!on;
+    } catch (e) {
+      setStatus('✕ Spotify no aceptó el aleatorio (¿hay un dispositivo activo?)');
+      throw e;
+    }
+  };
+
+  // modo: 'off' | 'context' (toda la lista) | 'track' (una canción)
+  const spSetRepeat = async (modo) => {
+    try {
+      await api('/me/player/repeat?state=' + modo, { method: 'PUT' });
+      lastRepeat = modo;
+    } catch (e) {
+      setStatus('✕ Spotify no aceptó el modo de repetición (¿hay un dispositivo activo?)');
+      throw e;
+    }
+  };
+
+  /* Encolar en vez de interrumpir. Hasta ahora, desde buscar o desde la
+     biblioteca solo se podía «reproducir ya», que corta en seco lo que esté
+     sonando: para apuntar una canción para dentro de un rato había que
+     acordarse de ella. `POST /me/player/queue` la mete detrás de la actual. */
+  const spQueue = async (uri, nombre) => {
+    if (!uri) return;
+    try {
+      await api('/me/player/queue?uri=' + encodeURIComponent(uri), { method: 'POST' });
+      setStatus('＋ en cola: ' + (nombre || 'canción'));
+      // Si la cola está abierta, que se vea entrar
+      if (window.SevenQueueRefresh) window.SevenQueueRefresh();
+    } catch (e) {
+      /* El motivo literal importa: sin dispositivo activo Spotify responde
+         404 «NO_ACTIVE_DEVICE», que es un problema distinto de un 403. */
+      setStatus(/404/.test(e.message)
+        ? '✕ no hay ningún dispositivo activo en Spotify: abre la app y dale al play'
+        : '✕ no se pudo encolar. ' + detalleSpotify(e));
+    }
+  };
+
+  /* Saca el mensaje que manda Spotify dentro del cuerpo del error. Los 403 de
+     esta API se tragan el motivo si no se hace esto — ya pasó tres veces en
+     este proyecto (biblioteca, playlists y el ❤). */
+  const detalleSpotify = (e) => {
+    const m = String(e && e.message || '');
+    const j = m.slice(m.indexOf('{'));
+    try { return JSON.parse(j).error.message || m; } catch (x) { return m; }
+  };
+
+  /* -------- Dónde suena (Spotify Connect) --------
+     La app siempre fue un mando a distancia sin saberlo: manda play, pausa,
+     volumen y seek a un aparato que elige Spotify por su cuenta. Con esto se
+     puede además VER cuáles hay y mandar la música a otro. */
+  const spDevices = async () => {
+    const d = await api('/me/player/devices');
+    return (d && Array.isArray(d.devices)) ? d.devices : [];
+  };
+
+  const spTransfer = async (id) => {
+    /* `play` lleva el estado ACTUAL a propósito: si estaba en pausa, cambiar
+       de altavoz no debería ponerse a sonar de golpe (p. ej. de madrugada). */
+    await api('/me/player', {
+      method: 'PUT',
+      body: JSON.stringify({ device_ids: [id], play: !!lastIsPlaying }),
+    });
   };
 
   const spSeek = async (ms) => {
@@ -474,7 +596,8 @@
           <div class="sp-artist">${escapeHtml(t.artist)}${t.album ? ` <span class="sp-alb">· ${escapeHtml(t.album)}</span>` : ''}</div>
         </div>
         <div class="sp-dur">${formatTime(t.duration)}</div>
-        <button class="sp-play" title="Reproducir">▶</button>
+        <button class="sp-queue" title="Añadir a la cola">＋</button>
+        <button class="sp-play" title="Reproducir ahora">▶</button>
       </li>
     `).join('');
   };
@@ -655,13 +778,24 @@
     const list = document.getElementById('spotifyResults');
     if (list && !list._wired) {
       list._wired = true;
+      const pistaDe = (row) => searchResults[parseInt(row.dataset.idx, 10)];
       const lanzar = (row) => {
-        const t = searchResults[parseInt(row.dataset.idx, 10)];
+        const t = pistaDe(row);
         if (t) playTrack(t);
       };
       list.addEventListener('click', (e) => {
         const row = e.target.closest('.sp-result');
-        if (row) lanzar(row);
+        if (!row) return;
+        /* El ＋ va DENTRO de la fila, y la fila entera reproduce: sin parar
+           aquí, encolar reproduciría además la canción — justo lo contrario
+           de lo que pide quien la encola. */
+        if (e.target.closest('.sp-queue')) {
+          e.stopPropagation();
+          const t = pistaDe(row);
+          if (t) spQueue(t.uri, t.name);
+          return;
+        }
+        lanzar(row);
       });
       // con teclado: las filas son focusables, Enter reproduce
       list.addEventListener('keydown', (e) => {
@@ -675,6 +809,125 @@
     }
   };
 
+  /* -------- Chip «dónde suena» + su menú --------
+     El menú se cuelga del <body>, NO de la barra de estado. En este proyecto
+     ya mordió cinco veces la misma trampa: un `position: fixed` dentro de un
+     ancestro con `transform` se ancla AL ANCESTRO, no a la pantalla. Colgando
+     de <body> no hay ancestro que pueda tener transform, y de paso no lo
+     recorta el `overflow` de la barra. */
+  let devMenu = null;
+  let devAbierto = false;
+
+  const chip = () => document.getElementById('devChip');
+
+  const pintarChipAparato = () => {
+    const c = chip();
+    if (!c) return;
+    const nom = document.getElementById('devName');
+    if (lastDevice && lastDevice.name) {
+      if (nom) nom.textContent = lastDevice.name;
+      c.hidden = false;
+      c.classList.toggle('dev-restringido', !!lastDevice.is_restricted);
+    } else {
+      c.hidden = !isLoggedIn();     // conectado pero sin aparato: se puede elegir uno
+      if (nom) nom.textContent = 'elegir dispositivo';
+      c.classList.remove('dev-restringido');
+    }
+  };
+
+  const cerrarMenuDev = () => {
+    devAbierto = false;
+    if (devMenu) devMenu.hidden = true;
+    const c = chip();
+    if (c) c.setAttribute('aria-expanded', 'false');
+  };
+
+  const colocarMenuDev = () => {
+    const c = chip();
+    if (!c || !devMenu) return;
+    const r = c.getBoundingClientRect();
+    const ancho = devMenu.offsetWidth || 220;
+    // La barra de estado vive abajo del todo: el menú abre hacia ARRIBA
+    devMenu.style.left = Math.round(
+      Math.max(8, Math.min(window.innerWidth - ancho - 8, r.right - ancho))) + 'px';
+    devMenu.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
+  };
+
+  const iconoAparato = (tipo) => ({
+    Computer: '▭', Smartphone: '▯', Speaker: '◉', TV: '▣',
+    CastVideo: '▣', CastAudio: '◉', AVR: '◉', STB: '▣', GameConsole: '◈',
+  }[tipo] || '♪');
+
+  const pintarMenuDev = (lista) => {
+    if (!lista.length) {
+      devMenu.innerHTML = `<div class="dev-vacio">
+        ▒ ningún dispositivo a la vista ▒
+        <span>abre Spotify en el móvil o el PC y dale al play una vez</span>
+      </div>`;
+      return;
+    }
+    devMenu.innerHTML = lista.map((d) => `
+      <button class="dev-item${d.is_active ? ' activo' : ''}" role="menuitem"
+        data-id="${escapeHtml(d.id || '')}" ${d.is_restricted ? 'disabled' : ''}
+        title="${d.is_restricted ? 'Spotify no permite controlar este dispositivo desde fuera' : ''}">
+        <span class="dev-item-ico" aria-hidden="true">${iconoAparato(d.type)}</span>
+        <span class="dev-item-nom">${escapeHtml(d.name || 'sin nombre')}</span>
+        ${d.is_active ? '<span class="dev-item-marca">sonando</span>' : ''}
+      </button>`).join('');
+  };
+
+  const abrirMenuDev = async () => {
+    if (!devMenu) {
+      devMenu = document.createElement('div');
+      devMenu.className = 'dev-menu';
+      devMenu.id = 'devMenu';
+      devMenu.setAttribute('role', 'menu');
+      devMenu.hidden = true;
+      document.body.appendChild(devMenu);
+      devMenu.addEventListener('click', async (e) => {
+        const it = e.target.closest('.dev-item');
+        if (!it || !it.dataset.id) return;
+        cerrarMenuDev();
+        try {
+          await spTransfer(it.dataset.id);
+          setStatus('◎ mandado a ' + it.querySelector('.dev-item-nom').textContent);
+          lastTrackId = null;      // que el sondeo refresque sin esperar
+          startPolling();
+        } catch (err) {
+          setStatus('✕ no se pudo cambiar de dispositivo. ' + detalleSpotify(err));
+        }
+      });
+    }
+    devAbierto = true;
+    devMenu.hidden = false;
+    const c = chip();
+    if (c) c.setAttribute('aria-expanded', 'true');
+    devMenu.innerHTML = '<div class="dev-vacio">▒ buscando dispositivos… ▒</div>';
+    colocarMenuDev();
+    try {
+      pintarMenuDev(await spDevices());
+    } catch (e) {
+      devMenu.innerHTML = `<div class="dev-vacio">▒ no se pudo consultar ▒
+        <span>${escapeHtml(detalleSpotify(e))}</span></div>`;
+    }
+    colocarMenuDev();   // el alto cambió al pintar la lista
+  };
+
+  const cablearChipDev = () => {
+    const c = chip();
+    if (!c || c._wired) return;
+    c._wired = true;
+    c.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (devAbierto) cerrarMenuDev(); else abrirMenuDev();
+    });
+    document.addEventListener('click', () => { if (devAbierto) cerrarMenuDev(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && devAbierto) cerrarMenuDev();
+    });
+    window.addEventListener('resize', () => { if (devAbierto) colocarMenuDev(); });
+  };
+
   // -------- Public --------
   const loadUser = async () => {
     try {
@@ -682,6 +935,7 @@
       window.PlayerCore.setUser(me.display_name || me.id, (me.images && me.images[0]) ? me.images[0].url : null);
       window.PlayerCore.setSpotifyConnected(true);
       showSearchBlock(true);
+      pintarChipAparato();   // conectado: el chip ya puede ofrecer elegir aparato
       if (window.LibraryModule) window.LibraryModule.onAuthChange(true);
       startPolling();
     } catch (e) {
@@ -711,6 +965,7 @@
 
   // -------- Handle redirect with ?code=... --------
   const init = async () => {
+    cablearChipDev();
     const url = new URL(window.location.href);
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
@@ -737,6 +992,12 @@
     connect, api, search: doSearch, playTrack, playContext, isLoggedIn,
     togglePlay: spTogglePlay, next: spNext, prev: spPrev, seek: spSeek,
     setVolume: spSetVolume,
+    setShuffle: spSetShuffle, setRepeat: spSetRepeat,
+    queue: spQueue,
+    // Último estado conocido del aparato y los modos (lo refresca el sondeo)
+    device: () => lastDevice,
+    shuffle: () => lastShuffle,
+    repeat: () => lastRepeat,
     /* Posición interpolada: el mismo reloj que mueve la barra y la letra
        entre poll y poll. Sin esto, quien preguntara por el minuto actual con
        Spotify Connect recibiría el 0 del <audio> local, que está parado. */

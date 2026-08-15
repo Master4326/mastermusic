@@ -1941,6 +1941,102 @@ body.playing .status-bar .filler {
   50% { opacity: 0.25; }
 }
 
+/* ---------- Chip «dónde suena» + menú de dispositivos ----------
+   Con Spotify Connect la música NO sale de este aparato, y la app nunca lo
+   decía: es lo que explica que la barra avance y no se oiga nada aquí. */
+.dev-chip {
+  flex-shrink: 0;
+  max-width: 40%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 2px solid var(--border-pixel);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.86em;
+  padding: 1px 7px;
+  cursor: pointer;
+  min-height: 22px;
+  transition: color .15s ease, border-color .15s ease;
+}
+.dev-chip:hover,
+.dev-chip[aria-expanded="true"] {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+.dev-chip .dev-ico { color: var(--accent); flex-shrink: 0; }
+.dev-chip #devName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Aparato que Spotify no deja gobernar desde fuera */
+.dev-chip.dev-restringido .dev-ico { color: var(--text-muted); }
+
+/* El menú es hijo de <body> (lo cuelga spotify.js): así ningún ancestro con
+   `transform` puede robarle el anclaje del position:fixed — la trampa que ya
+   mordió cinco veces en este proyecto — ni lo recorta el overflow de nadie. */
+.dev-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 210px;
+  max-width: min(320px, 92vw);
+  max-height: 46vh;
+  overflow-y: auto;
+  background: var(--bg-panel-2);
+  border: 2px solid var(--border-light);
+  box-shadow: inset 1px 1px 0 var(--border-hi), 0 6px 22px rgba(0, 0, 0, 0.55);
+  padding: 4px;
+}
+.dev-menu[hidden] { display: none; }
+.dev-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9em;
+  text-align: left;
+  padding: 7px 8px;
+  min-height: 38px;              /* objetivo de toque en móvil */
+  cursor: pointer;
+}
+.dev-item:hover:not(:disabled),
+.dev-item:focus-visible { background: var(--bg-frame); color: var(--accent); }
+.dev-item:disabled { color: var(--text-muted); cursor: not-allowed; }
+.dev-item.activo { color: var(--accent); }
+.dev-item-ico { flex-shrink: 0; color: var(--text-dim); }
+.dev-item.activo .dev-item-ico { color: var(--accent); }
+.dev-item-nom {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dev-item-marca {
+  flex-shrink: 0;
+  font-size: 0.78em;
+  color: var(--text-muted);
+  letter-spacing: .06em;
+}
+.dev-vacio {
+  padding: 12px 10px;
+  color: var(--text-muted);
+  font-size: 0.86em;
+  text-align: center;
+  line-height: 1.5;
+}
+.dev-vacio span {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-dim);
+  font-size: 0.92em;
+}
+
 /* ==========================================================
    MODO CINE — letra gigante sobre la carátula (opcional)
    ========================================================== */
@@ -3092,6 +3188,31 @@ body.vinyl-mode .cover-inner::after {
   color: var(--bg-deep);
   box-shadow: 0 0 8px var(--accent-glow);
 }
+
+/* ＋ encolar: mismo cuerpo que el ▶ pero apagado, porque es la acción
+   secundaria — el ▶ manda. Se enciende al pasar por encima de la fila para
+   que no sea una hilera de botones compitiendo por la mirada. */
+.sp-queue {
+  flex-shrink: 0;
+  background: transparent;
+  border: 2px solid var(--border-pixel);
+  color: var(--text-muted);
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity .15s ease, color .15s ease, background .15s ease;
+}
+.sp-result:hover .sp-queue,
+.sp-result:focus-within .sp-queue { opacity: 1; }
+.sp-queue:hover {
+  background: var(--accent);
+  color: var(--bg-deep);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+/* En táctil no hay hover: si se queda invisible, no existe */
+body.perf-tactil .sp-queue { opacity: 1; }
 .sp-empty {
   list-style: none;
   text-align: center;
@@ -3447,8 +3568,12 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
 /* ==========================================================
    PULIDO VISUAL
    ========================================================== */
-/* Fundido del color de acento al cambiar de canción.
-   @property hace que un custom property de color sea animable. */
+/* Fundido de TODA la paleta al cambiar de canción.
+   @property hace que un custom property de color sea animable; sin esto el
+   navegador trata la variable como texto y el color salta de golpe. Antes solo
+   estaban registrados el acento y su brillo, así que la letra activa se fundía
+   con elegancia mientras el fondo y los paneles pegaban un corte seco debajo.
+   Ahora viajan juntos: fondo, paneles, bordes, acento y texto. */
 @property --accent {
   syntax: '<color>';
   inherits: true;
@@ -3459,8 +3584,29 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
   inherits: true;
   initial-value: #5ce1e6;
 }
+@property --accent-dim  { syntax: '<color>'; inherits: true; initial-value: #3a8b8e; }
+@property --dyn-1       { syntax: '<color>'; inherits: true; initial-value: #1a1f4a; }
+@property --dyn-2       { syntax: '<color>'; inherits: true; initial-value: #0a0e2e; }
+@property --bg-window   { syntax: '<color>'; inherits: true; initial-value: #1a1f4a; }
+@property --bg-panel    { syntax: '<color>'; inherits: true; initial-value: #161a3e; }
+@property --bg-panel-2  { syntax: '<color>'; inherits: true; initial-value: #0f1330; }
+@property --bg-frame    { syntax: '<color>'; inherits: true; initial-value: #2a2f5e; }
+@property --text        { syntax: '<color>'; inherits: true; initial-value: #e8ecff; }
+@property --text-dim    { syntax: '<color>'; inherits: true; initial-value: #8b94d8; }
+@property --text-muted  { syntax: '<color>'; inherits: true; initial-value: #5a648f; }
+
 :root {
-  transition: --accent .45s ease, --accent-glow .45s ease;
+  transition:
+    --accent .45s ease, --accent-glow .45s ease, --accent-dim .45s ease,
+    --dyn-1 .7s ease, --dyn-2 .7s ease,
+    --bg-window .7s ease, --bg-panel .7s ease,
+    --bg-panel-2 .7s ease, --bg-frame .7s ease,
+    --text .45s ease, --text-dim .45s ease, --text-muted .45s ease;
+}
+/* Con «menos movimiento» los colores entran de golpe, sin transición */
+:root:has(body.reduce-motion) { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  :root { transition: none; }
 }
 
 /* Entrada suave al cambiar de pestaña */

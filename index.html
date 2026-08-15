@@ -296,22 +296,6 @@
               «automático» sigue la preferencia de tu sistema. «menos» detiene scanlines,
               notas flotantes, vinilo y destellos — la letra sigue funcionando igual.
             </p>
-            <div class="set-row">
-              <span class="set-hint" style="margin:0;min-width:74px">micrófono</span>
-              <div class="seg" data-set="mic">
-                <button class="seg-btn" data-val="off">apagado</button>
-                <button class="seg-btn" data-val="on">permitir</button>
-              </div>
-            </div>
-            <p class="set-hint">
-              En el celular, el espectro puede seguir la música escuchándola por el
-              micrófono. <b>Ojo:</b> mientras el micrófono está abierto, Android y iPhone
-              ponen todo el audio en modo llamada y <b>la música se oye más bajita</b>.
-              Eso lo hace el sistema y no se puede evitar desde una página web.
-              Solo compensa si la música suena en <b>otro aparato</b> (un parlante, la tele):
-              ahí el bajón no te afecta y el micrófono capta graves de verdad.
-              El sonido se analiza al vuelo: no se graba ni se envía a ningún sitio.
-            </p>
           </div>
 
           <div class="settings-block">
@@ -332,7 +316,7 @@
               <button class="retro-btn small" id="offsetMinus" title="Atrasar 0.25s">−</button>
               <input type="range" id="offsetSlider" min="-5" max="5" step="0.05" value="0" />
               <button class="retro-btn small" id="offsetPlus" title="Adelantar 0.25s">+</button>
-              <span class="offset-val" id="offsetValue">+0.00s</span>
+            <span class="offsnoet-val" id="offsetValue">+0.00s</span>
               <button class="retro-btn small" id="offsetReset" title="Volver a cero">0</button>
             </div>
           </div>
@@ -440,6 +424,10 @@
               <kbd>B</kbd><span>biblioteca</span>
               <kbd>Q</kbd><span>cola</span>
               <kbd>S</kbd><span>configuración</span>
+              <kbd>P</kbd><span>tarjeta para compartir</span>
+              <kbd>N</kbd><span>mini flotante (siempre encima)</span>
+              <kbd>R</kbd><span>grabar el edit en video</span>
+              <kbd>T</kbd><span>temporizador de sueño</span>
               <kbd>esc</kbd><span>cerrar panel / salir del modo cine</span>
             </div>
           </div>
@@ -530,16 +518,10 @@
               </g>
             </svg>
           </button>
-          <!-- Aquí hubo un ❤ para guardar en "Tus me gusta". Retirado: la API
-               responde 403 Forbidden a las apps en modo desarrollo aunque el
-               permiso esté concedido, así que el botón no podía funcionar. -->
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" title="Modo edit (letra animada)">✦</button>
           <!-- ⚗ Lab de efectos DESACTIVADO por ahora (quitar "hidden" para reactivar; el código en lyrics.js queda intacto) -->
           <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn" title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
           <button class="ctrl-btn vol-btn side-btn" id="cinemaBtn" title="Modo cine: letra animada + carátula girando (Esc para salir)">⛶</button>
-          <!-- Aquí vivió un menú ⋯ con tarjeta para compartir / mini flotante /
-               grabar / temporizador. Retirado a petición del usuario: la barra
-               se queda con volumen, ✦ y ⛶. No reintroducir. -->
         </div>
       </div>
     </div>
@@ -551,6 +533,13 @@
         <span id="statusText" role="status" aria-live="polite">▣ listo</span>
       </span>
       <span class="filler" aria-hidden="true"></span>
+      <!-- Dónde suena. Sale solo con Spotify Connect; el menú lo monta
+           spotify.js colgado del <body> (ver el comentario de allí). -->
+      <button class="dev-chip" id="devChip" hidden
+        aria-haspopup="true" aria-expanded="false"
+        title="Elegir en qué dispositivo suena">
+        <span class="dev-ico" aria-hidden="true">◎</span><span id="devName"></span>
+      </button>
       <span id="clock">--:--</span>
     </div>
   </div>
@@ -648,9 +637,6 @@
   <!-- Todos con defer: el navegador pinta la ventana ANTES de ejecutar
        ~230 KB de JS, y defer conserva este orden exacto de ejecución
        (que sí importa: beat.js depende del visualizador, ambient.js de beat). -->
-  <!-- perf.js va PRIMERO: decide la carga (cuántos elementos, cuántos fps,
-       resolución del canvas) y todos los demás módulos lo consultan. -->
-  <script defer src="js/perf.js"></script>
   <script defer src="js/vendor/jsmediatags.min.js"></script>
   <script defer src="js/db.js"></script>
   <script defer src="js/lyrics.js"></script>
@@ -668,7 +654,8 @@
   <script defer src="js/ambient.js"></script>
   <!-- escena de las canciones sin letra: solo pinta, lee beat.js igual que ambient -->
   <script defer src="js/ncs.js"></script>
-  <!-- Carátula y mandos en el sistema (overlay de Windows, auriculares). -->
+  <!-- Carátula y mandos en el sistema (overlay de Windows, pantalla de
+       bloqueo, auriculares). Es lo único que quedó de la tanda 8. -->
   <script defer src="js/mediasession.js"></script>
 
   <!-- Registro del Service Worker (solo bajo http/https, no file://) -->
