@@ -4021,14 +4021,6 @@ body.playing .ncs-brillo { animation-play-state: running; }
   color: var(--accent);
   opacity: 0.9;
 }
-.ncs-nota {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
-  color: var(--text-muted);
-  max-width: 48ch;
-}
-.ncs-nota::before { content: '▸ '; color: var(--accent-dim); }
-
 /* «menos movimiento»: la escena SIGUE (es contenido, no adorno), pero
    quieta. El anillo de progreso se queda: es información. */
 body.reduce-motion .lyrics-ncs { animation: none; }

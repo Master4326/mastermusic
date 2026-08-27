@@ -27,7 +27,6 @@
   const prog = document.getElementById('ncsProg');
   const tituloEl = document.getElementById('ncsTitulo');
   const artistaEl = document.getElementById('ncsArtista');
-  const notaEl = document.getElementById('ncsNota');
   const tabLyrics = document.getElementById('tab-lyrics');
   const mainFill = document.getElementById('progressFill');
 
@@ -109,21 +108,6 @@
     return (parseFloat(mainFill.style.width) || 0) / 100;
   };
 
-  /* ---------- El aviso de abajo ----------
-     Con Spotify Connect el audio no pasa por el navegador: no hay nada
-     que analizar y el espectro sería un adorno mudo. En ese caso la nota
-     dice cómo engancharlo (◈) en vez de callarse — un panel que se mueve
-     sin venir a cuento parece roto. */
-  const TXT_VIVO = 'sin letra para esta canción · el espectro va con la música';
-  const TXT_MUDO = 'sin letra para esta canción · pulsa ◈ para engancharlo al audio';
-  let notaPuesta = '';
-  const revisarNota = (vivo) => {
-    const txt = vivo ? TXT_VIVO : TXT_MUDO;
-    if (txt === notaPuesta) return;
-    notaPuesta = txt;
-    if (notaEl) notaEl.textContent = txt;
-  };
-
   /* ---------- Bucle ----------
      Uno solo, y solo mientras la escena está a la vista: en otra pestaña
      de la app, en segundo plano o con la escena apagada no gasta frames. */
@@ -149,9 +133,6 @@
     if (cuenta++ % 30 === 0) revisarPista();
 
     const viz = window.VisualizerModule;
-    const vivo = !!(viz && viz.isConnected && viz.isConnected());
-    if (cuenta % 30 === 1) revisarNota(vivo);
-
     const M = window.BeatModule;
     const m = M && M.get ? M.get() : null;
 
