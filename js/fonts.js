@@ -52,6 +52,29 @@
       alto: 1.65, peso: 400, activo: 700, track: '0.02em', mayus: false, ajuste: 1,
     },
     {
+      /* ESTILO SUPER MARIO BROS. La tipografía de los juegos es de Nintendo y
+         no se puede redistribuir. Press Start 2P es la 8-bit de NES por
+         excelencia — la misma pinta que el texto dentro del juego — y encima
+         YA viene en el <head> de index.html (la usan los títulos de la
+         interfaz), así que esta opción no descarga ni un byte extra.
+         El remate lo pone el CSS: el contorno negro grueso de los carteles
+         de la época (busca data-lyrics-font). */
+      id: 'mario', nombre: 'Press Start · estilo Mario',
+      css: "'Press Start 2P', 'VT323', monospace",
+      google: null,
+      alto: 2.1, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 0.92,
+    },
+    {
+      /* ESTILO HALO. La del juego es de Microsoft/343 y tampoco se puede
+         redistribuir. Orbitron es la geométrica de ciencia ficción más
+         reconocible con licencia libre; en MAYÚSCULAS y con el interletraje
+         abierto da el aire militar-espacial de los rótulos de Halo. */
+      id: 'halo', nombre: 'Orbitron · estilo Halo',
+      css: "'Orbitron', 'Michroma', 'Segoe UI', sans-serif",
+      google: 'Orbitron:wght@500;700;900',
+      alto: 1.7, peso: 500, activo: 900, track: '0.08em', mayus: true, ajuste: 1,
+    },
+    {
       id: 'retro', nombre: 'VT323 (la de siempre)',
       css: "'VT323', 'Share Tech Mono', monospace",
       google: null,

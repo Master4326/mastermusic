@@ -990,6 +990,44 @@ body.perf-tactil .tab-bar.se-esconde::after {
   -webkit-font-smoothing: none;
 }
 
+/* ---------- ESTILO SUPER MARIO BROS (Press Start 2P) ----------
+   Los carteles y rótulos de aquellos juegos llevaban SIEMPRE un contorno
+   negro grueso alrededor de cada letra: es lo que las despegaba de fondos
+   con nubes y ladrillos. Se hace con cuatro sombras duras a los cuatro
+   lados (no hay `text-stroke` fiable en todos los navegadores) y se le deja
+   un resplandor por detrás para que siga siendo esta app y no un emulador. */
+:root[data-lyrics-font="mario"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-font="mario"] .lyrics-body .lyric-line.active .w-big {
+  text-shadow:
+    0 0 14px var(--accent-glow),
+    -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000,
+    3px 3px 0 rgba(0, 0, 0, 0.9);
+}
+:root[data-lyrics-font="mario"] .lyrics-body .lyric-line,
+:root[data-lyrics-font="mario"] .lyrics-edit {
+  -webkit-font-smoothing: none;
+}
+
+/* ---------- ESTILO HALO (Orbitron) ----------
+   Los rótulos de Halo son mayúsculas anchas y frías, con el brillo pegado a
+   la letra en vez de derramado. Se cambia el halo suelto de la app por un
+   doble contorno corto: se lee metálico, no de neón. Las MAYÚSCULAS y el
+   interletraje abierto los pide la propia fuente en el catálogo. */
+:root[data-lyrics-font="halo"] .lyrics-body .lyric-line.active {
+  text-shadow:
+    0 0 2px var(--accent),
+    0 0 12px var(--accent-glow),
+    0 2px 0 rgba(0, 0, 0, 0.75);
+}
+:root[data-lyrics-font="halo"] .lyrics-body .lyric-line.active .w-big {
+  font-style: normal;            /* la cursiva de la palabra destacada tuerce
+                                    una fuente geométrica: aquí sobra */
+  text-shadow:
+    0 0 2px var(--accent),
+    0 0 22px var(--accent-glow),
+    0 2px 0 rgba(0, 0, 0, 0.75);
+}
+
 /* palabra destacada: más grande y en cursiva, como pal-grande del regalo */
 .lyrics-body .lyric-line.active .w-big {
   font-size: 1.18em;
