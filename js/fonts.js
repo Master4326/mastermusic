@@ -65,12 +65,25 @@
       alto: 2.1, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 0.92,
     },
     {
-      /* ESTILO HALO. La del juego es de Microsoft/343 y tampoco se puede
-         redistribuir. Orbitron es la geométrica de ciencia ficción más
-         reconocible con licencia libre; en MAYÚSCULAS y con el interletraje
-         abierto da el aire militar-espacial de los rótulos de Halo. */
+      /* ESTILO HALO · dos caminos en una sola lista.
+
+         1) Si en ESTE ordenador está instalada una fuente que se llame
+            «Halo» (la de fan de Will Turnbow, por ejemplo), el navegador la
+            usa y se ve la de verdad. No hace falta nada más: basta con
+            instalarla en el sistema como cualquier otra.
+         2) Si no está, cae en Orbitron, que se descarga de Google.
+
+         Por qué no va el archivo dentro del proyecto: la fuente del juego es
+         de Microsoft/343, y la versión de fan que circula solo trae un
+         «gratis» suelto, sin términos. Publicarla en la página sería
+         redistribuirla e incrustarla, y para eso no hay permiso. Instalada en
+         tu equipo es otra cosa: ahí no se distribuye nada.
+
+         Consecuencia práctica: tú la verás en el PC donde la instales; en el
+         móvil y para cualquier otra persona sale Orbitron. Es lo correcto y
+         además es lo que hace que la página siga siendo publicable. */
       id: 'halo', nombre: 'Halo',
-      css: "'Orbitron', 'Michroma', 'Segoe UI', sans-serif",
+      css: "'Halo', 'Halo 4', 'Orbitron', 'Michroma', 'Segoe UI', sans-serif",
       google: 'Orbitron:wght@500;700;900',
       alto: 1.7, peso: 500, activo: 900, track: '0.08em', mayus: true, ajuste: 1,
     },

@@ -248,6 +248,20 @@
 
   // null = no está en caché; { notFound:true } = cacheado como "sin letra";
   // si no, un objeto con la misma forma que devuelve LRClib.
+  /* Versión de lo que guarda la caché. Sube este número cuando un arreglo
+     cambie QUÉ letra se elige: si no, quien ya tuviera la canción guardada
+     seguiría viendo el resultado viejo para siempre y parecería que el
+     arreglo no funciona.
+
+     v2 (2026-09-07): hasta aquí, si la ficha exacta de LRClib solo traía
+     texto plano la app se quedaba con ella sin mirar la búsqueda, donde a
+     menudo SÍ había una versión con tiempos. Las entradas guardadas por ese
+     código tienen texto plano y nada más, y no hay forma de distinguir «esta
+     canción no tiene sincronía» de «se eligió mal». Así que las que no traen
+     tiempos y son de antes de v2 se vuelven a pedir UNA vez; luego se guardan
+     ya marcadas y no se repite la consulta. */
+  const CACHE_V = 2;
+
   const cacheGet = (key) => {
     const e = cache[key];
     if (!e) return null;
@@ -255,13 +269,14 @@
       if (Date.now() - (e.ts || 0) > NF_TTL) { delete cache[key]; return null; }
       return { notFound: true };
     }
+    if (!e.s && e.v !== CACHE_V) { delete cache[key]; return null; }   // ver CACHE_V
     e.ts = Date.now();   // toque LRU; se persiste en el próximo cacheSave
     return { syncedLyrics: e.s || null, plainLyrics: e.p || null };
   };
 
   const cachePut = (key, data) => {
     cache[key] = data
-      ? { s: data.syncedLyrics || '', p: data.plainLyrics || '', ts: Date.now() }
+      ? { s: data.syncedLyrics || '', p: data.plainLyrics || '', ts: Date.now(), v: CACHE_V }
       : { nf: 1, ts: Date.now() };
     const keys = Object.keys(cache);
     if (keys.length > CACHE_MAX) {
@@ -302,10 +317,24 @@
     searchP.catch(() => {});   // evita unhandledrejection si el exacto gana
 
     let lyricsData = null;
+    let planB = null;     // el exacto SIN tiempos: sirve solo si no hay nada mejor
     let getErr = null;
     try {
       const got = await getP;
-      lyricsData = (got && got.data) ? got.data : null;
+      const d = (got && got.data) ? got.data : null;
+      /* SOLO nos quedamos con el resultado exacto si trae TIEMPOS (o si es un
+         instrumental, que entonces no hay nada que sincronizar).
+
+         Aquí estaba el fallo: LRClib tiene varias fichas por canción y la que
+         casa exacta con álbum y duración puede ser una que solo guarda el
+         texto plano. La app la aceptaba y se paraba ahí, sin llegar a mirar
+         la búsqueda — y salía «esta letra no está sincronizada» aunque LRClib
+         SÍ tuviera la letra con tiempos.
+         Caso real (San Lucas, de Kevin Kaarl): el exacto devuelve una ficha
+         sin sincronía, y la búsqueda trae 17 versiones CON sincronía, una de
+         ellas con la misma duración clavada. */
+      if (d && (d.syncedLyrics || d.instrumental)) lyricsData = d;
+      else planB = d;
     } catch (e) {
       if (e && e.name === 'AbortError') throw e;
       getErr = e;   // el exacto falló de red; aún puede salvarnos la búsqueda
@@ -317,7 +346,8 @@
         s = await searchP;
       } catch (e) {
         if (e && e.name === 'AbortError') throw e;
-        throw getErr || e;   // ambas fallaron → que lo maneje el reintento
+        if (planB) return planB;   // sin búsqueda, mejor el plano que nada
+        throw getErr || e;         // ambas fallaron → que lo maneje el reintento
       }
       const arr = s && s.data;
       if (Array.isArray(arr) && arr.length) {
@@ -335,12 +365,23 @@
           }
           return best;
         };
-        lyricsData = masCercano(arr.filter(x => x.syncedLyrics))
+        const conTiempos = masCercano(arr.filter(x => x.syncedLyrics));
+        /* Si el exacto ya nos dio la letra (aunque sea plana) y lo único
+           sincronizado que hay dura MUY distinto, es otra versión: sus tiempos
+           irían corridos toda la canción y se leería peor que sin ellos. En
+           ese caso se queda el exacto. Con 30 s de margen esto casi nunca
+           salta — las duraciones de LRClib suelen ir clavadas — pero evita
+           pegarle a una canción los tiempos de un remix. */
+        const lejos = conTiempos && planB && dur
+          && Math.abs((+conTiempos.duration || 0) - dur) > 30;
+
+        lyricsData = (conTiempos && !lejos ? conTiempos : null)
+          || planB                                    // el exacto, aunque sea plano
           || masCercano(arr.filter(x => x.plainLyrics))
           || arr[0];
       }
     }
-    return lyricsData || null;
+    return lyricsData || planB || null;
   };
 
   // Precarga en caché la letra de la SIGUIENTE canción de la cola local,
