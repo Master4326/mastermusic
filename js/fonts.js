@@ -46,7 +46,7 @@
          parecida que hay con licencia libre. Lo que remata el parecido no son
          las letras sino la SOMBRA DURA en diagonal que el juego dibuja detrás
          del texto: eso se lo pone el CSS (busca data-lyrics-font). */
-      id: 'pixel', nombre: 'Pixelify · estilo Minecraft',
+      id: 'pixel', nombre: 'Minecraft',
       css: "'Pixelify Sans', 'VT323', monospace",
       google: 'Pixelify+Sans:wght@400;700',
       alto: 1.65, peso: 400, activo: 700, track: '0.02em', mayus: false, ajuste: 1,
@@ -59,7 +59,7 @@
          interfaz), así que esta opción no descarga ni un byte extra.
          El remate lo pone el CSS: el contorno negro grueso de los carteles
          de la época (busca data-lyrics-font). */
-      id: 'mario', nombre: 'Press Start · estilo Mario',
+      id: 'mario', nombre: 'Mario Bros',
       css: "'Press Start 2P', 'VT323', monospace",
       google: null,
       alto: 2.1, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 0.92,
@@ -69,7 +69,7 @@
          redistribuir. Orbitron es la geométrica de ciencia ficción más
          reconocible con licencia libre; en MAYÚSCULAS y con el interletraje
          abierto da el aire militar-espacial de los rótulos de Halo. */
-      id: 'halo', nombre: 'Orbitron · estilo Halo',
+      id: 'halo', nombre: 'Halo',
       css: "'Orbitron', 'Michroma', 'Segoe UI', sans-serif",
       google: 'Orbitron:wght@500;700;900',
       alto: 1.7, peso: 500, activo: 900, track: '0.08em', mayus: true, ajuste: 1,
