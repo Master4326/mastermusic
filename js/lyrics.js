@@ -2058,6 +2058,16 @@
        no tenga que re-deducir la regla al cerrarse: la condición (reposo,
        escena NCS, modo elegido) vive en un solo sitio. */
     refreshMode: () => applyMode(),
+    /* Vuelve a pintar la línea de ahora sin tocar el modo. Lo llama
+       js/fonts.js al terminar de bajar una tipografía: el modo edit calcula
+       sus tamaños MIDIENDO el texto, y lo que midió con la fuente de reserva
+       ya no vale. Si no suena nada no hace falta: lo pintará el próximo tick. */
+    repintar: () => {
+      lyricsEdit.innerHTML = '';
+      activeIdx = -2;
+      const audio = window.PlayerCore && window.PlayerCore.audio;
+      if (audio && parsedLines.length) tick(audio.currentTime);
+    },
     // El modo cine fuerza el render tipo edit sin cambiar la preferencia
     forceEdit: (on) => {
       forceEdit = !!on;

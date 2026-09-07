@@ -248,35 +248,38 @@
         </div>
 
         <!-- SETTINGS TAB -->
+        <!-- ==========================================================
+             AJUSTES · SOLO LAS OPCIONES.
+             Cada fila es: una etiqueta corta (.set-label) + su control.
+             Nada de párrafos explicando lo que ya dice el propio botón —
+             lo que de verdad haga falta aclarar va en su `title`, que
+             sale al posar el ratón y no ocupa sitio.
+             ========================================================== -->
         <div class="tab-content" id="tab-settings">
           <div class="settings-block">
             <h3>~ spotify ~</h3>
             <div class="library-actions">
               <!-- input oculto: el drag&drop de archivos sigue funcionando -->
               <input type="file" id="fileInput" accept="audio/*" multiple hidden />
-              <button class="retro-btn" id="spotifyConnectBtn">
+              <button class="retro-btn" id="spotifyConnectBtn"
+                      title="Si el corazón ♥ dice que no tiene permiso, desconecta y vuelve a conectar.">
                 <span class="bracket">[</span> conectar spotify <span class="bracket">]</span>
               </button>
             </div>
-            <p class="set-hint">
-              el corazón ♥ de la barra guarda la canción en <b>tus me gusta</b>.
-              si te dice que no tiene permiso, desconecta y vuelve a conectar:
-              tu sesión es anterior al permiso que hace falta para escribir.
-            </p>
           </div>
 
           <div class="settings-block">
             <h3>~ apariencia ~</h3>
-            <div class="set-row" style="margin-bottom:10px">
-              <span class="set-hint" style="margin:0;min-width:74px">pantalla crt</span>
+            <div class="set-row">
+              <span class="set-label">pantalla crt</span>
               <div class="seg" data-set="crt">
                 <button class="seg-btn" data-val="full">completo</button>
                 <button class="seg-btn" data-val="soft">sutil</button>
                 <button class="seg-btn" data-val="off">apagado</button>
               </div>
             </div>
-            <div class="set-row" style="margin-bottom:10px">
-              <span class="set-hint" style="margin:0;min-width:74px">listas</span>
+            <div class="set-row">
+              <span class="set-label">listas</span>
               <div class="seg" data-set="rows">
                 <button class="seg-btn" data-val="compact">compactas</button>
                 <button class="seg-btn" data-val="normal">normal</button>
@@ -284,23 +287,20 @@
               </div>
             </div>
             <div class="set-row">
-              <span class="set-hint" style="margin:0;min-width:74px">movimiento</span>
-              <div class="seg" data-set="motion">
+              <span class="set-label">movimiento</span>
+              <div class="seg" data-set="motion"
+                   title="«menos» detiene scanlines, notas flotantes, vinilo y destellos. La letra sigue igual.">
                 <button class="seg-btn" data-val="auto">automático</button>
                 <button class="seg-btn" data-val="full">completo</button>
                 <button class="seg-btn" data-val="less">menos</button>
               </div>
             </div>
-            <p class="set-hint" id="motionHint">
-              «automático» sigue la preferencia de tu sistema. «menos» detiene scanlines,
-              notas flotantes, vinilo y destellos — la letra sigue funcionando igual.
-            </p>
           </div>
 
           <div class="settings-block">
             <h3>~ letras ~</h3>
-            <div class="set-row" style="margin-bottom:10px">
-              <span class="set-hint" style="margin:0;min-width:74px">tamaño</span>
+            <div class="set-row">
+              <span class="set-label">tamaño</span>
               <div class="seg" data-set="lyrics">
                 <button class="seg-btn" data-val="s">S</button>
                 <button class="seg-btn" data-val="m">M</button>
@@ -308,83 +308,96 @@
                 <button class="seg-btn" data-val="xl">XL</button>
               </div>
             </div>
-            <span class="set-hint" style="display:block;margin-bottom:4px">
-              desfase de sincronía — se guarda por canción
-            </span>
+            <!-- TIPOGRAFÍA · los botones los pinta js/fonts.js, cada uno en su
+                 propia fuente. Añadir una fuente se hace allí, en CATALOGO. -->
+            <span class="set-label solo">tipografía</span>
+            <div class="font-picker" id="fontPicker"></div>
+            <div class="font-preview" id="fontPreview" aria-hidden="true">
+              <span class="fp-past">y aunque no estés</span>
+              <span class="fp-now">te sigo cantando igual</span>
+              <span class="fp-next">como la primera vez</span>
+            </div>
+            <span class="set-label solo" title="Adelanta o atrasa la letra. Se guarda por canción.">sincronía</span>
             <div class="offset-ctl">
               <button class="retro-btn small" id="offsetMinus" title="Atrasar 0.25s">−</button>
               <input type="range" id="offsetSlider" min="-5" max="5" step="0.05" value="0" />
               <button class="retro-btn small" id="offsetPlus" title="Adelantar 0.25s">+</button>
-            <span class="offsnoet-val" id="offsetValue">+0.00s</span>
+              <span class="offset-val" id="offsetValue">+0.00s</span>
               <button class="retro-btn small" id="offsetReset" title="Volver a cero">0</button>
             </div>
           </div>
 
+          <!-- Los tres colores estaban en tres bloques sueltos con el botón de
+               restablecer en un cuarto. Aquí van juntos: es UNA cosa. -->
           <div class="settings-block">
-            <h3>~ color de acento ~</h3>
-            <div class="color-swatches">
-              <button class="swatch swatch-auto" id="accentAuto" title="auto (color de la carátula de cada canción)">A</button>
-              <button class="swatch" data-color="cyan" style="--c:#5ce1e6"></button>
-              <button class="swatch" data-color="green" style="--c:#22ff77"></button>
-              <button class="swatch" data-color="pink" style="--c:#ff77c8"></button>
-              <button class="swatch" data-color="orange" style="--c:#ff9b5c"></button>
-              <button class="swatch" data-color="purple" style="--c:#b58cff"></button>
-              <button class="swatch" data-color="red" style="--c:#ff5c5c"></button>
-              <button class="swatch" data-color="yellow" style="--c:#ffe45c"></button>
-              <button class="swatch" data-color="white" style="--c:#ffffff"></button>
-              <label class="swatch custom-swatch" title="elige cualquier color">
-                <span class="custom-label">+</span>
-                <input type="color" id="customAccent" value="#5ce1e6">
-              </label>
+            <h3>~ colores ~</h3>
+            <div class="set-row">
+              <span class="set-label">acento</span>
+              <div class="color-swatches">
+                <button class="swatch swatch-auto" id="accentAuto" title="auto (color de la carátula de cada canción)">A</button>
+                <button class="swatch" data-color="cyan" style="--c:#5ce1e6"></button>
+                <button class="swatch" data-color="green" style="--c:#22ff77"></button>
+                <button class="swatch" data-color="pink" style="--c:#ff77c8"></button>
+                <button class="swatch" data-color="orange" style="--c:#ff9b5c"></button>
+                <button class="swatch" data-color="purple" style="--c:#b58cff"></button>
+                <button class="swatch" data-color="red" style="--c:#ff5c5c"></button>
+                <button class="swatch" data-color="yellow" style="--c:#ffe45c"></button>
+                <button class="swatch" data-color="white" style="--c:#ffffff"></button>
+                <label class="swatch custom-swatch" title="elige cualquier color">
+                  <span class="custom-label">+</span>
+                  <input type="color" id="customAccent" value="#5ce1e6">
+                </label>
+              </div>
             </div>
-          </div>
 
-          <div class="settings-block">
-            <h3>~ fondo ~</h3>
-            <div class="bg-options">
-              <label class="radio-row"> 
-                <input type="radio" name="bgMode" value="auto" id="bgAuto" checked />
-                <span>auto (color de la carátula)</span>
-              </label>
-              <label class="radio-row">
-                <input type="radio" name="bgMode" value="manual" id="bgManual" />
-                <span>color manual ↓</span>
-              </label>
+            <div class="set-row">
+              <span class="set-label">fondo</span>
+              <div class="bg-options">
+                <label class="radio-row">
+                  <input type="radio" name="bgMode" value="auto" id="bgAuto" checked />
+                  <span>carátula</span>
+                </label>
+                <label class="radio-row">
+                  <input type="radio" name="bgMode" value="manual" id="bgManual" />
+                  <span>manual</span>
+                </label>
+              </div>
             </div>
-            <div class="color-swatches" style="margin-top:10px">
-              <button class="swatch bg-preset" data-bg="#000000" style="--c:#000000" title="negro"></button>
-              <button class="swatch bg-preset" data-bg="#0a0e2e" style="--c:#0a0e2e" title="azul noche"></button>
-              <button class="swatch bg-preset" data-bg="#1a0033" style="--c:#1a0033" title="púrpura oscuro"></button>
-              <button class="swatch bg-preset" data-bg="#330011" style="--c:#330011" title="vino"></button>
-              <button class="swatch bg-preset" data-bg="#003322" style="--c:#003322" title="verde profundo"></button>
-              <button class="swatch bg-preset" data-bg="#332200" style="--c:#332200" title="ámbar"></button>
-              <button class="swatch bg-preset" data-bg="#1a1a1a" style="--c:#1a1a1a" title="gris oscuro"></button>
-              <button class="swatch bg-preset" data-bg="#ffffff" style="--c:#ffffff" title="blanco"></button>
-              <label class="swatch custom-swatch" title="elige cualquier color de fondo">
-                <span class="custom-label">+</span>
-                <input type="color" id="customBg" value="#0a0e2e">
-              </label>
+            <div class="set-row">
+              <span class="set-label"></span>
+              <div class="color-swatches">
+                <button class="swatch bg-preset" data-bg="#000000" style="--c:#000000" title="negro"></button>
+                <button class="swatch bg-preset" data-bg="#0a0e2e" style="--c:#0a0e2e" title="azul noche"></button>
+                <button class="swatch bg-preset" data-bg="#1a0033" style="--c:#1a0033" title="púrpura oscuro"></button>
+                <button class="swatch bg-preset" data-bg="#330011" style="--c:#330011" title="vino"></button>
+                <button class="swatch bg-preset" data-bg="#003322" style="--c:#003322" title="verde profundo"></button>
+                <button class="swatch bg-preset" data-bg="#332200" style="--c:#332200" title="ámbar"></button>
+                <button class="swatch bg-preset" data-bg="#1a1a1a" style="--c:#1a1a1a" title="gris oscuro"></button>
+                <button class="swatch bg-preset" data-bg="#ffffff" style="--c:#ffffff" title="blanco"></button>
+                <label class="swatch custom-swatch" title="elige cualquier color de fondo">
+                  <span class="custom-label">+</span>
+                  <input type="color" id="customBg" value="#0a0e2e">
+                </label>
+              </div>
             </div>
-          </div>
 
-          <div class="settings-block">
-            <h3>~ color del texto / lyrics ~</h3>
-            <div class="color-swatches">
-              <button class="swatch text-preset" data-text="#e8ecff" style="--c:#e8ecff" title="blanco azulado"></button>
-              <button class="swatch text-preset" data-text="#ffffff" style="--c:#ffffff" title="blanco puro"></button>
-              <button class="swatch text-preset" data-text="#ffe45c" style="--c:#ffe45c" title="amarillo"></button>
-              <button class="swatch text-preset" data-text="#22ff77" style="--c:#22ff77" title="verde fósforo"></button>
-              <button class="swatch text-preset" data-text="#ff77c8" style="--c:#ff77c8" title="rosa"></button>
-              <button class="swatch text-preset" data-text="#000000" style="--c:#000000" title="negro"></button>
-              <label class="swatch custom-swatch" title="color de texto personalizado">
-                <span class="custom-label">+</span>
-                <input type="color" id="customText" value="#e8ecff">
-              </label>
+            <div class="set-row">
+              <span class="set-label">texto</span>
+              <div class="color-swatches">
+                <button class="swatch text-preset" data-text="#e8ecff" style="--c:#e8ecff" title="blanco azulado"></button>
+                <button class="swatch text-preset" data-text="#ffffff" style="--c:#ffffff" title="blanco puro"></button>
+                <button class="swatch text-preset" data-text="#ffe45c" style="--c:#ffe45c" title="amarillo"></button>
+                <button class="swatch text-preset" data-text="#22ff77" style="--c:#22ff77" title="verde fósforo"></button>
+                <button class="swatch text-preset" data-text="#ff77c8" style="--c:#ff77c8" title="rosa"></button>
+                <button class="swatch text-preset" data-text="#000000" style="--c:#000000" title="negro"></button>
+                <label class="swatch custom-swatch" title="color de texto personalizado">
+                  <span class="custom-label">+</span>
+                  <input type="color" id="customText" value="#e8ecff">
+                </label>
+              </div>
             </div>
-          </div>
 
-          <div class="settings-block">
-            <button class="retro-btn" id="resetColors">
+            <button class="retro-btn small" id="resetColors" style="margin-top:4px">
               <span class="bracket">[</span> restablecer colores <span class="bracket">]</span>
             </button>
           </div>
@@ -392,23 +405,24 @@
           <div class="settings-block">
             <h3>~ datos ~</h3>
             <div class="set-row">
-              <button class="retro-btn small" id="clearLyricsCache">
+              <button class="retro-btn small" id="clearLyricsCache"
+                      title="Las letras guardadas para no volver a pedírselas a LRClib, que tarda.">
                 <span class="bracket">[</span> limpiar caché de letras <span class="bracket">]</span>
               </button>
-              <span class="set-hint" style="margin:0" id="cacheSize">—</span>
+              <span class="set-label" id="cacheSize">—</span>
             </div>
-            <div class="set-row" style="margin-top:8px">
-              <button class="retro-btn small" id="clearLibrary">
+            <div class="set-row">
+              <button class="retro-btn small" id="clearLibrary"
+                      title="Solo la música que importaste tú. No toca nada de Spotify.">
                 <span class="bracket">[</span> borrar música importada <span class="bracket">]</span>
               </button>
-              <span class="set-hint" style="margin:0" id="librarySize">—</span>
+              <span class="set-label" id="librarySize">—</span>
             </div>
-            <p class="set-hint">
-              la caché de letras evita volver a pedirlas a LRClib (son lentas).
-              borrar la música importada no toca nada de spotify.
-            </p>
           </div>
 
+          <!-- Solo las teclas que EXISTEN de verdad. Las de compartir (P),
+               mini flotante (N), grabar (R) y temporizador (T) se fueron con
+               share/pip/rec/extras: seguían aquí anunciando nada. -->
           <div class="settings-block">
             <h3>~ atajos de teclado ~</h3>
             <div class="keys-grid">
@@ -419,15 +433,11 @@
               <kbd>M</kbd><span>silenciar</span>
               <kbd>1 … 5</kbd><span>cambiar de pestaña</span>
               <kbd>L</kbd><span>letras</span>
-              <kbd>F</kbd> <span>buscar en spotify</span>
+              <kbd>F</kbd><span>buscar en spotify</span>
               <kbd>B</kbd><span>biblioteca</span>
               <kbd>Q</kbd><span>cola</span>
               <kbd>S</kbd><span>configuración</span>
-              <kbd>P</kbd><span>tarjeta para compartir</span>
-              <kbd>N</kbd><span>mini flotante (siempre encima)</span>
-              <kbd>R</kbd><span>grabar el edit en video</span>
-              <kbd>T</kbd><span>temporizador de sueño</span>
-              <kbd>esc</kbd><span>cerrar panel / salir del modo cine</span>
+              <kbd>esc</kbd><span>salir del modo cine</span>
             </div>
           </div>
 
@@ -648,6 +658,9 @@
   <script defer src="js/beat.js"></script>
   <script defer src="js/seven.js"></script>
   <script defer src="js/settings.js"></script>
+  <!-- tipografía de la letra: va DESPUÉS de settings.js (comparte el bloque
+       de ajustes) y después de lyrics.js, a quien le pide el repintado -->
+  <script defer src="js/fonts.js"></script>
   <script defer src="js/cinema.js"></script>
   <script defer src="js/colors.js"></script>
   <script defer src="js/ambient.js"></script>

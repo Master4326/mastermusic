@@ -42,31 +42,12 @@
     const v = leer('motion');
     const menos = v === 'less' || (v === 'auto' && mqMotion.matches);
     body.classList.toggle('reduce-motion', menos);
-    pintarAvisoMovimiento(v, menos);
     return menos;
   };
-
-  /* El estado real tiene que verse. Si el sistema pide menos movimiento,
-     «automático» apaga scanlines y notas flotantes sin decir nada, y parece
-     que la app se ha roto. */
-  const pintarAvisoMovimiento = (v, menos) => {
-    const el = document.getElementById('motionHint');
-    if (!el) return;
-    const base = '«automático» sigue la preferencia de tu sistema. '
-      + '«menos» detiene scanlines, notas flotantes, vinilo y destellos '
-      + '— la letra sigue funcionando igual.';
-    let estado;
-    if (menos && v === 'auto') {
-      estado = '<b style="color:var(--accent)">ahora mismo: reducido</b>, porque tu sistema '
-        + 'tiene los efectos de animación desactivados. Pon <b>«completo»</b> si quieres '
-        + 'las notas flotantes y el ambiente igualmente.';
-    } else if (menos) {
-      estado = '<b style="color:var(--accent)">ahora mismo: reducido</b> (lo has elegido tú).';
-    } else {
-      estado = '<b style="color:var(--accent)">ahora mismo: completo</b>.';
-    }
-    el.innerHTML = estado + '<br>' + base;
-  };
+  /* Aquí vivía pintarAvisoMovimiento(), un párrafo que explicaba en qué estado
+     estaba «movimiento». Se fue con el resto de las explicaciones largas de
+     ajustes: lo que hace cada opción se ve al pulsarla, y el detalle está en
+     el `title` del grupo. */
 
   const aplicar = (id) => {
     const v = leer(id);

@@ -572,11 +572,16 @@ body.perf-tactil .tab-bar.se-esconde::after {
 /* ----- Lyrics — music-edit style: pop animation on active line ----- */
 .lyrics-body {
   font-size: 22px;
-  line-height: 1.9;                  /* extra breathing room for scaled active line */
+  /* La fuente de la letra la elige el usuario (ajustes → letras → tipografía).
+     Las variables las pone js/fonts.js; los valores de aquí son la de siempre,
+     para que la letra se lea igual aunque ese módulo no llegue a cargar. */
+  font-family: var(--lyrics-font, 'VT323', monospace);
+  font-weight: var(--lyrics-weight, normal);
+  line-height: var(--lyrics-line, 1.9);   /* aire para la línea activa, que crece */
+  text-transform: var(--lyrics-caps, none);
   color: var(--text-dim);
   padding: 8px 12px 8px 0;           /* small right padding so scaled text never touches edge */
   text-align: left;
-  font-weight: normal;
   overflow-x: hidden;                /* hard-clip any horizontal overflow */
   overflow-y: auto;
   position: relative;                /* make this the offsetParent so line.offsetTop
@@ -593,7 +598,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
     opacity 0.4s ease-out,
     filter 0.5s ease-out;
   cursor: pointer;
-  letter-spacing: 0.02em;
+  letter-spacing: var(--lyrics-tracking, 0.02em);
   transform-origin: left center;
   transform: scale(0.95);
   opacity: 0.55;
@@ -620,8 +625,8 @@ body.perf-tactil .tab-bar.se-esconde::after {
     2px 2px 0 rgba(0, 0, 0, 0.6);    /* faux bold stroke without changing layout */
   transform: scale(1.12);            /* moderate, fits in container even when long */
   opacity: 1;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: var(--lyrics-weight-on, 700);
+  letter-spacing: var(--lyrics-tracking, 0.02em);
   animation: lyric-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 3;
   /* La línea activa entra enfocada DE GOLPE: sin `filter` en la transición.
@@ -1031,7 +1036,13 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
   flex: 1;
   min-height: 0;             /* llena el panel igual que .lyrics-body */
   overflow: hidden;
-  /* misma fuente retro que la letra normal (VT323, heredada del body) */
+  /* La misma fuente que la letra normal, la que el usuario haya elegido.
+     Los efectos que SÍ dependen de una fuente concreta para verse bien
+     (ed-apila y ed-trozos, que imitan los edits de TikTok con la Nunito
+     gorda) la declaran ellos en edit-fx.css y mandan sobre esto. */
+  font-family: var(--lyrics-font, 'VT323', monospace);
+  font-weight: var(--lyrics-weight, normal);
+  text-transform: var(--lyrics-caps, none);
 }
 .lyrics-edit .lyrics-empty { padding: 0 24px; }
 
@@ -2567,8 +2578,10 @@ body.playing .cin-brillo { animation-play-state: running; }
   left: 0; right: 0;
   z-index: 1;
   text-align: center;
-  font-family: 'VT323', monospace;
-  font-size: clamp(15px, 1.9vw, 27px);
+  /* los versos de al lado son letra: van en la fuente de la letra */
+  font-family: var(--lyrics-font, 'VT323', monospace);
+  text-transform: var(--lyrics-caps, none);
+  font-size: calc(clamp(15px, 1.9vw, 27px) * var(--lyrics-font-scale, 1));
   color: var(--text-dim);
   opacity: 0;
   filter: blur(1.4px);
@@ -3493,7 +3506,12 @@ body.crt-off .crt { display: none; }
    TAMAÑO DE LETRA Y DENSIDAD DE LISTAS
    ========================================================== */
 :root { --lyrics-scale: 1; --row-pad: 6px; }
-.lyrics-body { font-size: calc(clamp(19px, 2.3cqw, 46px) * var(--lyrics-scale)); }
+/* --lyrics-font-scale lo mide js/fonts.js: iguala lo que se VE de cada
+   tipografía a lo que se veía con VT323, para que S/M/L/XL sigan queriendo
+   decir lo mismo con cualquier fuente. Sin ese módulo vale 1 y no estorba. */
+.lyrics-body {
+  font-size: calc(clamp(19px, 2.3cqw, 46px) * var(--lyrics-scale) * var(--lyrics-font-scale, 1));
+}
 .sp-result { padding: var(--row-pad) 8px; }
 body.rows-cozy .sp-thumb { width: 46px; height: 46px; }
 body.rows-compact .sp-thumb { width: 30px; height: 30px; }
@@ -3531,13 +3549,92 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
   margin-top: 6px;
   line-height: 1.5;
 }
+
+/* ==========================================================
+   AJUSTES: tipografía de la letra (js/fonts.js)
+   Cada botón se dibuja EN SU PROPIA FUENTE — es su muestra, no
+   hace falta explicar cómo es ninguna. Debajo, tres versos de
+   mentira enseñan cómo quedará el panel de verdad.
+   ========================================================== */
+.font-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.font-chip {
+  font-size: 18px;
+  line-height: 1.35;
+  padding: 3px 12px;
+  background: var(--bg-panel-2);
+  border: 2px solid var(--border-dark);
+  color: var(--text-dim);
+  cursor: pointer;
+  /* Las fuentes llegan de Google una por una: sin esto, cada botón daría un
+     brinco de ancho al cambiar de la de reserva a la suya. */
+  transition: color 0.2s ease-out, border-color 0.2s ease-out;
+}
+.font-chip:hover { color: var(--text); border-color: var(--border-pixel); }
+.font-chip.active {
+  color: var(--bg-deep);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.font-preview {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border: 2px solid var(--border-dark);
+  background: var(--bg-panel-2);
+  overflow: hidden;
+  font-family: var(--lyrics-font, 'VT323', monospace);
+  font-weight: var(--lyrics-weight, normal);
+  line-height: var(--lyrics-line, 1.9);
+  letter-spacing: var(--lyrics-tracking, 0.02em);
+  text-transform: var(--lyrics-caps, none);
+}
+.font-preview span { display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.fp-past, .fp-next {
+  font-size: calc(16px * var(--lyrics-font-scale, 1));
+  color: var(--text-muted);
+  opacity: 0.45;
+}
+.fp-past { filter: blur(1px); }
+.fp-next { filter: blur(0.5px); }
+.fp-now {
+  font-size: calc(24px * var(--lyrics-font-scale, 1));
+  font-weight: var(--lyrics-weight-on, 700);
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent-glow), 0 0 14px var(--accent-glow);
+}
+/* Etiqueta de una fila de ajustes. Antes las etiquetas usaban .set-hint — la
+   MISMA pinta que los párrafos de explicación — y no se distinguía el nombre
+   del ajuste de una nota al pie. Ahora la etiqueta se lee como etiqueta: más
+   grande, en la fuente de la interfaz, y todas alineadas a la misma columna. */
+.set-label {
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+  letter-spacing: 1px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  min-width: 92px;
+  flex-shrink: 0;
+}
+.set-label.solo {          /* la que va ENCIMA de su control, no al lado */
+  display: block;
+  min-width: 0;
+  margin: 12px 0 5px;
+}
 .set-row {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin-bottom: 8px;      /* antes lo ponía cada fila con un style="" a mano */
 }
+.set-row:last-child { margin-bottom: 0; }
 .set-row .retro-btn { flex-shrink: 0; }
+/* «carátula / manual» del fondo: en fila, al lado de su etiqueta */
+.bg-options { flex-direction: row; align-items: center; margin-bottom: 0; }
 
 /* Desfase de sincronía */
 .offset-ctl { display: flex; align-items: center; gap: 8px; }
