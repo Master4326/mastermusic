@@ -861,6 +861,135 @@ body.perf-tactil .tab-bar.se-esconde::after {
   72%  { transform: rotate(calc(var(--sx, 1) * 7deg)); }
   100% { opacity: 1; transform: rotate(0); }
 }
+/* ══════════ TANDA NUEVA DE EFECTOS ══════════
+   Mismas reglas que los doce de arriba:
+   · solo transform, opacity y filter — nada que dispare layout ni pintado,
+     que es justo lo que se acaba de quitar de toda la app;
+   · el ÚLTIMO `filter` de cada keyframe es `none`, nunca `blur(0)`: con
+     fill-mode "both" ese valor se queda puesto y un elemento con filtro se
+     pinta recortado a su caja, lo que cortaba el resplandor de .w-big;
+   · `--sx` es el signo alternante (-1/1) que reparte lyrics.js, para los
+     efectos que van a un lado y a otro.
+   ═════════════════════════════════════════════ */
+
+/* espejo: cada letra llega del revés y se voltea a su sitio */
+.lyric-line.fx-espejo { perspective: 600px; }
+.lyric-line.fx-espejo .w {
+  animation-name: w-espejo;
+  animation-duration: 0.5s;
+}
+@keyframes w-espejo {
+  0%   { opacity: 0; transform: scaleX(-1) translateY(0.15em); filter: blur(2px); }
+  55%  { opacity: 1; transform: scaleX(1.12) translateY(0);    filter: none; }
+  100% { opacity: 1; transform: scaleX(1); }
+}
+
+/* cortina: unas entran desde arriba y otras desde abajo, alternando */
+.lyric-line.fx-cortina .w {
+  animation-name: w-cortina;
+  animation-duration: 0.55s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes w-cortina {
+  0%   { opacity: 0; transform: translateY(calc(var(--sx, 1) * 1.1em)); filter: blur(4px); }
+  70%  { opacity: 1; transform: translateY(calc(var(--sx, 1) * -0.08em)); filter: none; }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* rebote: cae y bota dos veces contra su renglón, cada vez más flojo */
+.lyric-line.fx-rebote .w {
+  animation-name: w-rebote;
+  animation-duration: 0.75s;
+  transform-origin: bottom center;
+}
+@keyframes w-rebote {
+  0%   { opacity: 0; transform: translateY(-0.9em) scaleY(1.15); filter: blur(2px); }
+  38%  { opacity: 1; transform: translateY(0) scaleY(0.82);      filter: none; }
+  55%  { transform: translateY(-0.3em) scaleY(1.06); }
+  72%  { transform: translateY(0) scaleY(0.92); }
+  86%  { transform: translateY(-0.1em) scaleY(1.02); }
+  100% { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+/* abanico: la frase entra abierta como una baraja y se cierra recta */
+.lyric-line.fx-abanico .w {
+  animation-name: w-abanico;
+  animation-duration: 0.62s;
+  animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1);
+  transform-origin: bottom center;
+}
+@keyframes w-abanico {
+  0%   { opacity: 0; transform: rotate(calc(var(--sx, 1) * 24deg)) translateY(0.5em) scale(0.9); filter: blur(3px); }
+  60%  { opacity: 1; transform: rotate(calc(var(--sx, 1) * -6deg)) translateY(0) scale(1.04);    filter: none; }
+  100% { opacity: 1; transform: rotate(0) translateY(0) scale(1); }
+}
+
+/* estela: llega disparada de lado y frena, con desenfoque de movimiento */
+.lyric-line.fx-estela .w {
+  animation-name: w-estela;
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.12, 0.9, 0.2, 1);
+}
+@keyframes w-estela {
+  0%   { opacity: 0; transform: translateX(calc(var(--sx, 1) * 2.2em)) scaleX(1.6); filter: blur(6px); }
+  62%  { opacity: 1; transform: translateX(calc(var(--sx, 1) * -0.12em)) scaleX(0.96); filter: none; }
+  100% { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+
+/* latido: aparece y da dos pulsos, como si respirara */
+.lyric-line.fx-latido .w {
+  animation-name: w-latido;
+  animation-duration: 0.8s;
+}
+@keyframes w-latido {
+  0%   { opacity: 0; transform: scale(0.7); filter: blur(3px); }
+  30%  { opacity: 1; transform: scale(1.14); filter: none; }
+  45%  { transform: scale(0.98); }
+  60%  { transform: scale(1.09); }
+  78%  { transform: scale(0.99); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* bloques: cada letra se coloca a saltos DUROS, como poner un bloque.
+   `steps()` a propósito — el encanto está en que no interpola nada. Va con
+   la tipografía Pixelify como anillo al dedo, pero sale con cualquiera. */
+.lyric-line.fx-bloques .w {
+  animation-name: w-bloques;
+  animation-duration: 0.42s;
+  animation-timing-function: steps(4, jump-end);
+}
+@keyframes w-bloques {
+  0%   { opacity: 0; transform: translateY(-0.8em) scale(1.35); filter: none; }
+  100% { opacity: 1; transform: translateY(0) scale(1);         filter: none; }
+}
+
+/* ==========================================================
+   ESTILO MINECRAFT (ajustes → letras → tipografía → Pixelify)
+
+   El juego dibuja su texto con una sombra DURA desplazada en diagonal, sin
+   nada de desenfoque. Eso —más que la forma de las letras— es lo que hace
+   que algo «parezca Minecraft». Con los tres halos del acento encima la
+   sombra se emborronaba y se perdía el efecto, así que en esta tipografía
+   queda un solo resplandor suave y manda la sombra.
+   El id de la fuente lo pone js/fonts.js en el <html>: cualquier otra fuente
+   del catálogo puede pedir su propio trato igual, sin tocar el módulo.
+   ========================================================== */
+:root[data-lyrics-font="pixel"] .lyrics-body .lyric-line.active {
+  text-shadow:
+    0 0 10px var(--accent-glow),
+    0.13em 0.13em 0 rgba(0, 0, 0, 0.95);
+}
+:root[data-lyrics-font="pixel"] .lyrics-body .lyric-line.active .w-big {
+  text-shadow:
+    0 0 14px var(--accent-glow),
+    0.13em 0.13em 0 rgba(0, 0, 0, 0.95);
+}
+:root[data-lyrics-font="pixel"] .lyrics-body .lyric-line,
+:root[data-lyrics-font="pixel"] .lyrics-edit {
+  /* los píxeles de la fuente se ven mejor sin suavizado de subpíxel */
+  -webkit-font-smoothing: none;
+}
+
 /* palabra destacada: más grande y en cursiva, como pal-grande del regalo */
 .lyrics-body .lyric-line.active .w-big {
   font-size: 1.18em;

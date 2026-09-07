@@ -457,9 +457,20 @@
     'fx-spin',    // letras giran como puerta (rotateY)
     'fx-elastic', // estirón elástico con rebote
     'fx-swing',   // palabras se columpian colgadas desde arriba
+    // ── tanda nueva ──
+    'fx-espejo',  // cada letra llega del revés y se voltea
+    'fx-cortina', // alternan entrando desde arriba y desde abajo
+    'fx-rebote',  // caen y botan dos veces contra su renglón
+    'fx-abanico', // entran abiertas en abanico y se enderezan
+    'fx-estela',  // disparadas de lado con desenfoque de movimiento
+    'fx-latido',  // aparecen y dan dos latidos
+    'fx-bloques', // letras que se colocan a saltos duros, como bloques
   ];
-  // efectos que revelan LETRA por letra; el resto va palabra a palabra
-  const LETTER_FX = new Set(['fx-type', 'fx-fall', 'fx-spin', 'fx-neon']);
+  /* Efectos que revelan LETRA por letra; el resto va palabra a palabra.
+     Ojo al meter aquí: una línea larga pasa de ~8 spans a ~40, y cada uno es
+     una animación viva. Seis de diecinueve es una proporción sana. */
+  const LETTER_FX = new Set(['fx-type', 'fx-fall', 'fx-spin', 'fx-neon',
+    'fx-espejo', 'fx-bloques']);
 
   // pseudo-azar determinista: misma canción + misma línea → mismo efecto,
   // pero cada canción tiene SU propia secuencia. El mezclado avalancha

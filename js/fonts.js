@@ -40,6 +40,18 @@
       alto: 1.55, peso: 500, activo: 700, track: '0em', mayus: false, ajuste: 1,
     },
     {
+      /* ESTILO MINECRAFT. La fuente del juego («Mojangles») es de Mojang y no
+         se puede redistribuir — y esta página es pública, así que meter una
+         copia sacada de por ahí no es una opción. Pixelify Sans es la más
+         parecida que hay con licencia libre. Lo que remata el parecido no son
+         las letras sino la SOMBRA DURA en diagonal que el juego dibuja detrás
+         del texto: eso se lo pone el CSS (busca data-lyrics-font). */
+      id: 'pixel', nombre: 'Pixelify · estilo Minecraft',
+      css: "'Pixelify Sans', 'VT323', monospace",
+      google: 'Pixelify+Sans:wght@400;700',
+      alto: 1.65, peso: 400, activo: 700, track: '0.02em', mayus: false, ajuste: 1,
+    },
+    {
       id: 'retro', nombre: 'VT323 (la de siempre)',
       css: "'VT323', 'Share Tech Mono', monospace",
       google: null,
@@ -199,6 +211,11 @@
     root.style.setProperty('--lyrics-weight-on', String(f.activo));
     root.style.setProperty('--lyrics-tracking', f.track);
     root.style.setProperty('--lyrics-caps', f.mayus ? 'uppercase' : 'none');
+    /* Para lo que una variable no arregla: una fuente concreta puede querer
+       su propia sombra, su propio interletraje o lo que sea. Con el id en el
+       <html>, el CSS puede apuntarle sin que este módulo sepa nada de estilos
+       (lo usa la de Minecraft para su sombra dura). */
+    root.dataset.lyricsFont = f.id;
     /* La escala medida la vez pasada se pone YA, sin esperar a la descarga: si
        no, al recargar la página la letra pega un salto de tamaño al llegar. */
     root.style.setProperty('--lyrics-font-scale', String(escalas[f.id] || 1));
