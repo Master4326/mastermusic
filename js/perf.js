@@ -34,25 +34,19 @@
   /* Cuántos elementos vivos pintar de los que pediría un PC. No es un
      ajuste de gusto: cada uno de esos nodos es una escritura de estilo y
      una capa que componer en cada frame. */
-  const cuantos = (n) => (bajo ? Math.max(3, Math.round(n * 0.34))
-    : movil ? Math.max(4, Math.round(n * 0.5)) : n);
+  const cuantos = (n) => (nivel >= 2 ? Math.max(3, Math.round(n * 0.34))
+    : nivel >= 1 ? Math.max(4, Math.round(n * 0.5)) : n);
 
   // 30 fps en el móvil: la mitad de trabajo y a simple vista no se nota
   // en luces de fondo (en el canvas del espectro tampoco).
-  const msFrame = () => (movil ? 33 : 0);
+  const msFrame = () => (nivel >= 1 ? 33 : 0);
 
   /* `perf-tactil` va aparte de `perf-movil` a propósito: una ventana
      estrecha de escritorio es «móvil» para la carga de trabajo (conviene
      recortar), pero tiene ratón — y lo que se toca con el dedo necesita
      otras reglas (objetivos grandes, nada que dependa del hover). */
-  const marcar = () => {
-    if (!document.body) return;
-    document.body.classList.toggle('perf-movil', movil);
-    document.body.classList.toggle('perf-bajo', bajo);
-    document.body.classList.toggle('perf-tactil', tactil);
-  };
-  document.addEventListener('DOMContentLoaded', marcar);
-  marcar();   // por si algún módulo arranca antes de DOMContentLoaded
+  // (las clases las pone aplicarNivel(), más abajo: el nivel puede cambiar
+  //  en marcha y tiene que ser un solo sitio quien las escriba)
 
   /* ---------- Suavizados que no dependen de los fps ----------
 
@@ -78,12 +72,102 @@
     return 1 - Math.pow(1 - k60, dt / DT60);
   };
 
+  /* ---------- CALIDAD ADAPTATIVA ----------
+
+     Hasta aquí todo se decidía UNA vez, al arrancar, y por lo que el aparato
+     DICE ser: si es táctil o si la pantalla es pequeña. Eso deja fuera justo
+     el caso del que se queja el usuario — un PC de sobremesa flojo, o viejo,
+     o con la batería en modo ahorro, o con veinte pestañas abiertas: tiene
+     ratón y pantalla grande, así que recibía la carga completa de un equipo
+     potente y se atragantaba. Y al revés: un móvil bueno se quedaba recortado
+     sin necesidad.
+
+     Así que además de suponer, se MIDE. Se cuentan los frames de verdad y, si
+     el aparato no da la talla un rato seguido, se baja un escalón de calidad
+     — que son exactamente las mismas mitigaciones que ya existían para móvil,
+     reutilizadas. Si luego se recupera y aguanta bien un buen rato, se vuelve
+     a subir.
+
+     Tres reglas para que esto no se note ni se vuelva loco:
+     1) HISTÉRESIS: bajar es fácil (2 s malos), subir es difícil (12 s buenos).
+        Si no, se pasaría la vida oscilando entre dos niveles.
+     2) Solo se juzga cuando la página está VISIBLE y sonando algo. En una
+        pestaña de fondo el navegador baja a 1 fps a propósito: eso no es que
+        el aparato sea malo.
+     3) Los primeros 3 s no cuentan: al arrancar hay descarga de fuentes,
+        parseo y primer pintado, y ahí cualquiera va lento. */
+  const NIVELES = ['alto', 'medio', 'bajo'];
+  let nivel = bajo ? 2 : movil ? 1 : 0;    // punto de partida: lo que se supuso
+  const oyentes = [];
+
+  const aplicarNivel = () => {
+    if (!document.body) return;
+    document.body.classList.toggle('perf-movil', nivel >= 1);
+    document.body.classList.toggle('perf-bajo', nivel >= 2);
+    document.body.classList.toggle('perf-tactil', tactil);
+  };
+
+  aplicarNivel();                                    // el nivel de partida, ya
+  document.addEventListener('DOMContentLoaded', aplicarNivel);   // por si no había body
+
+  const cambiar = (n) => {
+    n = Math.max(0, Math.min(2, n));
+    if (n === nivel) return;
+    const antes = NIVELES[nivel];
+    nivel = n;
+    aplicarNivel();
+    console.info(`[perf] calidad: ${antes} → ${NIVELES[nivel]}`);
+    for (const f of oyentes) { try { f(NIVELES[nivel]); } catch (_) {} }
+  };
+
+  /* El vigilante. Un solo rAF propio, cortísimo: cuenta frames y no toca el
+     DOM. Lo que cuesta esto es despreciable al lado de lo que evita. */
+  const OBJETIVO = 50;      // fps por debajo de los cuales se considera que sufre
+  const HOLGADO = 58;       // y por encima de los cuales va sobrado
+  let marca = 0, frames = 0, malos = 0, buenos = 0, arranque = 0;
+
+  const vigilar = (t) => {
+    requestAnimationFrame(vigilar);
+    if (!arranque) { arranque = t; marca = t; return; }
+    frames++;
+    const dt = t - marca;
+    if (dt < 1000) return;               // se juzga por ventanas de un segundo
+    const fps = (frames * 1000) / dt;
+    frames = 0; marca = t;
+
+    if (t - arranque < 3000) return;                        // regla 3
+    if (document.hidden || !document.body.classList.contains('playing')) {
+      malos = buenos = 0;                                   // regla 2
+      return;
+    }
+    /* Con el tope de 30 fps del móvil, pedirle 50 no tiene sentido: ya se le
+       está pidiendo la mitad a propósito. El listón baja con el nivel. */
+    const suelo = nivel >= 1 ? 26 : OBJETIVO;
+    const techo = nivel >= 1 ? 30 : HOLGADO;
+
+    if (fps < suelo) { malos++; buenos = 0; } else if (fps >= techo) { buenos++; malos = 0; }
+    else { malos = buenos = 0; }
+
+    if (malos >= 2) { malos = 0; cambiar(nivel + 1); }       // regla 1: bajar rápido
+    else if (buenos >= 12) { buenos = 0; cambiar(nivel - 1); }   // subir despacio
+  };
+  requestAnimationFrame(vigilar);
+
   window.MMPerf = {
     k,
+    /* Nivel actual: 'alto' | 'medio' | 'bajo'. `medio` es lo que antes se
+       llamaba «móvil» y `bajo` lo que se llamaba «móvil modesto». */
+    nivel: () => NIVELES[nivel],
+    /* Avisa cuando cambia, para lo que no se puede arreglar solo con CSS
+       (el número de barras del visualizador, por ejemplo). */
+    alCambiar: (f) => { if (typeof f === 'function') oyentes.push(f); },
     // cuántos frames de 60 Hz caben en dt (para ventanas de historia)
     frames60: (dtMs) => Math.min(100, Math.max(1, dtMs || DT60)) / DT60,
-    movil: () => movil,
-    bajo: () => bajo,
+    /* movil() y bajo() responden al nivel VIVO, no a lo que se supuso al
+       arrancar: así un PC flojo que ha bajado de escalón recibe las mismas
+       mitigaciones que un móvil, y un móvil bueno que ha subido las suelta. */
+    movil: () => nivel >= 1,
+    bajo: () => nivel >= 2,
     tactil: () => tactil,
     cuantos,
     msFrame,

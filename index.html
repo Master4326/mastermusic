@@ -646,6 +646,17 @@
   <!-- Todos con defer: el navegador pinta la ventana ANTES de ejecutar
        ~230 KB de JS, y defer conserva este orden exacto de ejecución
        (que sí importa: beat.js depende del visualizador, ambient.js de beat). -->
+  <!-- perf.js VA EL PRIMERO: decide cuánto trabajo aguanta este aparato y los
+       demás módulos le preguntan. Todos consultan con salvaguarda
+       (`window.MMPerf ? … : valor de PC`), así que mientras faltó este
+       <script> — desde la v65 hasta la v78 — la salvaguarda se activaba
+       SIEMPRE y todos los teléfonos corrían la carga completa de un PC: el
+       canvas al triple de resolución, 64 barras, sin tope de 30 fps y sin
+       ninguna de las reglas CSS de `body.perf-movil`. El archivo existía,
+       estaba en el SHELL del service worker y se descargaba en cada visita;
+       simplemente no lo ejecutaba nadie. Si vuelve a desaparecer de aquí, lo
+       canta `assets/check-modulos.js`. -->
+  <script defer src="js/perf.js"></script>
   <script defer src="js/vendor/jsmediatags.min.js"></script>
   <script defer src="js/db.js"></script>
   <script defer src="js/lyrics.js"></script>

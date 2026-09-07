@@ -69,6 +69,13 @@
   sizeCanvas();
   window.addEventListener('resize', sizeCanvas);
   if (window.ResizeObserver) new ResizeObserver(sizeCanvas).observe(canvas);
+  /* El nivel de calidad puede cambiar en marcha (js/perf.js mide los fps de
+     verdad). Cuando baja o sube hay que rehacer el canvas — el tope de
+     resolución depende del nivel — y olvidar las tiras cacheadas, porque
+     cambia el número de barras y con él su altura. */
+  if (window.MMPerf && window.MMPerf.alCambiar) {
+    window.MMPerf.alCambiar(() => { cacheTiras = null; sizeCanvas(); });
+  }
 
   // ---- Color helpers (siguen el acento del tema) ----
   const cssVar = (n, f) => {
@@ -114,6 +121,71 @@
     return { r: parseInt(c.substr(0, 2), 16), g: parseInt(c.substr(2, 2), 16), b: parseInt(c.substr(4, 2), 16) };
   };
   const rgba = ({ r, g, b }, a = 1) => `rgba(${r},${g},${b},${a})`;
+
+  /* ---------- Cacheo de lo caro del pintado ----------
+
+     Medido antes de esto (Chrome, CPU x6 para imitar un móvil): el bucle del
+     visualizador se comía 100 ms de cada segundo, más que todos los demás
+     bucles juntos. No era la aritmética: eran 64 barras creando DOS
+     degradados nuevos cada una y rellenándolos con `shadowBlur`, que es lo
+     más lento que hay en canvas 2D porque desenfoca en la CPU. Eso son 7.680
+     degradados y 7.680 desenfoques por segundo — y seguía corriendo con la
+     música parada.
+
+     Ahora: el degradado se pinta UNA vez en una tira de 1 píxel de ancho y
+     cada barra es un `drawImage` de esa tira estirada (idéntico a la vista,
+     porque los topes del degradado eran relativos a la altura de la barra).
+     El resplandor se lo pone el CSS al canvas entero con un `drop-shadow`:
+     una sola pasada de la GPU en vez de 128 desenfoques de CPU por frame. */
+  let cacheTiras = null;
+  const tirasDe = (maxBar, playing) => {
+    const { accent, claro } = colores();
+    // La firma dice cuándo hay que rehacerlas: color, altura o estado
+    const firma = `${accent.r},${accent.g},${accent.b}|${claro.r}|${Math.round(maxBar)}|${playing ? 1 : 0}`;
+    if (cacheTiras && cacheTiras.firma === firma) return cacheTiras;
+
+    const alto = Math.max(2, Math.ceil(maxBar));
+    const hacer = (pintar) => {
+      const c = document.createElement('canvas');
+      c.width = 1; c.height = alto;
+      pintar(c.getContext('2d'));
+      return c;
+    };
+    const barra = hacer((c) => {
+      const g = c.createLinearGradient(0, 0, 0, alto);
+      g.addColorStop(0,    rgba(claro, playing ? 1 : 0.7));
+      g.addColorStop(0.55, rgba(accent, 0.95));
+      g.addColorStop(1,    rgba(accent, 0.55));
+      c.fillStyle = g; c.fillRect(0, 0, 1, alto);
+    });
+    const reflejo = hacer((c) => {
+      const g = c.createLinearGradient(0, 0, 0, alto);
+      g.addColorStop(0, rgba(accent, 0.30));
+      g.addColorStop(1, rgba(accent, 0));
+      c.fillStyle = g; c.fillRect(0, 0, 1, alto);
+    });
+    cacheTiras = { firma, barra, reflejo };
+    return cacheTiras;
+  };
+
+  /* Las cadenas 'rgba(…)' también se hacían de nuevo en cada barra: unas 380
+     por frame, todas iguales entre sí. Se memorizan por color y opacidad. */
+  const memoTono = new Map();
+  const tono = (c, a) => {
+    const k = `${c.r},${c.g},${c.b},${a}`;
+    let v = memoTono.get(k);
+    if (v === undefined) {
+      if (memoTono.size > 64) memoTono.clear();   // el acento cambia con la canción
+      memoTono.set(k, v = `rgba(${k})`);
+    }
+    return v;
+  };
+
+  /* 64 barras eran 64 en todas partes. En un teléfono no se distinguen y
+     cada una cuesta dos drawImage y un fillRect por frame. */
+  const barrasVisibles = () => (window.MMPerf
+    ? Math.min(NUM_BARS, window.MMPerf.cuantos(NUM_BARS))
+    : NUM_BARS);
 
   // ---- Conexión perezosa al grafo de audio ----
   const tryAttach = async () => {
@@ -248,11 +320,16 @@
     let sum = 0;
     for (let i = 0; i < bins; i++) sum += freqData[i];
     if (sum === 0) return null;       // audio enrutado fuera / cambio de pista
-    const out = new Array(NUM_BARS);
+    /* El reparto va sobre las barras que de verdad se pintan, no sobre las
+       64 de siempre: con menos barras cada una abarca más banda. Si se
+       repartiera entre 64 y luego solo se dibujaran las primeras 22, se
+       verían nada más que los graves. */
+    const nb = barrasVisibles();
+    const out = new Array(nb);
     const minF = 2, maxF = bins * 0.78;
-    for (let i = 0; i < NUM_BARS; i++) {
-      const lo = minF + Math.pow(i / NUM_BARS, 1.9) * (maxF - minF);
-      const hi = minF + Math.pow((i + 1) / NUM_BARS, 1.9) * (maxF - minF);
+    for (let i = 0; i < nb; i++) {
+      const lo = minF + Math.pow(i / nb, 1.9) * (maxF - minF);
+      const hi = minF + Math.pow((i + 1) / nb, 1.9) * (maxF - minF);
       let max = 0;
       for (let j = Math.floor(lo); j < Math.ceil(hi) && j < bins; j++) if (freqData[j] > max) max = freqData[j];
       out[i] = max / 255;
@@ -263,9 +340,10 @@
   // ---- Animación suave cuando no hay señal ----
   const idleSpectrum = () => {
     const t = performance.now() / 1000;
-    const out = new Array(NUM_BARS);
-    for (let i = 0; i < NUM_BARS; i++) {
-      const x = i / NUM_BARS;
+    const nb = barrasVisibles();
+    const out = new Array(nb);
+    for (let i = 0; i < nb; i++) {
+      const x = i / nb;
       const env = Math.sin(x * Math.PI);                                   // joroba central
       const wave = (Math.sin(t * 1.6 + x * 7) * 0.5 + 0.5) * 0.40
                  + (Math.sin(t * 2.7 + x * 13) * 0.5 + 0.5) * 0.16;
@@ -453,22 +531,26 @@
   const eqBars = miniEq ? Array.from(miniEq.querySelectorAll('i')) : [];
   const eqIdx = [3, 10, 20, 33, 47];   // índices en smooth[] para cada barrita
   let eqLive = false;
-  const eqPrev = [0, 0, 0, 0, 0];      // última altura escrita, para no repetir
+  const eqPrev = [-1, -1, -1, -1, -1];   // último paso escrito, para no repetir
   const updateMiniEq = (playing) => {
     if (!eqBars.length) return;
     if (playing) {
       if (!eqLive) { miniEq.classList.add('live'); eqLive = true; }
       for (let k = 0; k < eqBars.length; k++) {
         const v = Math.min(1, (smooth[eqIdx[k]] || 0) * 1.35);
-        const px = 3 + Math.min(3, Math.round(v * 3)) * 3;
-        // el valor está cuantizado a 4 alturas: casi todos los frames repiten.
-        // Comparar antes de escribir evita ~300 invalidaciones de estilo/s.
-        if (eqPrev[k] !== px) { eqPrev[k] = px; eqBars[k].style.height = px + 'px'; }
+        const paso = Math.min(3, Math.round(v * 3));     // 0..3
+        /* Se escribe transform, no height: escribir el alto obliga a rehacer
+           layout. El valor está cuantizado a 4 pasos, así que casi todos los
+           frames repiten y ni siquiera se toca el estilo. */
+        if (eqPrev[k] !== paso) {
+          eqPrev[k] = paso;
+          eqBars[k].style.transform = 'scaleY(' + (0.25 + paso * 0.25).toFixed(2) + ')';
+        }
       }
     } else if (eqLive) {
       miniEq.classList.remove('live');
       eqLive = false;
-      for (let k = 0; k < eqBars.length; k++) { eqBars[k].style.height = ''; eqPrev[k] = 0; }
+      for (let k = 0; k < eqBars.length; k++) { eqBars[k].style.transform = ''; eqPrev[k] = -1; }
     }
   };
 
@@ -521,7 +603,7 @@
        getBands(), que es lo que mueve la onda del modo cine. Lo que se ahorra
        es justo lo caro: degradados, shadowBlur y relleno por barra. */
     if (!visible) {
-      for (let i = 0; i < NUM_BARS; i++) {
+      for (let i = 0, n = barrasVisibles(); i < n; i++) {
         const target = vals[i];
         const s = smooth[i];
         smooth[i] = s + (target - s) * (target > s ? kSube : kBaja);
@@ -535,20 +617,24 @@
 
     ctx.clearRect(0, 0, W, H);
 
-    const { accent, glow, claro } = colores();
+    const { accent, claro } = colores();
 
     const center = H / 2;
     const gap = 2;
-    const barW = (W - gap * (NUM_BARS - 1)) / NUM_BARS;
+    const nb = barrasVisibles();
+    const barW = (W - gap * (nb - 1)) / nb;
     const maxBar = H * 0.46;
     const radius = Math.min(barW / 2, 3);
+    const tiras = tirasDe(maxBar, playing);
 
     // Línea central tenue
-    ctx.strokeStyle = rgba(accent, 0.10);
+    ctx.strokeStyle = tono(accent, 0.10);
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, center); ctx.lineTo(W, center); ctx.stroke();
 
-    for (let i = 0; i < NUM_BARS; i++) {
+    ctx.fillStyle = tono(claro, 0.95);      // el tope del pico: un solo color
+
+    for (let i = 0; i < nb; i++) {
       const target = vals[i];
       const s = smooth[i];
       // ataque rápido, caída lenta
@@ -561,32 +647,21 @@
       if (v > peaks[i]) { peaks[i] = v; peakVel[i] = 0; }
       else { peakVel[i] += 0.0009 * fr; peaks[i] = Math.max(v, peaks[i] - peakVel[i] * fr); }
 
-      // barra superior con degradado + glow
-      const grad = ctx.createLinearGradient(0, center - bh, 0, center);
-      grad.addColorStop(0,    rgba(claro, playing ? 1 : 0.7));
-      grad.addColorStop(0.55, rgba(accent, 0.95));
-      grad.addColorStop(1,    rgba(accent, 0.55));
-      ctx.shadowColor = rgba(glow, playing ? 0.9 : 0.4);
-      ctx.shadowBlur = playing ? 12 : 6;
-      ctx.fillStyle = grad;
+      /* Barra y reflejo: la MISMA tira ya pintada, estirada a lo alto que
+         toque. Antes cada barra creaba sus dos degradados y los rellenaba
+         con shadowBlur: 64 barras × 2 degradados × 2 desenfoques, 60 veces
+         por segundo. El degradado ahora se pinta una vez (ver tirasDe) y el
+         resplandor lo pone el CSS sobre el canvas entero, de una pasada. */
+      ctx.save();
       roundedTopBar(x, center - bh, barW, bh, radius);
-      ctx.fill();
+      ctx.clip();
+      ctx.drawImage(tiras.barra, x, center - bh, barW, bh);
+      ctx.restore();
+      ctx.drawImage(tiras.reflejo, x, center, barW, bh * 0.7);
 
-      // reflejo inferior, desvanecido (sin glow)
-      ctx.shadowBlur = 0;
-      const refl = ctx.createLinearGradient(0, center, 0, center + bh * 0.7);
-      refl.addColorStop(0, rgba(accent, 0.30));
-      refl.addColorStop(1, rgba(accent, 0));
-      ctx.fillStyle = refl;
-      ctx.fillRect(x, center, barW, bh * 0.7);
-
-      // tope del pico: punta clara con el glow del acento
+      // tope del pico: punta clara
       const py = center - Math.max(1.5, peaks[i] * maxBar) - 2;
-      ctx.shadowColor = rgba(glow, 0.9);
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = rgba(claro, 0.95);
       ctx.fillRect(x, py, barW, 2);
-      ctx.shadowBlur = 0;
     }
 
     updateMiniEq(playing);
@@ -616,9 +691,13 @@
     // Espectro suavizado remuestreado a n bandas (0..1, graves → agudos).
     // Con señal en vivo (local o ◈ sync) es FFT real; sin señal, la onda idle.
     getBands: (n) => {
+      /* Se remuestrea sobre las barras VIVAS, no sobre las 64 del array: en
+         un móvil solo se rellenan las primeras y las demás valen 0 — el modo
+         cine se quedaría con la onda plana de medio espectro en adelante. */
+      const nb = barrasVisibles();
       const out = new Array(n);
       for (let i = 0; i < n; i++) {
-        const j = Math.min(NUM_BARS - 1, Math.round(i * (NUM_BARS - 1) / Math.max(1, n - 1)));
+        const j = Math.min(nb - 1, Math.round(i * (nb - 1) / Math.max(1, n - 1)));
         out[i] = smooth[j];
       }
       return out;
