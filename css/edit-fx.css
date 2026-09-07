@@ -1405,3 +1405,293 @@ body.reduce-motion .ed-spark { display: none !important; }/* ── ed-mascara: 
   to   { transform: perspective(700px) translateZ(40px) scale(0.99); }
 }/* con «menos movimiento» las cámaras vivas se quedan quietas */
 body.reduce-motion .ed-stack[class*="edcam-"] { animation: none !important; }
+
+/* ══════════════════════════════════════════════════════════
+   TANDA 8 · MÁS CAÑA EN LO MOVIDO
+
+   Por qué esta tanda: había 110 efectos, pero el reparto por intensidad los
+   encasillaba. En las partes movidas (`hype`) los TÍTULOS solo podían salir
+   de los once marcados con golpe — y el estribillo es justo donde se mira.
+   Once opciones repetidas en el sitio más visible = «siempre el mismo
+   estilo». Aquí van ocho títulos de golpe más (once → diecinueve) y seis
+   frases movidas.
+
+   Mismas reglas de la casa: solo transform, opacity y filter; el último
+   `filter` de cada keyframe es `none`, nunca `blur(0)`. El flash, la
+   sacudida, el aro y las chispas NO se escriben aquí: los dispara el motor
+   con la columna `g` del manifiesto de js/lyrics.js.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── títulos con golpe ── */
+
+.ed-titulo.ed-terremoto { animation-name: ed-terremoto; animation-duration: 0.72s; }
+@keyframes ed-terremoto {
+  0%   { opacity: 0; transform: scale(1.5); filter: blur(7px); }
+  22%  { opacity: 1; transform: scale(1) translate(-14px, 6px); filter: none; }
+  38%  { transform: scale(1.02) translate(11px, -7px); }
+  52%  { transform: scale(0.99) translate(-8px, -3px); }
+  66%  { transform: scale(1.01) translate(6px, 4px); }
+  80%  { transform: translate(-3px, -2px); }
+  100% { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+.ed-titulo.ed-bala { animation-name: ed-bala; animation-duration: 0.52s; animation-timing-function: cubic-bezier(0.1, 0.9, 0.15, 1); }
+@keyframes ed-bala {
+  0%   { opacity: 0; transform: translateX(120%) scaleX(2.4) skewX(-18deg); filter: blur(14px); }
+  55%  { opacity: 1; transform: translateX(-4%) scaleX(0.9) skewX(4deg);    filter: none; }
+  75%  { transform: translateX(2%) scaleX(1.04) skewX(-2deg); }
+  100% { opacity: 1; transform: translateX(0) scaleX(1) skewX(0); }
+}
+
+.ed-titulo.ed-machaca { animation-name: ed-machaca; animation-duration: 0.6s; transform-origin: bottom center; }
+@keyframes ed-machaca {
+  0%   { opacity: 0; transform: translateY(-90%) scale(1.6, 1.9); filter: blur(6px); }
+  40%  { opacity: 1; transform: translateY(0) scale(1.45, 0.42);  filter: none; }
+  58%  { transform: translateY(-8%) scale(0.88, 1.22); }
+  74%  { transform: translateY(0) scale(1.08, 0.92); }
+  88%  { transform: scale(0.97, 1.04); }
+  100% { opacity: 1; transform: translateY(0) scale(1, 1); }
+}
+
+.ed-titulo.ed-torbellino { animation-name: ed-torbellino; animation-duration: 0.68s; }
+@keyframes ed-torbellino {
+  0%   { opacity: 0; transform: rotate(-420deg) scale(0.05); filter: blur(9px); }
+  62%  { opacity: 1; transform: rotate(14deg) scale(1.16);   filter: none; }
+  82%  { transform: rotate(-5deg) scale(0.97); }
+  100% { opacity: 1; transform: rotate(0) scale(1); }
+}
+
+/* estrobo: aparece a fogonazos duros. steps() a propósito, nada de
+   interpolar — el encanto está en que salta. */
+.ed-titulo.ed-estrobo { animation-name: ed-estrobo; animation-duration: 0.66s; animation-timing-function: steps(1, end); }
+@keyframes ed-estrobo {
+  0%   { opacity: 0; transform: scale(1.35); filter: none; }
+  12%  { opacity: 1; transform: scale(1.18); }
+  24%  { opacity: 0; transform: scale(1.18); }
+  36%  { opacity: 1; transform: scale(1.08); }
+  48%  { opacity: 0; transform: scale(1.08); }
+  60%  { opacity: 1; transform: scale(1.02); }
+  72%  { opacity: 0.35; transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); filter: none; }
+}
+
+.ed-titulo.ed-cizalla { animation-name: ed-cizalla; animation-duration: 0.55s; animation-timing-function: cubic-bezier(0.2, 1.5, 0.4, 1); }
+@keyframes ed-cizalla {
+  0%   { opacity: 0; transform: skew(-42deg, 8deg) scale(1.3); filter: blur(6px); }
+  60%  { opacity: 1; transform: skew(9deg, -2deg) scale(0.98); filter: none; }
+  82%  { transform: skew(-3deg, 1deg) scale(1.02); }
+  100% { opacity: 1; transform: skew(0, 0) scale(1); }
+}
+
+.ed-titulo.ed-supernova { animation-name: ed-supernova; animation-duration: 0.7s; }
+@keyframes ed-supernova {
+  0%   { opacity: 0; transform: scale(0.02); filter: blur(2px) brightness(3); }
+  30%  { opacity: 1; transform: scale(1.55); filter: blur(3px) brightness(2.2); }
+  62%  { opacity: 1; transform: scale(0.92); filter: none; }
+  80%  { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); filter: none; }
+}
+
+.ed-titulo.ed-latigazo { animation-name: ed-latigazo; animation-duration: 0.6s; }
+@keyframes ed-latigazo {
+  0%   { opacity: 0; transform: translate(-70%, -40%) rotate(-28deg) scaleX(1.9); filter: blur(11px); }
+  50%  { opacity: 1; transform: translate(4%, 3%) rotate(6deg) scaleX(0.92);      filter: none; }
+  72%  { transform: translate(-2%, -1%) rotate(-3deg) scaleX(1.03); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0) scaleX(1); }
+}
+
+/* ── frases movidas (palabra a palabra) ── */
+
+.ed-metralla .ed-pal { animation-name: edp-metralla; animation-duration: 0.34s; animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+@keyframes edp-metralla {
+  0%   { opacity: 0; transform: translateX(calc(var(--sx, 1) * 1.8em)) scaleX(1.8); filter: blur(8px); }
+  70%  { opacity: 1; transform: translateX(calc(var(--sx, 1) * -0.06em)) scaleX(0.95); filter: none; }
+  100% { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+
+.ed-rebotes .ed-pal { animation-name: edp-rebotes; animation-duration: 0.72s; transform-origin: bottom center; }
+@keyframes edp-rebotes {
+  0%   { opacity: 0; transform: translateY(-1.4em) scale(1.1, 1.25); filter: blur(3px); }
+  32%  { opacity: 1; transform: translateY(0) scale(1.2, 0.68);      filter: none; }
+  48%  { transform: translateY(-0.45em) scale(0.92, 1.12); }
+  64%  { transform: translateY(0) scale(1.1, 0.86); }
+  78%  { transform: translateY(-0.15em) scale(0.97, 1.05); }
+  100% { opacity: 1; transform: translateY(0) scale(1, 1); }
+}
+
+.ed-tijeretazo .ed-pal { animation-name: edp-tijeretazo; animation-duration: 0.46s; }
+@keyframes edp-tijeretazo {
+  0%   { opacity: 0; transform: translateY(calc(var(--sx, 1) * 0.7em)) skewX(calc(var(--sx, 1) * 30deg)); filter: blur(5px); }
+  62%  { opacity: 1; transform: translateY(calc(var(--sx, 1) * -0.05em)) skewX(calc(var(--sx, 1) * -6deg)); filter: none; }
+  100% { opacity: 1; transform: translateY(0) skewX(0); }
+}
+
+.ed-sacude .ed-pal { animation-name: edp-sacude; animation-duration: 0.6s; }
+@keyframes edp-sacude {
+  0%   { opacity: 0; transform: scale(1.4); filter: blur(5px); }
+  26%  { opacity: 1; transform: scale(1) translate(5px, -3px); filter: none; }
+  40%  { transform: translate(-5px, 3px); }
+  54%  { transform: translate(4px, 2px); }
+  68%  { transform: translate(-3px, -2px); }
+  82%  { transform: translate(2px, 1px); }
+  100% { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+.ed-catapulta .ed-pal { animation-name: edp-catapulta; animation-duration: 0.66s; animation-timing-function: cubic-bezier(0.22, 1.5, 0.4, 1); }
+@keyframes edp-catapulta {
+  0%   { opacity: 0; transform: translateY(1.6em) rotate(calc(var(--sx, 1) * 45deg)) scale(0.6); filter: blur(6px); }
+  64%  { opacity: 1; transform: translateY(-0.12em) rotate(calc(var(--sx, 1) * -8deg)) scale(1.08); filter: none; }
+  100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+
+.ed-zigzag .ed-pal { animation-name: edp-zigzag; animation-duration: 0.55s; animation-timing-function: cubic-bezier(0.3, 1.4, 0.5, 1); }
+@keyframes edp-zigzag {
+  0%   { opacity: 0; transform: translate(calc(var(--sx, 1) * -1.3em), calc(var(--sx, 1) * -1.1em)) rotate(calc(var(--sx, 1) * -20deg)); filter: blur(6px); }
+  66%  { opacity: 1; transform: translate(calc(var(--sx, 1) * 0.07em), calc(var(--sx, 1) * 0.06em)) rotate(calc(var(--sx, 1) * 4deg)); filter: none; }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0); }
+}
+
+/* ══════════════════════════════════════════════════════════
+   TANDA 8 · MÁS CAÑA EN LO MOVIDO
+
+   Por qué esta tanda: había 110 efectos, pero el reparto por intensidad los
+   encasillaba. En las partes movidas (`hype`) los TÍTULOS solo podían salir
+   de los once marcados con golpe — y el estribillo es justo donde se mira.
+   Once opciones repitiéndose en el sitio más visible es exactamente la
+   sensación de «siempre el mismo estilo». Aquí van ocho títulos de golpe más
+   (once → diecinueve) y seis frases movidas (veintidós → veintiocho).
+
+   Mismas reglas de la casa: solo transform, opacity y filter; el último
+   `filter` de cada keyframe es `none`, nunca `blur(0)`. El flash, la
+   sacudida, el aro y las chispas NO se escriben aquí: los dispara el motor
+   con la columna `g` del manifiesto de js/lyrics.js.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── títulos con golpe ── */
+
+.ed-titulo.ed-terremoto { animation-name: ed-terremoto; animation-duration: 0.72s; }
+@keyframes ed-terremoto {
+  0%   { opacity: 0; transform: scale(1.5); filter: blur(7px); }
+  22%  { opacity: 1; transform: scale(1) translate(-14px, 6px); filter: none; }
+  38%  { transform: scale(1.02) translate(11px, -7px); }
+  52%  { transform: scale(0.99) translate(-8px, -3px); }
+  66%  { transform: scale(1.01) translate(6px, 4px); }
+  80%  { transform: translate(-3px, -2px); }
+  100% { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+.ed-titulo.ed-bala { animation-name: ed-bala; animation-duration: 0.52s; animation-timing-function: cubic-bezier(0.1, 0.9, 0.15, 1); }
+@keyframes ed-bala {
+  0%   { opacity: 0; transform: translateX(120%) scaleX(2.4) skewX(-18deg); filter: blur(14px); }
+  55%  { opacity: 1; transform: translateX(-4%) scaleX(0.9) skewX(4deg);    filter: none; }
+  75%  { transform: translateX(2%) scaleX(1.04) skewX(-2deg); }
+  100% { opacity: 1; transform: translateX(0) scaleX(1) skewX(0); }
+}
+
+.ed-titulo.ed-machaca { animation-name: ed-machaca; animation-duration: 0.6s; transform-origin: bottom center; }
+@keyframes ed-machaca {
+  0%   { opacity: 0; transform: translateY(-90%) scale(1.6, 1.9); filter: blur(6px); }
+  40%  { opacity: 1; transform: translateY(0) scale(1.45, 0.42);  filter: none; }
+  58%  { transform: translateY(-8%) scale(0.88, 1.22); }
+  74%  { transform: translateY(0) scale(1.08, 0.92); }
+  88%  { transform: scale(0.97, 1.04); }
+  100% { opacity: 1; transform: translateY(0) scale(1, 1); }
+}
+
+.ed-titulo.ed-torbellino { animation-name: ed-torbellino; animation-duration: 0.68s; }
+@keyframes ed-torbellino {
+  0%   { opacity: 0; transform: rotate(-420deg) scale(0.05); filter: blur(9px); }
+  62%  { opacity: 1; transform: rotate(14deg) scale(1.16);   filter: none; }
+  82%  { transform: rotate(-5deg) scale(0.97); }
+  100% { opacity: 1; transform: rotate(0) scale(1); }
+}
+
+/* estrobo: aparece a fogonazos DUROS. steps() a propósito, nada de
+   interpolar — el encanto está justo en que salta. */
+.ed-titulo.ed-estrobo { animation-name: ed-estrobo; animation-duration: 0.66s; animation-timing-function: steps(1, end); }
+@keyframes ed-estrobo {
+  0%   { opacity: 0;    transform: scale(1.35); filter: none; }
+  12%  { opacity: 1;    transform: scale(1.18); }
+  24%  { opacity: 0;    transform: scale(1.18); }
+  36%  { opacity: 1;    transform: scale(1.08); }
+  48%  { opacity: 0;    transform: scale(1.08); }
+  60%  { opacity: 1;    transform: scale(1.02); }
+  72%  { opacity: 0.35; transform: scale(1.02); }
+  100% { opacity: 1;    transform: scale(1); filter: none; }
+}
+
+.ed-titulo.ed-cizalla { animation-name: ed-cizalla; animation-duration: 0.55s; animation-timing-function: cubic-bezier(0.2, 1.5, 0.4, 1); }
+@keyframes ed-cizalla {
+  0%   { opacity: 0; transform: skew(-42deg, 8deg) scale(1.3); filter: blur(6px); }
+  60%  { opacity: 1; transform: skew(9deg, -2deg) scale(0.98); filter: none; }
+  82%  { transform: skew(-3deg, 1deg) scale(1.02); }
+  100% { opacity: 1; transform: skew(0, 0) scale(1); }
+}
+
+.ed-titulo.ed-supernova { animation-name: ed-supernova; animation-duration: 0.7s; }
+@keyframes ed-supernova {
+  0%   { opacity: 0; transform: scale(0.02); filter: blur(2px) brightness(3); }
+  30%  { opacity: 1; transform: scale(1.55); filter: blur(3px) brightness(2.2); }
+  62%  { opacity: 1; transform: scale(0.92); filter: none; }
+  80%  { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); filter: none; }
+}
+
+.ed-titulo.ed-latigazo { animation-name: ed-latigazo; animation-duration: 0.6s; }
+@keyframes ed-latigazo {
+  0%   { opacity: 0; transform: translate(-70%, -40%) rotate(-28deg) scaleX(1.9); filter: blur(11px); }
+  50%  { opacity: 1; transform: translate(4%, 3%) rotate(6deg) scaleX(0.92);      filter: none; }
+  72%  { transform: translate(-2%, -1%) rotate(-3deg) scaleX(1.03); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0) scaleX(1); }
+}
+
+/* ── frases movidas (palabra a palabra) ── */
+
+.ed-metralla .ed-pal { animation-name: edp-metralla; animation-duration: 0.34s; animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+@keyframes edp-metralla {
+  0%   { opacity: 0; transform: translateX(calc(var(--sx, 1) * 1.8em)) scaleX(1.8);    filter: blur(8px); }
+  70%  { opacity: 1; transform: translateX(calc(var(--sx, 1) * -0.06em)) scaleX(0.95); filter: none; }
+  100% { opacity: 1; transform: translateX(0) scaleX(1); }
+}
+
+.ed-rebotes .ed-pal { animation-name: edp-rebotes; animation-duration: 0.72s; transform-origin: bottom center; }
+@keyframes edp-rebotes {
+  0%   { opacity: 0; transform: translateY(-1.4em) scale(1.1, 1.25); filter: blur(3px); }
+  32%  { opacity: 1; transform: translateY(0) scale(1.2, 0.68);      filter: none; }
+  48%  { transform: translateY(-0.45em) scale(0.92, 1.12); }
+  64%  { transform: translateY(0) scale(1.1, 0.86); }
+  78%  { transform: translateY(-0.15em) scale(0.97, 1.05); }
+  100% { opacity: 1; transform: translateY(0) scale(1, 1); }
+}
+
+.ed-tijeretazo .ed-pal { animation-name: edp-tijeretazo; animation-duration: 0.46s; }
+@keyframes edp-tijeretazo {
+  0%   { opacity: 0; transform: translateY(calc(var(--sx, 1) * 0.7em)) skewX(calc(var(--sx, 1) * 30deg));    filter: blur(5px); }
+  62%  { opacity: 1; transform: translateY(calc(var(--sx, 1) * -0.05em)) skewX(calc(var(--sx, 1) * -6deg)); filter: none; }
+  100% { opacity: 1; transform: translateY(0) skewX(0); }
+}
+
+.ed-sacude .ed-pal { animation-name: edp-sacude; animation-duration: 0.6s; }
+@keyframes edp-sacude {
+  0%   { opacity: 0; transform: scale(1.4); filter: blur(5px); }
+  26%  { opacity: 1; transform: scale(1) translate(5px, -3px); filter: none; }
+  40%  { transform: translate(-5px, 3px); }
+  54%  { transform: translate(4px, 2px); }
+  68%  { transform: translate(-3px, -2px); }
+  82%  { transform: translate(2px, 1px); }
+  100% { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+.ed-catapulta .ed-pal { animation-name: edp-catapulta; animation-duration: 0.66s; animation-timing-function: cubic-bezier(0.22, 1.5, 0.4, 1); }
+@keyframes edp-catapulta {
+  0%   { opacity: 0; transform: translateY(1.6em) rotate(calc(var(--sx, 1) * 45deg)) scale(0.6);      filter: blur(6px); }
+  64%  { opacity: 1; transform: translateY(-0.12em) rotate(calc(var(--sx, 1) * -8deg)) scale(1.08);   filter: none; }
+  100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+
+.ed-zigzag .ed-pal { animation-name: edp-zigzag; animation-duration: 0.55s; animation-timing-function: cubic-bezier(0.3, 1.4, 0.5, 1); }
+@keyframes edp-zigzag {
+  0%   { opacity: 0; transform: translate(calc(var(--sx, 1) * -1.3em), calc(var(--sx, 1) * -1.1em)) rotate(calc(var(--sx, 1) * -20deg)); filter: blur(6px); }
+  66%  { opacity: 1; transform: translate(calc(var(--sx, 1) * 0.07em), calc(var(--sx, 1) * 0.06em)) rotate(calc(var(--sx, 1) * 4deg));   filter: none; }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0); }
+}

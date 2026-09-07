@@ -708,6 +708,26 @@
     ['ed-trozos',        'F',   'h', '',               0],  // el verso en trozos de 2-4 palabras que se relevan
     ['ed-relevo',        'F',   'h', '',               0],  // cada palabra entra empujando a la anterior
     ['ed-ondula',        'F',   'c', '',               0],
+    /* ── tanda 8 · más caña en lo movido ──
+       El cuello no eran los efectos: eran 110. Era el REPARTO. En las partes
+       movidas los títulos solo salían de los once con golpe, y el estribillo
+       es donde más se mira — once opciones repitiéndose ahí es exactamente
+       «siempre el mismo estilo». Estos ocho suben ese cupo a diecinueve.  */
+    ['ed-terremoto',     'T',   '',  '',               1],  // aterriza y sacude en cuatro direcciones
+    ['ed-bala',          'T',   '',  '',               1],  // cruza la pantalla y frena en seco
+    ['ed-machaca',       'T',   '',  '',               1],  // cae enorme y aplasta con rebote
+    ['ed-torbellino',    'T',   '',  '',               1],  // entra girando una vuelta entera
+    ['ed-estrobo',       'T',   '',  '',               1],  // aparece a fogonazos duros
+    ['ed-cizalla',       'T',   '',  '',               1],  // llega deformada en diagonal y se endereza
+    ['ed-supernova',     'T',   '',  '',               1],  // estalla desde un punto y se recoge
+    ['ed-latigazo',      'T',   '',  '',               1],  // cruza en diagonal con estirón
+    // y seis frases movidas más: 22 → 28
+    ['ed-metralla',      'F',   'h', '',               0],  // ráfaga: cada palabra disparada de un lado
+    ['ed-rebotes',       'F',   'h', '',               0],  // botan encadenadas con squash & stretch
+    ['ed-tijeretazo',    'F',   'h', '',               0],  // llegan cortadas en diagonal y se enderezan
+    ['ed-sacude',        'F',   'h', '',               0],  // aterrizan y vibran un instante
+    ['ed-catapulta',     'F',   'h', '',               0],  // salen despedidas desde abajo girando
+    ['ed-zigzag',        'F',   'h', '',               0],  // alternan en diagonal, arriba y abajo
   ];
 
   /* ── listas derivadas ──
@@ -1726,6 +1746,18 @@
       if (tab) tab.click();
       labPrevEdit = editMode;
       if (!editMode) { editMode = true; applyMode(); }   // sin tocar la preferencia
+      /* SIN CANCIÓN el lab no servía para nada: applyMode() deja mandando al
+         panel de reposo (o a la escena sin letra) y esconde #lyricsEdit, así
+         que la demo se pintaba dentro de un elemento oculto y no se veía
+         NADA. Y probar efectos es justo lo que se hace sin música puesta.
+         Mientras el lab está abierto manda el lab: se aparta lo de reposo y
+         se destapa la vista de edit. Al cerrarlo, applyMode() lo recompone. */
+      const idle = document.getElementById('lyricsIdle');
+      if (idle) idle.hidden = true;
+      const ncs = document.getElementById('lyricsNcs');
+      if (ncs) ncs.hidden = true;
+      lyricsBody.hidden = true;
+      lyricsEdit.hidden = false;
       lyricsEdit.innerHTML = '';
       labEl.hidden = false;
       if (labBtn) labBtn.classList.add('on');
@@ -1739,6 +1771,19 @@
       applyMode();   // repinta la letra real (o limpia si no hay canción)
     }
   };
+
+  /* El ⚗ lab estaba escrito entero —panel, chips de los 123 efectos, texto
+     propio, desfile automático— y no había forma de llegar a él: su botón
+     existe en index.html desde siempre, en la barra de abajo, pero con el
+     atributo `hidden` puesto. Nadie lo quitaba nunca.
+
+     Se destapa SOLO EN LOCAL. En la página publicada `location.hostname` es
+     master4326.github.io, el `hidden` se queda y no aparece nada: es una
+     herramienta para trabajar los efectos, no para quien viene a oír música.
+     (Si algún día se quiere en la web, se borra este `if` y ya.) */
+  const enLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+    || location.protocol === 'file:';
+  if (labBtn && enLocal) labBtn.hidden = false;
 
   if (labBtn) labBtn.addEventListener('click', () => labToggle());
   document.addEventListener('keydown', (e) => {
