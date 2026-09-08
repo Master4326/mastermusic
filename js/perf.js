@@ -37,9 +37,82 @@
   const cuantos = (n) => (nivel >= 2 ? Math.max(3, Math.round(n * 0.34))
     : nivel >= 1 ? Math.max(4, Math.round(n * 0.5)) : n);
 
-  // 30 fps en el móvil: la mitad de trabajo y a simple vista no se nota
-  // en luces de fondo (en el canvas del espectro tampoco).
-  const msFrame = () => (nivel >= 1 ? 33 : 0);
+  /* ---------- SUPERFICIE DE PANTALLA ----------
+
+     El bug que trajo todo esto: en un monitor de 2K o un ultrawide la app
+     daba tirones y en 1080p no. La causa no es que esos equipos sean malos,
+     es que TODO el adorno de fondo estaba medido en `vmax`, o sea en
+     proporción del lado MAYOR de la pantalla. Los tres focos de `.amb-blob`
+     miden 46/38/26 vmax y llevan `filter: blur(70px)`, así que:
+
+         1920×1080  →  vmax 19,2 px  →  foco grande de   883 px (0,78 Mpx)
+         2560×1440  →  vmax 25,6 px  →  foco grande de 1.178 px (1,39 Mpx)
+         3440×1440  →  vmax 34,4 px  →  foco grande de 1.582 px (2,50 Mpx)
+
+     Medido con la sonda: 5,2 Mpx desenfocados en 1080p, 7,6 en 2K y 11,6 en
+     el ultrawide. Un desenfoque cuesta superficie × radio, y encima
+     `ambient.js` le cambia la escala en cada frame, lo que obliga a
+     REHACERLO entero. De ahí que el mismo equipo que va sobrado en 1080p se
+     arrastre a 17,8 fps en un ultrawide (medido en el vídeo del usuario:
+     intervalos de 50-58 ms entre cambios reales de imagen).
+
+     `escalaFondo()` devuelve el factor por el que hay que encoger esos
+     adornos para que su superficie en píxeles NO crezca con la pantalla: la
+     raíz cuadrada mantiene el ÁREA constante, que es lo que se paga.
+     Con tope por abajo para que en una pantalla enorme no queden ridículos.
+
+     Clave: en 1080p o menos vale exactamente 1, así que en la pantalla del
+     usuario no cambia ni un píxel. Solo se recorta hacia arriba. */
+  const BASE_MPX = (1920 * 1080) / 1e6;          // la pantalla de referencia
+  let superficie = 0, escala = 1;
+
+  const medirPantalla = () => {
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    superficie = (window.innerWidth * window.innerHeight * d * d) / 1e6;
+    escala = superficie <= BASE_MPX ? 1
+      : Math.max(0.62, Math.sqrt(BASE_MPX / superficie));
+    escala = Math.round(escala * 100) / 100;
+    /* Un solo número para el CSS. Lo usan tanto el TAMAÑO del foco como el
+       RADIO de su desenfoque: un foco más pequeño necesita menos radio para
+       verse igual de difuso, y como el coste es superficie × radio, aplicarlo
+       a los dos ahorra dos veces. */
+    if (document.documentElement) {
+      document.documentElement.style.setProperty('--fondo-escala', escala);
+    }
+    if (document.body) {
+      document.body.classList.toggle('pantalla-grande', superficie > BASE_MPX * 1.25);
+    }
+  };
+  medirPantalla();
+  document.addEventListener('DOMContentLoaded', medirPantalla);
+  window.addEventListener('resize', medirPantalla, { passive: true });
+
+  /* ---------- TOPE DE FOTOGRAMAS ----------
+
+     30 fps en el móvil: la mitad de trabajo y a simple vista no se nota en
+     luces de fondo (en el canvas del espectro tampoco).
+
+     Y 60 fps COMO MÁXIMO en todas partes, que antes no había ninguno. En un
+     monitor de 120 Hz —el del vídeo— o de 165 Hz, los bucles de adorno
+     corrían a 120 o 165 pasadas por segundo: dos o tres veces el trabajo por
+     nada, porque estos adornos son luces muy suavizadas y un espectro de
+     barras, y a 60 se ven idénticos. La letra y los efectos de edit NO se
+     tocan: son animaciones CSS y siguen a los hercios que dé la pantalla.
+
+     ¿Por qué 13 y no 16,67? Porque el tope no puede caer donde quiera: solo
+     se puede pintar en un vsync, así que el intervalo real es el primer
+     múltiplo del periodo de la pantalla que llegue al tope. Con 16,67:
+
+         60 Hz  (16,67 ms) → 16,67 → 60 fps   ✔ (justo, y cualquier redondeo lo tira a 30)
+        120 Hz  ( 8,33 ms) → 16,67 → 60 fps   ✔
+        144 Hz  ( 6,94 ms) → 20,83 → 48 fps   ✘
+        165 Hz  ( 6,06 ms) → 18,18 → 55 fps
+
+     o sea que en un monitor de 144 Hz pedir «60» daba 48. Con 13 ms de tope,
+     60 Hz y 120 Hz dan 60 clavados, 144 Hz da 72 y 165 Hz da 55: nunca por
+     debajo de lo que se buscaba. Los 33 del móvil se quedan como estaban
+     (en una pantalla de 60 Hz caen justo en 30 fps). */
+  const msFrame = () => (nivel >= 1 ? 33 : 13);
 
   /* `perf-tactil` va aparte de `perf-movil` a propósito: una ventana
      estrecha de escritorio es «móvil» para la carga de trabajo (conviene
@@ -126,6 +199,14 @@
   const HOLGADO = 58;       // y por encima de los cuales va sobrado
   let marca = 0, frames = 0, malos = 0, buenos = 0, arranque = 0;
 
+  /* Los hercios REALES de la pantalla, que no se pueden preguntar: se
+     deducen del mejor segundo visto. Empieza suponiendo 60 y sube solo.
+     Hace falta porque el listón tiene que ser relativo a lo que la pantalla
+     puede dar: pedirle 58 fps a un móvil de 60 Hz es pedirle la perfección
+     (cualquier hipo lo baja de escalón para siempre), y en uno de 165 Hz
+     los mismos 58 los pasa un equipo que va a un tercio de gas. */
+  let refresco = 60;
+
   const vigilar = (t) => {
     requestAnimationFrame(vigilar);
     if (!arranque) { arranque = t; marca = t; return; }
@@ -136,14 +217,21 @@
     frames = 0; marca = t;
 
     if (t - arranque < 3000) return;                        // regla 3
+    if (fps > refresco) refresco = Math.min(250, fps);      // hercios de la pantalla
     if (document.hidden || !document.body.classList.contains('playing')) {
       malos = buenos = 0;                                   // regla 2
       return;
     }
-    /* Con el tope de 30 fps del móvil, pedirle 50 no tiene sentido: ya se le
-       está pidiendo la mitad a propósito. El listón baja con el nivel. */
-    const suelo = nivel >= 1 ? 26 : OBJETIVO;
-    const techo = nivel >= 1 ? 30 : HOLGADO;
+    /* El listón, relativo a los hercios de la pantalla y NO al nivel.
+
+       Antes bajaba con el nivel (suelo 26 / techo 30 a partir de `medio`)
+       dando por hecho que en el móvil el propio rAF iba a 30. No va: el tope
+       de 30 fps está DENTRO de los bucles de pintado, rAF sigue llamando a
+       los hercios de la pantalla. Así que en cualquier monitor de 120 Hz un
+       equipo en `medio` medía 120, veía «va sobrado», subía a `alto`, se
+       atragantaba, volvía a bajar... un vaivén cada catorce segundos. */
+    const suelo = Math.min(OBJETIVO, refresco * 0.80);
+    const techo = Math.min(HOLGADO, refresco * 0.92);
 
     if (fps < suelo) { malos++; buenos = 0; } else if (fps >= techo) { buenos++; malos = 0; }
     else { malos = buenos = 0; }
@@ -169,6 +257,15 @@
     movil: () => nivel >= 1,
     bajo: () => nivel >= 2,
     tactil: () => tactil,
+    // Megapíxeles que hay que pintar de verdad (ya contando el devicePixelRatio)
+    superficie: () => superficie,
+    // Factor ≤1 para encoger los adornos de fondo. 1 en 1080p o menos.
+    escalaFondo: () => escala,
+    /* ¿Es una pantalla lo bastante grande como para que rehacer un desenfoque
+       en cada frame salga caro? Lo consultan ambient.js y cinema.js para
+       dejar quieta la carátula de fondo en vez de reescalarla. */
+    fondoFijo: () => nivel >= 1 || superficie > BASE_MPX * 1.25,
+    hercios: () => Math.round(refresco),
     cuantos,
     msFrame,
     /* Reloj propio para cada bucle: le pasas dónde guardas el último
@@ -183,5 +280,6 @@
   };
 
   console.info(`[perf] ${movil ? (bajo ? 'móvil modesto' : 'móvil') : 'escritorio'}` +
-    ` · mem ${mem || '?'}GB · ${nucleos || '?'} núcleos`);
+    ` · mem ${mem || '?'}GB · ${nucleos || '?'} núcleos` +
+    ` · pantalla ${superficie.toFixed(1)} Mpx · adornos al ${Math.round(escala * 100)}%`);
 })();

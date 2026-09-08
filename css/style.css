@@ -2275,7 +2275,7 @@ body.cinema-open #fxLabBtn { pointer-events: none; opacity: 0.3; }
   inset: -70px;
   background-size: cover;
   background-position: center;
-  filter: blur(42px) saturate(1.35) brightness(0.5);
+  filter: blur(calc(42px * var(--fondo-escala, 1))) saturate(1.35) brightness(0.5);
   animation: cin-zoom 26s ease-in-out infinite alternate;
 }
 /* Zoom lento y constante. El fondo NO late con el bombo a propósito: daba
@@ -2513,12 +2513,24 @@ body.playing .cinema-disc { animation-play-state: running; }
   opacity: calc(0.34 + 0.30 * var(--au-e, 0));
   transition: opacity 1.6s ease-out;
 }
+/* Estas cuatro manchas eran, con diferencia, lo más caro de toda la app en
+   una pantalla grande. `width: 62%` es del contenedor, que va con
+   `inset: -12%`, o sea el 124% de la ventana: en un ultrawide de 3440 salían
+   manchas de 2.645 px de lado —y con `aspect-ratio: 1` también de ALTO, más
+   que la propia pantalla—, cuatro, cada una con `blur(70px)` y
+   `mix-blend-mode: screen`, que obliga al compositor a releer el fondo. Unos
+   28 Mpx desenfocados y mezclados por frame contra los 11 del mismo bloque
+   en 1080p.
+
+   `--fondo-escala` (js/perf.js) vale 1 en 1080p o menos: ahí no cambia nada.
+   Por encima encoge tamaño y radio a la vez. */
+
 .au-blob {
   position: absolute;
-  width: 62%;
+  width: calc(62% * var(--fondo-escala, 1));
   aspect-ratio: 1;
   border-radius: 50%;
-  filter: blur(70px);
+  filter: blur(calc(70px * var(--fondo-escala, 1)));
   mix-blend-mode: screen;
   will-change: transform;
 }
@@ -2540,7 +2552,7 @@ body.playing .cinema-disc { animation-play-state: running; }
 }
 .au-blob.b4 {
   bottom: 8%; left: 14%;
-  width: 48%;
+  width: calc(48% * var(--fondo-escala, 1));
   background: radial-gradient(circle, var(--magenta) 0%, transparent 68%);
   animation: au-4 23s ease-in-out infinite alternate;
   opacity: 0.55;
@@ -3623,6 +3635,18 @@ body.perf-tactil .sp-queue { opacity: 1; }
 .sp-static:hover { border-color: transparent; background: transparent; }
 .q-now.sp-static:hover { background: var(--bg-panel-2); }
 
+/* Las filas de «a continuación» SÍ se pulsan: al posarse encima, el número
+   de orden se cambia por un ▶. Sin esta pista visual la cola parecía —y era—
+   una lista de solo lectura; el número por sí solo no invita a pulsar. */
+#queueList .sp-result[data-idx]:hover .sp-idx,
+#queueList .sp-result[data-idx]:focus-visible .sp-idx { font-size: 0; }
+#queueList .sp-result[data-idx]:hover .sp-idx::after,
+#queueList .sp-result[data-idx]:focus-visible .sp-idx::after {
+  content: '▶';
+  font-size: 15px;
+  color: var(--accent);
+}
+
 /* Pista que Spotify no puede reproducir (archivo local, retirada del catálogo):
    se muestra igual para no "perder" canciones de la playlist, pero apagada. */
 .sp-unplayable { opacity: 0.45; cursor: default; }
@@ -4356,29 +4380,47 @@ body.reduce-motion .lyrics-ncs:not(.live) .ncs-rad i { animation: none; }
 }
 .window { z-index: 1; }        /* la ventana siempre por encima de las luces */
 
+/* --------------------------------------------------------
+   `--fondo-escala` la escribe js/perf.js y vale 1 en 1080p o menos,
+   así que a esa resolución NADA de esto cambia. Por encima baja
+   (0,75 en 2K, 0,65 en un ultrawide de 3440) para que la superficie
+   desenfocada se quede constante en vez de crecer con la pantalla.
+
+   Por qué hacía falta: estos tres focos estaban medidos en `vmax`, o sea
+   en proporción del lado MAYOR. En un ultrawide el foco grande pasaba de
+   883 px a 1.582 px — de 0,78 a 2,50 Mpx— y encima con `blur(70px)`, que
+   cuesta superficie × radio. Medido: 5,2 Mpx desenfocados en 1080p contra
+   11,6 en el ultrawide. Eso es el tirón que reportó el usuario.
+
+   El factor se aplica al tamaño Y al radio: un foco más pequeño necesita
+   menos radio para verse igual de difuso.
+   -------------------------------------------------------- */
+.ambient {
+  --amb-vmax: calc(1vmax * var(--fondo-escala, 1));
+}
 .amb-blob {
   position: absolute;
   border-radius: 50%;
   opacity: 0;
   will-change: transform, opacity;
   /* el filtro va aquí y no en el JS: es constante, solo cambia la escala */
-  filter: blur(70px);
+  filter: blur(calc(70px * var(--fondo-escala, 1)));
   transition: opacity .12s linear;
 }
 .amb-blob.b1 {                  /* graves: foco grande abajo a la izquierda */
-  width: 46vmax; height: 46vmax;
+  width: calc(46 * var(--amb-vmax)); height: calc(46 * var(--amb-vmax));
   left: -12vmax; bottom: -16vmax;
   background: radial-gradient(circle, var(--accent) 0%, transparent 68%);
 }
 .amb-blob.b2 {                  /* medios: arriba a la derecha */
-  width: 38vmax; height: 38vmax;
+  width: calc(38 * var(--amb-vmax)); height: calc(38 * var(--amb-vmax));
   right: -10vmax; top: -14vmax;
   background: radial-gradient(circle, var(--accent-glow, var(--accent)) 0%, transparent 66%);
 }
 .amb-blob.b3 {                  /* agudos: pequeño y centrado abajo */
-  width: 26vmax; height: 26vmax;
+  width: calc(26 * var(--amb-vmax)); height: calc(26 * var(--amb-vmax));
   left: 50%; bottom: -12vmax;
-  margin-left: -13vmax;
+  margin-left: calc(-13 * var(--amb-vmax));
   background: radial-gradient(circle, var(--text-dim, var(--accent)) 0%, transparent 70%);
 }
 /* Con «menos movimiento» el JS ya las apaga; esto las deja fuera del todo */
@@ -4430,10 +4472,19 @@ body.perf-bajo .amb-blob.b2 { display: none; }
   position: absolute;
   inset: -12%;
   background: center/cover no-repeat;
-  filter: blur(42px) saturate(1.5);
+  filter: blur(calc(42px * var(--fondo-escala, 1))) saturate(1.5);
   opacity: 0;
   will-change: transform, opacity;
   transition: opacity .8s ease-out;
+}
+/* En pantalla grande esta capa ocupa el panel entero de la letra —en un
+   ultrawide son más de 3 Mpx— y ambient.js le cambiaba el `scale` en cada
+   frame, que obliga a REHACER el desenfoque de toda ella. Aquí se queda
+   quieta (el JS deja de escalarla) con un poco de escala fija para que siga
+   cubriendo el panel; el que respira sigue siendo el resto del fondo. */
+body.pantalla-grande .la-cover {
+  transform: scale(1.12);
+  will-change: opacity;
 }
 /* En el móvil el JS deja de escalarla en cada frame (rehacer un desenfoque
    grande por frame es carísimo): se queda fija, con menos radio y un poco

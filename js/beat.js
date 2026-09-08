@@ -486,7 +486,26 @@
     }
   };
 
-  const bucle = () => { raf = requestAnimationFrame(bucle); if (!document.hidden) paso(); };
+  /* Tope de 60 fps, fijo, y por dos motivos. El obvio: no hace falta mirar el
+     analizador 165 veces por segundo para saber dónde está el bombo.
+     El que de verdad importa: las envolventes de aquí decaen POR FRAME
+     (`marco.boom *= 0.86`), y esas constantes están afinadas a 60 Hz. En un
+     monitor de 120 o 165 Hz se aplicaban 2 o 2,75 veces más seguido, así que
+     el golpe se apagaba en la mitad de tiempo del previsto y todo lo que
+     late con él —el aura del cine, el ♪ de la escena sin letra, los focos—
+     salía más flojo de lo diseñado. Con el tope vuelven a durar lo suyo.
+
+     Se queda en 60 incluso en el móvil (no usa msFrame(), que baja a 30):
+     esto no pinta nada, y bajarlo empeoraría la detección. */
+  const relojBeat = { ultimo: 0 };
+  const bucle = () => {
+    raf = requestAnimationFrame(bucle);
+    if (document.hidden) return;
+    const ahora = performance.now();
+    if (ahora - relojBeat.ultimo < 13) return;   // 13 y no 16,67: ver msFrame() en perf.js
+    relojBeat.ultimo = ahora;
+    paso();
+  };
   const arrancar = () => { if (!raf) bucle(); };
   const parar = () => { if (raf) { cancelAnimationFrame(raf); raf = null; } };
 

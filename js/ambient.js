@@ -51,6 +51,10 @@
   const K = (k60) => (P() ? P().k(k60, dtAmb) : k60);
   const cuantos = (n) => (P() ? P().cuantos(n) : n);
   const enMovil = () => !!(P() && P().movil());
+  /* Igual que `enMovil`, pero también en cualquier pantalla grande: lo que
+     decide aquí no es el aparato sino cuántos píxeles hay que rehacer. Lo
+     consulta la carátula de fondo, que lleva un desenfoque grande. */
+  const fondoFijo = () => (P() && P().fondoFijo ? P().fondoFijo() : enMovil());
 
   /* Memo colgado del PROPIO elemento. Ojo: no vale un diccionario con
      clave `id + prop` — estas barras son <i> sin id y compartirían
@@ -341,18 +345,32 @@
     /* Carátula de fondo: lleva blur(42px). Cambiarle el `scale` en cada
        frame obliga al navegador a rehacer el desenfoque de una imagen
        grande — carísimo en un teléfono, y allí no se hace.
+
+       Ni en un monitor grande: esta capa es el panel entero de la letra, y
+       en un ultrawide eso pasa de 3 Mpx. Rehacer ese desenfoque 120 veces
+       por segundo era una de las dos causas del tirón en 2K y más (la otra
+       eran los focos de `.amb-blob`). Por eso ya no se pregunta si es un
+       teléfono sino si hay muchos píxeles que rehacer: `fondoFijo()`.
+
        La OPACIDAD sí se escribe siempre: una capa ya desenfocada cambia de
        opacidad en el compositor, sin volver a rasterizar nada, o sea que
        es barata. Y es imprescindible: `.la-cover` nace con `opacity: 0`
        en el CSS, así que saltarse esta línea dejaba el fondo invisible —
        fue justo lo que rompió la v65 en el móvil. */
     if (laCover && portadaActual) {
-      if (!enMovil()) {
+      const quieta = fondoFijo();
+      if (!quieta) {
         escribir(laCover, 'transform', `scale(${(1.08 + graves * 0.1 + boom * 0.03).toFixed(3)})`);
+      } else {
+        /* La calidad puede bajar de escalón EN MARCHA (o el usuario mover la
+           ventana a otro monitor). Si se deja el último `scale` en línea,
+           gana al del CSS y la capa se queda con el tamaño de aquel frame:
+           hay que soltarlo una vez para que mande la hoja de estilos. */
+        escribir(laCover, 'transform', '');
       }
-      // en móvil, algo más de presencia: sin el zoom que la hace respirar
-      // se queda plana y con 0.1 apenas se distingue del fondo
-      escribir(laCover, 'opacity', ((enMovil() ? 0.17 : 0.1) + graves * 0.1).toFixed(2));
+      // sin el zoom que la hace respirar se queda plana y con 0.1 apenas se
+      // distingue del fondo: se le da algo más de presencia a cambio
+      escribir(laCover, 'opacity', ((quieta ? 0.17 : 0.1) + graves * 0.1).toFixed(2));
     }
     // ecualizador fantasma: una barra por banda, solo scaleY
     if (barras.length) {

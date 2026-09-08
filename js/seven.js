@@ -748,10 +748,17 @@
 
   const queueHead = (txt) => `<li class="q-section">${txt}</li>`;
 
+  /* Las pistas que hay pintadas ahora mismo, en el mismo orden que las filas.
+     La fila guarda solo su número (`data-idx`) y el objeto entero vive aquí:
+     es como lo hacen buscar (spotify.js) y biblioteca (library.js), y evita
+     tener que meter la uri y la portada dentro de un atributo HTML. */
+  let filasCola = [];
+
   // Misma anatomía de fila que la biblioteca: portada + meta + duración
-  const queueRow = (t, i, clickable, now) => `
-    <li class="sp-result ${clickable ? '' : 'sp-static'} ${now ? 'q-now' : ''}"
-        ${clickable ? `data-track-id="${t.id}"` : ''}>
+  const queueRow = (t, i, idx, now) => `
+    <li class="sp-result ${idx >= 0 ? '' : 'sp-static'} ${now ? 'q-now' : ''}"
+        ${idx >= 0 ? `data-idx="${idx}" tabindex="0" title="Sonar esta: ${escapeHtml(t.name)}"` : ''}
+        ${idx >= 0 && t.id ? `data-track-id="${t.id}"` : ''}>
       <span class="sp-idx">${now ? '▶' : String(i + 1).padStart(2, '0')}</span>
       <div class="sp-thumb" ${t.cover ? `style="background-image:url('${t.cover}')"` : ''}>${t.cover ? '' : '♪'}</div>
       <div class="sp-meta">
@@ -761,9 +768,13 @@
       <div class="sp-dur">${formatTime(t.duration)}</div>
     </li>`;
 
-  // Pista de Spotify (cruda) → la forma que usan las filas
+  // Pista de Spotify (cruda) → la forma que usan las filas.
+  // `uri` y `preview` hacen falta para poder reproducirla desde aquí.
   const spTrack = (it) => ({
     id: it.id ? 'sp:' + it.id : null,
+    uri: it.uri || (it.id ? 'spotify:track:' + it.id : null),
+    preview: it.preview_url || null,
+    spotify: true,
     name: it.name || '(sin título)',
     artist: (it.artists || []).map(a => a.name).filter(Boolean).join(', '),
     duration: (it.duration_ms || 0) / 1000,
@@ -783,11 +794,17 @@
         const data = await window.SpotifyModule.api('/me/player/queue');
         const sonando = data && data.currently_playing;
         const items = (data && data.queue) || [];
+        filasCola = [];
         let html = '';
-        if (sonando) html += queueHead('sonando ahora') + queueRow(spTrack(sonando), 0, false, true);
+        if (sonando) html += queueHead('sonando ahora') + queueRow(spTrack(sonando), 0, -1, true);
         html += queueHead('a continuación');
         html += items.length
-          ? items.slice(0, 20).map((it, i) => queueRow(spTrack(it), i, false)).join('')
+          ? items.slice(0, 20).map((it, i) => {
+              const t = spTrack(it);
+              // sin uri no hay forma de pedirle a Spotify que la ponga
+              const idx = t.uri ? filasCola.push(t) - 1 : -1;
+              return queueRow(t, i, idx, false);
+            }).join('')
           : queueEmpty('▒ nada más en la cola ▒');
         queueList.innerHTML = html;
       } catch (e) {
@@ -815,12 +832,59 @@
 
     // Local: lo que queda de la cola del reproductor
     const up = (st.queue || []).slice(st.queueIndex + 1).map(ix => st.tracks[ix]).filter(Boolean);
-    queueList.innerHTML = (cur ? queueHead('sonando ahora') + queueRow(cur, 0, false, true) : '')
+    filasCola = [];
+    queueList.innerHTML = (cur ? queueHead('sonando ahora') + queueRow(cur, 0, -1, true) : '')
       + queueHead('a continuación')
       + (up.length
-          ? up.map((t, i) => queueRow(t, i, true)).join('')
+          ? up.map((t, i) => queueRow(t, i, filasCola.push(t) - 1, false)).join('')
           : queueEmpty(cur ? '▒ no hay más canciones en cola ▒' : '▒ reproduce algo para ver la cola ▒'));
   };
+
+  /* ---------- Elegir una canción de la lista y que suene ----------
+
+     Las filas de la cola ya nacían con `data-track-id`, pero NADIE las
+     escuchaba: el único delegado que hay en app.js mira `.track-row`, que es
+     la lista de la config, y las de aquí son `.sp-result`. O sea que la cola
+     se veía y no se podía tocar. Ahora se puede, en local y en Spotify.
+
+     Va delegado en la lista entera y no fila a fila porque `renderQueue`
+     rehace el innerHTML cada 2,5 segundos: cualquier oyente puesto en una
+     fila se perdería en el primer refresco. */
+  const sonarDeLaCola = (row) => {
+    const t = filasCola[parseInt(row.dataset.idx, 10)];
+    if (!t) return;
+
+    if (t.spotify) {
+      const S = window.SpotifyModule;
+      if (!S || !S.isLoggedIn()) return;
+      /* Con el contexto (la playlist de la que sale) Spotify SALTA a esa
+         canción y conserva lo que venía detrás. Sin él reproduciría la pista
+         suelta y al terminar se quedaría en silencio, que es justo lo
+         contrario de lo que espera quien elige algo de una cola. */
+      S.playTrack(t, S.context ? S.context() : null);
+    } else if (window.PlayerCore && t.id) {
+      window.PlayerCore.playTrackById(t.id);
+    }
+    updateStatus('▶ ' + t.name + (t.artist ? ' · ' + t.artist : ''));
+    // repintar ya: si no, la fila elegida sigue en "a continuación" hasta el
+    // siguiente refresco y parece que no ha pasado nada
+    setTimeout(renderQueue, 350);
+  };
+
+  if (queueList) {
+    queueList.addEventListener('click', (e) => {
+      const row = e.target.closest('.sp-result[data-idx]');
+      if (row) sonarDeLaCola(row);
+    });
+    // con teclado: las filas son focusables (tabindex en queueRow)
+    queueList.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = e.target.closest('.sp-result[data-idx]');
+      if (!row) return;
+      e.preventDefault();       // que el espacio no haga scroll ni pause
+      sonarDeLaCola(row);
+    });
+  }
 
   // Refresca solo mientras la pestaña está visible (evita llamadas de sobra)
   setInterval(() => {

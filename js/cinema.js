@@ -248,7 +248,13 @@
     if (!wave) return;
     const rect = wave.getBoundingClientRect();
     if (!rect.width) return;
-    dpr = Math.max(1, window.devicePixelRatio || 1);
+    /* TOPE de resolución, el mismo que ya tenía el visualizador y que a esta
+       onda le faltaba. Aquí duele más que allá: la onda del cine cruza la
+       pantalla ENTERA, así que en un ultrawide con devicePixelRatio 2 eran
+       6.800 píxeles de ancho por rellenar en cada frame. Con 1,5 en el móvil
+       y 2 en el resto se ve igual de nítida. */
+    const tope = window.MMPerf && window.MMPerf.movil() ? 1.5 : 2;
+    dpr = Math.min(tope, Math.max(1, window.devicePixelRatio || 1));
     wW = Math.floor(rect.width);
     wH = Math.floor(rect.height);
     wave.width = Math.floor(wW * dpr);
@@ -447,10 +453,17 @@
     if (pauseIco) pauseIco.hidden = !sonando;
   };
 
+  /* Tope de fotogramas: este bucle repinta el aura, la onda y el ritmo del
+     modo cine, todo a pantalla completa. Sin tope corría a los hercios del
+     monitor —120 o 165— cuando a 60 se ve exactamente igual. Lo decide
+     perf.js, que también lo baja a 30 en el móvil o si la calidad cae. */
+  const relojCine = { ultimo: 0 };
+
   const loop = () => {
     if (!open) return;
     rafId = requestAnimationFrame(loop);
     if (document.hidden) return;
+    if (window.MMPerf && window.MMPerf.salta(relojCine, performance.now())) return;
     const t = window.PlayerCore && window.PlayerCore.state.currentTrack;
     if (t !== lastTrack) { lastTrack = t; paintTrack(); }
     const sync = window.LyricsModule && window.LyricsModule.getSync

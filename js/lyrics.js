@@ -1299,8 +1299,15 @@
     if (viz && viz.getBands) {
       esc.classList.add('live');
       let raf = 0;
+      // 19 barras + el ♪, cada una con su transform: sin tope esto corría a
+      // los hercios del monitor. Lo marca perf.js (60 fps, o 30 si conviene).
+      const relojRad = { ultimo: 0 };
       const paso = () => {
         if (!esc.isConnected) { cancelAnimationFrame(raf); return; }
+        if (window.MMPerf && window.MMPerf.salta(relojRad, performance.now())) {
+          raf = requestAnimationFrame(paso);
+          return;
+        }
         const bands = viz.getBands(19);
         radBars.forEach((b, k) => {
           // distancia circular al punto más alto: graves arriba, espejo a los lados
@@ -2083,11 +2090,21 @@
   // This replaces the slow 4Hz 'timeupdate' polling and removes the
   // up-to-250ms perceived delay.
   const startLoop = () => {
+    /* Tope de 60 fps, y aquí SIEMPRE 60 — no se usa MMPerf.msFrame(), que en
+       el móvil baja a 30. El teñido palabra a palabra es lo que se mira
+       fijamente toda la canción; los adornos de fondo pueden ir a 30 sin que
+       nadie lo note, esto no. Lo que sí sobra es pasar de 60: en un monitor
+       de 120 o 165 Hz este bucle corría a 120 o 165 y el ojo no distingue
+       nada por encima de los 60 en un texto que se colorea. */
+    const reloj = { ultimo: 0 };
     const loop = () => {
       requestAnimationFrame(loop);
       if (document.hidden) return;   // en segundo plano no hay nada que pintar
       const audio = window.PlayerCore && window.PlayerCore.audio;
       if (!audio || audio.paused) return;
+      const ahora = performance.now();
+      if (ahora - reloj.ultimo < 13) return;   // 13 y no 16,67: ver msFrame() en perf.js
+      reloj.ultimo = ahora;
       tick(audio.currentTime);
     };
     loop();

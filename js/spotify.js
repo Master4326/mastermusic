@@ -230,6 +230,13 @@
      aleatorio/repetir. Sin eso, los botones de aleatorio y repetir no tenían
      forma de saber cómo estaba Spotify de verdad. */
   let lastDevice = null;       // {id, name, type, volume_percent} o null
+  /* De dónde sale lo que suena: la playlist / álbum / artista. Hace falta
+     para que elegir una canción en la pestaña «cola» no rompa la cola: con
+     el contexto se salta A esa canción DENTRO de la lista y lo que venía
+     detrás se conserva; sin él, Spotify reproduce esa pista suelta y al
+     acabar se queda callado. El sondeo ya pide /me/player, así que esto no
+     cuesta ni una petición más. */
+  let lastContext = null;      // 'spotify:playlist:…' o null
   let lastShuffle = null;      // true/false; null = todavía no se sabe
   let lastRepeat = null;       // 'off' | 'context' | 'track'
 
@@ -288,6 +295,7 @@
         // Los modos se leen aunque no haya pista sonando: puede haber un
         // aparato despierto y en pausa, y el aleatorio sigue teniendo estado.
         if (data) leerModos(data);
+        if (data) lastContext = (data.context && data.context.uri) || null;
         if (data && data.item) {
           const it = data.item;
           const track = {
@@ -371,6 +379,7 @@
     lastDevice = null;
     lastShuffle = null;
     lastRepeat = null;
+    lastContext = null;
     pintarChipAparato();
   };
 
@@ -996,6 +1005,8 @@
     queue: spQueue,
     // Último estado conocido del aparato y los modos (lo refresca el sondeo)
     device: () => lastDevice,
+    // playlist/album del que sale lo que suena (lo usa la pestana «cola»)
+    context: () => lastContext,
     shuffle: () => lastShuffle,
     repeat: () => lastRepeat,
     /* Posición interpolada: el mismo reloj que mueve la barra y la letra

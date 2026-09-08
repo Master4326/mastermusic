@@ -584,7 +584,14 @@
        a 30 fps se ve idéntica y cuesta la mitad. Con música real, los 60
        — salvo en el móvil, donde 30 son los que hay para todo. */
     const t0 = ts || performance.now();
-    const minMs = window.MMPerf && window.MMPerf.movil() ? 33 : (playing ? 0 : 33);
+    /* El tope lo pone perf.js: 33 ms en el móvil o si la calidad ha bajado,
+       16 ms (60 fps) en el resto. Antes aquí había un 0 con música sonando,
+       o sea SIN tope: en un monitor de 120 o 165 Hz este canvas se repintaba
+       120 o 165 veces por segundo para un gráfico de barras que a 60 se ve
+       idéntico. Sin señal se sigue pidiendo 33: la onda de respaldo es lenta
+       y suave y a 30 fps no se distingue. */
+    const tope = window.MMPerf ? window.MMPerf.msFrame() : (playing ? 0 : 33);
+    const minMs = playing ? tope : Math.max(33, tope);
     if (t0 - ultimoFrame < minMs) return;
     /* Tiempo real transcurrido desde el frame que SÍ se pintó (no desde el
        anterior sin más): con el tope de 30 fps del móvil, contar mal aquí
