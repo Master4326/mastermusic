@@ -886,11 +886,19 @@
     });
   }
 
-  // Refresca solo mientras la pestaña está visible (evita llamadas de sobra)
+  /* Refresca solo con la pestaña de la cola abierta Y la ventana delante.
+     Cada pasada es una petición a Spotify (`/me/player/queue`), y a 2,5 s eran
+     24 por minuto que se sumaban a las 30 del sondeo de reproducción: entre
+     las dos cosas la app se comía el límite de la API y Spotify contestaba
+     **429 Too Many Requests** a TODO, incluidas las playlists — que entonces
+     salían vacías, como si estuvieran bloqueadas. A 6 s la cola sigue estando
+     al día (nadie mira una cola a cronómetro) por la cuarta parte del gasto.
+     Ver también el freno del 429 en js/spotify.js. */
   setInterval(() => {
+    if (document.hidden) return;
     const tab = document.getElementById('tab-queue');
     if (tab && tab.classList.contains('active')) renderQueue();
-  }, 2500);
+  }, 6000);
 
   /* Para que encolar una canción se vea al momento en vez de esperar hasta
      2,5 s al siguiente refresco. Solo repinta si la cola está a la vista. */

@@ -193,8 +193,50 @@
     return null;
   };
 
+  /* -------- FRENO ANTE EL 429 --------
+
+     Spotify contesta **429 Too Many Requests** cuando se le pide demasiado en
+     poco rato, y hasta ahora la app no lo miraba: `poll()` se tragaba el error
+     en silencio y dos segundos después volvía a preguntar. Igual con todo lo
+     demás. O sea que en cuanto caías en el 429 **te quedabas dentro**, porque
+     seguías pidiendo sin parar y cada intento renueva el castigo. Con la app
+     abierta en una pestaña eso son ~30 peticiones por minuto para siempre,
+     aunque no suene nada, más las de la cola y las de la biblioteca.
+
+     Ahí estaba el fallo de verdad detrás de «no salen las canciones»: la
+     biblioteca, las playlists y la cola pedían y recibían 429, y la app lo
+     enseñaba como si la playlist estuviera vacía.
+
+     Ahora, al primer 429 se apunta HASTA CUÁNDO hay que callarse y las
+     llamadas siguientes fallan al instante sin tocar la red. Se respeta la
+     cabecera `Retry-After` si Spotify la deja leer; si no (no siempre se
+     expone a otro origen), se dobla la espera en cada 429 seguido —5, 10, 20,
+     40 s…— con tope de cinco minutos. Un acierto la reinicia. */
+  let bloqueadoHasta = 0;      // marca de tiempo hasta la que no se pide nada
+  let esperaSeguida = 0;       // segundos de la última espera, para doblarla
+
+  const ESPERA_MIN = 5, ESPERA_MAX = 300;
+
+  const frenado = () => Math.max(0, bloqueadoHasta - Date.now());
+
+  const frenar = (res) => {
+    const cabecera = parseInt((res && res.headers.get('Retry-After')) || '0', 10);
+    esperaSeguida = cabecera > 0
+      ? Math.min(ESPERA_MAX, cabecera)
+      : Math.min(ESPERA_MAX, Math.max(ESPERA_MIN, esperaSeguida * 2 || ESPERA_MIN));
+    bloqueadoHasta = Date.now() + esperaSeguida * 1000;
+    console.warn(`[Spotify] 429: en pausa ${esperaSeguida}s` +
+      (cabecera > 0 ? ' (lo pide Retry-After)' : ' (sin Retry-After legible)'));
+    setStatus(`◷ spotify pidió esperar · reintentando en ${esperaSeguida}s`);
+  };
+
   // -------- Web API helpers --------
   const api = async (path, opts = {}) => {
+    /* Frenados: se falla aquí mismo, SIN tocar la red. Es lo único que saca
+       de un 429; seguir pidiendo solo alarga el castigo. */
+    const resto = frenado();
+    if (resto) throw new Error(`Spotify API 429: espera ${Math.ceil(resto / 1000)}s`);
+
     const token = await getValidToken();
     if (!token) throw new Error('No token');
     const res = await fetch('https://api.spotify.com/v1' + path, {
@@ -205,6 +247,8 @@
         ...(opts.headers || {}),
       },
     });
+    if (res.status === 429) { frenar(res); throw new Error('Spotify API 429: demasiadas peticiones'); }
+    esperaSeguida = 0;                 // una respuesta buena limpia la cuenta
     if (res.status === 204) return null;
     if (!res.ok) {
       const txt = await res.text();
@@ -220,6 +264,9 @@
 
   // -------- Polling current playback --------
   let pollTimer = null;
+  // La reprograma startPolling(); vive aquí porque la usa el oyente de
+  // visibilitychange, que se registra fuera.
+  let reprogramar = () => {};
   let lastTrackId = null;
   let lastIsPlaying = false;   // último estado conocido (lo refresca el polling)
 
@@ -364,13 +411,55 @@
         // silently ignore (e.g. nothing playing)
       }
     };
+
+    /* Cada cuánto volver a preguntar. Antes era `setInterval(poll, 2000)` a
+       secas: 30 peticiones por minuto SIEMPRE, sonara algo o no, con la
+       pestaña delante o enterrada detrás de otras veinte. Sumadas a las de la
+       cola y la biblioteca, es lo que llevaba al 429.
+
+       Los 2 s hacen falta SOLO mientras suena algo: son los que mantienen la
+       barra de progreso en su sitio y los que hacen que un cambio de canción
+       se note al momento. Parado no hay nada que refrescar, y en una pestaña
+       de fondo tampoco hay nadie mirando. */
+    const cuandoToca = () => {
+      if (document.hidden) return 30000;              // nadie está mirando
+      const resto = frenado();
+      if (resto) return Math.min(60000, resto + 500); // esperar a que pase el 429
+      return lastIsPlaying ? 2000 : 10000;
+    };
+
+    const siguiente = () => {
+      pollTimer = setTimeout(async () => {
+        if (!pollTimer) return;                       // lo pararon mientras tanto
+        if (!document.hidden && !frenado()) await poll();
+        if (pollTimer) siguiente();
+      }, cuandoToca());
+    };
+
+    /* Volver a la pestaña tiene que refrescar YA: con el intervalo de fondo a
+       30 s, si no, vuelves y sigue saliendo la canción de hace medio minuto.
+       Se reprograma el temporizador que ya hay en vez de parar y arrancar el
+       sondeo entero, porque `stopPolling()` borra también el aparato y los
+       modos y haría parpadear el chip de «dónde suena» en cada cambio de
+       pestaña. */
+    reprogramar = () => {
+      if (!pollTimer) return;
+      clearTimeout(pollTimer);
+      pollTimer = setTimeout(() => {}, 0);            // marca que sigue vivo
+      poll().finally(() => { if (pollTimer) { clearTimeout(pollTimer); siguiente(); } });
+    };
+
     poll();
-    pollTimer = setInterval(poll, 2000);
+    siguiente();
     if (!rafId) smoothLoop();
   };
 
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && !frenado()) reprogramar();
+  });
+
   const stopPolling = () => {
-    if (pollTimer) clearInterval(pollTimer);
+    if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     progStamp = 0;

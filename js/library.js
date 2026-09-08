@@ -271,7 +271,12 @@
       return 'esta playlist la hace spotify (descubrimiento semanal, daily mix, radio…)<br>'
         + 'y no deja abrirlas desde otras apps';
     }
-    if (/Spotify API 429/.test(msg)) return 'spotify pidió esperar un momento (demasiadas peticiones)';
+    if (/Spotify API 429/.test(msg)) {
+      // el freno de spotify.js mete los segundos que faltan en el mensaje
+      const seg = (msg.match(/espera (d+)s/) || [])[1];
+      return 'spotify pidió esperar: demasiadas peticiones'
+        + (seg ? '<br>vuelve a intentarlo en <b>' + seg + ' s</b>' : '<br>espera un momento y pulsa ⟳');
+    }
     console.error('[Biblioteca] fallo:', msg);
     return 'no se pudo cargar (¿sin conexión?)' + detailOf(msg);
   };
