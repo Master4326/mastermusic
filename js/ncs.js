@@ -186,7 +186,15 @@
     if (!panel.hidden) return;
     panel.hidden = false;
     firmaPista = '';        // fuerza el repintado de carátula y títulos
-    notaPuesta = '';
+    /* Aquí había un `notaPuesta = '';` que NO estaba declarado en ninguna
+       parte y que nadie más usaba: resto de una función retirada. Este archivo
+       va en modo estricto, así que asignar a una variable inexistente LANZA
+       ReferenceError — y lo lanzaba justo aquí, ANTES de revisarPista() y de
+       arrancar(), o sea que la escena sin letra se destapaba y se quedaba
+       congelada: sin carátula, sin títulos y sin bucle de pintado, en TODA
+       canción que LRClib no tuviera. Lo cazó una prueba de aguante de ocho
+       minutos mirando los errores de consola; a simple vista no se veía
+       porque el panel sí aparecía. */
     revisarPista();
     arrancar();
   };

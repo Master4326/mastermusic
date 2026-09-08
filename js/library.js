@@ -100,18 +100,37 @@
     return { rows, stats };
   };
 
-  const statsMsg = (s, via) => {
-    if (!s) return 'esta playlist está vacía';
-    const fuente = via === 'playlist' ? '<br>(vía el objeto playlist, porque /tracks está bloqueado)' : '';
-    if (!s.recibidos) {
-      return 'spotify no deja listar las canciones de esta playlist<br>'
-        + '(restricción a las apps en <b>modo desarrollo</b>: devuelve la lista vacía)<br>'
-        + 'pero <b>reproducirla sí funciona</b> — y así se pueden leer de la cola' + fuente;
-    }
-    return `spotify devolvió <b>${s.recibidos}</b> ítems y ninguno es una canción<br>`
-      + `(nulos: ${s.nulos} · episodios: ${s.episodios})<br>`
-      + `abre la consola del navegador para ver el detalle` + fuente;
+  /* Lo que se le dice al usuario cuando una playlist no lista.
+
+     Antes salían CUATRO líneas hablándole de «restricción a las apps en modo
+     desarrollo», del «objeto playlist» y de que «/tracks está bloqueado». A
+     quien abre una playlist para oír música eso no le dice nada y encima
+     parece que la app está rota. El motivo técnico sigue estando, pero donde
+     le toca: en la consola (los console.warn de fetchTracksPage) y en el
+     diagnóstico, que ahora solo sale en local.
+
+     Una línea, y debajo el botón que SÍ funciona. */
+  const statsMsg = (s) => {
+    if (!s || !s.recibidos) return 'spotify no deja ver la lista de esta playlist desde aquí';
+    // Llegaron ítems pero ninguno era una canción: episodios de podcast,
+    // pistas retiradas del catálogo o archivos locales de la playlist.
+    if (s.episodios && s.episodios >= s.recibidos - s.nulos) return 'aquí solo hay episodios de podcast';
+    return 'ninguna de estas canciones se puede reproducir';
   };
+
+  /* El diagnóstico es una herramienta de desarrollo: prueba seis variantes de
+     la misma petición y escupe códigos HTTP. Igual que el ⚗ del laboratorio,
+     no tiene por qué salirle a nadie en la web publicada. */
+  const enLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+    || location.protocol === 'file:';
+
+  const botonesDeRescate = () =>
+    '<br><button class="retro-btn small" id="libPlayQueue" style="margin-top:10px">'
+    + '<span class="bracket">[</span> ▶ reproducir y ver canciones <span class="bracket">]</span></button>'
+    + (enLocal
+        ? ' <button class="retro-btn small" id="libDiag" style="margin-top:10px">'
+          + '<span class="bracket">[</span> ⚙ diagnóstico <span class="bracket">]</span></button>'
+        : '');
 
   const mapPlaylist = (p) => ({
     id: p.id,
@@ -206,11 +225,7 @@
     if (view.detail) {
       ul.innerHTML = view.detail.rows.length
         ? view.detail.rows.map(rowTrack).join('')
-        : empty(statsMsg(view.detail.stats, view.detail.via)
-            + '<br><button class="retro-btn small" id="libPlayQueue" style="margin-top:10px">'
-            + '<span class="bracket">[</span> ▶ reproducir y ver canciones <span class="bracket">]</span></button>'
-            + ' <button class="retro-btn small" id="libDiag" style="margin-top:10px">'
-            + '<span class="bracket">[</span> ⚙ diagnóstico <span class="bracket">]</span></button>');
+        : empty(statsMsg(view.detail.stats) + botonesDeRescate());
     } else {
       const c = cache[view.col];
       if (!c) {
@@ -246,9 +261,10 @@
         : 'spotify no autorizó esta petición' + detailOf(msg);
     }
     if (/Spotify API 404/.test(msg)) {
-      return 'spotify no encuentra esta playlist.<br>'
-        + 'las playlists que <b>hace spotify</b> (descubrimiento semanal, daily mix, radio…)<br>'
-        + 'están bloqueadas para apps en modo desarrollo' + detailOf(msg);
+      // Sin detailOf: aquí la API solo dice "Resource not found", que no
+      // añade nada y alarga un mensaje que ya explica la causa real.
+      return 'esta playlist la hace spotify (descubrimiento semanal, daily mix, radio…)<br>'
+        + 'y no deja abrirlas desde otras apps';
     }
     if (/Spotify API 429/.test(msg)) return 'spotify pidió esperar un momento (demasiadas peticiones)';
     console.error('[Biblioteca] fallo:', msg);
@@ -299,20 +315,43 @@
     }
   };
 
-  // Spotify restringe algunos endpoints a las apps en development mode.
-  // Si /playlists/{id}/tracks se cierra, el objeto playlist completo suele
-  // seguir trayendo sus pistas (sin paginar): mejor eso que una lista vacía.
+  // El objeto playlist entero suele seguir trayendo sus pistas (las primeras
+  // 100, sin paginar) aunque /playlists/{id}/tracks no dé ninguna.
+  const viaObjetoPlaylist = async (id) => {
+    const d = await window.SpotifyModule.api(`/playlists/${id}`);
+    const t = (d && d.tracks) || {};
+    return { items: t.items || [], total: t.total || 0, more: false, via: 'playlist' };
+  };
+
+  /* Spotify restringe endpoints a las apps en development mode, y AQUÍ ESTABA
+     EL BUG: el respaldo del objeto playlist solo se probaba dentro del `catch`,
+     o sea únicamente cuando /tracks lanzaba un 403 o un 404. Pero la forma más
+     común de la restricción no es un error: es **un 200 con `items: []`**. Por
+     ese camino no saltaba ninguna excepción, así que el respaldo no llegaba a
+     probarse nunca y el usuario veía la playlist vacía con un ladrillo de
+     texto explicándole por qué — teniendo a un solo intento de distancia las
+     canciones. Ahora la lista vacía también dispara el respaldo. */
   const fetchTracksPage = async (id, offset) => {
+    let porTracks = null;
     try {
       const d = await getPage(`/playlists/${id}/tracks`, offset, true);
-      return { items: (d && d.items) || [], total: (d && d.total) || 0, more: !!(d && d.next), via: 'tracks' };
+      porTracks = { items: (d && d.items) || [], total: (d && d.total) || 0,
+                    more: !!(d && d.next), via: 'tracks' };
+      // con pistas, o pidiendo una página siguiente, no hay nada que rescatar
+      if (porTracks.items.length || offset > 0) return porTracks;
+      console.warn('[Biblioteca] /tracks respondió 200 con la lista vacía; probando el objeto playlist');
     } catch (e) {
       if (offset > 0 || !/Spotify API 40[34]/.test(e.message || '')) throw e;
       console.warn('[Biblioteca] /tracks bloqueado, probando el objeto playlist:', e.message);
-      const d = await window.SpotifyModule.api(`/playlists/${id}`);
-      const t = (d && d.tracks) || {};
-      return { items: t.items || [], total: t.total || 0, more: false, via: 'playlist' };
     }
+    try {
+      const alt = await viaObjetoPlaylist(id);
+      if (alt.items.length) return alt;
+    } catch (e) {
+      console.warn('[Biblioteca] el objeto playlist tampoco:', e.message);
+      if (!porTracks) throw e;      // sin nada que enseñar, que hable el error
+    }
+    return porTracks || { items: [], total: 0, more: false, via: 'tracks' };
   };
 
   const openPlaylist = async (p, more) => {
@@ -343,11 +382,7 @@
       view.loading = false;
       const ul = list();
       // Aunque no podamos LISTARLA, reproducirla por contexto sí suele funcionar.
-      if (ul) ul.innerHTML = empty(errorMsg(e)
-        + '<br><button class="retro-btn small" id="libPlayQueue" style="margin-top:10px">'
-        + '<span class="bracket">[</span> ▶ reproducir y ver canciones <span class="bracket">]</span></button>'
-        + ' <button class="retro-btn small" id="libDiag" style="margin-top:10px">'
-        + '<span class="bracket">[</span> ⚙ diagnóstico <span class="bracket">]</span></button>');
+      if (ul) ul.innerHTML = empty(errorMsg(e) + botonesDeRescate());
       paintMore();
       return;
     }
