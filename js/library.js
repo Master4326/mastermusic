@@ -121,8 +121,13 @@
   /* El diagnóstico es una herramienta de desarrollo: prueba seis variantes de
      la misma petición y escupe códigos HTTP. Igual que el ⚗ del laboratorio,
      no tiene por qué salirle a nadie en la web publicada. */
+  /* …y en la web publicada solo si se pide a propósito con `?diag` en la URL.
+     Escondiéndolo del todo se perdía la única forma de ver POR QUÉ falla una
+     playlist sin abrir la consola, que es justo lo que hace falta cuando el
+     usuario dice «no salen las canciones» y uno no tiene su cuenta delante. */
   const enLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
-    || location.protocol === 'file:';
+    || location.protocol === 'file:'
+    || /[?&]diag\b/.test(location.search);
 
   const botonesDeRescate = () =>
     '<br><button class="retro-btn small" id="libPlayQueue" style="margin-top:10px">'
@@ -414,7 +419,13 @@
     const total = (d && d.total) != null ? d.total : (d && d.tracks && d.tracks.total);
     // Las claves de la respuesta dicen más que el conteo cuando viene rara
     const claves = d && typeof d === 'object' ? Object.keys(d).slice(0, 6).join(',') : String(d);
-    return { n: items.length, total: total == null ? '?' : total, claves };
+    /* De QUIÉN es la playlist es el dato que decide si hay algo que arreglar:
+       las que hace Spotify (owner `spotify`: descubrimiento semanal, daily
+       mix, radio, blends) están bloqueadas para las apps en modo desarrollo y
+       no hay forma de abrirlas. Las del propio usuario deberían listar. */
+    const o = d && d.owner;
+    const duenio = o ? (o.id === 'spotify' ? 'SPOTIFY (bloqueada, sin arreglo)' : (o.display_name || o.id)) : null;
+    return { n: items.length, total: total == null ? '?' : total, claves, duenio };
   };
 
   const diagnose = async (id) => {
@@ -425,8 +436,9 @@
     for (const [label, path] of probes(id)) {
       try {
         const d = await window.SpotifyModule.api(path);
-        const { n, total, claves } = countItems(d);
+        const { n, total, claves, duenio } = countItems(d);
         lines.push(`<b>${escapeHtml(label)}</b> → ok · ítems: <b>${n}</b> · total: ${total}`
+          + (duenio ? ` · de: <b>${escapeHtml(duenio)}</b>` : '')
           + `<br><span style="opacity:.6">claves: ${escapeHtml(claves)}</span>`);
         console.info('[Diagnóstico]', label, path, d);
       } catch (e) {
