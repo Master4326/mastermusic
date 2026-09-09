@@ -30,6 +30,14 @@
                  scope: 'user-read-recently-played' },
     top:       { title: 'top canciones', path: '/me/top/tracks',           paged: true,  kind: 'track',
                  scope: 'user-top-read' },
+    /* Álbumes y artistas: la app llevaba desde siempre sin poder abrir ni
+       uno. Los dos endpoints están vivos y sin usar.
+       OJO con `/me/following`: NO devuelve `{items}` como los demás, sino
+       `{artists:{items,cursors}}`, y va por cursor en vez de offset. Por eso
+       lleva `dentro` y `cursor`. */
+    albums:    { title: 'álbumes',       path: '/me/albums',               paged: true,  kind: 'album' },
+    artists:   { title: 'artistas',      path: '/me/following?type=artist', paged: false, kind: 'artist',
+                 dentro: 'artists', scope: 'user-follow-read' },
   };
 
   // rows / next(offset) / total por colección; null = aún no cargada
@@ -90,6 +98,9 @@
     if (!it || typeof it !== 'object') return it;
     if ('item' in it) return it.item;
     if ('track' in it) return it.track;
+    /* NO se desenvuelve `album` aquí a propósito: una PISTA también trae su
+       `.album`, así que hacerlo devolvería el disco en vez de la canción.
+       Los de /me/albums se mapean aparte, en loadCol. */
     return it;
   };
 
@@ -154,6 +165,26 @@
           + '<span class="bracket">[</span> ⚙ diagnóstico <span class="bracket">]</span></button>'
         : '');
 
+  const mapAlbum = (a) => ({
+    id: a.id,
+    uri: a.uri,
+    name: a.name || '(sin título)',
+    owner: (a.artists || []).map((x) => x.name).filter(Boolean).join(', '),
+    total: a.total_tracks || ((a.tracks && a.tracks.total) || 0),
+    cover: (a.images && a.images[0]) ? a.images[0].url : null,
+    anio: (a.release_date || '').slice(0, 4),
+  });
+
+  const mapArtist = (a) => ({
+    id: a.id,
+    uri: a.uri,
+    name: a.name || '(sin nombre)',
+    // Los géneros son lo que mejor describe a un artista de un vistazo
+    owner: (a.genres || []).slice(0, 2).join(' · '),
+    total: 0,
+    cover: (a.images && a.images[0]) ? a.images[0].url : null,
+  });
+
   const mapPlaylist = (p) => ({
     id: p.id,
     uri: p.uri,
@@ -203,6 +234,31 @@
       <div class="lib-card-sub">${p.total} ${p.total === 1 ? 'canción' : 'canciones'}${p.owner ? ' · ' + escapeHtml(p.owner) : ''}</div>
     </li>`;
 
+  /* Álbum y artista usan la MISMA tarjeta que las playlists: es la misma
+     forma (portada cuadrada, nombre, subtítulo) y así la rejilla no cambia.
+     Solo cambian el marcador de posición y el subtítulo. */
+  const rowAlbum = (a, i) => `
+    <li class="lib-card" data-idx="${i}" title="${escapeHtml(a.name)}">
+      <div class="lib-card-art" ${a.cover ? `style="background-image:url('${a.cover}')"` : ''}>
+        ${a.cover ? '' : '<span class="lib-card-ph">◙</span>'}
+        <button class="lib-card-play sp-play" title="Reproducir el álbum">▶</button>
+      </div>
+      <div class="lib-card-name">${escapeHtml(a.name)}</div>
+      <div class="lib-card-sub">${escapeHtml(a.owner)}${a.anio ? ' · ' + a.anio : ''}</div>
+    </li>`;
+
+  const rowArtist = (a, i) => `
+    <li class="lib-card lib-card-redonda" data-idx="${i}" title="${escapeHtml(a.name)}">
+      <div class="lib-card-art" ${a.cover ? `style="background-image:url('${a.cover}')"` : ''}>
+        ${a.cover ? '' : '<span class="lib-card-ph">◍</span>'}
+        <button class="lib-card-play sp-play" title="Reproducir a este artista">▶</button>
+      </div>
+      <div class="lib-card-name">${escapeHtml(a.name)}</div>
+      <div class="lib-card-sub">${escapeHtml(a.owner || 'artista')}</div>
+    </li>`;
+
+  const ETIQUETA = { playlist: 'playlist', album: 'álbum', artist: 'artista' };
+
   const paintHead = () => {
     const head = $('libHead');
     if (!head) return;
@@ -211,7 +267,8 @@
     head.querySelector('.lib-head-title').textContent = view.detail.name;
     head.querySelector('.lib-head-sub').textContent = view.detail.sub;
     const kind = head.querySelector('.lib-head-kind');
-    if (kind) kind.textContent = view.detail.owner ? 'playlist · ' + view.detail.owner : 'playlist';
+    const tipo = ETIQUETA[view.detail.tipo || 'playlist'] || 'playlist';
+    if (kind) kind.textContent = view.detail.owner ? tipo + ' · ' + view.detail.owner : tipo;
     const cover = $('libHeadCover');
     if (cover) {
       cover.style.backgroundImage = view.detail.cover ? `url('${view.detail.cover}')` : '';
@@ -241,30 +298,39 @@
     paintChips();
     paintHead();
 
-    // Rejilla de portadas solo en la lista de playlists; el resto son filas
-    const esRejilla = !view.detail && COLS[view.col].kind === 'playlist'
-      && !!(cache[view.col] && cache[view.col].rows && cache[view.col].rows.length);
+    // Rejilla de portadas para lo que tiene carátula cuadrada; el resto, filas
+    const enRejilla = (k) => k === 'playlist' || k === 'album' || k === 'artist';
+    // Dentro de un ARTISTA se enseñan sus discos: también rejilla
+    const detalleEnRejilla = !!view.detail && view.detail.tipo === 'artist';
+    const esRejilla = detalleEnRejilla
+      || (!view.detail && enRejilla(COLS[view.col].kind)
+          && !!(cache[view.col] && cache[view.col].rows && cache[view.col].rows.length));
     ul.classList.toggle('as-grid', esRejilla);
 
     if (view.detail) {
       ul.innerHTML = view.detail.rows.length
-        ? view.detail.rows.map(rowTrack).join('')
-        : empty(statsMsg(view.detail.stats) + botonesDeRescate());
+        ? (view.detail.tipo === 'artist'
+            ? view.detail.rows.map(rowAlbum).join('')
+            : view.detail.rows.map(rowTrack).join(''))
+        : empty(view.detail.tipo === 'artist'
+            ? 'este artista no devolvió discos'
+            : statsMsg(view.detail.stats) + botonesDeRescate());
     } else {
       const c = cache[view.col];
+      const k = COLS[view.col].kind;
       if (!c) {
         // aún cargando: rejilla o filas, según lo que vaya a llegar
-        const esGrid = COLS[view.col].kind === 'playlist';
-        ul.classList.toggle('as-grid', esGrid);
-        ul.innerHTML = skeletons(esGrid ? 8 : 6);
+        ul.classList.toggle('as-grid', enRejilla(k));
+        ul.innerHTML = skeletons(enRejilla(k) ? 8 : 6);
       } else if (c.error) {
         ul.innerHTML = empty(c.error);
       } else if (!c.rows.length) {
         ul.innerHTML = empty('nada por aquí todavía');
       } else {
-        ul.innerHTML = COLS[view.col].kind === 'playlist'
-          ? c.rows.map(rowPlaylist).join('')
-          : c.rows.map(rowTrack).join('');
+        ul.innerHTML = (k === 'playlist' ? c.rows.map(rowPlaylist)
+          : k === 'album' ? c.rows.map(rowAlbum)
+          : k === 'artist' ? c.rows.map(rowArtist)
+          : c.rows.map(rowTrack)).join('');
       }
     }
     paintMore();
@@ -322,11 +388,18 @@
     view.loading = true;
     paintMore();
     try {
-      const data = await getPage(def.path, more ? prev.next : 0, def.paged);
+      const bruto = await getPage(def.path, more ? prev.next : 0, def.paged);
+      // `/me/following` mete lo suyo dentro de `artists`; el resto va plano
+      const data = (def.dentro && bruto && bruto[def.dentro]) ? bruto[def.dentro] : bruto;
       const items = (data && data.items) || [];
       const rows = def.kind === 'playlist'
         ? items.filter(Boolean).map(mapPlaylist)
-        : sift(items).rows;
+        : def.kind === 'album'
+          // cada disco viene envuelto en { added_at, album }
+          ? items.map((x) => (x && x.album) ? x.album : x).filter(Boolean).map(mapAlbum)
+          : def.kind === 'artist'
+            ? items.filter(Boolean).map(mapArtist)
+            : sift(items).rows;
 
       const base = (more && prev) ? prev.rows : [];
       const offset = (more ? prev.next : 0) + items.length;
@@ -418,6 +491,81 @@
       const ul = list();
       // Aunque no podamos LISTARLA, reproducirla por contexto sí suele funcionar.
       if (ul) ul.innerHTML = empty(errorMsg(e) + botonesDeRescate());
+      paintMore();
+      return;
+    }
+    view.loading = false;
+    paint();
+  };
+
+  /* Abrir un ÁLBUM: sus canciones. `/albums/{id}/tracks` devuelve pistas
+     "simplificadas" —sin el objeto `album` dentro—, así que la portada y el
+     nombre del disco se les pegan aquí; si no, la fila saldría sin carátula
+     y al reproducirla la barra de arriba se quedaría con la anterior. */
+  const openAlbum = async (a, more) => {
+    if (view.loading) return;
+    if (!more) {
+      view.detail = { tipo: 'album', id: a.id, uri: a.uri, name: a.name, cover: a.cover || null,
+                      owner: a.owner || '', sub: '· cargando ·', rows: [], next: 0, total: a.total };
+      paint();
+      const ul0 = list();
+      if (ul0) ul0.innerHTML = skeletons(6);
+    }
+    const d = view.detail;
+    if (!d || d.next == null) return;
+    view.loading = true;
+    paintMore();
+    try {
+      const data = await getPage(`/albums/${d.id}/tracks`, d.next, true);
+      const items = (data && data.items) || [];
+      const conDisco = items.filter(Boolean).map((t) => ({
+        ...t, album: { name: d.name, images: d.cover ? [{ url: d.cover }] : [] },
+      }));
+      const { rows, stats } = sift(conDisco);
+      d.stats = stats;
+      d.rows = d.rows.concat(rows);
+      d.total = (data && data.total) || d.total;
+      d.next = (data && data.next) ? d.next + items.length : null;
+      d.sub = `${d.rows.length} de ${d.total} ${d.total === 1 ? 'canción' : 'canciones'}`;
+    } catch (e) {
+      d.sub = '';
+      view.loading = false;
+      const ul = list();
+      if (ul) ul.innerHTML = empty(errorMsg(e) + botonesDeRescate());
+      paintMore();
+      return;
+    }
+    view.loading = false;
+    paint();
+  };
+
+  /* Abrir un ARTISTA: sus discos. `/artists/{id}/top-tracks` se retiró en
+     feb-2026, así que lo que se puede enseñar son los álbumes —que es, de
+     hecho, más útil para explorar. `include_groups` deja fuera los discos
+     donde solo aparece de invitado, que ensucian mucho la lista. */
+  const openArtist = async (a, more) => {
+    if (view.loading) return;
+    if (!more) {
+      view.detail = { tipo: 'artist', id: a.id, uri: a.uri, name: a.name, cover: a.cover || null,
+                      owner: a.owner || '', sub: '· cargando ·', rows: [], next: 0, total: 0 };
+      paint();
+    }
+    const d = view.detail;
+    if (!d || d.next == null) return;
+    view.loading = true;
+    paintMore();
+    try {
+      const data = await getPage(`/artists/${d.id}/albums?include_groups=album,single`, d.next, true);
+      const items = (data && data.items) || [];
+      d.rows = d.rows.concat(items.filter(Boolean).map(mapAlbum));
+      d.total = (data && data.total) || d.rows.length;
+      d.next = (data && data.next) ? d.next + items.length : null;
+      d.sub = `${d.rows.length} de ${d.total} ${d.total === 1 ? 'disco' : 'discos'}`;
+    } catch (e) {
+      d.sub = '';
+      view.loading = false;
+      const ul = list();
+      if (ul) ul.innerHTML = empty(errorMsg(e));
       paintMore();
       return;
     }
@@ -583,7 +731,10 @@
       if (e.target.closest('#libRefresh')) {
         if (view.detail) {
           const d = view.detail;
-          openPlaylist({ id: d.id, uri: d.uri, name: d.name, total: d.total, cover: d.cover, owner: d.owner }, false);
+          const igual = { id: d.id, uri: d.uri, name: d.name, total: d.total, cover: d.cover, owner: d.owner };
+          if (d.tipo === 'album') openAlbum(igual, false);
+          else if (d.tipo === 'artist') openArtist(igual, false);
+          else openPlaylist(igual, false);
         } else {
           cache[view.col] = null;
           paint();
@@ -592,8 +743,11 @@
         return;
       }
       if (e.target.closest('#libMore')) {
-        if (view.detail) openPlaylist(null, true);
-        else loadCollection(view.col, true);
+        if (view.detail) {
+          if (view.detail.tipo === 'album') openAlbum(null, true);
+          else if (view.detail.tipo === 'artist') openArtist(null, true);
+          else openPlaylist(null, true);
+        } else loadCollection(view.col, true);
         return;
       }
       if (e.target.closest('#libPlayQueue')) {
@@ -622,14 +776,45 @@
         }
         return;
       }
-      if (!view.detail && COLS[view.col].kind === 'playlist') {
-        // ▶ reproduce la playlist entera; el resto de la fila la abre
+      /* Dentro de un artista, las tarjetas son sus DISCOS: se abren. Va antes
+         que la rama de las colecciones porque aquí ya estamos en un detalle. */
+      if (view.detail && view.detail.tipo === 'artist') {
         if (e.target.closest('.sp-play')) playAllPlaylist(item);
-        else openPlaylist(item, false);
+        else openAlbum(item, false);
         return;
+      }
+      if (!view.detail) {
+        const k = COLS[view.col].kind;
+        // En todas: ▶ reproduce entero, el resto de la tarjeta abre
+        if (k === 'playlist') {
+          if (e.target.closest('.sp-play')) playAllPlaylist(item);
+          else openPlaylist(item, false);
+          return;
+        }
+        if (k === 'album') {
+          if (e.target.closest('.sp-play')) playAllPlaylist(item);
+          else openAlbum(item, false);
+          return;
+        }
+        if (k === 'artist') {
+          if (e.target.closest('.sp-play')) playAllPlaylist(item);
+          else openArtist(item, false);
+          return;
+        }
       }
       play(item);
     });
+  };
+
+  /* Abrir un artista o un álbum desde FUERA (lo usa el buscador). Se
+     asegura de que el bloque esté visible y cableado antes de pintar: si se
+     llega aquí sin haber abierto nunca la pestaña, no hay nada montado. */
+  const abrir = (tipo, item) => {
+    if (!window.SpotifyModule || !window.SpotifyModule.isLoggedIn()) return;
+    showBlock(true);
+    wire();
+    if (tipo === "artist") openArtist(item, false);
+    else if (tipo === "album") openAlbum(item, false);
   };
 
   // Se llama al abrir la pestaña (desde seven.js)
@@ -656,7 +841,8 @@
   };
 
   // detailOf se comparte con la cola (seven.js) para no duplicar el parseo
-  window.LibraryModule = { open, onAuthChange, detailOf };
+  // `abrir` lo usa el buscador para saltar a un artista o a un álbum
+  window.LibraryModule = { open, abrir, onAuthChange, detailOf };
 
   document.addEventListener('DOMContentLoaded', () => {
     showBlock(!!(window.SpotifyModule && window.SpotifyModule.isLoggedIn()));

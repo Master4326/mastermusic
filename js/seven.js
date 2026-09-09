@@ -25,6 +25,7 @@
       contents.forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
       if (name === 'queue') renderQueue();   // refresco inmediato al abrir la cola
       if (name === 'library' && window.LibraryModule) window.LibraryModule.open();
+      if (name === 'stats' && window.StatsModule) window.StatsModule.open();
       if (name === 'search') {               // foco directo al buscador
         const inp = document.getElementById('spotifySearchInput');
         if (inp && !inp.closest('[hidden]')) setTimeout(() => inp.focus(), 0);
@@ -977,8 +978,12 @@
     } else if (e.key === 'b' || e.key === 'B') {
       const libTab = document.querySelector('.tab[data-tab="library"]');
       if (libTab) libTab.click();
-    } else if (['1', '2', '3', '4', '5'].includes(e.key)) {
-      const map = { '1': 'lyrics', '2': 'search', '3': 'library', '4': 'queue', '5': 'settings' };
+    } else if (e.key === 'h' || e.key === 'H') {
+      // Historial. La 'l' ya era de lyrics y la 'b' de biblioteca.
+      const stTab = document.querySelector('.tab[data-tab="stats"]');
+      if (stTab) stTab.click();
+    } else if (['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+      const map = { '1': 'lyrics', '2': 'search', '3': 'library', '4': 'queue', '5': 'settings', '6': 'stats' };
       const tab = document.querySelector(`.tab[data-tab="${map[e.key]}"]`);
       if (tab) tab.click();
     }

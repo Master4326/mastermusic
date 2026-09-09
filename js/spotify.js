@@ -25,7 +25,7 @@
      no le añade ninguno: la única forma de ganar un permiso nuevo es volver a
      pasar por la pantalla de autorización. Guardamos aquí con qué versión se
      autorizó la sesión para poder decirlo en vez de fallar sin explicación. */
-  const SCOPES_V = '3';
+  const SCOPES_V = '4';
 
   const SCOPES = [
     /* `user-read-currently-playing` fuera: era para
@@ -52,6 +52,15 @@
        cualquiera es meterla en una playlist nuestra, y para eso hace falta
        este permiso. Es `-private`: la lista se crea oculta. */
     'playlist-modify-private',
+    /* Para el ♥. Se pidió una vez en 2026-08 y se retiró porque
+       `PUT /me/tracks` devolvía 403 con el permiso concedido y todo. La
+       explicación apareció ahora: **ese endpoint ya no existe** —feb-2026 lo
+       sustituyó por `PUT /me/library`— y los endpoints retirados contestan
+       403 EN SILENCIO, sin decir que están retirados. O sea que el permiso
+       nunca fue el problema. */
+    'user-library-modify',
+    // Para la sección «artistas» de la biblioteca (GET /me/following)
+    'user-follow-read',
     'user-library-read',
     // Necesarios para las secciones "recientes" y "top" de la biblioteca.
     // Si tu sesión es anterior a esto, desconecta y vuelve a conectar.
@@ -780,6 +789,7 @@
     lastTrackId = track.id;
     window.PlayerCore.state.currentTrack = track;
     if (window.LyricsModule) window.LyricsModule.fetch(track);
+    refrescarLike(track);
     /* Cambiar de canción es el ÚNICO momento en que la cola se acorta, así
        que es aquí donde la radio se repone. Es lo que hace que no se acabe:
        mientras la sesión siga viva, siempre quedan canciones por delante.
@@ -1094,6 +1104,95 @@
      que tapa `/playlists/{id}/tracks`. No reimplementar: el botón no puede
      funcionar hasta que Spotify cambie las reglas. */
 
+  /* ==========================================================
+     ESCRIBIR EN SPOTIFY — el ♥ y las playlists
+
+     Hasta ahora la app era de SOLO LECTURA contra Spotify: sabía buscar,
+     listar y reproducir, pero no podía guardar nada. El ♥ existió y se
+     retiró en agosto porque `PUT /me/tracks` devolvía 403 aun con el permiso
+     concedido; la explicación llegó ahora: **ese endpoint está retirado**
+     desde feb-2026 y los retirados contestan 403 sin decir por qué.
+
+     Los de ahora son genéricos y llevan las URIs en la query (hasta 40):
+       PUT    /me/library?uris=…   guardar / seguir
+       DELETE /me/library?uris=…   quitar
+       GET    /me/library/contains?uris=…  → [true|false]
+     ========================================================== */
+  const like = () => document.getElementById('likeBtn');
+  let likeUri = null;        // la uri cuyo estado enseña el botón
+  let likeOn = false;
+  let likeMuerto = false;    // si Spotify también rechaza el endpoint nuevo
+
+  const pintarLike = (visible) => {
+    const b = like();
+    if (!b) return;
+    b.hidden = !visible || likeMuerto;
+    b.textContent = likeOn ? '♥' : '♡';
+    b.classList.toggle('like-on', likeOn);
+    b.title = likeOn ? 'Quitar de Tus me gusta' : 'Guardar en Tus me gusta';
+  };
+
+  // Al cambiar de canción: preguntar si ya está guardada
+  const refrescarLike = async (t) => {
+    if (likeMuerto || !t || !t.uri || !t.spotify || !isLoggedIn()) { pintarLike(false); return; }
+    likeUri = t.uri;
+    try {
+      const d = await api('/me/library/contains?uris=' + encodeURIComponent(t.uri));
+      if (likeUri !== t.uri) return;               // ya cambiaron de canción
+      likeOn = Array.isArray(d) ? !!d[0] : false;
+      pintarLike(true);
+    } catch (e) {
+      /* Un 403 aquí significa que Spotify tampoco deja LEER la biblioteca a
+         las apps en modo desarrollo. Se apaga el botón entero en vez de
+         dejar un corazón que miente. */
+      if (/40[34]/.test(e.message || '')) { likeMuerto = true; console.warn('[♥] Spotify no deja consultar la biblioteca:', detalleSpotify(e)); }
+      pintarLike(false);
+    }
+  };
+
+  const alternarLike = async () => {
+    if (!likeUri) return;
+    const quiero = !likeOn;
+    // Se pinta ya y se corrige si falla: el ♥ tiene que responder al instante
+    likeOn = quiero;
+    pintarLike(true);
+    try {
+      await api('/me/library?uris=' + encodeURIComponent(likeUri), { method: quiero ? 'PUT' : 'DELETE' });
+      setStatus(quiero ? '♥ guardada en Tus me gusta' : '♡ quitada de Tus me gusta');
+    } catch (e) {
+      likeOn = !quiero;
+      pintarLike(true);
+      if (/403/.test(e.message || '')) {
+        likeMuerto = true;
+        pintarLike(false);
+        setStatus('✕ Spotify no deja guardar desde apps en modo desarrollo');
+        console.warn('[♥] 403 también con /me/library:', detalleSpotify(e));
+      } else {
+        setStatus('✕ no se pudo guardar. ' + detalleSpotify(e));
+      }
+    }
+  };
+
+  /* Crear una playlist de verdad a partir de una lista de URIs. La usa la
+     pantalla del historial para convertir «tus más escuchadas» en algo que
+     puedas abrir en Spotify — que es justo lo que Spotify no te deja hacer,
+     porque él ni siquiera guarda ese historial. */
+  const crearPlaylist = async (nombre, uris, descripcion) => {
+    const d = await api('/me/playlists', {
+      method: 'POST',
+      body: JSON.stringify({ name: nombre, public: false, description: descripcion || '' }),
+    });
+    const id = d && d.id;
+    if (!id) throw new Error('Spotify no devolvió la playlist');
+    // De 100 en 100, que es el tope de la API
+    for (let i = 0; i < uris.length; i += 100) {
+      await api('/playlists/' + id + '/items', {
+        method: 'POST', body: JSON.stringify({ uris: uris.slice(i, i + 100) }),
+      });
+    }
+    return { id, url: (d.external_urls && d.external_urls.spotify) || null };
+  };
+
   const formatTime = (s) => {
     if (!isFinite(s) || s < 0) return '0:00';
     const m = Math.floor(s / 60);
@@ -1179,7 +1278,21 @@
            </li>`;
       return;
     }
-    list.innerHTML = searchResults.map((t, i) => `
+    list.innerHTML = searchResults.map((t, i) => {
+      // Artistas y álbumes: sin duración ni ＋; se abren, no se encolan
+      if (t.tipo && t.tipo !== 'track') {
+        return `
+      <li class="sp-result" data-idx="${i}" tabindex="0">
+        <div class="sp-thumb${t.tipo === 'artist' ? ' sp-thumb-redonda' : ''}" ${t.cover ? `style="background-image:url('${t.cover}')"` : ''}>${t.cover ? '' : (t.tipo === 'artist' ? '◍' : '◙')}</div>
+        <div class="sp-meta">
+          <div class="sp-name">${escapeHtml(t.name)}</div>
+          <div class="sp-artist">${escapeHtml(t.artist)}</div>
+        </div>
+        <div class="sp-dur">${t.tipo === 'artist' ? 'artista' : (t.total ? t.total + ' temas' : 'álbum')}</div>
+        <button class="sp-play" title="Reproducir">▶</button>
+      </li>`;
+      }
+      return `
       <li class="sp-result" data-idx="${i}" tabindex="0">
         <div class="sp-thumb" ${t.cover ? `style="background-image:url('${t.cover}')"` : ''}>${t.cover ? '' : '♪'}</div>
         <div class="sp-meta">
@@ -1189,8 +1302,8 @@
         <div class="sp-dur">${formatTime(t.duration)}</div>
         <button class="sp-queue" title="Añadir a la cola">＋</button>
         <button class="sp-play" title="Reproducir ahora">▶</button>
-      </li>
-    `).join('');
+      </li>`;
+    }).join('');
   };
 
   /* Secuencia contra respuestas cruzadas: al teclear rápido salen varias
@@ -1198,6 +1311,11 @@
      pantalla los resultados de lo que ya no está escrito. Misma solución
      que en lyrics.js. */
   let seqBusqueda = 0;
+
+  /* Qué se busca: canciones, artistas o álbumes. La app llevaba desde
+     siempre buscando SOLO canciones (`type=track`), y con eso no se podía
+     llegar a un artista ni a un disco. */
+  let tipoBusqueda = 'track';
 
   const doSearch = async (query) => {
     const q = query.trim();
@@ -1207,8 +1325,34 @@
     try {
       // limit máx. 10: desde feb-2026 Spotify limita las búsquedas de apps
       // en development mode a 10 resultados (más devuelve 400 "Invalid limit").
-      const data = await api('/search?type=track&limit=10&q=' + encodeURIComponent(q));
+      const data = await api(`/search?type=${tipoBusqueda}&limit=10&q=` + encodeURIComponent(q));
       if (mia !== seqBusqueda) return;
+
+      // Artistas y álbumes: filas distintas, y al pulsarlas se ABREN
+      if (tipoBusqueda !== 'track') {
+        const lista = tipoBusqueda === 'artist'
+          ? ((data && data.artists && data.artists.items) || [])
+          : ((data && data.albums && data.albums.items) || []);
+        searchResults = lista.filter(Boolean).map((it) => ({
+          id: it.id,
+          uri: it.uri,
+          name: it.name,
+          artist: tipoBusqueda === 'artist'
+            ? ((it.genres || []).slice(0, 2).join(' · ') || 'artista')
+            : (it.artists || []).map((a) => a.name).join(', '),
+          album: '',
+          duration: 0,
+          cover: (it.images && it.images[0]) ? it.images[0].url : null,
+          total: it.total_tracks || 0,
+          owner: (it.artists || []).map((a) => a.name).join(', '),
+          spotify: true,
+          tipo: tipoBusqueda,
+        }));
+        renderResults(q);
+        if (searchResults.length) anotarReciente(q);
+        return;
+      }
+
       const items = (data && data.tracks && data.tracks.items) || [];
       searchResults = items.map(it => ({
         id: 'sp:' + it.id,
@@ -1635,6 +1779,19 @@
     const input = document.getElementById('spotifySearchInput');
     const limpiar = document.getElementById('spotifyClear');
 
+    // Chips de tipo: canciones / artistas / álbumes
+    document.querySelectorAll(".sp-tipo").forEach((c) => {
+      if (c._wired) return;
+      c._wired = true;
+      c.addEventListener("click", () => {
+        if (c.dataset.tipo === tipoBusqueda) return;
+        tipoBusqueda = c.dataset.tipo;
+        document.querySelectorAll(".sp-tipo").forEach((x) => x.classList.toggle("active", x === c));
+        if (input && input.value.trim()) doSearch(input.value);
+        else { searchResults = []; renderResults(""); }
+      });
+    });
+
     if (input && !input._wired) {
       input._wired = true;
       const refrescarX = () => { if (limpiar) limpiar.hidden = !input.value; };
@@ -1689,9 +1846,24 @@
     if (list && !list._wired) {
       list._wired = true;
       const pistaDe = (row) => searchResults[parseInt(row.dataset.idx, 10)];
-      const lanzar = (row) => {
+      const lanzar = (row, soloPlay) => {
         const t = pistaDe(row);
-        if (t) playTrack(t);
+        if (!t) return;
+        /* Un artista o un álbum no se «reproducen desde la lista»: se ABREN.
+           El ▶ sí los reproduce enteros por contexto (Spotify acepta álbum y
+           artista como `context_uri`). Al abrirlos se salta a la pestaña de
+           biblioteca, que es la que tiene la vista de detalle. */
+        if (t.tipo && t.tipo !== 'track') {
+          if (soloPlay) { playContext(t.uri).catch(() => setStatus('✕ no se pudo reproducir')); return; }
+          const L = window.LibraryModule;
+          if (L && L.abrir) {
+            const tab = document.querySelector('.tab[data-tab="library"]');
+            if (tab) tab.click();
+            L.abrir(t.tipo, t);
+          }
+          return;
+        }
+        playTrack(t);
       };
       list.addEventListener('click', (e) => {
         const row = e.target.closest('.sp-result');
@@ -1705,7 +1877,7 @@
           if (t) spQueue(t.uri, t.name);
           return;
         }
-        lanzar(row);
+        lanzar(row, !!e.target.closest('.sp-play'));
       });
       // con teclado: las filas son focusables, Enter reproduce
       list.addEventListener('keydown', (e) => {
@@ -1836,6 +2008,13 @@
     colocarMenuDev();   // el alto cambió al pintar la lista
   };
 
+  const cablearLike = () => {
+    const b = like();
+    if (!b || b._wired) return;
+    b._wired = true;
+    b.addEventListener('click', alternarLike);
+  };
+
   const cablearChipDev = () => {
     const c = chip();
     if (!c || c._wired) return;
@@ -1920,6 +2099,7 @@
   // -------- Handle redirect with ?code=... --------
   const init = async () => {
     cablearChipDev();
+    cablearLike();
     const url = new URL(window.location.href);
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
@@ -1948,6 +2128,9 @@
     setVolume: spSetVolume,
     setShuffle: spSetShuffle, setRepeat: spSetRepeat,
     queue: spQueue,
+    // Escribir en Spotify: el ♥ y crear playlists de verdad
+    crearPlaylist,
+    puedeGuardar: () => !likeMuerto,
     /* La cola sin gastar una sola petición: sonando aquí, el SDK ya dice lo
        que viene detrás. Devuelve null cuando la música va por otro aparato, y
        entonces quien pregunte tira de `/me/player/queue` como siempre. */

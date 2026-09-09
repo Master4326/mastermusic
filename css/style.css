@@ -2143,6 +2143,82 @@ body.playing .status-bar .filler {
   50% { opacity: 0.25; }
 }
 
+/* ---------- Estadísticas / historial ----------
+   Reaprovecha .sp-result y .sp-thumb de la pestaña de buscar; aquí solo va
+   lo que esa no tenía: la rejilla de datos, el ranking y el reloj. */
+.st-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.st-dato {
+  border: 2px solid var(--border-pixel);
+  padding: 8px 6px;
+  text-align: center;
+  background: var(--bg-panel-2);
+}
+.st-dato b { display: block; color: var(--accent); font-size: 1.15em; line-height: 1.3; }
+.st-dato span { color: var(--text-muted); font-size: 0.76em; letter-spacing: .04em; }
+
+.st-titulo {
+  color: var(--accent);
+  font-size: 0.9em;
+  letter-spacing: .08em;
+  margin: 14px 0 4px;
+}
+.st-pie { color: var(--text-muted); font-size: 0.78em; margin: 4px 0 0; line-height: 1.5; }
+.st-nota { margin-top: 14px; opacity: .8; }
+
+/* Puesto del ranking: ancho fijo para que los números no bailen */
+.st-pos {
+  flex-shrink: 0;
+  width: 1.6em;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+.st-veces {
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 0.8em;
+  color: var(--accent);
+  line-height: 1.35;
+}
+.st-veces span { display: block; color: var(--text-muted); font-size: 0.9em; }
+.st-art { cursor: default; }
+
+/* Reloj de escucha: 24 barras, una por hora del día */
+.st-reloj {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 92px;
+  padding: 4px 0 0;
+}
+.st-hora {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.st-barra {
+  width: 100%;
+  background: var(--accent);
+  opacity: .75;
+  min-height: 2px;
+}
+.st-hora span {
+  font-size: 0.62em;
+  color: var(--text-muted);
+  height: 1em;
+  line-height: 1;
+}
+
 /* ---------- Chip «dónde suena» + menú de dispositivos ----------
    Con Spotify Connect la música NO sale de este aparato, y la app nunca lo
    decía: es lo que explica que la barra avance y no se oiga nada aquí. */
@@ -4960,3 +5036,42 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   .status-bar { display: none; }   /* 24 px que valen más para la letra */
   .tab { min-height: 32px; padding: 5px 10px; }
 }
+
+/* Botones del pie de las estadísticas */
+.st-acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+/* El ♥ encendido: mismo trato que el resto de botones activos de la fila */
+.ctrl-btn.like-on { color: var(--accent); }
+
+/* Artista: la portada redonda es la convención en todas partes, y de un
+   vistazo distingue un artista de un disco sin leer el subtítulo. */
+.lib-card-redonda .lib-card-art { border-radius: 50%; overflow: hidden; }
+
+/* Artista en los resultados de búsqueda: miniatura redonda */
+.sp-thumb-redonda { border-radius: 50%; }
+
+/* ---------- Karaoke con puntuación ----------
+   El panel se cuelga arriba del panel de la letra y solo existe con el modo
+   encendido; sin eso estorbaría a la letra, que es lo que importa aquí. */
+.kar-panel { display: none; }
+body.karaoke-on .kar-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: absolute;
+  top: 6px; left: 8px; right: 8px;
+  z-index: 6;
+  padding: 6px 10px;
+  background: var(--bg-panel-2);
+  border: 2px solid var(--border-pixel);
+  pointer-events: none;
+}
+.kar-nota { flex-shrink: 0; text-align: center; line-height: 1.1; }
+.kar-nota b { display: block; color: var(--accent); font-size: 1.5em; }
+.kar-nota span { color: var(--text-muted); font-size: 0.62em; letter-spacing: .06em; }
+.kar-info { flex: 1; min-width: 0; }
+.kar-juicio { color: var(--text); font-size: 0.86em; }
+.kar-lineas { color: var(--text-muted); font-size: 0.72em; }
+/* Historial de líneas: una barrita por línea medida */
+.kar-barras { display: flex; align-items: flex-end; gap: 2px; height: 16px; margin-top: 3px; }
+.kar-barras i { flex: 1; background: var(--accent); opacity: .7; min-height: 2px; }
+#karaokeBtn.activo { color: var(--accent); }

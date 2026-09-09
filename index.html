@@ -109,6 +109,13 @@
               <path d="M16.2 5.6l3.3-.9 3.4 12.6-3.3.9z" transform="translate(-2 0)"/>
             </svg>
           </button>
+          <button class="tab icon-tab" data-tab="stats" title="Tu historial y tus estadísticas — lo guarda esta app, no Spotify (H)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <line x1="5" y1="20" x2="5" y2="12"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="19" y1="20" x2="19" y2="9"/>
+            </svg>
+          </button>
           <button class="tab icon-tab" data-tab="queue" title="Cola — a continuación (Q)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
               <line x1="4" y1="6" x2="20" y2="6"/>
@@ -129,6 +136,8 @@
         <!-- LYRICS TAB -->
         <div class="tab-content active" id="tab-lyrics">
           <!-- Ambiente: esquinas pixel que laten + notas flotantes (decorativo) -->
+          <!-- Nota del karaoke. Solo se ve con body.karaoke-on. -->
+          <div class="kar-panel" id="karaokePanel" aria-live="polite"></div>
           <div class="lyrics-ambient" id="lyricsAmbient" aria-hidden="true">
             <!-- Fondo reactivo (js/ambient.js): carátula difuminada, ecualizador
                  fantasma, aura tras la línea activa y ondas en cada golpe.
@@ -203,6 +212,11 @@
           <p class="lyrics-empty" id="searchHint">▒ conecta spotify en <b>config ⚙</b> para buscar canciones ▒</p>
           <div class="sp-search-block" id="spotifySearchBlock" hidden>
             <div class="sp-search-head">♫ buscar en spotify</div>
+            <div class="lib-nav">
+              <button class="lib-chip sp-tipo active" data-tipo="track">canciones</button>
+              <button class="lib-chip sp-tipo" data-tipo="artist">artistas</button>
+              <button class="lib-chip sp-tipo" data-tipo="album">álbumes</button>
+            </div>
             <div class="search-row">
               <span class="prompt">♫</span>
               <input type="text" id="spotifySearchInput" placeholder="canción o artista..." class="retro-input"
@@ -224,6 +238,8 @@
               <button class="lib-chip" data-col="saved">guardadas</button>
               <button class="lib-chip" data-col="recent">recientes</button>
               <button class="lib-chip" data-col="top">top</button>
+              <button class="lib-chip" data-col="albums">álbumes</button>
+              <button class="lib-chip" data-col="artists">artistas</button>
               <button class="lib-refresh" id="libRefresh" title="Recargar desde Spotify">⟳</button>
             </div>
             <div class="lib-head" id="libHead" hidden>
@@ -238,6 +254,21 @@
             </div>
             <ul class="track-list sp-results" id="libList"></ul>
             <button class="retro-btn small lib-more" id="libMore" hidden>[ cargar más ]</button>
+          </div>
+        </div>
+
+        <!-- STATS TAB (tu historial: lo guarda esta app, no Spotify) -->
+        <div class="tab-content" id="tab-stats">
+          <div class="sp-search-block">
+            <div class="sp-search-head">▤ tu historial</div>
+            <div class="lib-nav">
+              <button class="lib-chip st-chip active" data-dias="7">semana</button>
+              <button class="lib-chip st-chip" data-dias="30">mes</button>
+              <button class="lib-chip st-chip" data-dias="365">año</button>
+              <button class="lib-chip st-chip" data-dias="0">todo</button>
+              <button class="lib-refresh" id="statsRefresh" title="Recargar">⟳</button>
+            </div>
+            <div id="statsBody"></div>
           </div>
         </div>
 
@@ -535,6 +566,15 @@
               </g>
             </svg>
           </button>
+          <!-- ♥ Guardar en «Tus me gusta». Se retiró en 2026-08 porque
+               PUT /me/tracks devolvía 403 a las apps en modo desarrollo;
+               resulta que ese endpoint ya ni existe (feb-2026 lo sustituyó
+               por PUT /me/library) y los retirados contestan 403 en silencio.
+               Vuelve con el endpoint nuevo. Lo enseña js/spotify.js solo
+               cuando hay sesión y una canción de Spotify sonando. -->
+          <button class="ctrl-btn vol-btn side-btn" id="likeBtn" title="Guardar en Tus me gusta" hidden>♡</button>
+          <button class="ctrl-btn vol-btn side-btn" id="karaokeBtn"
+                  title="Karaoke con puntuación: mide si cantas cuando toca (ritmo, no afinación — el audio de Spotify va cifrado y no se puede analizar). Mejor con auriculares.">🎤</button>
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" title="Modo edit (letra animada)">✦</button>
           <!-- ⚗ Lab de efectos DESACTIVADO por ahora (quitar "hidden" para reactivar; el código en lyrics.js queda intacto) -->
           <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn" title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
@@ -670,6 +710,9 @@
   <script defer src="js/lyrics.js"></script>
   <script defer src="js/spotify.js"></script>
   <script defer src="js/library.js"></script>
+  <script defer src="js/historial.js"></script>
+  <script defer src="js/stats.js"></script>
+  <script defer src="js/karaoke.js"></script>
   <script defer src="js/app.js"></script>
   <script defer src="js/visualizer.js"></script>
   <!-- beat.js va DESPUÉS del visualizador (le pide el analizador crudo) y
