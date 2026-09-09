@@ -1371,8 +1371,11 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
   text-shadow: none;
 }
 #fxLabBtn.on { color: var(--accent); text-shadow: 0 0 6px var(--accent-glow); }
-/* lab desactivado: el atributo hidden SIEMPRE gana, pise lo que pise */
-#fxLabBtn[hidden] { display: none !important; }
+/* .ctrl-btn pone display:flex, y una regla de autor gana a la del navegador:
+   sin esto, poner hidden en un botón de la fila NO lo esconde (le pasaba al ♡,
+   que se veía siempre aunque no hubiera sesión). El atributo manda, pise lo
+   que pise, y vale para todos: el ⚗ del lab, el ♡, y el que venga. */
+.ctrl-btn[hidden] { display: none !important; }
 @media (max-width: 440px) {
   .fx-lab { width: 156px; font-size: 13px; }
 }
@@ -5048,30 +5051,3 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
 
 /* Artista en los resultados de búsqueda: miniatura redonda */
 .sp-thumb-redonda { border-radius: 50%; }
-
-/* ---------- Karaoke con puntuación ----------
-   El panel se cuelga arriba del panel de la letra y solo existe con el modo
-   encendido; sin eso estorbaría a la letra, que es lo que importa aquí. */
-.kar-panel { display: none; }
-body.karaoke-on .kar-panel {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  position: absolute;
-  top: 6px; left: 8px; right: 8px;
-  z-index: 6;
-  padding: 6px 10px;
-  background: var(--bg-panel-2);
-  border: 2px solid var(--border-pixel);
-  pointer-events: none;
-}
-.kar-nota { flex-shrink: 0; text-align: center; line-height: 1.1; }
-.kar-nota b { display: block; color: var(--accent); font-size: 1.5em; }
-.kar-nota span { color: var(--text-muted); font-size: 0.62em; letter-spacing: .06em; }
-.kar-info { flex: 1; min-width: 0; }
-.kar-juicio { color: var(--text); font-size: 0.86em; }
-.kar-lineas { color: var(--text-muted); font-size: 0.72em; }
-/* Historial de líneas: una barrita por línea medida */
-.kar-barras { display: flex; align-items: flex-end; gap: 2px; height: 16px; margin-top: 3px; }
-.kar-barras i { flex: 1; background: var(--accent); opacity: .7; min-height: 2px; }
-#karaokeBtn.activo { color: var(--accent); }

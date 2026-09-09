@@ -136,8 +136,6 @@
         <!-- LYRICS TAB -->
         <div class="tab-content active" id="tab-lyrics">
           <!-- Ambiente: esquinas pixel que laten + notas flotantes (decorativo) -->
-          <!-- Nota del karaoke. Solo se ve con body.karaoke-on. -->
-          <div class="kar-panel" id="karaokePanel" aria-live="polite"></div>
           <div class="lyrics-ambient" id="lyricsAmbient" aria-hidden="true">
             <!-- Fondo reactivo (js/ambient.js): carátula difuminada, ecualizador
                  fantasma, aura tras la línea activa y ondas en cada golpe.
@@ -573,8 +571,6 @@
                Vuelve con el endpoint nuevo. Lo enseña js/spotify.js solo
                cuando hay sesión y una canción de Spotify sonando. -->
           <button class="ctrl-btn vol-btn side-btn" id="likeBtn" title="Guardar en Tus me gusta" hidden>♡</button>
-          <button class="ctrl-btn vol-btn side-btn" id="karaokeBtn"
-                  title="Karaoke con puntuación: mide si cantas cuando toca (ritmo, no afinación — el audio de Spotify va cifrado y no se puede analizar). Mejor con auriculares.">🎤</button>
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" title="Modo edit (letra animada)">✦</button>
           <!-- ⚗ Lab de efectos DESACTIVADO por ahora (quitar "hidden" para reactivar; el código en lyrics.js queda intacto) -->
           <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn" title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
@@ -712,7 +708,6 @@
   <script defer src="js/library.js"></script>
   <script defer src="js/historial.js"></script>
   <script defer src="js/stats.js"></script>
-  <script defer src="js/karaoke.js"></script>
   <script defer src="js/app.js"></script>
   <script defer src="js/visualizer.js"></script>
   <!-- beat.js va DESPUÉS del visualizador (le pide el analizador crudo) y
