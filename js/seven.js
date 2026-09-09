@@ -785,6 +785,50 @@
       ? it.album.images[it.album.images.length - 1].url : null,
   });
 
+  /* Pinta la cola de Spotify. Sale de `renderQueue` porque ahora se llama
+     dos veces seguidas: primero con lo que sabe el SDK (al instante) y luego,
+     si hace falta, con la cola entera que da la API. */
+  const pintarCola = (sonando, items) => {
+    filasCola = [];
+    let html = '';
+    if (sonando) html += queueHead('sonando ahora') + queueRow(spTrack(sonando), 0, -1, true);
+    html += queueHead('a continuación');
+    html += items.length
+      ? items.map((it, i) => {
+          const t = spTrack(it);
+          // sin uri no hay forma de pedirle a Spotify que la ponga
+          const idx = t.uri ? filasCola.push(t) - 1 : -1;
+          return queueRow(t, i, idx, false);
+        }).join('')
+      : queueEmpty('▒ nada más en la cola ▒');
+    queueList.innerHTML = html;
+  };
+
+  /* Cola de la API, cacheada. `/me/player/queue` da la lista entera, pero
+     pedirla en cada refresco (6 s) es lo que en la v87 nos comió el límite y
+     Spotify devolvía 429 a TODO. Con la caché se pide una vez cada 20 s como
+     mucho, y solo cuando la del SDK se queda corta. El sello es la pista que
+     suena: al cambiar de canción la cola es otra y hay que volver a pedirla. */
+  let colaCache = { pistas: null, sello: null, t: 0, pedida: 0 };
+  const COLA_TTL = 20000;   // lo cacheado vale 20 s
+  const MIN_GAP  = 2000;    // y nunca dos peticiones seguidas en menos de esto
+  const olvidarCola = () => { colaCache.t = 0; };
+
+  const colaApi = async (sello) => {
+    const ahora = Date.now();
+    const misma = colaCache.pistas && colaCache.sello === sello;
+    /* Sirve lo cacheado si aún no ha caducado O si se acaba de pedir. El
+       freno importa porque la radio rellena la cola EN TANDAS y llama a
+       `SevenQueueRefresh` una vez por tanda: sin él serían tres o cuatro
+       peticiones en un suspiro, que es exactamente como nos ganamos el 429. */
+    if (misma && (ahora - colaCache.t < COLA_TTL || ahora - colaCache.pedida < MIN_GAP))
+      return colaCache.pistas;
+    const data = await window.SpotifyModule.api('/me/player/queue');
+    const pistas = (data && data.queue) || [];
+    colaCache = { pistas, sello, t: ahora, pedida: ahora };
+    return pistas;
+  };
+
   const renderQueue = async () => {
     if (!queueList || !window.PlayerCore || queueBusy) return;
     const st = window.PlayerCore.state;
@@ -803,19 +847,24 @@
         const data = local || await window.SpotifyModule.api('/me/player/queue');
         const sonando = data && data.currently_playing;
         const items = (data && data.queue) || [];
-        filasCola = [];
-        let html = '';
-        if (sonando) html += queueHead('sonando ahora') + queueRow(spTrack(sonando), 0, -1, true);
-        html += queueHead('a continuación');
-        html += items.length
-          ? items.slice(0, 20).map((it, i) => {
-              const t = spTrack(it);
-              // sin uri no hay forma de pedirle a Spotify que la ponga
-              const idx = t.uri ? filasCola.push(t) - 1 : -1;
-              return queueRow(t, i, idx, false);
-            }).join('')
-          : queueEmpty('▒ nada más en la cola ▒');
-        queueList.innerHTML = html;
+
+        // Lo que ya se sabe, pintado sin esperar a nadie
+        pintarCola(sonando, items);
+
+        /* El SDK NO adelanta la cola entera: `next_tracks` viene recortado y
+           casi siempre trae UNA pista. Desde la v88 la música suena en la
+           propia pestaña, así que la cola se veía siempre con una sola
+           canción. Cuando se queda corta, se completa con la de la API —que
+           sí las trae todas— y se repinta encima. */
+        if (local && items.length <= 1) {
+          try {
+            const full = await colaApi((sonando && sonando.id) || null);
+            // solo si aporta: un fallo de la API no debe borrar lo ya pintado
+            if (full.length > items.length) pintarCola(sonando, full);
+          } catch (e) {
+            console.warn('[Cola] la API no pudo completar la del SDK:', (e && e.message) || e);
+          }
+        }
       } catch (e) {
         // Antes esto decía siempre "no se pudo leer la cola" y escondía el motivo
         const msg = (e && e.message) || '';
@@ -877,6 +926,7 @@
     updateStatus('▶ ' + t.name + (t.artist ? ' · ' + t.artist : ''));
     // repintar ya: si no, la fila elegida sigue en "a continuación" hasta el
     // siguiente refresco y parece que no ha pasado nada
+    olvidarCola();            // la cola ya no es la que teníamos cacheada
     setTimeout(renderQueue, 350);
   };
 
@@ -912,6 +962,7 @@
   /* Para que encolar una canción se vea al momento en vez de esperar hasta
      2,5 s al siguiente refresco. Solo repinta si la cola está a la vista. */
   window.SevenQueueRefresh = () => {
+    olvidarCola();            // acaban de encolar algo: la caché ya no vale
     const tab = document.getElementById('tab-queue');
     if (tab && tab.classList.contains('active')) renderQueue();
   };
