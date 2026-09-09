@@ -23,6 +23,11 @@
        usuario, así que lo decide él. La lee js/visualizer.js directamente
        de localStorage: mismo nombre y mismo formato, sin traducciones. */
     mic:    { key: 'mm_mic', def: 'off' },
+    /* «Sigue sonando»: al reproducir una canción SUELTA del buscador, encolar
+       parecidas para que la música no se pare al acabar. La lee js/spotify.js
+       directamente de localStorage, igual que el micrófono: mismo nombre y
+       mismo formato, sin traducciones por el medio. */
+    radio:  { key: 'mm_radio', def: 'on' },
     // La intensidad del modo edit NO es un ajuste: lyrics.js la deduce sola
     // del ritmo de cada línea y de los graves (ver intensidadAuto).
   };

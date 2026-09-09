@@ -11,6 +11,7 @@
     REFRESH: 'sp_refresh_token',
     EXPIRES: 'sp_expires_at',
     VERIFIER: 'sp_verifier',
+    SCOPES: 'sp_scopes_v',
   };
 
   // Spotify exige que la Redirect URI coincida EXACTAMENTE con la
@@ -19,24 +20,38 @@
   // http://127.0.0.1:5500/  (la que imprime server.js al arrancar).
   const REDIRECT_URI = window.location.origin.replace('//localhost', '//127.0.0.1')
     + window.location.pathname.replace(/index\.html$/, '');
+  /* Sube este número CADA VEZ que cambien los SCOPES de abajo. Un token ya
+     emitido conserva para siempre los permisos con los que nació, y refrescarlo
+     no le añade ninguno: la única forma de ganar un permiso nuevo es volver a
+     pasar por la pantalla de autorización. Guardamos aquí con qué versión se
+     autorizó la sesión para poder decirlo en vez de fallar sin explicación. */
+  const SCOPES_V = '3';
+
   const SCOPES = [
-    /* Aquí se pedían `user-read-private`, `user-read-email` y
-       `user-read-currently-playing`. Los tres fuera:
-       - private/email: NINGÚN código los leía. Y desde las reglas de
-         feb-2026 `/me` ya ni devuelve email, country ni product, así que
-         pedirlos era regalar dos líneas de miedo en la pantalla de
-         consentimiento ("tu dirección de correo", "tus datos de suscripción")
-         a cambio de nada. `loadUser` solo usa display_name/id/images, que
-         vienen igual sin permiso alguno.
-       - currently-playing: era para `/me/player/currently-playing`, que ya
-         no se llama — el sondeo pide `/me/player`, que va con
-         `user-read-playback-state` (el de abajo).
-       Quitar permisos NO rompe las sesiones ya abiertas: el token que tengas
-       simplemente lleva más de los que hacen falta. */
+    /* `user-read-currently-playing` fuera: era para
+       `/me/player/currently-playing`, que ya no se llama — el sondeo pide
+       `/me/player`, que va con `user-read-playback-state` (el de abajo).
+
+       `user-read-email` y `user-read-private` VUELVEN (se habían quitado por
+       inútiles, y lo eran: desde feb-2026 `/me` ya ni devuelve email, country
+       ni product). Ahora hacen falta por otra razón: el **Web Playback SDK**
+       los exige junto con `streaming` para arrancar, aunque su contenido no
+       se lea en ningún sitio. Sin los tres, la música no puede sonar en esta
+       pestaña y volveríamos a depender de tener Spotify abierto aparte. */
+    'streaming',
+    'user-read-email',
+    'user-read-private',
     'user-read-playback-state',
     'user-modify-playback-state',
     'playlist-read-private',
     'playlist-read-collaborative',
+    /* Para la lista puente de la radio (ver `listaRadio`). Spotify SOLO
+       enciende su autoplay —el de verdad, el que pone artistas parecidos—
+       cuando lo que suena es un CONTEXTO; con una canción suelta (`uris`) se
+       calla al acabar. La única forma de darle un contexto a una canción
+       cualquiera es meterla en una playlist nuestra, y para eso hace falta
+       este permiso. Es `-private`: la lista se crea oculta. */
+    'playlist-modify-private',
     'user-library-read',
     // Necesarios para las secciones "recientes" y "top" de la biblioteca.
     // Si tu sesión es anterior a esto, desconecta y vuelve a conectar.
@@ -150,6 +165,11 @@
     if (!res.ok) return false;
     const data = await res.json();
     saveTokens(data);
+    /* Solo AQUÍ se apunta la versión de permisos, nunca en refreshToken():
+       un token refrescado hereda los permisos del original, así que refrescar
+       no pone al día nada. Esto se escribe al salir de la pantalla de
+       autorización, que es el único momento en que se conceden de verdad. */
+    try { localStorage.setItem(STORAGE.SCOPES, SCOPES_V); } catch (x) {}
     // limpieza de la marca que dejó el ❤ retirado (sesiones anteriores)
     try { localStorage.removeItem('mm_like_bloqueado'); } catch (x) {}
     return true;
@@ -179,6 +199,39 @@
     if (data.access_token) localStorage.setItem(STORAGE.TOKEN, data.access_token);
     if (data.refresh_token) localStorage.setItem(STORAGE.REFRESH, data.refresh_token);
     if (data.expires_in) localStorage.setItem(STORAGE.EXPIRES, String(Date.now() + data.expires_in * 1000));
+    programarRenovacion();
+  };
+
+  /* -------- Renovar el token ANTES de que caduque --------
+
+     El token dura una hora y hasta ahora solo se renovaba de rebote, cuando
+     algo fallaba al usarlo. Eso dejaba un agujero conocido: con la app
+     abierta más de una hora sin reproducir nada, nadie tocaba el token, y al
+     ir a buscar o abrir la biblioteca salía «conecta spotify» aunque
+     siguieras conectado — había que recargar.
+
+     El sondeo cada 2 s lo tapaba sin querer (cada petición pasa por
+     `getValidToken`). Ahora que sonando en esta pestaña YA NO hay sondeo, el
+     agujero quedaba del todo al aire. Así que se renueva por reloj, un minuto
+     antes de la hora, suene algo o no. */
+  let renovTimer = null;
+
+  const renovarAhora = async () => {
+    // Si sale bien, `saveTokens` vuelve a programar sola con la caducidad nueva
+    if (await refreshToken()) return;
+    console.warn('[Spotify] no se pudo renovar el token; se reintenta en 5 min');
+    clearTimeout(renovTimer);
+    renovTimer = setTimeout(renovarAhora, 300000);
+  };
+
+  const programarRenovacion = () => {
+    clearTimeout(renovTimer);
+    if (!localStorage.getItem(STORAGE.REFRESH)) return;
+    const exp = parseInt(localStorage.getItem(STORAGE.EXPIRES) || '0', 10);
+    /* Un minuto de margen. El mínimo de 5 s es para el caso de abrir la app
+       con el token ya caducado: renovar, pero no en el mismo suspiro que el
+       arranque. */
+    renovTimer = setTimeout(renovarAhora, Math.max(5000, exp - Date.now() - 60000));
   };
 
   const isLoggedIn = () => {
@@ -186,6 +239,12 @@
     const exp = parseInt(localStorage.getItem(STORAGE.EXPIRES) || '0', 10);
     return tok && Date.now() < exp;
   };
+
+  /* ¿La sesión abierta trae los permisos de AHORA? Una sesión de antes del
+     SDK sigue siendo válida para buscar y para mandar a otro aparato, pero no
+     puede reproducir aquí: le falta `streaming`. Conviene decirlo antes de
+     intentarlo, no después de un error críptico del SDK. */
+  const scopesAlDia = () => localStorage.getItem(STORAGE.SCOPES) === SCOPES_V;
 
   const getValidToken = async () => {
     if (isLoggedIn()) return localStorage.getItem(STORAGE.TOKEN);
@@ -262,6 +321,322 @@
     try { return JSON.parse(txt); } catch (e) { return null; }
   };
 
+  /* ==========================================================
+     REPRODUCTOR DENTRO DE LA PESTAÑA (Web Playback SDK)
+
+     Hasta aquí la app era SOLO un mando a distancia: sabía pedirle a Spotify
+     «pon esto», pero necesitaba que hubiera un aparato encendido al otro
+     lado. De ahí venía lo de tener que abrir Spotify primero — sin aparato,
+     el mando apunta a la nada y la API contesta 404 NO_ACTIVE_DEVICE.
+
+     El SDK le da la vuelta: carga un reproductor de Spotify DENTRO de esta
+     página y la convierte en un aparato más de Spotify Connect, llamado
+     MASTER MUSIC. A partir de ahí no hay que abrir nada: se entra a la web,
+     se le da al play y suena aquí.
+
+     Tres cosas que conviene tener presentes:
+     · Hace falta **Premium** (ya hacía falta antes para controlar la
+       reproducción) y los permisos `streaming` + email + private.
+     · El audio va cifrado (DRM). NO se puede enchufar a un AnalyserNode, así
+       que el visualizador y el ◈ siguen dependiendo del micrófono. Esto no
+       es un fallo que arreglar: el navegador no da acceso a ese audio.
+     · Si algo de esto falta —cuenta free, navegador sin DRM, bloqueador que
+       se come scdn.co, sesión vieja sin `streaming`— NO se rompe nada: se
+       apaga el SDK y la app vuelve a ser el mando a distancia de siempre.
+     ========================================================== */
+  const NOMBRE_APARATO = 'MASTER MUSIC';
+  const SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
+
+  let sdkPlayer = null;      // instancia de Spotify.Player
+  let sdkDeviceId = null;    // nuestro id de aparato, cuando está listo
+  let sdkActivo = false;     // ¿lo que suena, suena AQUÍ?
+  let sdkIntento = null;     // promesa del arranque, para no arrancar dos veces
+  let sdkVetado = false;     // el navegador o la cuenta no pueden: no reintentar
+  /* Aparato al que van los play. null = esta pestaña, que es justo lo que
+     evita tener que abrir Spotify. Lo cambia el usuario desde el chip. */
+  let destinoElegido = null;
+  /* Lo que suena y lo que viene detrás, tal cual lo entrega el SDK. Con el
+     mando a distancia esto NO se podía saber sin pedir `/me/player/queue`;
+     ahora llega gratis en cada cambio de estado y da de comer a dos cosas:
+     la precarga de la letra siguiente y la pestaña de cola. */
+  let ventana = null;
+  let ultimaPrecarga = null;   // para no repetir la misma precarga en cada evento
+
+  const somos = (id) => !!id && id === sdkDeviceId;
+
+  /* Si el SDK no llegó a arrancar devuelve null, y entonces las llamadas van
+     sin `device_id`: exactamente el comportamiento de antes, con Spotify
+     eligiendo aparato por su cuenta. */
+  const destino = () => destinoElegido || sdkDeviceId || null;
+
+  const conDestino = (path) => {
+    const id = destino();
+    if (!id) return path;
+    return path + (path.includes('?') ? '&' : '?') + 'device_id=' + id;
+  };
+
+  /* -------- Seguir donde ibas --------
+     Pega NUEVA que trae el SDK, y conviene tenerla clara: como el aparato es
+     esta misma pestaña, al recargar la página el aparato desaparece y la
+     música se corta. Antes no pasaba porque quien sonaba era el móvil.
+
+     Se apunta cada pocos segundos qué sonaba y por qué minuto iba. Al volver
+     a abrir, la canción aparece puesta en la barra —con su carátula y su
+     letra— parada en ese punto, y el play la retoma justo ahí.
+
+     NO se arranca sola a propósito: el navegador bloquea el audio que no ha
+     pedido el usuario, y que la música se dispare al abrir una pestaña asusta
+     más de lo que ayuda. */
+  const CLAVE_ULTIMO = 'sp_ultimo';
+  const ULTIMO_TTL = 12 * 3600 * 1000;   // pasado un día, retomar ya no tiene sentido
+  let ultimoGuardado = 0;
+  let reanudar = null;                   // {uri, ctx, pos} pendiente de retomar
+
+  const guardarUltimo = (state) => {
+    const it = state && state.track_window && state.track_window.current_track;
+    if (!it) return;
+    const ahora = Date.now();
+    // Como mucho cada 5 s mientras suena; una pausa sí se apunta al momento.
+    if (!state.paused && ahora - ultimoGuardado < 5000) return;
+    ultimoGuardado = ahora;
+    try {
+      localStorage.setItem(CLAVE_ULTIMO, JSON.stringify({
+        uri: it.uri,
+        ctx: (state.context && state.context.uri) || null,
+        pos: state.position || 0,
+        t: ahora,
+        // La pista entera, para poder repintarla al volver sin pedir nada
+        pista: pistaDesde(it),
+      }));
+    } catch (e) {}
+  };
+
+  const olvidarUltimo = () => {
+    reanudar = null;
+    try { localStorage.removeItem(CLAVE_ULTIMO); } catch (e) {}
+  };
+
+  const restaurarUltimo = () => {
+    if (reanudar || lastTrackId) return;   // ya hay algo puesto: no estorbar
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(CLAVE_ULTIMO) || 'null'); } catch (e) {}
+    if (!d || !d.uri || !d.pista) return;
+    if (Date.now() - (d.t || 0) > ULTIMO_TTL) { olvidarUltimo(); return; }
+
+    reanudar = { uri: d.uri, ctx: d.ctx, pos: d.pos || 0 };
+    pintarPista(d.pista);
+    notarCambio(d.pista);        // deja la letra pedida ya, sin esperar al play
+    progBase = (d.pos || 0) / 1000;
+    progDur = d.pista.duration || 0;
+    progStamp = 0;               // parado: que el reloj de la barra no lo mueva
+    paintProgress(progBase);
+    pintarPlay(false);
+    /* Con retraso a propósito: `notarCambio` acaba de poner la canción en
+       `PlayerCore`, y la barra de estado la repinta con el nombre de la pista
+       en su repaso de cada 500 ms. Dicho ahora, el aviso duraría medio
+       segundo. Dicho después, se queda. */
+    setTimeout(() => {
+      if (reanudar) setStatus('▸ dale al play para seguir donde lo dejaste');
+    }, 900);
+  };
+
+  let avisoReconexion = false;
+  const avisarReconexion = () => {
+    if (avisoReconexion) return;
+    avisoReconexion = true;
+    setStatus('◎ tu sesión es anterior al reproductor propio · pulsa [ conectar spotify ] para autorizarlo');
+  };
+
+  const vetarSDK = (motivo, detalle) => {
+    sdkVetado = true;
+    sdkActivo = false;
+    sdkDeviceId = null;
+    console.warn('[Spotify SDK]', motivo, detalle || '');
+    setStatus('◎ ' + motivo + ' · sigue funcionando como mando a distancia');
+    try { if (sdkPlayer) sdkPlayer.disconnect(); } catch (e) {}
+    sdkPlayer = null;
+    pintarChipAparato();
+    startPolling();
+  };
+
+  const cargarSDK = () => new Promise((resolve, reject) => {
+    if (window.Spotify && window.Spotify.Player) { resolve(); return; }
+    /* El gancho global tiene que estar puesto ANTES de meter el <script>: el
+       SDK lo llama nada más cargarse y si no existe, se pierde el aviso. */
+    window.onSpotifyWebPlaybackSDKReady = resolve;
+    const s = document.createElement('script');
+    s.src = SDK_URL;
+    s.async = true;
+    // Los bloqueadores de rastreadores se comen scdn.co más de lo que parece.
+    s.onerror = () => reject(new Error('no se pudo cargar el reproductor de Spotify'));
+    document.head.appendChild(s);
+  });
+
+  /* iOS y Safari no dejan sonar un elemento de audio que no haya desbloqueado
+     un gesto del usuario. Sin esto, el primer play en iPhone se queda mudo y
+     SIN error: parece que la app está rota. */
+  const desbloquearAlPrimerGesto = () => {
+    const una = () => {
+      document.removeEventListener('pointerdown', una);
+      document.removeEventListener('keydown', una);
+      if (sdkPlayer && sdkPlayer.activateElement) {
+        sdkPlayer.activateElement().catch(() => {});
+      }
+    };
+    document.addEventListener('pointerdown', una);
+    document.addEventListener('keydown', una);
+  };
+
+  /* El corazón del asunto: el estado llega EMPUJADO por el SDK, no
+     preguntando. Cada pausa, cada cambio de canción y cada seek disparan
+     esto sin gastar ni una petición de la cuota. */
+  const sdkEstado = (state) => {
+    if (!state) {
+      /* Estado nulo = ya no somos el aparato que suena (se la llevaron al
+         móvil, o nos echaron). Hay que volver al sondeo: es la única forma
+         de enterarse de lo que pasa fuera de esta pestaña. */
+      if (sdkActivo) {
+        sdkActivo = false;
+        lastDevice = null;
+        pintarChipAparato();
+        startPolling();
+      }
+      return;
+    }
+
+    if (!sdkActivo) {
+      sdkActivo = true;
+      stopPolling(true);          // corta la red, deja vivo el reloj de la barra
+      lastDevice = { id: sdkDeviceId, name: NOMBRE_APARATO, type: 'Computer', is_active: true };
+      pintarChipAparato();
+      if (!rafId) smoothLoop();
+    }
+
+    const it = state.track_window && state.track_window.current_track;
+    if (it) {
+      const track = pistaDesde(it);
+      pintarPista(track);
+      /* Sin compensación de latencia ni anti-jitter, al revés que el sondeo:
+         esta posición no ha viajado por la red, es la del audio de aquí al
+         lado. Lo que dice es exacto. */
+      progBase = (state.position || 0) / 1000;
+      progStamp = performance.now();
+      progDur = (state.duration || it.duration_ms || 0) / 1000;
+      if (state.paused) paintProgress(progBase);
+      pintarPlay(!state.paused);
+      notarCambio(track);
+      if (window.PlayerCore) window.PlayerCore.state.isPreview = false;
+    } else {
+      pintarPlay(!state.paused);
+    }
+
+    /* La canción que viene: se precarga su letra AHORA, mientras suena la
+       actual, para que al cambiar de pista salga sola. LRClib tarda ~6-7 s
+       desde esta red, así que es la diferencia entre que la letra esté puesta
+       al empezar la canción o que llegue por el primer estribillo. */
+    ventana = state.track_window || null;
+    const sig = ventana && ventana.next_tracks && ventana.next_tracks[0];
+    if (sig && window.LyricsModule && window.LyricsModule.prefetch) {
+      const clave = sig.uri || sig.id;
+      if (clave && clave !== ultimaPrecarga) {
+        ultimaPrecarga = clave;
+        window.LyricsModule.prefetch(pistaDesde(sig));
+      }
+    }
+
+    guardarUltimo(state);
+
+    // Contexto y modos, lo mismo que `leerModos()` saca del sondeo
+    lastContext = (state.context && state.context.uri) || null;
+    const rep = ['off', 'context', 'track'][state.repeat_mode] || 'off';
+    if (!!state.shuffle !== lastShuffle || rep !== lastRepeat) {
+      lastShuffle = !!state.shuffle;
+      lastRepeat = rep;
+      window.dispatchEvent(new CustomEvent('mm:spotify-modes', {
+        detail: { shuffle: lastShuffle, repeat: lastRepeat, device: lastDevice, deviceChanged: false },
+      }));
+    }
+  };
+
+  const arrancarSDK = () => {
+    if (sdkIntento) return sdkIntento;
+    if (sdkVetado) return Promise.resolve(false);
+    /* Una sesión de antes de este cambio no tiene `streaming`, y el SDK
+       fallaría con un error de autenticación que parece otra cosa. Mejor
+       decirlo claro y no gastar la carga del script. */
+    if (!scopesAlDia()) { avisarReconexion(); return Promise.resolve(false); }
+
+    sdkIntento = cargarSDK().then(() => new Promise((resolve) => {
+      const vol = (window.PlayerCore && window.PlayerCore.state)
+        ? window.PlayerCore.state.volume : 0.7;
+
+      sdkPlayer = new window.Spotify.Player({
+        name: NOMBRE_APARATO,
+        /* Se le da un token FRESCO cada vez que lo pide (también cuando el
+           suyo caduca a la hora), no uno guardado al arrancar. */
+        getOAuthToken: (cb) => { getValidToken().then((t) => { if (t) cb(t); }); },
+        volume: Math.max(0, Math.min(1, vol)),
+      });
+
+      sdkPlayer.addListener('ready', ({ device_id }) => {
+        sdkDeviceId = device_id;
+        console.log('[Spotify] reproductor listo en esta pestaña:', device_id);
+        pintarChipAparato();
+        /* Ya hay dónde retomar: si no había nada sonando en ningún sitio, se
+           deja puesta la canción de la última vez. */
+        restaurarUltimo();
+        resolve(true);
+      });
+
+      sdkPlayer.addListener('not_ready', ({ device_id }) => {
+        if (sdkDeviceId === device_id) sdkDeviceId = null;
+        if (sdkActivo) { sdkActivo = false; startPolling(); }
+        pintarChipAparato();
+      });
+
+      sdkPlayer.addListener('player_state_changed', sdkEstado);
+
+      // Navegador sin DRM (o con el DRM desactivado a mano)
+      sdkPlayer.addListener('initialization_error', ({ message }) => {
+        vetarSDK('este navegador no puede reproducir Spotify dentro de la página', message);
+        resolve(false);
+      });
+      // Token sin `streaming`, o caducado sin poder renovarse
+      sdkPlayer.addListener('authentication_error', ({ message }) => {
+        console.warn('[Spotify SDK] autenticación:', message);
+        sdkVetado = true;
+        avisoReconexion = false;   // este aviso sí merece salir
+        avisarReconexion();
+        resolve(false);
+      });
+      // Cuenta free: el SDK no reproduce, punto
+      sdkPlayer.addListener('account_error', ({ message }) => {
+        vetarSDK('para que suene aquí hace falta Spotify Premium', message);
+        resolve(false);
+      });
+      sdkPlayer.addListener('playback_error', ({ message }) => {
+        console.warn('[Spotify SDK] reproducción:', message);
+        setStatus('✕ Spotify no pudo reproducir esa pista aquí');
+      });
+      sdkPlayer.addListener('autoplay_failed', () => {
+        setStatus('▸ toca la pantalla una vez: el navegador no deja arrancar el audio solo');
+      });
+
+      desbloquearAlPrimerGesto();
+      sdkPlayer.connect().then((ok) => { if (!ok) resolve(false); });
+
+      /* Red de seguridad: si `ready` no llega nunca, que la promesa no se
+         quede colgada para siempre. El oyente sigue puesto por si llega
+         tarde. */
+      setTimeout(() => resolve(!!sdkDeviceId), 15000);
+    })).catch((e) => {
+      console.warn('[Spotify SDK] no arrancó:', e && e.message);
+      return false;
+    });
+
+    return sdkIntento;
+  };
+
   // -------- Polling current playback --------
   let pollTimer = null;
   // La reprograma startPolling(); vive aquí porque la usa el oyente de
@@ -323,16 +698,104 @@
     if (window.LyricsModule) window.LyricsModule.tick(sec);
   };
 
+  let ultimaAncla = 0;   // último re-anclaje contra el reproductor de la pestaña
+
   const smoothLoop = () => {
     rafId = requestAnimationFrame(smoothLoop);
     if (!lastIsPlaying || !progStamp) return;
     const st = window.PlayerCore && window.PlayerCore.state;
     if (st && st.isPreview) return;   // el preview de 30s ya lo mueve el audio local
-    const sec = progBase + (performance.now() - progStamp) / 1000;
+    const ahora = performance.now();
+
+    /* Sonando aquí no hay sondeo que vuelva a poner el reloj en hora —esa es
+       la gracia—, así que cada 10 s se lo preguntamos al propio reproductor.
+       Es una lectura LOCAL: no toca la red ni gasta cuota. Sin esto, la barra
+       y la letra se irían separando del audio en las canciones largas.
+       La corrección es suave (el mismo 35% que usa el sondeo): re-anclar en
+       seco hace parpadear la línea activa de la letra. */
+    if (sdkActivo && sdkPlayer && ahora - ultimaAncla > 10000) {
+      ultimaAncla = ahora;
+      sdkPlayer.getCurrentState().then((s) => {
+        if (!s || s.paused) return;
+        const est = progBase + (performance.now() - progStamp) / 1000;
+        const real = s.position / 1000;
+        progBase = Math.abs(real - est) < 0.8 ? est + (real - est) * 0.35 : real;
+        progStamp = performance.now();
+      }).catch(() => {});
+    }
+
+    const sec = progBase + (ahora - progStamp) / 1000;
     paintProgress(progDur ? Math.min(progDur, sec) : sec);
   };
 
+  /* -------- Pintado de la pista, compartido --------
+     La misma canción llega ahora por DOS caminos: el sondeo de `/me/player`
+     (cuando suena en otro aparato) y el evento `player_state_changed` del
+     reproductor de esta pestaña (SDK). Los dos entregan la pista con la misma
+     forma, así que el mapeo y el pintado se escriben una sola vez; lo que sí
+     cambia entre uno y otro es cómo se ancla el reloj, y eso se queda en cada
+     lado (el sondeo compensa la latencia de red; el SDK no la tiene). */
+  const pistaDesde = (it) => ({
+    // El SDK deja `id` en null para algunas pistas; el uri nunca falta.
+    id: 'sp:' + (it.id || it.uri),
+    name: it.name,
+    artist: (it.artists || []).map((a) => a.name).join(', '),
+    album: it.album ? it.album.name : '',
+    duration: it.duration_ms / 1000,
+    cover: it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : null,
+    url: null,
+    spotify: true,
+    uri: it.uri,
+  });
+
+  const pintarPista = (track) => {
+    document.getElementById('npTitle').textContent = track.name;
+    document.getElementById('npArtist').textContent = track.artist;
+    const npCover = document.getElementById('npCover');
+    if (npCover && track.cover) {
+      npCover.style.backgroundImage = `url('${track.cover}')`;
+      npCover.innerHTML = '';
+    }
+    const coverArt = document.getElementById('coverArt');
+    if (coverArt && track.cover) {
+      coverArt.style.backgroundImage = `url('${track.cover}')`;
+      coverArt.style.backgroundSize = 'cover';
+      coverArt.style.backgroundPosition = 'center';
+      coverArt.innerHTML = '';
+    }
+    document.getElementById('timeTotal').textContent = formatTime(track.duration);
+  };
+
+  const pintarPlay = (playing) => {
+    lastIsPlaying = playing;
+    document.getElementById('playIcon').hidden = playing;
+    document.getElementById('pauseIcon').hidden = !playing;
+    document.body.classList.toggle('playing', playing);
+  };
+
+  /* Va aparte del pintado a propósito: pedir la letra es caro y solo debe
+     pasar cuando la canción cambia de verdad, no en cada refresco. */
+  const notarCambio = (track) => {
+    if (track.id === lastTrackId) return;
+    lastTrackId = track.id;
+    window.PlayerCore.state.currentTrack = track;
+    if (window.LyricsModule) window.LyricsModule.fetch(track);
+    /* Cambiar de canción es el ÚNICO momento en que la cola se acorta, así
+       que es aquí donde la radio se repone. Es lo que hace que no se acabe:
+       mientras la sesión siga viva, siempre quedan canciones por delante.
+       Vale para los dos caminos —el SDK y el sondeo—, porque los dos pasan
+       por aquí al cambiar de pista. */
+    if (radio) rellenarRadio();
+  };
+
   const startPolling = () => {
+    /* Sonando en esta misma pestaña no hay NADA que preguntarle a la API: el
+       estado llega solo por eventos del SDK. Se corta aquí, y no en cada
+       llamador, porque `startPolling()` se llama desde diez sitios (play,
+       pausa, siguiente, cambio de aparato…) y bastaría olvidarse de uno para
+       volver a las 30 peticiones por minuto. El reloj de la barra sí tiene
+       que seguir corriendo. */
+    if (sdkActivo) { if (!rafId) smoothLoop(); return; }
     if (pollTimer) return;
     const poll = async () => {
       try {
@@ -345,33 +808,11 @@
         if (data) lastContext = (data.context && data.context.uri) || null;
         if (data && data.item) {
           const it = data.item;
-          const track = {
-            id: 'sp:' + it.id,
-            name: it.name,
-            artist: it.artists.map(a => a.name).join(', '),
-            album: it.album ? it.album.name : '',
-            duration: it.duration_ms / 1000,
-            cover: it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : null,
-            url: null,
-            spotify: true,
-            uri: it.uri,
-          };
-          // Update now playing bar
-          document.getElementById('npTitle').textContent = track.name;
-          document.getElementById('npArtist').textContent = track.artist;
-          const npCover = document.getElementById('npCover');
-          if (npCover && track.cover) {
-            npCover.style.backgroundImage = `url('${track.cover}')`;
-            npCover.innerHTML = '';
-          }
-          const coverArt = document.getElementById('coverArt');
-          if (coverArt && track.cover) {
-            coverArt.style.backgroundImage = `url('${track.cover}')`;
-            coverArt.style.backgroundSize = 'cover';
-            coverArt.style.backgroundPosition = 'center';
-            coverArt.innerHTML = '';
-          }
-          document.getElementById('timeTotal').textContent = formatTime(track.duration);
+          const track = pistaDesde(it);
+          /* Hay música de verdad en algún aparato: manda esa, no lo que
+             dejamos apuntado de la última vez. */
+          reanudar = null;
+          pintarPista(track);
           // Re-ancla el reloj local con el progreso real; smoothLoop interpola
           // entre polls para que letra y barra no salten cada 2s.
           const playing = !!data.is_playing;
@@ -395,17 +836,8 @@
             // Reproduciendo pinta el rAF (smoothLoop); en pausa pintamos aquí
             if (!playing) paintProgress(progBase);
           }
-          // Update play icon
-          lastIsPlaying = playing;
-          document.getElementById('playIcon').hidden = playing;
-          document.getElementById('pauseIcon').hidden = !playing;
-          document.body.classList.toggle('playing', playing);
-
-          if (track.id !== lastTrackId) {
-            lastTrackId = track.id;
-            window.PlayerCore.state.currentTrack = track;
-            if (window.LyricsModule) window.LyricsModule.fetch(track);
-          }
+          pintarPlay(playing);
+          notarCambio(track);
         }
       } catch (e) {
         // silently ignore (e.g. nothing playing)
@@ -458,9 +890,15 @@
     if (!document.hidden && !frenado()) reprogramar();
   });
 
-  const stopPolling = () => {
+  /* `soloRed`: corta las peticiones pero deja vivo el reloj de la barra y lo
+     que se sabe del aparato. Lo usa el SDK al empezar a sonar aquí — ahí no
+     hay que preguntar nada, pero la barra y la letra tienen que seguir
+     moviéndose y el chip debe seguir diciendo dónde suena. Sin flag (cerrar
+     sesión) se borra todo, que es lo que hacía antes. */
+  const stopPolling = (soloRed) => {
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
+    if (soloRed) return;
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     progStamp = 0;
     // Sin sondeo no se sabe nada del aparato: dejarlo puesto haría que la
@@ -474,9 +912,41 @@
 
   // -------- Controles de reproducción (Spotify Connect) --------
   // app.js delega aquí cuando la canción actual es de Spotify.
+  /* Sonando en esta pestaña, play/pausa/siguiente/atrás/volumen/seek son
+     llamadas LOCALES al reproductor: responden al instante, no gastan cuota
+     y no pueden caer en el 429. Solo se sale a la API cuando la música va por
+     otro aparato. */
   const spTogglePlay = async () => {
+    /* Primer play tras recargar: en vez de un play a secas —que empezaría la
+       canción desde el principio, o daría 404 si no hay aparato— se retoma la
+       de la última vez por el minuto exacto en que se quedó. */
+    if (reanudar && !lastIsPlaying) {
+      const r = reanudar;
+      reanudar = null;
+      try {
+        await arrancarSDK();
+        const body = r.ctx
+          ? { context_uri: r.ctx, offset: { uri: r.uri }, position_ms: r.pos }
+          : { uris: [r.uri], position_ms: r.pos };
+        await api(conDestino('/me/player/play'), { method: 'PUT', body: JSON.stringify(body) });
+        lastTrackId = null;
+        lastIsPlaying = true;
+        startPolling();
+        setStatus('▶ seguimos donde lo dejaste');
+        return;
+      } catch (e) {
+        // Que falle no debe dejar el botón muerto: se sigue al play normal
+        console.warn('[Spotify] no se pudo retomar:', e && e.message);
+      }
+    }
+    if (sdkActivo && sdkPlayer) {
+      // No hay que pintar nada a mano: `player_state_changed` llega solo.
+      try { await sdkPlayer.togglePlay(); return; } catch (e) { /* cae a la API */ }
+    }
     try {
-      await api(lastIsPlaying ? '/me/player/pause' : '/me/player/play', { method: 'PUT' });
+      /* Con destino: darle al play sin nada sonando en ningún sitio era el
+         404 de siempre. Apuntando a esta pestaña, arranca aquí. */
+      await api(conDestino(lastIsPlaying ? '/me/player/pause' : '/me/player/play'), { method: 'PUT' });
       lastIsPlaying = !lastIsPlaying;
       // Refleja el cambio al instante; el polling lo confirma después.
       document.getElementById('playIcon').hidden = lastIsPlaying;
@@ -489,6 +959,9 @@
   };
 
   const spNext = async () => {
+    if (sdkActivo && sdkPlayer) {
+      try { await sdkPlayer.nextTrack(); return; } catch (e) { /* cae a la API */ }
+    }
     try {
       await api('/me/player/next', { method: 'POST' });
       lastTrackId = null;          // fuerza al polling a refrescar la canción
@@ -497,6 +970,9 @@
   };
 
   const spPrev = async () => {
+    if (sdkActivo && sdkPlayer) {
+      try { await sdkPlayer.previousTrack(); return; } catch (e) { /* cae a la API */ }
+    }
     try {
       await api('/me/player/previous', { method: 'POST' });
       lastTrackId = null;
@@ -506,6 +982,11 @@
 
   const spSetVolume = async (pct) => {
     pct = Math.max(0, Math.min(100, Math.round(pct)));
+    /* Este es el que más se ahorra: arrastrar la barra de volumen soltaba una
+       petición por cada paso. En local es una llamada de nada. */
+    if (sdkActivo && sdkPlayer) {
+      try { await sdkPlayer.setVolume(pct / 100); return; } catch (e) {}
+    }
     try { await api('/me/player/volume?volume_percent=' + pct, { method: 'PUT' }); }
     catch (e) { /* algunos dispositivos no aceptan volumen remoto; silencioso */ }
   };
@@ -517,7 +998,11 @@
      devolver el botón a su sitio, que es peor mentira que no tenerlo. */
   const spSetShuffle = async (on) => {
     try {
-      await api('/me/player/shuffle?state=' + (on ? 'true' : 'false'), { method: 'PUT' });
+      /* Con `device_id`: el SDK no tiene método local para aleatorio ni
+         repetir, así que estos dos siguen saliendo a la API — pero apuntando
+         a esta pestaña, que si no Spotify busca un aparato activo y sin
+         ninguno responde 404. */
+      await api(conDestino('/me/player/shuffle?state=' + (on ? 'true' : 'false')), { method: 'PUT' });
       lastShuffle = !!on;
     } catch (e) {
       setStatus('✕ Spotify no aceptó el aleatorio (¿hay un dispositivo activo?)');
@@ -528,7 +1013,7 @@
   // modo: 'off' | 'context' (toda la lista) | 'track' (una canción)
   const spSetRepeat = async (modo) => {
     try {
-      await api('/me/player/repeat?state=' + modo, { method: 'PUT' });
+      await api(conDestino('/me/player/repeat?state=' + modo), { method: 'PUT' });
       lastRepeat = modo;
     } catch (e) {
       setStatus('✕ Spotify no aceptó el modo de repetición (¿hay un dispositivo activo?)');
@@ -543,7 +1028,8 @@
   const spQueue = async (uri, nombre) => {
     if (!uri) return;
     try {
-      await api('/me/player/queue?uri=' + encodeURIComponent(uri), { method: 'POST' });
+      await arrancarSDK();
+      await api(conDestino('/me/player/queue?uri=' + encodeURIComponent(uri)), { method: 'POST' });
       setStatus('＋ en cola: ' + (nombre || 'canción'));
       // Si la cola está abierta, que se vea entrar
       if (window.SevenQueueRefresh) window.SevenQueueRefresh();
@@ -584,12 +1070,19 @@
   };
 
   const spSeek = async (ms) => {
-    try {
-      await api('/me/player/seek?position_ms=' + Math.round(ms), { method: 'PUT' });
-      // re-ancla el reloj local ya, sin esperar al siguiente poll (2s)
+    // Re-anclar el reloj vale para los dos caminos: el de aquí y el remoto.
+    const anclar = () => {
       progBase = ms / 1000;
       progStamp = performance.now();
       paintProgress(progBase);
+    };
+    if (sdkActivo && sdkPlayer) {
+      try { await sdkPlayer.seek(Math.round(ms)); anclar(); return; } catch (e) {}
+    }
+    try {
+      await api('/me/player/seek?position_ms=' + Math.round(ms), { method: 'PUT' });
+      // re-ancla el reloj local ya, sin esperar al siguiente poll (2s)
+      anclar();
     }
     catch (e) { setStatus('✕ no se pudo adelantar en Spotify'); }
   };
@@ -722,6 +1215,10 @@
         uri: it.uri,
         name: it.name,
         artist: it.artists.map(a => a.name).join(', '),
+        /* Se guarda el id del artista principal, que antes se tiraba: es la
+           puerta a `GET /artists/{id}`, el único sitio donde viven los
+           géneros. Sin él, «sigue sonando» solo puede buscar por nombre. */
+        artistId: (it.artists[0] && it.artists[0].id) || null,
         album: it.album ? it.album.name : '',
         duration: it.duration_ms / 1000,
         cover: it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : null,
@@ -776,30 +1273,340 @@
   // Reproduce un contexto entero (playlist / álbum), opcionalmente empezando
   // en una pista concreta. Así la cola de Spotify sigue con el resto.
   const playContext = async (contextUri, offsetUri) => {
+    // Una playlist o un álbum ya continúan solos: se apaga la radio para que
+    // no siga metiendo canciones detrás de otra cosa.
+    pararRadio();
+    await arrancarSDK();          // que exista el aparato antes de apuntarle
     const body = { context_uri: contextUri };
     if (offsetUri) body.offset = { uri: offsetUri };
-    await api('/me/player/play', { method: 'PUT', body: JSON.stringify(body) });
+    await api(conDestino('/me/player/play'), { method: 'PUT', body: JSON.stringify(body) });
     lastTrackId = null;
     lastIsPlaying = true;
     if (window.PlayerCore) window.PlayerCore.state.isPreview = false;
     startPolling();
   };
 
+  /* -------- «Sigue sonando»: cola automática --------
+
+     Poner una canción desde el buscador reproducía ESA y se acababa la
+     música. En la app de Spotify no pasa: al terminar sigue con cosas
+     parecidas. Esto lo imita.
+
+     NO se puede hacer como lo hace Spotify. `GET /recommendations` —el
+     endpoint que servía exactamente para esto— lleva muerto desde nov-2024 y
+     responde 403 a las apps creadas después. Y aunque `context_uri` acepta
+     artistas, `offset` **solo** funciona con álbum o playlist, así que
+     tampoco vale el truco de «pon esta canción y sigue con el artista».
+
+     Así que la lista se arma a mano con lo que queda vivo:
+       · `GET /artists/{id}` → los géneros. Es el ÚNICO sitio donde están:
+         las pistas no los traen.
+       · `GET /search` con `artist:"…"` y `genre:"…"` → candidatas.
+       · `POST /me/player/queue` → a la cola, en orden.
+
+     Solo salta con una canción SUELTA. Desde una playlist o un álbum se
+     reproduce en contexto y Spotify ya continúa con el resto por su cuenta.
+
+     ---- NO SE ACABA ----
+     La primera versión encolaba diez canciones y se callaba: eso no es una
+     radio, es una lista corta. Ahora hay una SESIÓN de radio que sigue viva
+     mientras suene, y **en cada cambio de canción se rellena la cola** para
+     mantener siempre unas cuantas por delante. Mientras no pongas otra cosa,
+     no se termina.
+
+     La clave para que no se repita es el **`offset` de la búsqueda**: sin él,
+     `genre:"reggaeton"` devolvería SIEMPRE las mismas diez y la radio giraría
+     en bucle a los veinte minutos. Cada relleno va rotando entre las
+     consultas (género 1, género 2, artista…) y pasando de página, con `vistas`
+     guardando lo ya encolado para no repetir nunca. */
+  const RADIO_COLCHON = 5;   // cuántas mantener siempre por delante
+  const RADIO_INICIAL = 5;   // las de la primera tanda
+  let radioSeq = 0;          // poner otra cosa cancela la radio anterior
+  let radio = null;          // sesión viva: {generos, artista, vistas, turno…}
+
+  const radioEncendida = () => localStorage.getItem('mm_radio') !== 'off';
+
+  const pararRadio = () => { radioSeq++; radio = null; };
+
+  const mezclar = (arr) => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const buscarPistas = async (q, offset) => {
+    try {
+      // limit 10: el tope de las apps en modo desarrollo desde feb-2026.
+      // offset llega hasta 1000, o sea 100 páginas por consulta.
+      const d = await api('/search?type=track&limit=10&offset=' + (offset || 0)
+        + '&q=' + encodeURIComponent(q));
+      return ((d && d.tracks && d.tracks.items) || []).filter((x) => x && x.uri);
+    } catch (e) { return []; }      // que falle una no debe tumbar la radio
+  };
+
+  /* Siguiente puñado de candidatas. Rota entre las consultas y va pasando
+     páginas; cuando una consulta se agota, la rotación pasa sola a la
+     siguiente y el `turno` sube, así que la radio nunca se queda seca. */
+  const masCandidatas = async () => {
+    const r = radio;
+    if (!r || !r.consultas.length) return [];
+    for (let intento = 0; intento < r.consultas.length * 2; intento++) {
+      const q = r.consultas[r.turno % r.consultas.length];
+      const pagina = Math.floor(r.turno / r.consultas.length);
+      r.turno++;
+      /* Tope del `offset` de Spotify: 1000, o sea 100 páginas por consulta.
+         Son unas 3.000 canciones — más de un día seguido de música—, pero si
+         alguien llega, la radio vuelve a empezar en vez de callarse: se
+         olvida lo ya puesto (menos lo que suena ahora) y se repite catálogo.
+         Repetirse a las 20 horas es mucho mejor que quedarse en silencio. */
+      if (pagina > 99) {
+        r.turno = 0;
+        r.vistas = new Set();
+        const actual = window.PlayerCore && window.PlayerCore.state.currentTrack;
+        if (actual && actual.uri) r.vistas.add(actual.uri);
+        continue;
+      }
+      const items = (await buscarPistas(q, pagina * 10)).filter((x) => !r.vistas.has(x.uri));
+      if (items.length) return items;
+    }
+    return [];
+  };
+
+  // Encola de verdad. Devuelve cuántas entraron.
+  const encolarPistas = async (lista, mia) => {
+    let n = 0;
+    for (const p of lista) {
+      if (mia !== radioSeq) return n;             // pusieron otra cosa
+      if (radio) radio.vistas.add(p.uri);
+      try {
+        await api(conDestino('/me/player/queue?uri=' + encodeURIComponent(p.uri)), { method: 'POST' });
+        n++;
+      } catch (e) {
+        /* Un 429, o el aparato que se fue. Parar en seco: insistir con las
+           que quedan solo alargaría el castigo del freno. */
+        console.warn('[radio] cola cortada:', e && e.message);
+        break;
+      }
+    }
+    return n;
+  };
+
+  /* El relleno. Lo llama `notarCambio` en CADA cambio de canción, que es el
+     único momento en que la cola se acorta. Con el SDK sabemos exactamente
+     cuántas quedan por delante (`next_tracks`); sonando en otro aparato no
+     hay forma de saberlo sin gastar peticiones, así que se repone una por
+     canción, que mantiene el colchón igual de lleno. */
+  const rellenarRadio = async () => {
+    if (!radio || radio.rellenando || !radioEncendida()) return;
+    const faltan = (sdkActivo && ventana && Array.isArray(ventana.next_tracks))
+      ? RADIO_COLCHON - ventana.next_tracks.length
+      : 1;
+    if (faltan <= 0) return;
+
+    radio.rellenando = true;
+    const mia = radioSeq;
+    try {
+      let puestas = 0;
+      // Dos vueltas como mucho: si en dos no salió nada, se deja para el
+      // siguiente cambio de canción en vez de insistir aquí.
+      for (let v = 0; v < 2 && puestas < faltan; v++) {
+        const cand = await masCandidatas();
+        if (mia !== radioSeq) return;
+        if (!cand.length) break;
+        puestas += await encolarPistas(mezclar(cand).slice(0, faltan - puestas), mia);
+      }
+      if (puestas && window.SevenQueueRefresh) window.SevenQueueRefresh();
+    } finally {
+      if (radio) radio.rellenando = false;
+    }
+  };
+
+  /* ==========================================================
+     EL AUTOPLAY DE VERDAD DE SPOTIFY (lista puente)
+
+     Todo lo de arriba es una imitación: buscar por género y encolar. Está
+     bien, pero no es lo que hace la app de Spotify — allí pones una canción
+     de Kevin Kaarl y detrás llegan Ed Maverick, Milo j, Esperón. Eso lo
+     decide el motor de recomendaciones de Spotify, y a ese motor no se llega
+     por la API (`GET /recommendations` está muerto desde nov-2024).
+
+     PERO hay una puerta: **Spotify solo enciende su autoplay cuando lo que
+     suena es un CONTEXTO** (playlist o álbum). Con `uris: [una canción]` la
+     música se para al acabar — es una limitación conocida y reportada desde
+     hace años. Con una playlist, Spotify pone sus recomendaciones detrás.
+
+     Así que a la canción suelta se le fabrica un contexto: una playlist
+     privada nuestra, SIEMPRE LA MISMA, en la que se mete solo la canción que
+     se va a poner, y se reproduce esa playlist. A partir de ahí manda el
+     autoplay de Spotify: el de verdad, el mismo de la app.
+
+     Cuesta 3 peticiones en vez de 1 (comprobar la lista, meter la canción,
+     reproducir) y a cambio la radio la pone Spotify entera: cero peticiones
+     después. Sale MÁS BARATO que la imitación por género, que gastaba una
+     docena.
+
+     Dos avisos honestos:
+     · Crea UNA playlist privada en la cuenta del usuario. Se reutiliza para
+       siempre y se sobrescribe en cada canción; no se acumula nada.
+     · Depende de que el usuario tenga el «Autoplay» encendido en Spotify. Si
+       no lo tiene, no llega nada — y para eso está `vigilarAutoplay`, que lo
+       comprueba y enciende la radio por género como red de seguridad.
+     ========================================================== */
+  const CLAVE_LISTA = 'sp_lista_radio';
+  const NOMBRE_LISTA = 'MASTER MUSIC · radio';
+  const DESC_LISTA = 'La usa tu reproductor para que Spotify siga con música parecida. '
+    + 'Se sobrescribe con cada canción; puedes borrarla cuando quieras.';
+
+  const listaRadio = async () => {
+    let id = localStorage.getItem(CLAVE_LISTA);
+    if (id) {
+      // Pudo borrarla desde Spotify: se comprueba antes de darla por buena
+      try { await api('/playlists/' + id); return id; }
+      catch (e) { try { localStorage.removeItem(CLAVE_LISTA); } catch (x) {} }
+    }
+    const d = await api('/me/playlists', {
+      method: 'POST',
+      body: JSON.stringify({ name: NOMBRE_LISTA, public: false, description: DESC_LISTA }),
+    });
+    id = d && d.id;
+    if (id) { try { localStorage.setItem(CLAVE_LISTA, id); } catch (x) {} }
+    return id || null;
+  };
+
+  // Devuelve true si consiguió poner la canción por la lista puente.
+  const playPorPuente = async (t) => {
+    try {
+      const id = await listaRadio();
+      if (!id) return false;
+      // PUT reemplaza el contenido entero: la lista siempre tiene 1 canción
+      await api('/playlists/' + id + '/items', {
+        method: 'PUT', body: JSON.stringify({ uris: [t.uri] }),
+      });
+      await api(conDestino('/me/player/play'), {
+        method: 'PUT', body: JSON.stringify({ context_uri: 'spotify:playlist:' + id }),
+      });
+      return true;
+    } catch (e) {
+      console.warn('[radio] la lista puente no salió, se tira de la radio propia:', e && e.message);
+      return false;
+    }
+  };
+
+  /* Red de seguridad. Si el usuario tiene el autoplay apagado en Spotify, o
+     si a Spotify no le apetece recomendar nada, la lista puente deja la
+     música muriéndose igual. Se mira una vez, a los segundos, y si detrás no
+     hay nada se enciende la radio por género. */
+  const vigilarAutoplay = async (t) => {
+    await new Promise((r) => setTimeout(r, 7000));
+    if (!radioEncendida() || radio) return;         // ya hay radio propia puesta
+    if (lastTrackId && t.id && lastTrackId !== t.id) return;   // ya cambiaron de canción
+    let hay = 1;
+    if (sdkActivo && ventana && Array.isArray(ventana.next_tracks)) {
+      hay = ventana.next_tracks.length;
+    } else {
+      // Sonando en otro aparato no se sabe sin preguntar: una petición, una vez
+      try {
+        const d = await api('/me/player/queue');
+        hay = ((d && d.queue) || []).length;
+      } catch (e) { return; }                       // ante la duda, no meter mano
+    }
+    if (hay > 0) return;                            // Spotify ya puso lo suyo
+    console.warn('[radio] el autoplay de Spotify no puso nada; enciendo la radio por género');
+    radiar(t);
+  };
+
+  // Abre la sesión de radio a partir de la canción que se acaba de poner.
+  const radiar = async (t) => {
+    if (!radioEncendida() || !t || !t.uri) return;
+    pararRadio();
+    const mia = radioSeq;
+
+    let generos = [];
+    if (t.artistId) {
+      try {
+        const a = await api('/artists/' + t.artistId);
+        generos = (a && a.genres) || [];
+      } catch (e) { /* sin géneros se tira solo del artista */ }
+    }
+    if (mia !== radioSeq) return;
+
+    const artista = (t.artist || '').split(',')[0].trim();
+    /* El orden de las consultas es el orden en que la radio va tirando. El
+       género delante: es lo que pidió el usuario («música del género»), y
+       poniendo el artista primero la radio empezaría pareciendo un disco
+       suyo. El artista se queda como una consulta más de la rotación. */
+    const consultas = generos.slice(0, 3).map((g) => 'genre:"' + g + '"');
+    if (artista) consultas.push('artist:"' + artista + '"');
+    if (!consultas.length) return;
+
+    radio = {
+      consultas,
+      turno: 0,
+      vistas: new Set([t.uri]),
+      rellenando: false,
+      genero: generos[0] || null,
+    };
+
+    const cand = await masCandidatas();
+    if (mia !== radioSeq || !radio) return;
+    const puestas = await encolarPistas(mezclar(cand).slice(0, RADIO_INICIAL), mia);
+    if (mia !== radioSeq || !puestas) return;
+
+    setStatus(radio.genero
+      ? '◈ radio de ' + radio.genero + ' · seguirá sola al acabar'
+      : '◈ radio encendida · seguirá sola al acabar');
+    if (window.SevenQueueRefresh) window.SevenQueueRefresh();
+  };
+
   // contextUri (opcional): reproduce la pista dentro de su playlist/álbum
   const playTrack = async (t, contextUri) => {
     if (!t) return;
     setStatus('▣ cargando: ' + t.name);
+    /* Antes de mandar el play, que el reproductor de la pestaña esté
+       levantado: si no, `conDestino()` no tendría a quién apuntar y con
+       Spotify cerrado volveríamos al 404 de siempre. Después de la primera
+       vez esto no cuesta nada (devuelve la promesa ya resuelta). */
+    await arrancarSDK();
     try {
-      // Full playback via Spotify Connect (requiere Premium + un dispositivo activo)
-      const body = contextUri
-        ? { context_uri: contextUri, offset: { uri: t.uri } }
-        : { uris: [t.uri] };
-      await api('/me/player/play', { method: 'PUT', body: JSON.stringify(body) });
+      /* Canción suelta y radio encendida: se pone por la LISTA PUENTE para
+         que Spotify encienda su autoplay de verdad. Si eso falla (permiso
+         que falta, red, lo que sea) se cae al play de siempre. */
+      let porPuente = false;
+      if (!contextUri && radioEncendida()) porPuente = await playPorPuente(t);
+
+      if (!porPuente) {
+        // Suena aquí mismo si el SDK arrancó; si no, en el aparato que haya
+        const body = contextUri
+          ? { context_uri: contextUri, offset: { uri: t.uri } }
+          : { uris: [t.uri] };
+        await api(conDestino('/me/player/play'), { method: 'PUT', body: JSON.stringify(body) });
+      }
       lastTrackId = null;          // fuerza al polling a refrescar la canción
       lastIsPlaying = true;
       window.PlayerCore.state.isPreview = false;
       startPolling();
-      setStatus('▶ reproduciendo en Spotify: ' + t.name);
+      setStatus(destino() && somos(destino())
+        ? '▶ sonando aquí: ' + t.name
+        : '▶ reproduciendo en Spotify: ' + t.name);
+      /* Canción suelta: que al acabar no se quede la app en silencio. Si fue
+         por la lista puente, la radio la pone Spotify y aquí solo se vigila
+         que de verdad haya puesto algo; si no hubo puente, se enciende la
+         nuestra. Sin `await`: la música ya suena y esto va por detrás. */
+      if (!contextUri && radioEncendida()) {
+        if (porPuente) {
+          pararRadio();            // manda Spotify: que la nuestra no estorbe
+          /* Con retraso, como el aviso de «seguir donde ibas»: la barra de
+             estado repinta el nombre de la canción en su repaso de cada
+             500 ms y se comería este mensaje. */
+          setTimeout(() => setStatus('◈ radio de spotify · seguirá sola al acabar'), 900);
+          vigilarAutoplay(t);
+        } else {
+          radiar(t);
+        }
+      }
     } catch (e) {
       // Fallback: preview de 30s por el reproductor local
       if (t.preview && window.PlayerCore) {
@@ -811,10 +1618,15 @@
         document.getElementById('playIcon').hidden = true;
         document.getElementById('pauseIcon').hidden = false;
         showNowPlaying(t);
-        setStatus('▶ preview 30s · para la canción completa necesitas Spotify Premium con la app abierta');
+        setStatus('▶ preview 30s · para la canción completa necesitas Spotify Premium');
+      } else if (!scopesAlDia()) {
+        /* Lo más probable a partir de este cambio: sesión abierta antes de
+           que existiera el reproductor propio. No es culpa de la canción. */
+        setStatus('◎ pulsa [ conectar spotify ] para autorizar el reproductor de esta pestaña');
+        alert('Tu sesión de Spotify es anterior al reproductor propio.\n\nPulsa [ conectar spotify ] y autoriza otra vez: a partir de ahí la música suena aquí, sin tener que abrir Spotify en ningún sitio.');
       } else {
-        setStatus('✕ sin dispositivo activo. Abre Spotify (Premium) en tu móvil/PC y vuelve a intentar.');
-        alert('Para reproducir la canción completa necesitas:\n\n· Spotify Premium\n· La app de Spotify abierta en algún dispositivo\n\nEsta canción tampoco tiene preview de 30s disponible.');
+        setStatus('✕ no se pudo reproducir. ' + detalleSpotify(e));
+        alert('No se pudo reproducir la canción completa.\n\n· Hace falta Spotify Premium.\n· Si tu navegador no admite contenido protegido (DRM), abre Spotify en el móvil o el PC y elígelo en «dónde suena».\n\nMotivo: ' + detalleSpotify(e));
       }
     }
   };
@@ -923,14 +1735,16 @@
     if (!c) return;
     const nom = document.getElementById('devName');
     if (lastDevice && lastDevice.name) {
-      if (nom) nom.textContent = lastDevice.name;
+      // Sonando aquí no hace falta el nombre del aparato: el aparato es esto.
+      if (nom) nom.textContent = sdkActivo ? 'sonando aquí' : lastDevice.name;
       c.hidden = false;
       c.classList.toggle('dev-restringido', !!lastDevice.is_restricted);
     } else {
       c.hidden = !isLoggedIn();     // conectado pero sin aparato: se puede elegir uno
-      if (nom) nom.textContent = 'elegir dispositivo';
+      if (nom) nom.textContent = sdkDeviceId ? 'sonará aquí' : 'elegir dispositivo';
       c.classList.remove('dev-restringido');
     }
+    c.classList.toggle('dev-aqui', sdkActivo);
   };
 
   const cerrarMenuDev = () => {
@@ -960,16 +1774,21 @@
     if (!lista.length) {
       devMenu.innerHTML = `<div class="dev-vacio">
         ▒ ningún dispositivo a la vista ▒
-        <span>abre Spotify en el móvil o el PC y dale al play una vez</span>
+        <span>${sdkVetado
+          ? 'este navegador no puede reproducir aquí: abre Spotify en el móvil o el PC'
+          : 'abre Spotify en el móvil o el PC, o dale al play a una canción para que suene aquí'}</span>
       </div>`;
       return;
     }
+    /* Esta pestaña primero: es el destino por defecto y el que evita tener
+       que abrir Spotify, así que no debe quedar perdido entre los demás. */
+    lista = lista.slice().sort((a, b) => (somos(b.id) ? 1 : 0) - (somos(a.id) ? 1 : 0));
     devMenu.innerHTML = lista.map((d) => `
-      <button class="dev-item${d.is_active ? ' activo' : ''}" role="menuitem"
+      <button class="dev-item${d.is_active ? ' activo' : ''}${somos(d.id) ? ' es-aqui' : ''}" role="menuitem"
         data-id="${escapeHtml(d.id || '')}" ${d.is_restricted ? 'disabled' : ''}
         title="${d.is_restricted ? 'Spotify no permite controlar este dispositivo desde fuera' : ''}">
-        <span class="dev-item-ico" aria-hidden="true">${iconoAparato(d.type)}</span>
-        <span class="dev-item-nom">${escapeHtml(d.name || 'sin nombre')}</span>
+        <span class="dev-item-ico" aria-hidden="true">${somos(d.id) ? '◆' : iconoAparato(d.type)}</span>
+        <span class="dev-item-nom">${escapeHtml(d.name || 'sin nombre')}${somos(d.id) ? ' (esta pestaña)' : ''}</span>
         ${d.is_active ? '<span class="dev-item-marca">sonando</span>' : ''}
       </button>`).join('');
   };
@@ -988,7 +1807,13 @@
         cerrarMenuDev();
         try {
           await spTransfer(it.dataset.id);
-          setStatus('◎ mandado a ' + it.querySelector('.dev-item-nom').textContent);
+          /* Se recuerda la elección: los siguientes play van ahí y no
+             vuelven a esta pestaña por su cuenta. Elegir esta pestaña deja
+             el destino en null, que ya significa «aquí». */
+          destinoElegido = somos(it.dataset.id) ? null : it.dataset.id;
+          setStatus(somos(it.dataset.id)
+            ? '◆ la música pasa a sonar aquí'
+            : '◎ mandado a ' + it.querySelector('.dev-item-nom').textContent);
           lastTrackId = null;      // que el sondeo refresque sin esperar
           startPolling();
         } catch (err) {
@@ -1035,19 +1860,50 @@
       showSearchBlock(true);
       pintarChipAparato();   // conectado: el chip ya puede ofrecer elegir aparato
       if (window.LibraryModule) window.LibraryModule.onAuthChange(true);
+      /* Arranca el reloj de la renovación. Hace falta AQUÍ y no solo en
+         `saveTokens`: al abrir la app con una sesión todavía válida no se
+         guarda ningún token, así que sin esto el temporizador no se armaría
+         nunca y volvería el agujero de la hora. */
+      programarRenovacion();
       startPolling();
+      /* Se levanta el reproductor de la pestaña nada más conectar, sin
+         esperar a que le den al play: así el aparato MASTER MUSIC ya existe
+         cuando llegue la primera canción, y aparece en la lista de «dónde
+         suena» desde el primer momento. No se espera a que termine — que
+         tarde en cargar no debe retrasar la biblioteca. */
+      arrancarSDK();
     } catch (e) {
       console.warn('Spotify load user failed', e);
     }
   };
 
   const connect = async () => {
+    /* Sesión válida pero de antes del reproductor propio: lo que hace falta
+       es volver a autorizar, no cerrar sesión. Preguntar «¿cerrar sesión?»
+       aquí obligaba a dos vueltas para conseguir un permiso que falta. */
+    if (isLoggedIn() && !scopesAlDia()) {
+      await startAuth();
+      return;
+    }
     if (isLoggedIn()) {
       const ok = confirm('Ya estás conectado a Spotify. ¿Cerrar sesión?');
       if (ok) {
         localStorage.removeItem(STORAGE.TOKEN);
         localStorage.removeItem(STORAGE.REFRESH);
         localStorage.removeItem(STORAGE.EXPIRES);
+        try { if (sdkPlayer) sdkPlayer.disconnect(); } catch (x) {}
+        sdkPlayer = null;
+        sdkDeviceId = null;
+        sdkActivo = false;
+        sdkIntento = null;
+        destinoElegido = null;
+        ventana = null;
+        ultimaPrecarga = null;
+        clearTimeout(renovTimer);
+        olvidarUltimo();
+        pararRadio();
+        // La lista puente es de la cuenta que se va: su id no vale para otra
+        try { localStorage.removeItem(CLAVE_LISTA); } catch (x) {}
         stopPolling();
         showSearchBlock(false);
         searchResults = [];
@@ -1092,6 +1948,16 @@
     setVolume: spSetVolume,
     setShuffle: spSetShuffle, setRepeat: spSetRepeat,
     queue: spQueue,
+    /* La cola sin gastar una sola petición: sonando aquí, el SDK ya dice lo
+       que viene detrás. Devuelve null cuando la música va por otro aparato, y
+       entonces quien pregunte tira de `/me/player/queue` como siempre. */
+    colaLocal: () => {
+      if (!sdkActivo || !ventana) return null;
+      return {
+        currently_playing: ventana.current_track || null,
+        queue: (ventana.next_tracks || []).slice(),
+      };
+    },
     // Último estado conocido del aparato y los modos (lo refresca el sondeo)
     device: () => lastDevice,
     // playlist/album del que sale lo que suena (lo usa la pestana «cola»)

@@ -2176,6 +2176,16 @@ body.playing .status-bar .filler {
 /* Aparato que Spotify no deja gobernar desde fuera */
 .dev-chip.dev-restringido .dev-ico { color: var(--text-muted); }
 
+/* Sonando en esta misma pestaña (Web Playback SDK). Merece destacar: es el
+   estado en el que no hace falta abrir Spotify en ningún sitio, y hasta ahora
+   el chip solo sabía decir el nombre de un aparato ajeno. */
+.dev-chip.dev-aqui {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+.dev-chip.dev-aqui .dev-ico { color: var(--accent); }
+.dev-item.es-aqui .dev-item-ico { color: var(--accent); }
+
 /* El menú es hijo de <body> (lo cuelga spotify.js): así ningún ancestro con
    `transform` puede robarle el anclaje del position:fixed — la trampa que ya
    mordió cinco veces en este proyecto — ni lo recorta el overflow de nadie. */

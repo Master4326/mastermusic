@@ -777,6 +777,8 @@
     spotify: true,
     name: it.name || '(sin título)',
     artist: (it.artists || []).map(a => a.name).filter(Boolean).join(', '),
+    // Para «sigue sonando»: sin esto la radio solo puede buscar por nombre
+    artistId: ((it.artists || [])[0] || {}).id || null,
     duration: (it.duration_ms || 0) / 1000,
     cover: it.album && it.album.images && it.album.images.length
       ? it.album.images[it.album.images.length - 1].url : null,
@@ -791,7 +793,13 @@
     if (cur && cur.spotify && window.SpotifyModule && window.SpotifyModule.isLoggedIn()) {
       queueBusy = true;
       try {
-        const data = await window.SpotifyModule.api('/me/player/queue');
+        /* Sonando en la propia pestaña, lo que viene detrás ya lo sabe el
+           reproductor del SDK: se pinta al instante y sin gastar una petición
+           cada 6 segundos. Enseña menos canciones por delante que la API,
+           pero son las de verdad y no hay que esperarlas. Con la música en
+           otro aparato no queda más remedio que preguntar. */
+        const local = window.SpotifyModule.colaLocal ? window.SpotifyModule.colaLocal() : null;
+        const data = local || await window.SpotifyModule.api('/me/player/queue');
         const sonando = data && data.currently_playing;
         const items = (data && data.queue) || [];
         filasCola = [];

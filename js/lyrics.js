@@ -2160,6 +2160,23 @@
   window.LyricsModule = {
     fetch: fetchLyrics,
     tick,
+    /* Precarga silenciosa de UNA pista concreta. `prefetchNext` (más arriba)
+       solo sabe mirar la cola local y además descarta las de Spotify a
+       propósito, porque hasta ahora no había forma de saber qué canción venía
+       detrás en Spotify Connect. Con el Web Playback SDK sí la hay
+       (`track_window.next_tracks`), así que spotify.js llama aquí con esa
+       pista mientras suena la actual: al cambiar de canción la letra ya está
+       en la caché y sale sola, en vez de esperar los ~6-7 s de LRClib.
+       No toca la UI ni la pista actual, y cualquier fallo se ignora: si la
+       precarga no llegó, se pedirá normal cuando suene. */
+    prefetch: (track) => {
+      if (!track || !track.name || !track.artist) return;
+      const key = trackKey(track);
+      if (cacheGet(key) !== null) return;      // ya está (o ya se sabe que no hay)
+      resolveLyrics(track, undefined)
+        .then((d) => cachePut(key, d))
+        .catch(() => {});
+    },
     // ajustes → datos → limpiar caché (localStorage ya lo borra settings.js;
     // esto tira además la copia que este módulo tiene en memoria)
     clearCache: () => { cache = {}; },

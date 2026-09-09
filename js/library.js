@@ -65,6 +65,8 @@
     uri: it.uri || null,
     name: it.name || '(sin título)',
     artist: (it.artists || []).map(a => a.name).filter(Boolean).join(', '),
+    // Para «sigue sonando»: de aquí saca spotify.js los géneros del artista
+    artistId: ((it.artists || [])[0] || {}).id || null,
     album: it.album ? it.album.name : '',
     duration: (it.duration_ms || 0) / 1000,
     cover: it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : null,
@@ -75,11 +77,21 @@
     unplayable: !it.uri,
   });
 
-  // Cada endpoint envuelve las pistas distinto: /me/tracks y las playlists dan
-  // { track }, recently-played también, /me/top/tracks las da sueltas.
-  // Ojo: { track: null } (pista retirada) debe dar null, no el envoltorio;
-  // por eso comprobamos la CLAVE, no que el valor sea truthy.
-  const unwrap = (it) => (it && typeof it === 'object' && 'track' in it) ? it.track : it;
+  /* Cada endpoint envuelve las pistas distinto: /me/tracks y recently-played
+     dan { track }, /me/top/tracks las da sueltas, y **las playlists ahora dan
+     { item }** — en feb-2026 Spotify renombró `/playlists/{id}/tracks` a
+     `/playlists/{id}/items` y de paso, dentro, `track` pasó a llamarse `item`.
+     Se aceptan las dos formas: la vieja sigue llegando por los otros
+     endpoints, que no cambiaron.
+
+     Ojo: { track: null } (pista retirada del catálogo) debe dar null y no el
+     envoltorio; por eso se comprueba la CLAVE, no que el valor sea truthy. */
+  const unwrap = (it) => {
+    if (!it || typeof it !== 'object') return it;
+    if ('item' in it) return it.item;
+    if ('track' in it) return it.track;
+    return it;
+  };
 
   // Convierte los ítems crudos en filas y de paso cuenta lo que se descarta,
   // para poder decir POR QUÉ una playlist llena aparece vacía.
@@ -111,7 +123,12 @@
 
      Una línea, y debajo el botón que SÍ funciona. */
   const statsMsg = (s) => {
-    if (!s || !s.recibidos) return 'spotify no deja ver la lista de esta playlist desde aquí';
+    /* Antes decía «spotify no deja ver la lista desde aquí», y era mentira:
+       lo que pasaba es que la app pedía `/playlists/{id}/tracks`, retirado en
+       feb-2026. Con `/items` las playlists propias listan. Si aun así no llega
+       nada, lo normal es que sea una de las que hace Spotify. */
+    if (!s || !s.recibidos) return 'esta playlist no devolvió ninguna canción<br>'
+      + '<span style="opacity:.7">si la hizo spotify (daily mix, radio, descubrimiento…) no deja abrirla desde otras apps</span>';
     // Llegaron ítems pero ninguno era una canción: episodios de podcast,
     // pistas retiradas del catálogo o archivos locales de la playlist.
     if (s.episodios && s.episodios >= s.recibidos - s.nulos) return 'aquí solo hay episodios de podcast';
@@ -142,7 +159,9 @@
     uri: p.uri,
     name: p.name,
     owner: (p.owner && (p.owner.display_name || p.owner.id)) || '',
-    total: (p.tracks && p.tracks.total) || 0,
+    /* `items` desde feb-2026, `tracks` antes. Leer solo el viejo era lo que
+       dejaba el «0 de 0 canciones» en la cabecera de cada playlist. */
+    total: ((p.items || p.tracks) || {}).total || 0,
     cover: (p.images && p.images[0]) ? p.images[0].url : null,
   });
 
@@ -273,7 +292,9 @@
     }
     if (/Spotify API 429/.test(msg)) {
       // el freno de spotify.js mete los segundos que faltan en el mensaje
-      const seg = (msg.match(/espera (d+)s/) || [])[1];
+      // Era `(d+)`: sin la barra, buscaba letras «d» literales y NUNCA sacaba
+      // los segundos, así que el aviso salía siempre sin el dato que importa.
+      const seg = (msg.match(/espera (\d+)s/) || [])[1];
       return 'spotify pidió esperar: demasiadas peticiones'
         + (seg ? '<br>vuelve a intentarlo en <b>' + seg + ' s</b>' : '<br>espera un momento y pulsa ⟳');
     }
@@ -326,33 +347,37 @@
   };
 
   // El objeto playlist entero suele seguir trayendo sus pistas (las primeras
-  // 100, sin paginar) aunque /playlists/{id}/tracks no dé ninguna.
+  // 100, sin paginar) aunque la lista no dé ninguna. Aquí también cambió el
+  // nombre: `tracks` → `items` (feb-2026).
   const viaObjetoPlaylist = async (id) => {
     const d = await window.SpotifyModule.api(`/playlists/${id}`);
-    const t = (d && d.tracks) || {};
+    const t = (d && (d.items || d.tracks)) || {};
     return { items: t.items || [], total: t.total || 0, more: false, via: 'playlist' };
   };
 
-  /* Spotify restringe endpoints a las apps en development mode, y AQUÍ ESTABA
-     EL BUG: el respaldo del objeto playlist solo se probaba dentro del `catch`,
-     o sea únicamente cuando /tracks lanzaba un 403 o un 404. Pero la forma más
-     común de la restricción no es un error: es **un 200 con `items: []`**. Por
-     ese camino no saltaba ninguna excepción, así que el respaldo no llegaba a
-     probarse nunca y el usuario veía la playlist vacía con un ladrillo de
-     texto explicándole por qué — teniendo a un solo intento de distancia las
-     canciones. Ahora la lista vacía también dispara el respaldo. */
+  /* LA CAUSA DE «spotify no deja ver la lista de esta playlist desde aquí»:
+     no era una restricción del modo desarrollo, era que **el endpoint ya no
+     existe**. En feb-2026 Spotify renombró `/playlists/{id}/tracks` a
+     `/playlists/{id}/items` (y con él, `track` → `item` dentro de cada
+     entrada, y `tracks` → `items` en el objeto playlist). Pedirle a Spotify
+     un endpoint retirado no da un error que se entienda: da 403/404, o un 200
+     con la lista vacía. La app lo leyó como «no me dejan» y enseñó eso.
+
+     El respaldo por el objeto playlist se queda igualmente: cubre el caso de
+     una lista vacía sin error, que antes no disparaba nada porque solo se
+     probaba dentro del `catch`. */
   const fetchTracksPage = async (id, offset) => {
     let porTracks = null;
     try {
-      const d = await getPage(`/playlists/${id}/tracks`, offset, true);
+      const d = await getPage(`/playlists/${id}/items`, offset, true);
       porTracks = { items: (d && d.items) || [], total: (d && d.total) || 0,
-                    more: !!(d && d.next), via: 'tracks' };
+                    more: !!(d && d.next), via: 'items' };
       // con pistas, o pidiendo una página siguiente, no hay nada que rescatar
       if (porTracks.items.length || offset > 0) return porTracks;
-      console.warn('[Biblioteca] /tracks respondió 200 con la lista vacía; probando el objeto playlist');
+      console.warn('[Biblioteca] /items respondió 200 con la lista vacía; probando el objeto playlist');
     } catch (e) {
       if (offset > 0 || !/Spotify API 40[34]/.test(e.message || '')) throw e;
-      console.warn('[Biblioteca] /tracks bloqueado, probando el objeto playlist:', e.message);
+      console.warn('[Biblioteca] /items falló, probando el objeto playlist:', e.message);
     }
     try {
       const alt = await viaObjetoPlaylist(id);
@@ -361,7 +386,7 @@
       console.warn('[Biblioteca] el objeto playlist tampoco:', e.message);
       if (!porTracks) throw e;      // sin nada que enseñar, que hable el error
     }
-    return porTracks || { items: [], total: 0, more: false, via: 'tracks' };
+    return porTracks || { items: [], total: 0, more: false, via: 'items' };
   };
 
   const openPlaylist = async (p, more) => {
@@ -405,23 +430,28 @@
     paint();
   };
 
-  // ---------- Sonda de diagnóstico ----------
-  // Spotify restringe endpoints a las apps en development mode y no siempre
-  // con el mismo código. Probamos variantes de la MISMA petición y enseñamos
-  // cuál devuelve pistas, para saber por dónde tirar.
+  /* ---------- Sonda de diagnóstico ----------
+     Prueba variantes de la MISMA petición y enseña cuál devuelve pistas.
+     Se deja el endpoint VIEJO (`/tracks`) a propósito junto al nuevo: si
+     alguna vez vuelve a fallar la lista, lo primero que hay que saber es si
+     es otro cambio de nombre como el de feb-2026, y para eso hace falta ver
+     los dos lado a lado. */
   const probes = (id) => [
-    ['/tracks',                `/playlists/${id}/tracks?limit=20`],
-    ['/tracks + market',       `/playlists/${id}/tracks?limit=20&market=from_token`],
-    ['/tracks + add_types',    `/playlists/${id}/tracks?limit=20&additional_types=track,episode`],
+    ['/items',                 `/playlists/${id}/items?limit=20`],
+    ['/items + market',        `/playlists/${id}/items?limit=20&market=from_token`],
+    ['/items + add_types',     `/playlists/${id}/items?limit=20&additional_types=track,episode`],
+    ['/tracks (retirado)',     `/playlists/${id}/tracks?limit=20`],
     ['playlist',               `/playlists/${id}`],
-    ['playlist + market',      `/playlists/${id}?market=from_token`],
-    ['playlist + fields',      `/playlists/${id}?fields=tracks.items(track(id,name,uri)),tracks.total`],
+    ['playlist + fields',      `/playlists/${id}?fields=items.items(item(id,name,uri)),items.total`],
   ];
 
   const countItems = (d) => {
-    let items = (d && d.items) || (d && d.tracks && d.tracks.items);
+    // El objeto playlist trae la lista bajo `items` (feb-2026) o `tracks`
+    // (antes); la sonda tiene que saber leer las dos para poder compararlas.
+    const dentro = (d && (d.items || d.tracks)) || null;
+    let items = (d && Array.isArray(d.items)) ? d.items : (dentro && dentro.items);
     if (!Array.isArray(items)) items = [];
-    const total = (d && d.total) != null ? d.total : (d && d.tracks && d.tracks.total);
+    const total = (d && d.total) != null ? d.total : (dentro && dentro.total);
     // Las claves de la respuesta dicen más que el conteo cuando viene rara
     const claves = d && typeof d === 'object' ? Object.keys(d).slice(0, 6).join(',') : String(d);
     /* De QUIÉN es la playlist es el dato que decide si hay algo que arreglar:
@@ -473,9 +503,11 @@
     window.SpotifyModule.playTrack(t, ctx);
   };
 
-  // Spotify bloquea /playlists/{id}/tracks a las apps en development mode,
-  // pero /me/player/queue sí responde: si reproducimos la playlist, la cola
-  // nos devuelve sus canciones. Es la única vía que queda para verlas.
+  /* Rescate para cuando la lista no llega por ninguna vía (las playlists que
+     hace Spotify —descubrimiento semanal, daily mix, radio, blends— siguen
+     bloqueadas a las apps en modo desarrollo y no hay forma de abrirlas):
+     `/me/player/queue` sí responde, así que reproduciendo la playlist la cola
+     nos devuelve sus canciones. */
   const playAndListQueue = async (p) => {
     const ul = list();
     if (!window.SpotifyModule) return;
