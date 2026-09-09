@@ -3741,6 +3741,44 @@ body.perf-tactil .sp-queue { opacity: 1; }
 .sp-unplayable { opacity: 0.45; cursor: default; }
 .sp-unplayable:hover { border-color: transparent; background: transparent; }
 
+/* --- Buscar dentro de la lista abierta --- */
+.lib-filtro-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.lib-filtro {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-panel-2);
+  border: 2px solid var(--border-pixel);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.78em;
+  padding: 6px 8px;
+  outline: none;
+}
+.lib-filtro:focus { border-color: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+.lib-filtro::placeholder { color: var(--text-muted); }
+.lib-filtro-cuenta {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 0.68em;
+  letter-spacing: .05em;
+}
+.lib-salto {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  background: transparent;
+  border: 2px solid var(--border-pixel);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.lib-salto:hover { background: var(--accent); color: var(--bg-deep); }
+
 .lib-more {
   display: block;
   margin: 12px auto 4px;

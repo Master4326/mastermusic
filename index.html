@@ -250,6 +250,14 @@
               </div>
               <button class="lib-play-big" id="libPlayAll" title="Reproducir toda la playlist">▶</button>
             </div>
+            <!-- Buscar DENTRO de la lista abierta: con mil canciones, bajar
+                 a mano hasta la que quieres no es forma de encontrarla. -->
+            <div class="lib-filtro-fila" id="libFiltroFila" hidden>
+              <input type="text" class="lib-filtro" id="libFiltro" autocomplete="off"
+                     placeholder="buscar en esta lista…" aria-label="Buscar en esta lista">
+              <span class="lib-filtro-cuenta" id="libFiltroCuenta"></span>
+              <button class="lib-salto" id="libFin" title="Ir al final de la lista (o volver arriba)">⤓</button>
+            </div>
             <ul class="track-list sp-results" id="libList"></ul>
             <button class="retro-btn small lib-more" id="libMore" hidden>[ cargar más ]</button>
           </div>

@@ -46,7 +46,22 @@
     col: 'playlists',   // colección activa
     detail: null,       // { id, uri, name, sub, rows, next, total } si estamos dentro de una playlist
     loading: false,
+    auto: false,        // la lista se está trayendo entera por detrás
+    filtro: '',         // texto del buscador de dentro de la lista
   };
+
+  /* ---------- Traer la lista ENTERA ----------
+     Antes esto iba con un botón «cargar más»: en una playlist de mil
+     canciones, para llegar a la última había que darle veinte veces y luego
+     bajar a mano. Ahora la primera página se pinta igual de rápido y el resto
+     entra sola por detrás, página a página, sin tocar nada.
+
+     El tope existe porque un `next` que no se apague nunca —un fallo de la
+     API, un endpoint que devuelve siempre lo mismo— dejaría al navegador
+     dando vueltas para siempre. Al llegar al tope reaparece el botón para
+     seguir a mano, que es mejor que quedarse a medias en silencio. */
+  const MAX_PAGINAS = 60;          // 60 × 50 = 3000 canciones
+  let cargaSeq = 0;                // cancela la carga si el usuario se va a otra cosa
 
   // ---------- Peticiones ----------
   // Desde feb-2026 algunos endpoints rechazan limits altos en apps en
@@ -259,6 +274,35 @@
 
   const ETIQUETA = { playlist: 'playlist', album: 'álbum', artist: 'artista' };
 
+  // Dentro de un artista las filas son sus discos; en lo demás, canciones
+  const filaDetalle = (d, t, i) => (d.tipo === 'artist' ? rowAlbum(t, i) : rowTrack(t, i));
+
+  /* Filtra conservando el índice REAL en `rows`: la fila lleva ese número en
+     `data-idx` y es con él con el que se busca la canción al hacer clic. Con
+     el índice del listado filtrado se reproduciría otra distinta. */
+  const filtradas = (rows) => {
+    const q = view.filtro.trim().toLowerCase();
+    const conIndice = rows.map((t, i) => [t, i]);
+    if (!q) return conIndice;
+    return conIndice.filter(([t]) =>
+      (t.name || '').toLowerCase().includes(q) || (t.artist || t.owner || '').toLowerCase().includes(q));
+  };
+
+  const paintFiltro = () => {
+    const fila = $('libFiltroFila');
+    if (!fila) return;
+    fila.hidden = !view.detail;
+    const inp = $('libFiltro');
+    if (inp && inp.value !== view.filtro) inp.value = view.filtro;
+    const cuenta = $('libFiltroCuenta');
+    if (!cuenta || !view.detail) return;
+    const total = view.detail.rows.length;
+    const vistas = filtradas(view.detail.rows).length;
+    cuenta.textContent = view.filtro.trim()
+      ? vistas + ' de ' + total
+      : (view.auto && view.detail.next != null ? '· trayendo la lista ·' : '');
+  };
+
   const paintHead = () => {
     const head = $('libHead');
     if (!head) return;
@@ -286,9 +330,12 @@
     const btn = $('libMore');
     if (!btn) return;
     const src = view.detail || cache[view.col];
-    const has = !!(src && src.next !== null && src.next !== undefined);
-    btn.hidden = !has;
-    btn.textContent = view.loading ? '· cargando ·' : '[ cargar más ]';
+    const quedan = !!(src && src.next !== null && src.next !== undefined);
+    /* Red de seguridad, no el camino normal: la lista entra sola. El botón
+       solo asoma si la carga automática se paró —tope de páginas o un fallo a
+       mitad— para poder seguir a mano en vez de quedarse a medias. */
+    btn.hidden = !quedan || view.auto;
+    btn.textContent = view.loading ? '· cargando ·' : '[ seguir cargando ]';
     btn.disabled = view.loading;
   };
 
@@ -297,6 +344,7 @@
     if (!ul) return;
     paintChips();
     paintHead();
+    paintFiltro();
 
     // Rejilla de portadas para lo que tiene carátula cuadrada; el resto, filas
     const enRejilla = (k) => k === 'playlist' || k === 'album' || k === 'artist';
@@ -308,13 +356,19 @@
     ul.classList.toggle('as-grid', esRejilla);
 
     if (view.detail) {
-      ul.innerHTML = view.detail.rows.length
-        ? (view.detail.tipo === 'artist'
-            ? view.detail.rows.map(rowAlbum).join('')
-            : view.detail.rows.map(rowTrack).join(''))
-        : empty(view.detail.tipo === 'artist'
+      const d = view.detail;
+      const vistas = filtradas(d.rows);
+      ul.innerHTML = d.rows.length
+        ? (vistas.length
+            ? vistas.map(([t, i]) => filaDetalle(d, t, i)).join('')
+            : empty('nada que se llame así en esta lista'))
+        : empty(d.tipo === 'artist'
             ? 'este artista no devolvió discos'
-            : statsMsg(view.detail.stats) + botonesDeRescate());
+            : statsMsg(d.stats) + botonesDeRescate());
+      /* Cuántas filas hay puestas ya: con la lista entera entrando por
+         detrás, cada página añade solo las suyas en vez de rehacerlo todo.
+         Con el filtro puesto no vale el atajo y se repinta entero. */
+      ul._pintadas = view.filtro.trim() ? -1 : d.rows.length;
     } else {
       const c = cache[view.col];
       const k = COLS[view.col].kind;
@@ -417,6 +471,10 @@
       if (view.col === col && !view.detail) paint();
       else paintMore();
     }
+    // primera página de la colección: el resto entra solo
+    if (!more && !view.auto && cache[col] && cache[col].next != null && !cache[col].error) {
+      traerElRestoCol(col);
+    }
   };
 
   // El objeto playlist entero suele seguir trayendo sus pistas (las primeras
@@ -465,6 +523,7 @@
   const openPlaylist = async (p, more) => {
     if (view.loading) return;
     if (!more) {
+      cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
       view.detail = { id: p.id, uri: p.uri, name: p.name, cover: p.cover || null, owner: p.owner || '',
                       sub: '· cargando ·', rows: [], next: 0, total: p.total, cargando: true };
       paint();
@@ -486,8 +545,17 @@
       d.next = data.more ? d.next + data.items.length : null;
       d.sub = `${d.rows.length} de ${d.total} ${d.total === 1 ? 'canción' : 'canciones'}`;
     } catch (e) {
-      d.sub = '';
       view.loading = false;
+      /* Un fallo a mitad NO puede borrar lo que ya está: con la lista
+         entrando sola, caerse en la página 8 tirando las 350 canciones ya
+         traídas es peor que quedarse corto. Se avisa y se deja el botón. */
+      d.fallo = true;
+      if (d.rows.length) {
+        d.sub = d.rows.length + ' de ' + d.total + ' · se cortó: ' + errorMsg(e);
+        paint();
+        return;
+      }
+      d.sub = '';
       const ul = list();
       // Aunque no podamos LISTARLA, reproducirla por contexto sí suele funcionar.
       if (ul) ul.innerHTML = empty(errorMsg(e) + botonesDeRescate());
@@ -495,7 +563,10 @@
       return;
     }
     view.loading = false;
-    paint();
+    // durante la carga automática solo se añaden las filas nuevas
+    if (view.auto) pintarNuevas(d); else paint();
+    // recién abierta: traerse el resto de la lista por detrás, sin botones
+    if (!more) traerElResto(openPlaylist);
   };
 
   /* Abrir un ÁLBUM: sus canciones. `/albums/{id}/tracks` devuelve pistas
@@ -505,6 +576,7 @@
   const openAlbum = async (a, more) => {
     if (view.loading) return;
     if (!more) {
+      cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
       view.detail = { tipo: 'album', id: a.id, uri: a.uri, name: a.name, cover: a.cover || null,
                       owner: a.owner || '', sub: '· cargando ·', rows: [], next: 0, total: a.total };
       paint();
@@ -528,15 +600,20 @@
       d.next = (data && data.next) ? d.next + items.length : null;
       d.sub = `${d.rows.length} de ${d.total} ${d.total === 1 ? 'canción' : 'canciones'}`;
     } catch (e) {
-      d.sub = '';
       view.loading = false;
+      d.fallo = true;
+      if (d.rows.length) { d.sub = d.rows.length + ' de ' + d.total + ' · se cortó: ' + errorMsg(e); paint(); return; }
+      d.sub = '';
       const ul = list();
       if (ul) ul.innerHTML = empty(errorMsg(e) + botonesDeRescate());
       paintMore();
       return;
     }
     view.loading = false;
-    paint();
+    // durante la carga automática solo se añaden las filas nuevas
+    if (view.auto) pintarNuevas(d); else paint();
+    // recién abierta: traerse el resto de la lista por detrás, sin botones
+    if (!more) traerElResto(openAlbum);
   };
 
   /* Abrir un ARTISTA: sus discos. `/artists/{id}/top-tracks` se retiró en
@@ -546,6 +623,7 @@
   const openArtist = async (a, more) => {
     if (view.loading) return;
     if (!more) {
+      cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
       view.detail = { tipo: 'artist', id: a.id, uri: a.uri, name: a.name, cover: a.cover || null,
                       owner: a.owner || '', sub: '· cargando ·', rows: [], next: 0, total: 0 };
       paint();
@@ -562,18 +640,88 @@
       d.next = (data && data.next) ? d.next + items.length : null;
       d.sub = `${d.rows.length} de ${d.total} ${d.total === 1 ? 'disco' : 'discos'}`;
     } catch (e) {
-      d.sub = '';
       view.loading = false;
+      d.fallo = true;
+      if (d.rows.length) { d.sub = d.rows.length + ' de ' + d.total + ' · se cortó: ' + errorMsg(e); paint(); return; }
+      d.sub = '';
       const ul = list();
       if (ul) ul.innerHTML = empty(errorMsg(e));
       paintMore();
       return;
     }
     view.loading = false;
-    paint();
+    // durante la carga automática solo se añaden las filas nuevas
+    if (view.auto) pintarNuevas(d); else paint();
+    // recién abierta: traerse el resto de la lista por detrás, sin botones
+    if (!more) traerElResto(openArtist);
+  };
+
+  /* Añade al final solo las filas nuevas. Repintar la lista entera en cada
+     página serían, con mil canciones, veinte repintados cada vez más caros
+     —y el navegador tirando la posición del scroll en cada uno, justo
+     mientras el usuario está mirando. */
+  const pintarNuevas = (d) => {
+    const ul = list();
+    if (!ul) return;
+    const ya = ul._pintadas;
+    if (ya === -1 || ya === undefined || d.rows.length < ya) { paint(); return; }
+    if (d.rows.length > ya) {
+      ul.insertAdjacentHTML('beforeend',
+        d.rows.slice(ya).map((t, i) => filaDetalle(d, t, ya + i)).join(''));
+      ul._pintadas = d.rows.length;
+    }
+    paintHead();
+    paintFiltro();
+    paintMore();
+  };
+
+  /* Trae lo que queda de una lista, página a página, hasta el final. Se para
+     sola si el usuario vuelve atrás o abre otra cosa: `cargaSeq` cambia y
+     esta tanda deja de ser la vigente. */
+  const traerElResto = async (cargador) => {
+    const mia = ++cargaSeq;
+    const d0 = view.detail;
+    if (!d0) return;
+    view.auto = true;
+    let vueltas = 0;
+    while (view.detail === d0 && d0.next != null && mia === cargaSeq) {
+      if (++vueltas > MAX_PAGINAS) {
+        console.warn('[Biblioteca] tope de páginas: el resto queda a mano');
+        break;
+      }
+      const antes = d0.next;
+      await cargador(null, true);
+      if (d0.fallo) break;              // un error a mitad: que salga el botón
+      /* Si una vuelta no movió el offset, la siguiente tampoco lo va a mover:
+         seguir sería girar en el sitio hasta agotar el tope. */
+      if (d0.next === antes) break;
+    }
+    if (mia !== cargaSeq) return;       // se fue a otra cosa: no tocar nada
+    view.auto = false;
+    if (view.detail === d0) paint();
+  };
+
+  // Lo mismo para las colecciones (playlists, guardadas, álbumes…)
+  const traerElRestoCol = async (col) => {
+    const mia = ++cargaSeq;
+    view.auto = true;
+    let vueltas = 0;
+    while (view.col === col && !view.detail && mia === cargaSeq
+           && cache[col] && cache[col].next != null && !cache[col].error) {
+      if (++vueltas > MAX_PAGINAS) break;
+      const antes = cache[col].next;
+      await loadCollection(col, true);
+      if (!cache[col] || cache[col].next === antes) break;
+    }
+    if (mia !== cargaSeq) return;
+    view.auto = false;
+    if (view.col === col && !view.detail) paint();
   };
 
   const back = () => {
+    cargaSeq++;              // corta la carga de la lista que estábamos viendo
+    view.auto = false;
+    view.filtro = '';
     view.detail = null;
     paint();
   };
@@ -713,10 +861,48 @@
 
   const currentRows = () => view.detail ? view.detail.rows : ((cache[view.col] && cache[view.col].rows) || []);
 
+  /* El panel que hace scroll no siempre es el mismo elemento (depende de si
+     la ventana está maximizada, del modo móvil…), así que se busca de verdad
+     en vez de dar por hecho un selector. */
+  const conScroll = (el) => {
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+      const ov = getComputedStyle(n).overflowY;
+      if ((ov === 'auto' || ov === 'scroll') && n.scrollHeight > n.clientHeight + 4) return n;
+    }
+    return document.scrollingElement || document.documentElement;
+  };
+
   const wire = () => {
     const block = $('libBlock');
     if (!block || block._wired) return;
     block._wired = true;
+
+    // Buscar dentro de la lista: filtra según se escribe
+    const inp = $('libFiltro');
+    if (inp) {
+      inp.addEventListener('input', () => { view.filtro = inp.value; paint(); });
+      /* Esc limpia sin tener que borrar a mano. No hace falta cortar la
+         propagación: los atajos de teclado (app.js y seven.js) ya se guardan
+         contra los INPUT, y tragarse el Escape aquí se lo quitaría a quien lo
+         quiera de verdad. */
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { inp.value = ''; view.filtro = ''; paint(); }
+      });
+    }
+
+    /* Ir al final de un tirón: es justo para lo que se pedía esto — oír la
+       última de una lista de mil sin bajar a mano. Si ya estás abajo, sube. */
+    const fin = $('libFin');
+    if (fin) {
+      fin.addEventListener('click', () => {
+        const ul = list();
+        if (!ul) return;
+        const cont = conScroll(ul);
+        const abajo = cont.scrollTop + cont.clientHeight >= cont.scrollHeight - 8;
+        cont.scrollTo({ top: abajo ? 0 : cont.scrollHeight, behavior: 'smooth' });
+        fin.textContent = abajo ? '⤓' : '⤒';
+      });
+    }
 
     block.addEventListener('click', (e) => {
       const chip = e.target.closest('.lib-chip');
