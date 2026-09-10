@@ -694,51 +694,23 @@
   };
   engancharReposo();
 
-  // ---------- Render track list into Library tab ----------
-  const renderRetroTrackList = () => {
-    if (!window.PlayerCore) return;
-    const tracks = window.PlayerCore.state.tracks;
-    const list = document.getElementById('trackList');
-    if (!list) return;   // la lista de biblioteca ya no existe en config
-    if (!tracks.length) {
-      list.innerHTML = `<li style="text-align:center;color:var(--text-muted);padding:30px;font-style:italic">▒ biblioteca vacía — importa música ▒</li>`;
-      return;
-    }
-    list.innerHTML = tracks.map((t, i) => {
-      const isPlaying = window.PlayerCore.state.currentTrack && window.PlayerCore.state.currentTrack.id === t.id;
-      return `
-        <li class="track-row ${isPlaying ? 'playing' : ''}" data-track-id="${t.id}">
-          <div class="tr-num">${String(i + 1).padStart(2, '0')}</div>
-          <div class="tr-info">
-            <div class="tr-title">${escapeHtml(t.name)}</div>
-            <div class="tr-artist">${escapeHtml(t.artist || 'desconocido')}${t.album ? ' · ' + escapeHtml(t.album) : ''}</div>
-          </div>
-          <div class="tr-duration">${formatTime(t.duration)}</div>
-          <button class="tr-del" data-del-id="${t.id}" title="Quitar de la biblioteca">✕</button>
-        </li>
-      `;
-    }).join('');
-  };
+  /* Aquí vivía `renderRetroTrackList`, que pintaba la música importada en
+     un <ul id="trackList"> de la pestaña de config. Ese <ul> desapareció del
+     HTML y la función se quedó dando vueltas cada 500 ms buscándolo (y
+     cancelándose sola en la primera vuelta). Tu música ya tiene un sitio de
+     verdad: la colección «mi música» de la pestaña de listas, en
+     js/library.js, que además se puede filtrar, encolar y ordenar.
 
+     escapeHtml y formatTime se quedan: los usa la cola, aquí abajo. */
   const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
-
   const formatTime = (s) => {
     if (!isFinite(s) || s < 0) return '0:00';
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
-
-  /* Refresco periódico por si app.js añade pistas. #trackList ya no existe en
-     la config actual, así que en cuanto se confirma que no está, el intervalo
-     se cancela solo en vez de despertar cada 500 ms el resto de la sesión.
-     Si algún día vuelve la lista, sigue funcionando igual. */
-  const listTimer = setInterval(() => {
-    if (!document.getElementById('trackList')) { clearInterval(listTimer); return; }
-    renderRetroTrackList();
-  }, 500);
 
   // ---------- Cola de reproducción (pestaña "cola") ----------
   const queueList = document.getElementById('queueList');
@@ -755,9 +727,12 @@
      tener que meter la uri y la portada dentro de un atributo HTML. */
   let filasCola = [];
 
-  // Misma anatomía de fila que la biblioteca: portada + meta + duración
-  const queueRow = (t, i, idx, now) => `
-    <li class="sp-result ${idx >= 0 ? '' : 'sp-static'} ${now ? 'q-now' : ''}"
+  /* Misma anatomía de fila que la biblioteca: portada + meta + duración.
+     `pos` (la posición dentro de la cola LOCAL) solo llega con música propia:
+     es lo que permite sacar una canción de la cola, cosa que con Spotify
+     Connect no se puede porque la cola es suya y su API no lo ofrece. */
+  const queueRow = (t, i, idx, now, pos) => `
+    <li class="sp-result ${idx >= 0 ? '' : 'sp-static'} ${now ? 'q-now sp-now' : ''}"
         ${idx >= 0 ? `data-idx="${idx}" tabindex="0" title="Sonar esta: ${escapeHtml(t.name)}"` : ''}
         ${idx >= 0 && t.id ? `data-track-id="${t.id}"` : ''}>
       <span class="sp-idx">${now ? '▶' : String(i + 1).padStart(2, '0')}</span>
@@ -767,6 +742,7 @@
         <div class="sp-artist">${escapeHtml(t.artist || 'desconocido')}</div>
       </div>
       <div class="sp-dur">${formatTime(t.duration)}</div>
+      ${pos != null ? `<button class="sp-del q-quitar" data-pos="${pos}" title="Quitar de la cola">✕</button>` : ''}
     </li>`;
 
   // Pista de Spotify (cruda) → la forma que usan las filas.
@@ -836,6 +812,7 @@
 
     // Spotify: pedir la cola real de la cuenta a la API
     if (cur && cur.spotify && window.SpotifyModule && window.SpotifyModule.isLoggedIn()) {
+      pintarDesde();          // va por su lado: no debe retrasar la cola
       queueBusy = true;
       try {
         /* Sonando en la propia pestaña, lo que viene detrás ya lo sabe el
@@ -889,13 +866,94 @@
     }
 
     // Local: lo que queda de la cola del reproductor
-    const up = (st.queue || []).slice(st.queueIndex + 1).map(ix => st.tracks[ix]).filter(Boolean);
+    const desde = st.queueIndex + 1;
+    const up = (st.queue || []).slice(desde).map(ix => st.tracks[ix]).filter(Boolean);
     filasCola = [];
     queueList.innerHTML = (cur ? queueHead('sonando ahora') + queueRow(cur, 0, -1, true) : '')
       + queueHead('a continuación')
       + (up.length
-          ? up.map((t, i) => queueRow(t, i, filasCola.push(t) - 1, false)).join('')
-          : queueEmpty(cur ? '▒ no hay más canciones en cola ▒' : '▒ reproduce algo para ver la cola ▒'));
+          ? up.map((t, i) => queueRow(t, i, filasCola.push(t) - 1, false, desde + i)).join('')
+          : queueEmpty(cur
+              ? '▒ no hay más canciones en cola ▒<br><span class="sp-empty-tip">añade con el ＋ de cualquier lista, o con <kbd>shift+enter</kbd> en el buscador</span>'
+              : '▒ reproduce algo para ver la cola ▒<br><span class="sp-empty-tip">pulsa <kbd>ctrl+K</kbd> y escribe lo que quieras oír</span>'));
+    pintarDesde();
+  };
+
+  /* ---------- «Sonando desde» ----------
+     La cola dice QUÉ viene después; esto dice DE DÓNDE sale. Sin las dos
+     cosas no se sabe lo que se está oyendo: sonaba algo, y averiguar de qué
+     playlist salía era imposible desde la app.
+
+     El contexto que da Spotify es una uri (`spotify:playlist:37i9…`), que no
+     le dice nada a nadie. Se traduce a su nombre con UNA petición por lista y
+     se guarda: la misma playlist suena veinte canciones seguidas. */
+  const nombresCtx = new Map();
+  let ctxPidiendo = null;
+
+  const partesCtx = (uri) => {
+    const m = /^spotify:(playlist|album|artist|collection)(?::(.+))?$/.exec(uri || '');
+    return m ? { tipo: m[1], id: m[2] || null } : null;
+  };
+
+  const resolverCtx = async (uri) => {
+    if (nombresCtx.has(uri)) return nombresCtx.get(uri);
+    const p = partesCtx(uri);
+    if (!p) return null;
+    if (p.tipo === 'collection') {                 // «Tus me gusta»
+      const d = { tipo: 'playlist', nombre: 'tus me gusta', item: null };
+      nombresCtx.set(uri, d);
+      return d;
+    }
+    if (!p.id || ctxPidiendo === uri) return null;
+    ctxPidiendo = uri;
+    try {
+      const ruta = { playlist: '/playlists/', album: '/albums/', artist: '/artists/' }[p.tipo];
+      const d = await window.SpotifyModule.api(ruta + p.id);
+      const item = {
+        id: p.id, uri, name: d.name || '',
+        owner: (d.owner && (d.owner.display_name || d.owner.id))
+          || (d.artists || []).map((a) => a.name).join(', ') || '',
+        total: ((d.items || d.tracks) || {}).total || d.total_tracks || 0,
+        cover: (d.images && d.images[0]) ? d.images[0].url : null,
+      };
+      const info = { tipo: p.tipo, nombre: d.name || p.tipo, item };
+      nombresCtx.set(uri, info);
+      return info;
+    } catch (e) {
+      // Que no se pueda leer el nombre no es motivo para no decir nada:
+      // se guarda el tipo, que ya es más que una uri en crudo.
+      const info = { tipo: p.tipo, nombre: p.tipo === 'album' ? 'un álbum' : 'una lista', item: null };
+      nombresCtx.set(uri, info);
+      return info;
+    } finally { ctxPidiendo = null; }
+  };
+
+  let ctxActual = null;      // {tipo, item} de lo que enseña el chip
+
+  const pintarDesde = async () => {
+    const chipDesde = document.getElementById('queueFrom');
+    if (!chipDesde || !window.PlayerCore) return;
+    const st = window.PlayerCore.state;
+    const cur = st.currentTrack;
+
+    // Música propia: la lista la sabe el reproductor, sin preguntar a nadie
+    if (!cur || !cur.spotify) {
+      const d = st.desde;
+      chipDesde.hidden = !d || !d.nombre;
+      if (d && d.nombre) chipDesde.textContent = '◂ desde ' + d.nombre;
+      ctxActual = null;
+      return;
+    }
+    const uri = (window.SpotifyModule && window.SpotifyModule.context)
+      ? window.SpotifyModule.context() : null;
+    if (!uri) { chipDesde.hidden = true; ctxActual = null; return; }
+    const info = await resolverCtx(uri);
+    if (!info) return;                     // la petición está en marcha
+    ctxActual = info;
+    chipDesde.hidden = false;
+    chipDesde.textContent = '◂ desde ' + info.nombre;
+    chipDesde.title = 'Abrir ' + (info.tipo === 'album' ? 'este álbum'
+      : info.tipo === 'artist' ? 'este artista' : 'esta lista');
   };
 
   /* ---------- Elegir una canción de la lista y que suene ----------
@@ -932,8 +990,37 @@
 
   if (queueList) {
     queueList.addEventListener('click', (e) => {
+      // Quitar de la cola va ANTES: el ✕ está dentro de la fila, y la fila
+      // entera reproduce. Sin cortar aquí, quitar pondría la canción.
+      const quitar = e.target.closest('.q-quitar');
+      if (quitar) {
+        e.stopPropagation();
+        const pos = parseInt(quitar.dataset.pos, 10);
+        if (window.PlayerCore && window.PlayerCore.dequeueAt && window.PlayerCore.dequeueAt(pos)) {
+          renderQueue();
+        }
+        return;
+      }
       const row = e.target.closest('.sp-result[data-idx]');
       if (row) sonarDeLaCola(row);
+    });
+
+    /* El chip «◂ desde …» abre esa lista. Es el atajo que faltaba: oyes algo
+       que te gusta, quieres ver de dónde sale, y estabas a un clic de nada. */
+    const chipDesde = document.getElementById('queueFrom');
+    if (chipDesde) chipDesde.addEventListener('click', () => {
+      const st = window.PlayerCore && window.PlayerCore.state;
+      if (st && st.currentTrack && !st.currentTrack.spotify) {
+        // Música propia: la lista es tu biblioteca
+        const libTab = document.querySelector('.tab[data-tab="library"]');
+        if (libTab) libTab.click();
+        if (window.LibraryModule && window.LibraryModule.irA) window.LibraryModule.irA('mine');
+        return;
+      }
+      if (!ctxActual || !ctxActual.item || !window.LibraryModule) return;
+      const libTab = document.querySelector('.tab[data-tab="library"]');
+      if (libTab) libTab.click();
+      window.LibraryModule.abrir(ctxActual.tipo, ctxActual.item);
     });
     // con teclado: las filas son focusables (tabindex en queueRow)
     queueList.addEventListener('keydown', (e) => {
@@ -1022,7 +1109,11 @@
     } else if (e.key === 'q' || e.key === 'Q' || e.key === 'c' || e.key === 'C') {
       const qTab = document.querySelector('.tab[data-tab="queue"]');
       if (qTab) qTab.click();
-    } else if (e.key === 'f' || e.key === 'F' || e.key === '/') {
+    } else if (e.key === 'f' || e.key === 'F') {
+      /* La barra «/» ya NO viene aquí: se la queda el buscador universal
+         (js/buscador.js), que mira en tu música, tus listas, tu historial y
+         Spotify a la vez. Saltar a la pestaña de Spotify era mandarte a uno
+         solo de los cuatro sitios donde puede estar lo que buscas. */
       e.preventDefault();
       const sTab = document.querySelector('.tab[data-tab="search"]');
       if (sTab) sTab.click();

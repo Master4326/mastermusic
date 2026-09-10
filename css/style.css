@@ -5089,3 +5089,397 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
 
 /* Artista en los resultados de búsqueda: miniatura redonda */
 .sp-thumb-redonda { border-radius: 50%; }
+
+/* ==========================================================
+   ══════════════════════════════════════════════════════════
+   COMODIDAD · lo añadido para que buscar, poner una lista y
+   saber qué suena después dejen de ser tres viajes distintos.
+   ══════════════════════════════════════════════════════════
+   ========================================================== */
+
+/* ----------------------------------------------------------
+   Pestañas CON SU NOMBRE
+   Eran cuatro iconos pelados: para saber cuál era cuál había que
+   posar el ratón encima, y con el dedo ni eso. El nombre solo se
+   retira cuando de verdad no cabe (ver la consulta de más abajo).
+   ---------------------------------------------------------- */
+.tab.icon-tab { gap: 6px; }
+.tab-ico { font-size: 1.05em; line-height: 1; }
+.tab-txt {
+  font-family: 'VT323', monospace;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+/* ----------------------------------------------------------
+   Chips de QUÉ se busca (canciones / artistas / álbumes)
+   ---------------------------------------------------------- */
+.sp-tipos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 2px 0 4px;
+}
+.sp-tipo {
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  letter-spacing: 1px;
+  padding: 2px 12px;
+  background: var(--bg-panel-2);
+  border: 2px solid var(--border-dark);
+  color: var(--text-dim);
+  cursor: pointer;
+  line-height: 1.5;
+}
+.sp-tipo:hover { color: var(--text); border-color: var(--border-pixel); }
+.sp-tipo.active {
+  color: var(--bg-deep);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ----------------------------------------------------------
+   La fila que SUENA AHORA dentro de una lista
+   En una playlist de 300, sin esto no hay forma de ver por dónde
+   vas sin acordarte del título de memoria.
+   ---------------------------------------------------------- */
+.sp-result.sp-now {
+  border-color: var(--accent-dim);
+  background: rgba(92, 225, 230, 0.07);
+}
+.sp-result.sp-now .sp-name { color: var(--accent); text-shadow: 0 0 5px var(--accent-glow); }
+.sp-result.sp-now .sp-idx { color: var(--accent); }
+
+/* ✕ para quitar una canción TUYA de la biblioteca (solo música local) */
+.sp-del {
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity .12s, color .12s;
+}
+.sp-result:hover .sp-del,
+.sp-result:focus-within .sp-del { opacity: 1; }
+.sp-del:hover { color: var(--magenta); text-shadow: 0 0 6px var(--magenta); }
+body.perf-tactil .sp-del { opacity: 1; }
+
+/* ----------------------------------------------------------
+   Cabecera de la cola: «de qué lista sale esto»
+   ---------------------------------------------------------- */
+.q-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.q-head .sp-search-head { margin-bottom: 0; }
+.q-desde {
+  max-width: 100%;
+  padding: 2px 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-dark);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.q-desde:hover { color: var(--accent); border-color: var(--accent-dim); }
+
+/* ----------------------------------------------------------
+   Botón de buscar de la barra de estado
+   Es el ÚNICO acceso al buscador que existe sin teclado.
+   ---------------------------------------------------------- */
+.paleta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 10px;
+  font-family: 'VT323', monospace;
+  font-size: 15px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-pixel);
+  cursor: pointer;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.paleta-btn:hover {
+  color: var(--bg-deep);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ==========================================================
+   EL BUSCADOR UNIVERSAL (Ctrl+K)
+
+   z-index 10000: por encima del modo cine (9000), del CRT (9000/9001)
+   y del cartel de arrastrar archivos (9999). Es lo único que puede
+   salir estando en cualquier sitio, así que tiene que ganar a todo.
+   ========================================================== */
+.paleta {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(12px, 8vh, 90px) 14px 14px;
+}
+.paleta[hidden] { display: none; }
+.paleta-fondo {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 22, 0.78);
+  backdrop-filter: blur(3px);
+}
+.paleta-caja {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: min(560px, 84vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 34px var(--accent-glow), 0 18px 60px rgba(0, 0, 0, .6),
+              inset 1px 1px 0 var(--border-pixel);
+  animation: paletaEntra .16s ease-out both;
+}
+@keyframes paletaEntra {
+  from { opacity: 0; transform: translateY(-10px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+body.reduce-motion .paleta-caja { animation: none; }
+
+.paleta-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #000;
+  border-bottom: 2px solid var(--border-dark);
+  flex: 0 0 auto;
+}
+.paleta-prompt {
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent-glow);
+  font-size: 22px;
+  line-height: 1;
+}
+.paleta-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: 'VT323', monospace;
+  font-size: 24px;
+  line-height: 1.2;
+}
+.paleta-input::placeholder { color: var(--text-muted); }
+.paleta-x {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  background: transparent;
+  border: 2px solid var(--border-pixel);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+.paleta-x:hover { color: var(--bg-deep); background: var(--magenta); border-color: var(--magenta); }
+
+.paleta-lista {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+  margin: 0;
+  list-style: none;
+}
+.paleta-seccion {
+  padding: 8px 8px 3px;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.paleta-fila-r {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+/* Una sola marca de «esto es lo que va a pasar si pulsas enter»: la misma
+   con el teclado y con el ratón. Dos formas distintas de resaltar (una para
+   el hover y otra para la selección) era la manera más rápida de pulsar sin
+   querer una fila que no era la que se veía elegida. */
+.paleta-fila-r.sel {
+  border-color: var(--accent);
+  background: var(--bg-panel-2);
+  box-shadow: inset 0 0 14px rgba(92, 225, 230, .12);
+}
+.paleta-ico {
+  width: 38px; height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-frame) center/cover no-repeat;
+  border: 1px solid var(--border-dark);
+  color: var(--text-dim);
+  font-size: 16px;
+}
+.paleta-ico.redonda { border-radius: 50%; }
+.paleta-txt { flex: 1; min-width: 0; }
+.paleta-tit {
+  display: block;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.paleta-fila-r.sel .paleta-tit { color: var(--accent); }
+.paleta-sub {
+  display: block;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.paleta-dur {
+  flex-shrink: 0;
+  font-family: 'VT323', monospace;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+.paleta-mas {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  background: transparent;
+  border: 2px solid var(--border-pixel);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+.paleta-mas:hover { color: var(--bg-deep); background: var(--accent); border-color: var(--accent); }
+/* La pista de la derecha («▶ poner», «abrir») solo en la fila elegida: en
+   todas a la vez es una columna de ruido que nadie lee. */
+.paleta-pista {
+  flex-shrink: 0;
+  font-family: 'VT323', monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--accent-dim);
+  opacity: 0;
+}
+.paleta-fila-r.sel .paleta-pista { opacity: 1; color: var(--accent); }
+.paleta-vacio {
+  list-style: none;
+  text-align: center;
+  padding: 30px 16px;
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+.paleta-tip { font-size: 14px; opacity: .8; }
+
+.paleta-pie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 6px 14px;
+  background: var(--bg-panel-2);
+  border-top: 2px solid var(--border-dark);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+.paleta-pie kbd {
+  display: inline-block;
+  padding: 0 4px;
+  background: var(--bg-frame);
+  border: 1px solid var(--border-pixel);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 10px;
+}
+
+/* ----------------------------------------------------------
+   Responsive del buscador y de los nombres de las pestañas
+   ---------------------------------------------------------- */
+@media (max-width: 560px) {
+  .paleta { padding: 0; align-items: stretch; }
+  .paleta-caja {
+    width: 100%;
+    max-height: 100%;
+    border-width: 0 0 3px;
+  }
+  .paleta-input { font-size: 20px; }
+  /* Con el dedo no hay atajos que enseñar y el sitio hace falta para la lista */
+  .paleta-pie { display: none; }
+  .paleta-fila-r { padding: 9px 8px; }   /* objetivo de toque */
+}
+
+/* Ventana estrecha: los nombres de las pestañas son lo primero que sobra,
+   pero el icono se queda — y el `title` sigue estando para el ratón.
+
+   Va por CONTENEDOR y no por pantalla, y esa es la diferencia entre que
+   funcione y que no: .window es redimensionable a mano (resize: both), así
+   que puede quedarse en 700 px dentro de un monitor de 2560. Con una
+   @media el navegador miraría el monitor, dejaría los cinco nombres puestos
+   y la barra —que lleva `overflow: hidden` para poder colapsarse— cortaría
+   las últimas pestañas por la mitad. El resto del archivo ya mide así
+   (unidades cqw sobre el contenedor `win`).
+
+   El umbral: el panel derecho es el ancho de la ventana menos los 320 px de
+   la carátula y los márgenes; por debajo de ~860 px los cinco nombres, sus
+   iconos y el engranaje dejan de caber. */
+@container win (max-width: 860px) {
+  .tab-txt { display: none; }
+}
+
+/* Y en un teléfono, donde la ventana ocupa toda la pantalla, por si el
+   navegador no entiende consultas de contenedor. */
+@media (max-width: 700px) {
+  .tab-txt { display: none; }
+}
+
+/* Teléfono en horizontal · la regla de más arriba escondía la barra de
+   estado ENTERA para regalarle 24 px a la letra. Con el buscador dentro eso
+   dejaba de ser 24 px de adorno: se llevaba por delante el único botón que
+   abre el buscador sin teclado. Se queda la barra, pero solo con el botón:
+   el texto de estado y el reloj son justo lo prescindible aquí. */
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 1000px) {
+  .status-bar {
+    display: flex;
+    padding-top: 0;
+    padding-bottom: 0;
+    min-height: 0;
+  }
+  .status-bar .status-left,
+  .status-bar #clock { display: none; }
+  .paleta-btn { font-size: 13px; padding: 0 8px; }
+}

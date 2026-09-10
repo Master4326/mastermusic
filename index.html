@@ -94,35 +94,45 @@
 
       <!-- RIGHT: LYRICS -->
       <section class="right-panel">
+        <!-- Las pestañas llevan SU NOMBRE al lado del icono. Antes eran cuatro
+             iconos pelados y había que pasar el ratón por encima (y en el
+             móvil, ni eso) para enterarse de cuál era cuál. El nombre solo se
+             esconde en ventanas muy estrechas, donde no cabe. -->
         <div class="tab-bar" role="tablist" aria-label="Secciones">
-          <button class="tab active" data-tab="lyrics">lyrics</button>
+          <button class="tab icon-tab active" data-tab="lyrics" title="Letra sincronizada (L)">
+            <span class="tab-ico" aria-hidden="true">♪</span><span class="tab-txt">letra</span>
+          </button>
           <button class="tab icon-tab" data-tab="search" title="Buscar en Spotify (F)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
               <circle cx="10.5" cy="10.5" r="5.5"/>
               <line x1="15" y1="15" x2="20.5" y2="20.5"/>
-            </svg>
+            </svg><span class="tab-txt">buscar</span>
           </button>
-          <button class="tab icon-tab" data-tab="library" title="Tu biblioteca de Spotify: playlists, guardadas, recientes (B)">
+          <button class="tab icon-tab" data-tab="library" title="Tu música y tu biblioteca de Spotify: playlists, álbumes, artistas (B)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
               <rect x="3" y="4" width="3.4" height="16"/>
               <rect x="9" y="4" width="3.4" height="16"/>
               <path d="M16.2 5.6l3.3-.9 3.4 12.6-3.3.9z" transform="translate(-2 0)"/>
-            </svg>
+            </svg><span class="tab-txt">listas</span>
           </button>
-          <button class="tab icon-tab" data-tab="stats" title="Tu historial y tus estadísticas — lo guarda esta app, no Spotify (H)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-              <line x1="5" y1="20" x2="5" y2="12"/>
-              <line x1="12" y1="20" x2="12" y2="4"/>
-              <line x1="19" y1="20" x2="19" y2="9"/>
-            </svg>
-          </button>
-          <button class="tab icon-tab" data-tab="queue" title="Cola — a continuación (Q)">
+          <button class="tab icon-tab" data-tab="queue" title="Cola — lo que suena después (Q)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
               <line x1="4" y1="6" x2="20" y2="6"/>
               <line x1="4" y1="12" x2="20" y2="12"/>
               <line x1="4" y1="18" x2="11" y2="18"/>
               <path d="M15.5 15.2v6.2l5.2-3.1z" fill="currentColor" stroke="none"/>
-            </svg>
+            </svg><span class="tab-txt">cola</span>
+          </button>
+          <!-- HISTORIAL · la pestaña existía en el teclado (H y 6) y en el
+               service worker, pero no en el HTML: js/stats.js se cargaba —
+               tampoco, faltaba su <script>— y salía por la puerta en la
+               primera línea porque no encontraba #statsBody. -->
+          <button class="tab icon-tab" data-tab="stats" title="Tu historial y tus más escuchadas (H)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <line x1="5" y1="20" x2="5" y2="13"/>
+              <line x1="12" y1="20" x2="12" y2="6"/>
+              <line x1="19" y1="20" x2="19" y2="10"/>
+            </svg><span class="tab-txt">historial</span>
           </button>
           <span class="tab-right">
             <button class="tab icon-tab tab-gear" data-tab="settings" title="Configuración (S)">
@@ -164,14 +174,21 @@
             <h4 class="li-mark" data-txt="MASTER MUSIC">MASTER MUSIC</h4>
             <p class="li-sub">la letra aparecerá aquí, sincronizada al segundo</p>
             <div class="li-ways">
+              <!-- El buscador va PRIMERO: es la puerta única a todo lo demás,
+                   y es lo que nadie encuentra solo si no se le dice. -->
+              <div class="li-way">
+                <span class="li-ico" aria-hidden="true">⌕</span>
+                <b>ctrl + K</b>
+                <em>busca en todo</em>
+              </div>
               <div class="li-way">
                 <span class="li-ico" aria-hidden="true">♫</span>
                 <b>arrastra tus mp3</b>
-                <em>suéltalos en la ventana</em>
+                <em>o [ importar música ]</em>
               </div>
               <div class="li-way">
                 <span class="li-ico" aria-hidden="true">◈</span>
-                <b>o conecta spotify</b>
+                <b>conecta spotify</b>
                 <em>en config ⚙ · tecla S</em>
               </div>
             </div>
@@ -210,16 +227,21 @@
           <p class="lyrics-empty" id="searchHint">▒ conecta spotify en <b>config ⚙</b> para buscar canciones ▒</p>
           <div class="sp-search-block" id="spotifySearchBlock" hidden>
             <div class="sp-search-head">♫ buscar en spotify</div>
-            <div class="lib-nav">
-              <button class="lib-chip sp-tipo active" data-tipo="track">canciones</button>
-              <button class="lib-chip sp-tipo" data-tipo="artist">artistas</button>
-              <button class="lib-chip sp-tipo" data-tipo="album">álbumes</button>
-            </div>
             <div class="search-row">
               <span class="prompt">♫</span>
-              <input type="text" id="spotifySearchInput" placeholder="canción o artista..." class="retro-input"
+              <input type="text" id="spotifySearchInput" placeholder="canción, artista o álbum..." class="retro-input"
                 autocomplete="off" spellcheck="false" />
               <button class="sp-limpiar" id="spotifyClear" title="Borrar (Esc)" hidden>✕</button>
+            </div>
+            <!-- QUÉ SE BUSCA · spotify.js sabe buscar artistas y álbumes desde
+                 siempre (`tipoBusqueda`, y `wireSearch` cablea estos chips),
+                 pero los botones NUNCA estuvieron en el HTML: la app se quedó
+                 buscando solo canciones, sin forma de llegar a un artista ni
+                 a un disco. Esto es literalmente el interruptor que faltaba. -->
+            <div class="sp-tipos" role="group" aria-label="Qué buscar">
+              <button class="sp-tipo active" data-tipo="track">canciones</button>
+              <button class="sp-tipo" data-tipo="artist">artistas</button>
+              <button class="sp-tipo" data-tipo="album">álbumes</button>
             </div>
             <!-- últimas búsquedas: volver a una es un clic, no re-teclearla -->
             <div class="sp-recientes" id="spotifyRecientes" hidden></div>
@@ -227,18 +249,36 @@
           </div>
         </div>
 
-        <!-- LIBRARY TAB (tu biblioteca de spotify) -->
+        <!-- LIBRARY TAB (tu música + tu biblioteca de spotify) -->
         <div class="tab-content" id="tab-library">
           <p class="lyrics-empty" id="libHint">▒ conecta spotify en <b>config ⚙</b> para ver tu biblioteca ▒</p>
           <div class="lib-block" id="libBlock" hidden>
+            <!-- «mi música» va PRIMERA y no necesita Spotify: es lo que tú
+                 importaste. Antes la biblioteca local no se veía en ningún
+                 sitio — el <ul id="trackList"> que la pintaba desapareció del
+                 HTML y con él la única forma de ver tus mp3.
+                 «álbumes» y «artistas» estaban definidos en COLS de
+                 library.js (con sus endpoints y todo) sin chip que los
+                 abriera. -->
             <div class="lib-nav">
-              <button class="lib-chip active" data-col="playlists">playlists</button>
+              <button class="lib-chip active" data-col="mine">mi música</button>
+              <button class="lib-chip" data-col="playlists">playlists</button>
               <button class="lib-chip" data-col="saved">guardadas</button>
-              <button class="lib-chip" data-col="recent">recientes</button>
-              <button class="lib-chip" data-col="top">top</button>
               <button class="lib-chip" data-col="albums">álbumes</button>
               <button class="lib-chip" data-col="artists">artistas</button>
+              <button class="lib-chip" data-col="recent">recientes</button>
+              <button class="lib-chip" data-col="top">top</button>
               <button class="lib-refresh" id="libRefresh" title="Recargar desde Spotify">⟳</button>
+            </div>
+            <!-- BUSCAR DENTRO DE LA LISTA · library.js lleva el filtro escrito
+                 (`view.filtro`, `filtradas`, `paintFiltro`) y hasta el CSS
+                 (.lib-filtro) estaba puesto; solo faltaba la fila. Sin ella,
+                 encontrar una canción en una playlist de mil era bajar a mano. -->
+            <div class="lib-filtro-fila" id="libFiltroFila" hidden>
+              <input type="text" id="libFiltro" class="lib-filtro" placeholder="filtrar esta lista…"
+                     autocomplete="off" spellcheck="false" />
+              <span class="lib-filtro-cuenta" id="libFiltroCuenta"></span>
+              <button class="lib-salto" id="libFin" title="Ir al final de la lista (y volver)">⤓</button>
             </div>
             <div class="lib-head" id="libHead" hidden>
               <button class="lib-back" id="libBack" title="Volver">‹</button>
@@ -250,38 +290,33 @@
               </div>
               <button class="lib-play-big" id="libPlayAll" title="Reproducir toda la playlist">▶</button>
             </div>
-            <!-- Buscar DENTRO de la lista abierta: con mil canciones, bajar
-                 a mano hasta la que quieres no es forma de encontrarla. -->
-            <div class="lib-filtro-fila" id="libFiltroFila" hidden>
-              <input type="text" class="lib-filtro" id="libFiltro" autocomplete="off"
-                     placeholder="buscar en esta lista…" aria-label="Buscar en esta lista">
-              <span class="lib-filtro-cuenta" id="libFiltroCuenta"></span>
-              <button class="lib-salto" id="libFin" title="Ir al final de la lista (o volver arriba)">⤓</button>
-            </div>
             <ul class="track-list sp-results" id="libList"></ul>
             <button class="retro-btn small lib-more" id="libMore" hidden>[ cargar más ]</button>
           </div>
         </div>
 
-        <!-- STATS TAB (tu historial: lo guarda esta app, no Spotify) -->
-        <div class="tab-content" id="tab-stats">
-          <div class="sp-search-block">
-            <div class="sp-search-head">▤ tu historial</div>
-            <div class="lib-nav">
-              <button class="lib-chip st-chip active" data-dias="7">semana</button>
-              <button class="lib-chip st-chip" data-dias="30">mes</button>
-              <button class="lib-chip st-chip" data-dias="365">año</button>
-              <button class="lib-chip st-chip" data-dias="0">todo</button>
-              <button class="lib-refresh" id="statsRefresh" title="Recargar">⟳</button>
-            </div>
-            <div id="statsBody"></div>
-          </div>
-        </div>
-
         <!-- QUEUE TAB (a continuación) -->
         <div class="tab-content" id="tab-queue">
-          <div class="sp-search-head">♫ a continuación</div>
+          <div class="q-head">
+            <div class="sp-search-head">♫ a continuación</div>
+            <!-- DE DÓNDE SALE lo que suena. Es la mitad de «saber la lista»:
+                 la cola te dice qué viene, esto te dice de qué lista viene.
+                 Se pulsa y se abre esa lista. -->
+            <button class="q-desde" id="queueFrom" hidden title="Abrir esta lista"></button>
+          </div>
           <ul class="track-list" id="queueList"></ul>
+        </div>
+
+        <!-- STATS TAB (tu historial · lo que Spotify no guarda) -->
+        <div class="tab-content" id="tab-stats">
+          <div class="lib-nav">
+            <button class="lib-chip st-chip active" data-dias="7">semana</button>
+            <button class="lib-chip st-chip" data-dias="30">mes</button>
+            <button class="lib-chip st-chip" data-dias="365">año</button>
+            <button class="lib-chip st-chip" data-dias="0">siempre</button>
+            <button class="lib-refresh" id="statsRefresh" title="Recalcular">⟳</button>
+          </div>
+          <div id="statsBody"></div>
         </div>
 
         <!-- SETTINGS TAB -->
@@ -294,10 +329,16 @@
              ========================================================== -->
         <div class="tab-content" id="tab-settings">
           <div class="settings-block">
-            <h3>~ spotify ~</h3>
+            <h3>~ música ~</h3>
             <div class="library-actions">
-              <!-- input oculto: el drag&drop de archivos sigue funcionando -->
               <input type="file" id="fileInput" accept="audio/*" multiple hidden />
+              <!-- IMPORTAR · el <input> llevaba aquí escondido desde siempre y
+                   NADIE lo abría: la única forma de meter música era arrastrar
+                   archivos a la ventana, cosa que en un teléfono no se puede
+                   hacer. O sea que en el móvil la música local era inalcanzable. -->
+              <button class="retro-btn" id="importBtn" title="Añadir mp3, wav, ogg, flac o m4a de tu equipo">
+                <span class="bracket">[</span> importar música <span class="bracket">]</span>
+              </button>
               <button class="retro-btn" id="spotifyConnectBtn"
                       title="Si el corazón ♥ dice que no tiene permiso, desconecta y vuelve a conectar.">
                 <span class="bracket">[</span> conectar spotify <span class="bracket">]</span>
@@ -305,8 +346,11 @@
             </div>
             <div class="set-row">
               <span class="set-label">sigue sonando</span>
+              <!-- settings.js define esta opción (`radio`) desde que existe
+                   «sigue sonando», pero no había botones: quedaba encendida
+                   para siempre y sin forma de apagarla. -->
               <div class="seg" data-set="radio"
-                   title="Al poner una canción suelta, deja que siga el autoplay de Spotify — el de verdad, con artistas parecidos, igual que en la app. Para eso la canción se reproduce dentro de una playlist privada llamada «MASTER MUSIC · radio», que se crea una sola vez y se sobrescribe en cada canción. Si tienes el autoplay apagado en Spotify, la app pone música del mismo género por su cuenta.">
+                   title="Al poner una canción suelta del buscador, encolar otras parecidas para que la música no se pare al acabar.">
                 <button class="seg-btn" data-val="on">sí</button>
                 <button class="seg-btn" data-val="off">no</button>
               </div>
@@ -338,6 +382,16 @@
                 <button class="seg-btn" data-val="auto">automático</button>
                 <button class="seg-btn" data-val="full">completo</button>
                 <button class="seg-btn" data-val="less">menos</button>
+              </div>
+            </div>
+            <div class="set-row">
+              <span class="set-label">micrófono</span>
+              <!-- La otra opción que settings.js definía sin botones. Manda el
+                   botón ◈ del espectro; apagada, el visualizador ni lo enseña. -->
+              <div class="seg" data-set="mic"
+                   title="Deja que el espectro escuche por el micrófono (botón ◈). En el móvil abrir el micrófono baja el volumen de la música: solo vale la pena si suena en OTRO aparato.">
+                <button class="seg-btn" data-val="on">permitir</button>
+                <button class="seg-btn" data-val="off">no</button>
               </div>
             </div>
           </div>
@@ -471,18 +525,20 @@
           <div class="settings-block">
             <h3>~ atajos de teclado ~</h3>
             <div class="keys-grid">
+              <kbd>ctrl + K</kbd><span><b>buscar en todo</b> (o la tecla <kbd>/</kbd>)</span>
               <kbd>espacio</kbd><span>reproducir / pausa</span>
               <kbd>← →</kbd><span>±5 segundos</span>
               <kbd>shift + ← →</kbd><span>canción anterior / siguiente</span>
               <kbd>↑ ↓</kbd><span>volumen ±5%</span>
               <kbd>M</kbd><span>silenciar</span>
-              <kbd>1 … 5</kbd><span>cambiar de pestaña</span>
-              <kbd>L</kbd><span>letras</span>
+              <kbd>1 … 6</kbd><span>cambiar de pestaña</span>
+              <kbd>L</kbd><span>letra</span>
               <kbd>F</kbd><span>buscar en spotify</span>
-              <kbd>B</kbd><span>biblioteca</span>
+              <kbd>B</kbd><span>listas</span>
               <kbd>Q</kbd><span>cola</span>
+              <kbd>H</kbd><span>historial</span>
               <kbd>S</kbd><span>configuración</span>
-              <kbd>esc</kbd><span>salir del modo cine</span>
+              <kbd>esc</kbd><span>cerrar el buscador o el modo cine</span>
             </div>
           </div>
 
@@ -552,6 +608,13 @@
           <span class="rep-badge">1</span>
         </button>
 
+        <!-- ♥ GUARDAR EN SPOTIFY · spotify.js tiene el corazón entero escrito
+             (pintarLike / refrescarLike / alternarLike, contra el endpoint
+             nuevo /me/library) y hasta la regla .ctrl-btn.like-on en el CSS.
+             Le faltaba el botón. Lo enseña y lo esconde él según si la
+             canción es de Spotify y si la cuenta tiene permiso. -->
+        <button class="ctrl-btn like-btn" id="likeBtn" title="Guardar en Tus me gusta" hidden>♡</button>
+
         <!-- VOLUMEN: icono discreto, la barra se despliega al pasar el mouse -->
         <div class="volume-ctl" id="volumeCtl">
           <span class="vol-pct" id="volPct">70</span>
@@ -572,13 +635,6 @@
               </g>
             </svg>
           </button>
-          <!-- ♥ Guardar en «Tus me gusta». Se retiró en 2026-08 porque
-               PUT /me/tracks devolvía 403 a las apps en modo desarrollo;
-               resulta que ese endpoint ya ni existe (feb-2026 lo sustituyó
-               por PUT /me/library) y los retirados contestan 403 en silencio.
-               Vuelve con el endpoint nuevo. Lo enseña js/spotify.js solo
-               cuando hay sesión y una canción de Spotify sonando. -->
-          <button class="ctrl-btn vol-btn side-btn" id="likeBtn" title="Guardar en Tus me gusta" hidden>♡</button>
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" title="Modo edit (letra animada)">✦</button>
           <!-- ⚗ Lab de efectos DESACTIVADO por ahora (quitar "hidden" para reactivar; el código en lyrics.js queda intacto) -->
           <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn" title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
@@ -594,6 +650,12 @@
         <span id="statusText" role="status" aria-live="polite">▣ listo</span>
       </span>
       <span class="filler" aria-hidden="true"></span>
+      <!-- BUSCAR EN TODO · el atajo Ctrl+K no existe para quien usa el dedo, y
+           la barra de estado es lo único que se ve SIEMPRE (la de pestañas se
+           esconde sola en la letra y el cine la tapa entera). -->
+      <button class="paleta-btn" id="paletaBtn" title="Buscar en todo: tu música, tus listas, Spotify y los mandos (Ctrl+K)">
+        <span aria-hidden="true">⌕</span> buscar
+      </button>
       <!-- Dónde suena. Sale solo con Spotify Connect; el menú lo monta
            spotify.js colgado del <body> (ver el comentario de allí). -->
       <button class="dev-chip" id="devChip" hidden
@@ -714,12 +776,17 @@
   <script defer src="js/lyrics.js"></script>
   <script defer src="js/spotify.js"></script>
   <script defer src="js/library.js"></script>
+  <script defer src="js/app.js"></script>
+  <!-- HISTORIAL Y ESTADÍSTICAS · los dos archivos existían, estaban en el
+       SHELL del service worker (se descargaban en cada visita) y nadie los
+       ejecutaba: sin estos dos <script> no se guardaba ni una escucha. Van
+       DESPUÉS de app.js porque historial.js se engancha a PlayerCore.onTrack,
+       y stats.js después de historial.js porque le pide las cuentas. -->
   <script defer src="js/historial.js"></script>
   <script defer src="js/stats.js"></script>
-  <script defer src="js/app.js"></script>
   <script defer src="js/visualizer.js"></script>
   <!-- beat.js va DESPUÉS del visualizador (le pide el analizador crudo) y
-       ANTES de ambient.js, que solo pinta lo que este detecta -->
+       ANTES de ambient.js, dcque solo pinta lo que este detecta -->
   <script defer src="js/beat.js"></script>
   <script defer src="js/seven.js"></script>
   <script defer src="js/settings.js"></script>
@@ -734,6 +801,11 @@
   <!-- Carátula y mandos en el sistema (overlay de Windows, pantalla de
        bloqueo, auriculares). Es lo único que quedó de la tanda 8. -->
   <script defer src="js/mediasession.js"></script>
+  <!-- BUSCADOR UNIVERSAL (Ctrl+K) · va EL ÚLTIMO a propósito: le pregunta a
+       todos los demás (tu música de PlayerCore, tus listas de LibraryModule,
+       el catálogo de SpotifyModule, tu historial) y los mandos que ofrece
+       tienen que existir ya cuando se monta. -->
+  <script defer src="js/buscador.js"></script>
 
   <!-- Registro del Service Worker (solo bajo http/https, no file://) -->
   <script>

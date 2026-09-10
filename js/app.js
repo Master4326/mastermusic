@@ -11,6 +11,7 @@
     tracks: [],          // [{id, name, artist, album, duration, url, cover, file}]
     queue: [],           // índices dentro de tracks
     queueIndex: -1,
+    desde: null,         // {tipo, nombre} de la lista local que se está oyendo
     currentTrack: null,
     isPlaying: false,
     shuffle: false,
@@ -103,11 +104,34 @@
     a.src = url;
   });
 
+  /* Avisa a quien pinte la música local (la pestaña «listas» y el buscador
+     universal) de que la biblioteca cambió. Antes no había forma de
+     enterarse: seven.js repintaba la lista con un setInterval de 500 ms
+     porque nadie avisaba de nada. */
+  const avisarBiblioteca = () => {
+    window.dispatchEvent(new CustomEvent('mm:biblioteca', { detail: { n: state.tracks.length } }));
+  };
+
+  const estado = (msg) => { if (window.SevenStatus) window.SevenStatus(msg); };
+
   // ---- Add files ----
   const addFiles = async (files) => {
     const audioFiles = [...files].filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(f.name));
-    if (!audioFiles.length) return;
-    for (const file of audioFiles) {
+    if (!audioFiles.length) {
+      if (files && files.length) estado('✕ eso no es audio (mp3 · wav · ogg · flac · m4a)');
+      return;
+    }
+    /* Lo mismo dos veces no. Se compara por nombre y tamaño, que es lo único
+       que identifica un archivo antes de leerlo: soltar la misma carpeta dos
+       veces duplicaba la biblioteca entera. */
+    const yaEsta = new Set(state.tracks.map(t => t.file ? `${t.file.name}|${t.file.size}` : ''));
+    const nuevos = audioFiles.filter(f => !yaEsta.has(`${f.name}|${f.size}`));
+    const repes = audioFiles.length - nuevos.length;
+    if (!nuevos.length) { estado(`▣ ${repes === 1 ? 'esa canción ya estaba' : 'esas canciones ya estaban'}`); return; }
+
+    let hechas = 0;
+    for (const file of nuevos) {
+      estado(`▣ importando ${++hechas} de ${nuevos.length}…`);
       const url = URL.createObjectURL(file);
       const meta = await readMetadata(file);
       const duration = await probeDuration(url);
@@ -123,7 +147,12 @@
           duration, cover: meta.cover, blob: file,
         }).catch((e) => console.warn('No se pudo guardar la canción:', e));
       }
+      // Se avisa canción a canción: la lista se llena a la vista en vez de
+      // aparecer de golpe al final de una carpeta de 200 mp3.
+      avisarBiblioteca();
     }
+    estado(`♫ ${nuevos.length} ${nuevos.length === 1 ? 'canción importada' : 'canciones importadas'}`
+      + (repes ? ` · ${repes} repetida${repes === 1 ? '' : 's'} que ya estaba${repes === 1 ? '' : 'n'}` : ''));
   };
 
   // ---- Load persisted library from IndexedDB ----
@@ -142,6 +171,7 @@
     } catch (e) {
       console.warn('No se pudo cargar la biblioteca guardada:', e);
     }
+    avisarBiblioteca();
   };
 
   // ---- Remove a track (library + IndexedDB) ----
@@ -152,6 +182,7 @@
     if (t.url) { try { URL.revokeObjectURL(t.url); } catch (e) {} }
     state.tracks.splice(idx, 1);
     if (window.MusicDB) window.MusicDB.delete(id).catch(() => {});
+    avisarBiblioteca();
     if (state.currentTrack && state.currentTrack.id === id) {
       audio.pause();
       audio.removeAttribute('src');
@@ -163,13 +194,62 @@
   };
 
   // ---- Playback ----
-  const playTrackById = (id) => {
+  /* `ids` acota la cola a una lista concreta (lo que se esté viendo filtrado,
+     por ejemplo). Sin él la cola es la biblioteca entera, que es lo que hacía
+     siempre: poner una canción desde una búsqueda de tres resultados seguía
+     con las otras doscientas, no con esas tres.
+
+     `desde` es el nombre de esa lista, y va como ARGUMENTO por una razón que
+     costó una prueba roja: al principio quien llamaba lo dejaba puesto en
+     `state.desde` justo antes, y esta función lo borraba a continuación al
+     no recibir `ids`. Pasarlo aquí hace imposible esa pelea — quien pone la
+     canción es quien sabe de dónde sale. */
+  const playTrackById = (id, ids, desde) => {
     const idx = state.tracks.findIndex(t => t.id === id);
     if (idx < 0) return;
-    state.queue = state.tracks.map((_, i) => i);
+    let cola = state.tracks.map((_, i) => i);
+    if (Array.isArray(ids) && ids.length) {
+      const dentro = new Set(ids);
+      const acotada = cola.filter(i => dentro.has(state.tracks[i].id));
+      if (acotada.length) cola = acotada;
+    }
+    if (!cola.includes(idx)) cola.push(idx);
+    state.queue = cola;
     if (state.shuffle) shuffleArray(state.queue, idx);
     state.queueIndex = state.queue.indexOf(idx);
+    state.desde = desde || null;
     loadAndPlay(state.tracks[idx]);
+  };
+
+  /* ---- Encolar y desencolar (solo música local) ----
+     Con Spotify Connect manda la cola de Spotify y esto no aplica: allí se
+     encola con `SpotifyModule.queue`. Aquí la cola es nuestra, así que se
+     puede tocar de verdad — que es justo lo que faltaba para poder ARMAR una
+     lista en vez de solo mirarla. */
+  const enqueueById = (id, siguiente) => {
+    const idx = state.tracks.findIndex(t => t.id === id);
+    if (idx < 0) return false;
+    if (!state.queue.length) {           // nada sonando: esto arranca la cola
+      state.queue = [idx];
+      state.queueIndex = 0;
+      loadAndPlay(state.tracks[idx]);
+      return true;
+    }
+    const donde = siguiente ? state.queueIndex + 1 : state.queue.length;
+    state.queue.splice(donde, 0, idx);
+    return true;
+  };
+
+  // `pos` es la posición dentro de state.queue, no dentro de tracks
+  const dequeueAt = (pos) => {
+    if (pos <= state.queueIndex || pos >= state.queue.length) return false;
+    state.queue.splice(pos, 1);
+    return true;
+  };
+
+  const clearQueue = () => {
+    if (state.queueIndex < 0) { state.queue = []; return; }
+    state.queue = state.queue.slice(0, state.queueIndex + 1);
   };
 
   const shuffleArray = (arr, keepFirst) => {
@@ -272,7 +352,17 @@
   audio.addEventListener('ended', () => document.body.classList.remove('playing'));
 
   // ---- UI events ----
-  el.fileInput.addEventListener('change', (e) => addFiles(e.target.files));
+  el.fileInput.addEventListener('change', (e) => {
+    addFiles(e.target.files);
+    /* Se vacía para que volver a elegir EL MISMO archivo dispare otro
+       `change`. Sin esto, importar algo, borrarlo y querer importarlo otra
+       vez no hacía nada: el valor del input no había cambiado. */
+    e.target.value = '';
+  });
+
+  // El botón que abre el diálogo de archivos (antes no existía ninguno)
+  const importBtn = $('importBtn');
+  if (importBtn) importBtn.addEventListener('click', () => el.fileInput.click());
 
   // Drag & drop
   let dragCounter = 0;
@@ -533,6 +623,10 @@
     audio,
     addFiles,
     playTrackById,
+    enqueueById,
+    dequeueAt,
+    clearQueue,
+    removeTrack,
     // Control central: los módulos nuevos (sesión de medios, mini flotante,
     // modo cine) mandan por aquí y el desvío a Spotify se resuelve solo.
     togglePlay,

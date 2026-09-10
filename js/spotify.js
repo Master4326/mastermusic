@@ -760,11 +760,10 @@
   const pintarPista = (track) => {
     document.getElementById('npTitle').textContent = track.name;
     document.getElementById('npArtist').textContent = track.artist;
-    const npCover = document.getElementById('npCover');
-    if (npCover && track.cover) {
-      npCover.style.backgroundImage = `url('${track.cover}')`;
-      npCover.innerHTML = '';
-    }
+    /* Aquí había un segundo pintado sobre #npCover, la carátula de una barra
+       inferior que se retiró hace tiempo. El id no existe desde entonces, así
+       que eran cuatro líneas buscando algo que nunca está. La carátula viva es
+       #coverArt, la del panel izquierdo. */
     const coverArt = document.getElementById('coverArt');
     if (coverArt && track.cover) {
       coverArt.style.backgroundImage = `url('${track.cover}')`;
@@ -1403,7 +1402,7 @@
   const showNowPlaying = (t) => {
     document.getElementById('npTitle').textContent = t.name;
     document.getElementById('npArtist').textContent = t.artist;
-    const npCoverEl = document.getElementById('coverArt') || document.getElementById('npCover');
+    const npCoverEl = document.getElementById('coverArt');
     if (npCoverEl && t.cover) {
       npCoverEl.style.backgroundImage = `url('${t.cover}')`;
       npCoverEl.style.backgroundSize = 'cover';

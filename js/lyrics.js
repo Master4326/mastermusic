@@ -112,6 +112,11 @@
   if (lyricsIdle) {
     const tipEl = document.getElementById('lyricsIdleTip');
     const TIPS = [
+      // El primero de la lista es el que más falta hace saber: un solo cuadro
+      // para tu música, tus listas, tu historial, Spotify y los mandos.
+      'ctrl + K busca en todo: tu música, tus listas, tu historial y spotify',
+      'en el buscador, shift + enter encola la canción en vez de ponerla',
+      'la cola (Q) dice de qué lista sale lo que suena — y se pulsa para abrirla',
       'pulsa ✦ para el modo edit — la letra a pantalla completa, animada',
       '⛶ es modo cine: carátula girando y letra gigante',
       '◈ sync engancha el espectro al audio del sistema (ideal con Spotify)',

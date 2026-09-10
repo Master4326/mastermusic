@@ -23,7 +23,13 @@
 
   // ---------- Colecciones ----------
   // path: endpoint base | paged: admite offset | scope: permiso que puede faltar
+  // local: no es de Spotify — sale de PlayerCore, y funciona sin conexión
   const COLS = {
+    /* TU MÚSICA · la que importas tú. Va primera y es la única que no
+       necesita cuenta de Spotify. Desde que el <ul id="trackList"> se cayó
+       del HTML no había NINGÚN sitio donde ver los mp3 importados: se
+       guardaban en IndexedDB y desaparecían de la vista. */
+    mine:      { title: 'mi música',     local: true,                      paged: false, kind: 'track' },
     playlists: { title: 'mis playlists', path: '/me/playlists',            paged: true,  kind: 'playlist' },
     saved:     { title: 'guardadas',     path: '/me/tracks',               paged: true,  kind: 'track' },
     recent:    { title: 'recientes',     path: '/me/player/recently-played', paged: false, kind: 'track',
@@ -43,11 +49,32 @@
   // rows / next(offset) / total por colección; null = aún no cargada
   const cache = {};
   const view = {
-    col: 'playlists',   // colección activa
+    col: 'mine',        // colección activa (la local abre sin pedir nada a nadie)
     detail: null,       // { id, uri, name, sub, rows, next, total } si estamos dentro de una playlist
     loading: false,
     auto: false,        // la lista se está trayendo entera por detrás
     filtro: '',         // texto del buscador de dentro de la lista
+  };
+
+  const conSpotify = () => !!(window.SpotifyModule && window.SpotifyModule.isLoggedIn());
+
+  /* Tu música importada, en la misma forma de fila que todo lo demás. Se lee
+     de PlayerCore en cada pintado y no se cachea: es un array que ya está en
+     memoria, y cachearlo solo serviría para enseñarlo desactualizado. */
+  const filasLocales = () => {
+    const st = window.PlayerCore && window.PlayerCore.state;
+    if (!st) return [];
+    return st.tracks.map((t) => ({
+      id: t.id,
+      uri: null,
+      name: t.name,
+      artist: t.artist || 'desconocido',
+      album: t.album || '',
+      duration: t.duration || 0,
+      cover: t.cover || null,
+      spotify: false,
+      local: true,
+    }));
   };
 
   /* ---------- Traer la lista ENTERA ----------
@@ -223,19 +250,30 @@
       <div class="skel-lines"><div class="skel-line"></div><div class="skel-line short"></div></div>
     </li>`).join('');
 
+  /* ¿Es esta la que está sonando? Marcarla es media respuesta a «saber por
+     dónde voy»: en una lista de 300, sin esto no hay forma de ver dónde
+     estás sin acordarte del título. */
+  const sonando = (t) => {
+    const cur = window.PlayerCore && window.PlayerCore.state.currentTrack;
+    if (!cur || !t) return false;
+    return (t.uri && cur.uri === t.uri) || (t.id && cur.id === t.id);
+  };
+
   const rowTrack = (t, i) => `
-    <li class="sp-result${t.unplayable ? ' sp-unplayable' : ''}" data-idx="${i}"
+    <li class="sp-result${t.unplayable ? ' sp-unplayable' : ''}${sonando(t) ? ' sp-now' : ''}" data-idx="${i}"
+        tabindex="0"
         ${t.unplayable ? 'title="Spotify no da una URI para esta pista (archivo local o retirada del catálogo)"' : ''}>
-      <span class="sp-idx">${String(i + 1).padStart(2, '0')}</span>
+      <span class="sp-idx">${sonando(t) ? '▶' : String(i + 1).padStart(2, '0')}</span>
       <div class="sp-thumb" ${t.cover ? `style="background-image:url('${t.cover}')"` : ''}>${t.cover ? '' : '♪'}</div>
       <div class="sp-meta">
         <div class="sp-name">${escapeHtml(t.name)}</div>
-        <div class="sp-artist">${escapeHtml(t.artist)}${t.unplayable ? ' · no disponible' : ''}</div>
+        <div class="sp-artist">${escapeHtml(t.artist)}${t.album ? ` <span class="sp-alb">· ${escapeHtml(t.album)}</span>` : ''}${t.unplayable ? ' · no disponible' : ''}</div>
       </div>
       <div class="sp-dur">${formatTime(t.duration)}</div>
       ${t.unplayable ? '<span class="sp-dur">✕</span>'
-        : `<button class="sp-queue" title="Añadir a la cola">＋</button>
+        : `<button class="sp-queue" title="Poner a continuación">＋</button>
            <button class="sp-play" title="Reproducir ahora">▶</button>`}
+      ${t.local ? '<button class="sp-del" title="Quitar de tu música">✕</button>' : ''}
     </li>`;
 
   // Las playlists van en rejilla de portadas, como la biblioteca de Spotify
@@ -288,19 +326,33 @@
       (t.name || '').toLowerCase().includes(q) || (t.artist || t.owner || '').toLowerCase().includes(q));
   };
 
+  /* Las filas que se ven ahora mismo, filtro aplicado, sea una lista abierta
+     o una colección. Antes el filtro solo valía DENTRO de una lista: con 80
+     playlists en la rejilla, encontrar una era ir mirándolas. */
+  const filasVisibles = () => filtradas(currentRows());
+
   const paintFiltro = () => {
     const fila = $('libFiltroFila');
     if (!fila) return;
-    fila.hidden = !view.detail;
+    const filas = currentRows();
+    // Con cuatro cosas el filtro estorba más de lo que ayuda
+    fila.hidden = filas.length < 8 && !view.filtro.trim();
     const inp = $('libFiltro');
     if (inp && inp.value !== view.filtro) inp.value = view.filtro;
+    if (inp) {
+      inp.placeholder = view.detail
+        ? 'buscar en «' + (view.detail.name || 'esta lista') + '»…'
+        : 'filtrar ' + ((COLS[view.col] && COLS[view.col].title) || 'esta lista') + '…';
+    }
     const cuenta = $('libFiltroCuenta');
-    if (!cuenta || !view.detail) return;
-    const total = view.detail.rows.length;
-    const vistas = filtradas(view.detail.rows).length;
+    if (!cuenta) return;
+    const total = filas.length;
+    const vistas = filtradas(filas).length;
+    const cargando = view.auto
+      && ((view.detail && view.detail.next != null) || (!view.detail && cache[view.col] && cache[view.col].next != null));
     cuenta.textContent = view.filtro.trim()
       ? vistas + ' de ' + total
-      : (view.auto && view.detail.next != null ? '· trayendo la lista ·' : '');
+      : (cargando ? '· trayendo la lista ·' : (total ? total + '' : ''));
   };
 
   const paintHead = () => {
@@ -320,8 +372,14 @@
     }
   };
 
+  /* Scope al bloque de la biblioteca a propósito: las pestañas del historial
+     usan la MISMA clase .lib-chip (con .st-chip encima), y un
+     querySelectorAll global les apagaba la suya cada vez que se repintaba
+     aquí. Dos listas de chips distintas, dos dueños distintos. */
   const paintChips = () => {
-    document.querySelectorAll('.lib-chip').forEach(c => {
+    const block = $('libBlock');
+    if (!block) return;
+    block.querySelectorAll('.lib-chip').forEach(c => {
       c.classList.toggle('active', !view.detail && c.dataset.col === view.col);
     });
   };
@@ -369,10 +427,28 @@
          detrás, cada página añade solo las suyas en vez de rehacerlo todo.
          Con el filtro puesto no vale el atajo y se repinta entero. */
       ul._pintadas = view.filtro.trim() ? -1 : d.rows.length;
+    } else if (COLS[view.col].local) {
+      // Tu música: ni petición, ni caché, ni esqueletos. Ya está en memoria.
+      const filas = filtradas(currentRows());
+      ul.classList.remove('as-grid');
+      ul.innerHTML = currentRows().length
+        ? (filas.length ? filas.map(([t, i]) => rowTrack(t, i)).join('')
+                        : empty('nada que se llame así en tu música'))
+        : empty('todavía no has importado nada<br>'
+            + '<span style="opacity:.75">arrastra tus mp3 a la ventana, o usa '
+            + '<b>[ importar música ]</b> en config ⚙</span>'
+            + '<br><button class="retro-btn small" id="libImportar" style="margin-top:10px">'
+            + '<span class="bracket">[</span> importar música <span class="bracket">]</span></button>');
+      ul._pintadas = -1;
     } else {
       const c = cache[view.col];
       const k = COLS[view.col].kind;
-      if (!c) {
+      if (!conSpotify()) {
+        ul.classList.remove('as-grid');
+        ul.innerHTML = empty('«' + COLS[view.col].title + '» es de Spotify<br>'
+          + '<span style="opacity:.75">conéctate en <b>config ⚙</b> · tu música sigue en '
+          + '<b>mi música</b>, sin cuenta ninguna</span>');
+      } else if (!c) {
         // aún cargando: rejilla o filas, según lo que vaya a llegar
         ul.classList.toggle('as-grid', enRejilla(k));
         ul.innerHTML = skeletons(enRejilla(k) ? 8 : 6);
@@ -381,10 +457,14 @@
       } else if (!c.rows.length) {
         ul.innerHTML = empty('nada por aquí todavía');
       } else {
-        ul.innerHTML = (k === 'playlist' ? c.rows.map(rowPlaylist)
-          : k === 'album' ? c.rows.map(rowAlbum)
-          : k === 'artist' ? c.rows.map(rowArtist)
-          : c.rows.map(rowTrack)).join('');
+        const filas = filtradas(c.rows);
+        const fila = k === 'playlist' ? rowPlaylist
+          : k === 'album' ? rowAlbum
+          : k === 'artist' ? rowArtist
+          : rowTrack;
+        ul.innerHTML = filas.length
+          ? filas.map(([t, i]) => fila(t, i)).join('')
+          : empty('nada que se llame así en ' + COLS[view.col].title);
       }
     }
     paintMore();
@@ -436,6 +516,9 @@
     if (view.loading) return;
     const def = COLS[col];
     if (!def) return;
+    // Tu música no se «carga»: vive en PlayerCore y se lee al pintar
+    if (def.local) { paint(); return; }
+    if (!conSpotify()) { paint(); return; }
     const prev = cache[col];
     if (more && (!prev || prev.next == null)) return;
 
@@ -788,6 +871,17 @@
 
   // ---------- Reproducción ----------
   const play = (t) => {
+    /* Tu música va por el reproductor de la casa. La cola se acota a LO QUE
+       SE ESTÁ VIENDO (filtro incluido): poner una canción de una búsqueda de
+       tres resultados sigue con esas tres, no con la biblioteca entera. */
+    if (t.local) {
+      if (!window.PlayerCore) return;
+      const ids = filtradas(currentRows()).map(([x]) => x.id);
+      window.PlayerCore.playTrackById(t.id, ids, {
+        nombre: view.filtro.trim() ? '«' + view.filtro.trim() + '» en tu música' : 'tu música',
+      });
+      return;
+    }
     if (!window.SpotifyModule) return;
     if (t.unplayable) {
       setStatus('✕ spotify no puede reproducir esta pista (archivo local o retirada)');
@@ -797,6 +891,20 @@
     // Spotify continúa con el resto de la playlist, no con una sola pista.
     const ctx = view.detail ? view.detail.uri : null;
     window.SpotifyModule.playTrack(t, ctx);
+  };
+
+  // ＋ en una fila: a continuación, sin cortar lo que suena
+  const encolar = (t) => {
+    if (t.local) {
+      if (!window.PlayerCore || !window.PlayerCore.enqueueById) return;
+      window.PlayerCore.enqueueById(t.id, true);
+      setStatus('＋ a continuación: ' + t.name);
+      if (window.SevenQueueRefresh) window.SevenQueueRefresh();
+      return;
+    }
+    if (window.SpotifyModule && window.SpotifyModule.queue) {
+      window.SpotifyModule.queue(t.uri, t.name);
+    }
   };
 
   /* Rescate para cuando la lista no llega por ninguna vía (las playlists que
@@ -852,14 +960,23 @@
   };
 
   // ---------- Cableado ----------
-  const showBlock = (show) => {
+  /* La biblioteca YA NO se esconde sin Spotify. Antes, sin sesión, la pestaña
+     entera era una frase gris — y con ella se iba también el único sitio
+     donde podría estar tu propia música, que no necesita cuenta de nadie.
+     Ahora el bloque está siempre y es cada colección la que avisa de que le
+     hace falta Spotify (ver `paint`). */
+  const mostrarBloque = () => {
     const block = $('libBlock');
     const hint = $('libHint');
-    if (block) block.hidden = !show;
-    if (hint) hint.hidden = show;
+    if (block) block.hidden = false;
+    if (hint) hint.hidden = true;
   };
 
-  const currentRows = () => view.detail ? view.detail.rows : ((cache[view.col] && cache[view.col].rows) || []);
+  const currentRows = () => {
+    if (view.detail) return view.detail.rows;
+    if (COLS[view.col] && COLS[view.col].local) return filasLocales();
+    return (cache[view.col] && cache[view.col].rows) || [];
+  };
 
   /* El panel que hace scroll no siempre es el mismo elemento (depende de si
      la ventana está maximizada, del modo móvil…), así que se busca de verdad
@@ -906,11 +1023,14 @@
 
     block.addEventListener('click', (e) => {
       const chip = e.target.closest('.lib-chip');
-      if (chip) {
+      if (chip && chip.dataset.col) {
+        cargaSeq++;              // corta la carga automática de la anterior
+        view.auto = false;
         view.detail = null;
+        view.filtro = '';        // el filtro es de la lista que se deja atrás
         view.col = chip.dataset.col;
         paint();
-        if (!cache[view.col]) loadCollection(view.col, false);
+        if (!COLS[view.col].local && !cache[view.col]) loadCollection(view.col, false);
         return;
       }
       if (e.target.closest('#libBack')) { back(); return; }
@@ -940,6 +1060,12 @@
         if (view.detail) playAndListQueue(view.detail);
         return;
       }
+      // El botón del estado vacío de «mi música» abre el mismo diálogo
+      if (e.target.closest('#libImportar')) {
+        const inp = $('fileInput');
+        if (inp) inp.click();
+        return;
+      }
       if (e.target.closest('#libPlayAll') || e.target.closest('#libPlayAnyway')) {
         if (view.detail) playAllPlaylist(view.detail);
         return;
@@ -957,9 +1083,17 @@
          reproduciría también, que es justo lo contrario de encolar. */
       if (e.target.closest('.sp-queue')) {
         e.stopPropagation();
-        if (window.SpotifyModule && window.SpotifyModule.queue) {
-          window.SpotifyModule.queue(item.uri, item.name);
-        }
+        encolar(item);
+        return;
+      }
+      // ✕ en tu música: quitarla de la biblioteca (solo local, y preguntando)
+      if (e.target.closest('.sp-del')) {
+        e.stopPropagation();
+        if (!item.local || !window.PlayerCore || !window.PlayerCore.removeTrack) return;
+        if (!confirm('¿Quitar «' + item.name + '» de tu música?\n\nNo borra el archivo de tu disco.')) return;
+        window.PlayerCore.removeTrack(item.id);
+        setStatus('▣ quitada: ' + item.name);
+        paint();
         return;
       }
       /* Dentro de un artista, las tarjetas son sus DISCOS: se abren. Va antes
@@ -996,21 +1130,42 @@
      asegura de que el bloque esté visible y cableado antes de pintar: si se
      llega aquí sin haber abierto nunca la pestaña, no hay nada montado. */
   const abrir = (tipo, item) => {
-    if (!window.SpotifyModule || !window.SpotifyModule.isLoggedIn()) return;
-    showBlock(true);
+    if (!conSpotify()) return;
+    mostrarBloque();
     wire();
-    if (tipo === "artist") openArtist(item, false);
-    else if (tipo === "album") openAlbum(item, false);
+    if (tipo === 'artist') openArtist(item, false);
+    else if (tipo === 'album') openAlbum(item, false);
+    else if (tipo === 'playlist') openPlaylist(item, false);
+  };
+
+  /* Saltar a una colección desde fuera (lo usa el buscador universal para
+     «ver mi música» o «abrir mis playlists»). */
+  const irA = (col) => {
+    if (!COLS[col]) return;
+    mostrarBloque();
+    wire();
+    view.detail = null;
+    view.filtro = '';
+    view.col = col;
+    paint();
+    if (!COLS[col].local && !cache[col]) loadCollection(col, false);
   };
 
   // Se llama al abrir la pestaña (desde seven.js)
   const open = () => {
-    const logged = window.SpotifyModule && window.SpotifyModule.isLoggedIn();
-    showBlock(!!logged);
-    if (!logged) return;
+    mostrarBloque();
     wire();
+    /* Al entrar por primera vez se elige la colección que TENGA algo: con
+       Spotify conectado, tus playlists; sin él (o sin playlists), tu música.
+       Abrir siempre en una lista vacía es la forma más rápida de que la
+       pestaña parezca rota. */
+    if (!view.tocada) {
+      view.tocada = true;
+      const hayLocal = !!(window.PlayerCore && window.PlayerCore.state.tracks.length);
+      if (!hayLocal && conSpotify()) view.col = 'playlists';
+    }
     paint();
-    if (!cache[view.col]) loadCollection(view.col, false);
+    if (!COLS[view.col].local && !cache[view.col]) loadCollection(view.col, false);
   };
 
   // La llama spotify.js al conectar / desconectar
@@ -1018,19 +1173,66 @@
     if (!connected) {
       Object.keys(cache).forEach(k => delete cache[k]);
       view.detail = null;
+      // Sin sesión, quedarse en una colección de Spotify es quedarse mirando
+      // un aviso: se vuelve a lo único que sigue estando, tu música.
+      if (COLS[view.col] && !COLS[view.col].local) view.col = 'mine';
     }
-    // El argumento manda: no volvemos a consultar isLoggedIn() aquí porque
-    // depende de que el token ya se haya borrado antes de avisarnos.
-    showBlock(!!connected);
+    mostrarBloque();
     const tab = $('tab-library');
-    if (connected && tab && tab.classList.contains('active')) open();
+    if (tab && tab.classList.contains('active')) open();
   };
 
-  // detailOf se comparte con la cola (seven.js) para no duplicar el parseo
-  // `abrir` lo usa el buscador para saltar a un artista o a un álbum
-  window.LibraryModule = { open, abrir, onAuthChange, detailOf };
-
-  document.addEventListener('DOMContentLoaded', () => {
-    showBlock(!!(window.SpotifyModule && window.SpotifyModule.isLoggedIn()));
+  /* Repintar cuando cambia tu música importada (lo avisa app.js). Solo si la
+     pestaña está delante: repintar a ciegas mientras importas 200 mp3 sería
+     200 repintados que nadie ve. */
+  window.addEventListener('mm:biblioteca', () => {
+    const tab = $('tab-library');
+    if (!tab || !tab.classList.contains('active')) return;
+    if (view.detail || !COLS[view.col] || !COLS[view.col].local) return;
+    paint();
   });
+
+  /* ---------- Mover la marca de «esto es lo que suena» ----------
+     Al cambiar de canción hay que mover el ▶ de la lista. Repintar entera
+     valdría... y tiraría el scroll: estás a mitad de una playlist de 400,
+     entra la siguiente canción y la lista salta al principio sola. Aquí se
+     tocan SOLO las dos filas que cambian. */
+  const marcarSonando = () => {
+    const ul = list();
+    if (!ul) return;
+    const filas = currentRows();
+    ul.querySelectorAll('.sp-result[data-idx]').forEach((li) => {
+      const t = filas[parseInt(li.dataset.idx, 10)];
+      if (!t) return;
+      const on = sonando(t);
+      if (on === li.classList.contains('sp-now')) return;   // esta no cambia
+      li.classList.toggle('sp-now', on);
+      const idx = li.querySelector('.sp-idx');
+      if (idx) idx.textContent = on ? '▶' : String(parseInt(li.dataset.idx, 10) + 1).padStart(2, '0');
+    });
+  };
+
+  const engancharSonando = () => {
+    if (!window.PlayerCore || !window.PlayerCore.onTrack) { setTimeout(engancharSonando, 400); return; }
+    window.PlayerCore.onTrack(() => {
+      const tab = $('tab-library');
+      if (tab && tab.classList.contains('active')) marcarSonando();
+    });
+  };
+  engancharSonando();
+
+  // detailOf se comparte con la cola (seven.js) para no duplicar el parseo
+  // `abrir` / `irA` los usa el buscador universal para saltar a una lista
+  // `playlistsCache` se la pide el buscador para poder buscar entre tus listas
+  window.LibraryModule = {
+    open, abrir, irA, onAuthChange, detailOf,
+    playAll: playAllPlaylist,
+    coleccion: (col) => (cache[col] && cache[col].rows) || [],
+    precargar: (col) => {
+      if (!COLS[col] || COLS[col].local || cache[col] || !conSpotify()) return;
+      loadCollection(col, false);
+    },
+  };
+
+  document.addEventListener('DOMContentLoaded', mostrarBloque);
 })();
