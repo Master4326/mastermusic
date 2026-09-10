@@ -13,6 +13,19 @@
   let forceEdit = false;      // true mientras el modo cine está abierto
   let parsedLines = [];       // [{ time, text }]
   let activeIdx = -1;
+  /* Último segundo que vio tick(). Quien necesita repintar «lo de ahora»
+     (cambiar de modo, cerrar el cine, terminar de bajar una tipografía) lo
+     usa en vez de audio.currentTime: con Spotify Connect la música NO suena
+     en el <audio> de la página, así que ahí currentTime es 0 y repintar
+     mostraba el primer verso de la canción en lugar del que va sonando. */
+  let ultimoT = 0;
+  /* Repinta la vista con el segundo que va sonando. Declaración `function` a
+     propósito: se llama desde applyMode(), que corre al arrancar el módulo,
+     antes de que estén definidas las const de más abajo. */
+  function repintarAhora() {
+    if (!parsedLines.length) return;   // sin letra no hay nada que repintar (y tick aún no existe)
+    tick(ultimoT);
+  }
   let lastTrackKey = null;
   let userScrolledRecently = false;
   let scrollTimer = null;
@@ -28,25 +41,41 @@
   let activeController = null; // AbortController de la petición en curso
   let retryTimer = null;      // reintento diferido ante fallos de red
 
-  // Parse LRC format: "[mm:ss.xx] text"
+  /* Parse LRC format: "[mm:ss.xx] text"
+     Y también el LRC «mejorado»: algunas letras traen además el tiempo de
+     CADA palabra dentro del verso, en marcas <mm:ss.xx>. Cuando están, el
+     karaoke las usa y el teñido va clavado en vez de estimado. Y, estén o no,
+     hay que quitarlas del texto: antes se colaban tal cual y el verso salía
+     lleno de "<00:12.34>" por pantalla. */
   const parseLRC = (lrc) => {
     if (!lrc) return [];
     const lines = lrc.split(/\r?\n/);
     const result = [];
     const tag = /\[(\d+):(\d+)(?:\.(\d+))?\]/g;
+    const wtag = /<(\d+):(\d+)(?:[.:](\d+))?>/g;
+    const aSeg = (mm, ss, frac) => {
+      const ms = frac ? parseInt(String(frac).padEnd(3, '0').slice(0, 3), 10) : 0;
+      return parseInt(mm, 10) * 60 + parseInt(ss, 10) + ms / 1000;
+    };
     for (const line of lines) {
       let m;
       const stamps = [];
       tag.lastIndex = 0;
-      while ((m = tag.exec(line)) !== null) {
-        const min = parseInt(m[1], 10);
-        const sec = parseInt(m[2], 10);
-        const ms = m[3] ? parseInt(m[3].padEnd(3, '0').slice(0, 3), 10) : 0;
-        stamps.push(min * 60 + sec + ms / 1000);
-      }
-      const text = line.replace(tag, '').trim();
+      while ((m = tag.exec(line)) !== null) stamps.push(aSeg(m[1], m[2], m[3]));
+
+      const crudo = line.replace(tag, '');
+      const words = [];
+      wtag.lastIndex = 0;
+      while ((m = wtag.exec(crudo)) !== null) words.push(aSeg(m[1], m[2], m[3]));
+      const text = crudo.replace(wtag, ' ').replace(/\s+/g, ' ').trim();
+
       for (const t of stamps) {
-        result.push({ time: t, text });
+        /* Los tiempos por palabra son absolutos, así que solo valen para el
+           verso al que pertenecen: si la línea lleva varias marcas (el mismo
+           texto repetido en varios momentos), se quedan fuera. */
+        const l = { time: t, text };
+        if (words.length && stamps.length === 1) l.words = words;
+        result.push(l);
       }
     }
     return result.sort((a, b) => a.time - b.time);
@@ -132,6 +161,7 @@
     lineNodes = [];
     gapMap = new Map();
     gapAct = null;
+    karaokeOlvidar();
   };
 
   /* Mensajes de paso ("buscando…", "sin conexión…"): estos SÍ son texto,
@@ -181,7 +211,15 @@
     gapMap = new Map();
     gapAct = null;
     lyricsBody.querySelectorAll('.lyric-gap').forEach((g) => gapMap.set(+g.dataset.gap, g));
-    lyricsEdit.innerHTML = '';   // el modo edit se repinta en el próximo tick
+    /* El modo edit se repinta en el próximo tick, pero SOLO si el índice
+       cambia — y al llegar una letra nueva puede coincidir con el que ya
+       había (canción encadenada desde la caché de la precarga, letra que
+       aparece tarde…), y entonces el panel se quedaba vacío hasta el verso
+       siguiente. Estos dos valores imposibles obligan a repintar. */
+    lyricsEdit.innerHTML = '';
+    activeIdx = -2;
+    edIdx = -3;
+    karaokeOlvidar();
   };
 
   // GET con reintentos suaves ante fallos transitorios (cortes de red, 429,
@@ -531,11 +569,53 @@
     return h % mod;
   };
 
-  // cuánto dura cantada la línea i (para repartir las palabras)
+  /* Presupuesto de ANIMACIÓN de la línea i: cuánto tiempo tienen los efectos
+     de entrada para desplegar el verso. Topado a 7 s a propósito — un verso
+     antes de un puente de 40 s no puede tardar 40 s en aparecer. Para el
+     KARAOKE no sirve: eso es duracionCantada(). */
   const duracionLinea = (i) => {
     const cur = parsedLines[i], next = parsedLines[i + 1];
     if (!cur || !next || cur.time < 0) return 3;
     return Math.min(7, Math.max(1.2, next.time - cur.time));
+  };
+
+  /* Sílabas aproximadas: grupos de vocales. Es el mejor predictor simple de
+     lo que tarda en cantarse una palabra, y bastante mejor que el número de
+     letras —que era lo que se usaba—: "strength" (1 sílaba, 8 letras) pesaba
+     lo mismo que "corazón" (3 sílabas, 7 letras), así que dentro del verso el
+     teñido se adelantaba en las palabras largas de una sílaba y se retrasaba
+     en las cortas de varias. */
+  const silabas = (w) => {
+    const s = String(w || '').toLowerCase().replace(/[^a-záéíóúüñïöäy]/g, '');
+    if (!s) return 1;
+    const g = s.match(/[aeiouáéíóúüïöäy]+/g);
+    let n = g ? g.length : 1;
+    // 'e' muda final del inglés (time, love, strange): no suma sílaba
+    if (n > 1 && /[^aeiouáéíóú]e$/.test(s)) n--;
+    return Math.max(1, n);
+  };
+
+  const silabasLinea = (txt) => (String(txt || '').trim().split(/\s+/)
+    .filter(Boolean).reduce((s, w) => s + silabas(w), 0)) || 1;
+
+  /* Lo que se TARDA EN CANTAR el verso i, que no es el hueco hasta el
+     siguiente ni el presupuesto de animación:
+       · duracionLinea() está topada a 7 s, y con ella el karaoke terminaba de
+         teñir el verso en 6 s aunque el siguiente entrara 12 s después: la
+         letra se encendía mucho antes de que la cantaran. En las baladas y en
+         el último verso de cada parte se notaba muchísimo.
+       · el hueco entero tampoco vale: antes de un instrumental puede haber
+         40 s, y nadie canta un verso en 40 s — el teñido se quedaba clavado.
+     Así que manda el hueco, pero con techo de lo que físicamente cabe cantar:
+     ~0,62 s por sílaba es el ritmo de una balada lenta. */
+  const duracionCantada = (i) => {
+    const cur = parsedLines[i];
+    if (!cur || cur.time < 0) return 3;
+    const next = parsedLines[i + 1];
+    // 0.94: el verso se acaba de cantar un poco antes de que entre el siguiente
+    const hueco = next ? (next.time - cur.time) * 0.94 : 4.5;
+    const techo = silabasLinea(cur.text) * 0.62 + 0.35;
+    return Math.max(0.8, Math.min(Math.max(hueco, 0.8), techo));
   };
 
   let revSeq = 0;   // token por revelado: invalida timers de revelados viejos
@@ -955,10 +1035,32 @@
     return filas;
   };
 
+  /* ── Medidas del panel, con respaldo ──
+     #lyricsEdit vive dentro de #tab-lyrics y las pestañas inactivas son
+     `display:none`: mientras estás en buscar / cola / biblioteca, clientWidth
+     y clientHeight valen CERO. Todos los tamaños del modo edit se calculan
+     midiendo el panel, así que las líneas que se pintaban con la pestaña
+     tapada salían a 13-20 px (ilegibles en un panel de 500 px) y en el
+     deletreo directamente a 0 px: el panel parecía en blanco al volver.
+     Aquí se guarda la última medida buena y se usa de respaldo; además
+     `edMedidoVacio` deja constancia de que esa pintada no vale, y el
+     vigilante de tick() la repite en cuanto el panel vuelve a tener tamaño. */
+  let edPW = 0, edPH = 0;
+  const panelW = () => {
+    const v = lyricsEdit.clientWidth;
+    if (v) edPW = v;
+    return v || edPW || 600;
+  };
+  const panelH = () => {
+    const v = lyricsEdit.clientHeight;
+    if (v) edPH = v;
+    return v || edPH || 400;
+  };
+
   // tamaño de fuente para que cada fila llene el panel sin desbordar
   const edTamanos = (filas) => {
-    const W = lyricsEdit.clientWidth * 0.88;
-    const H = lyricsEdit.clientHeight;
+    const W = panelW() * 0.88;
+    const H = panelH();
     const objetivo = Math.min(W, H * 1.1);
     const tam = filas.map(f =>
       Math.min(objetivo / (0.58 * Math.max(4, edLargo(f))), H * 0.24));
@@ -1024,7 +1126,7 @@
   // chispas pixel que salen disparadas del centro (estilo retro del player)
   const edSparks = (n = 12) => {
     if (calma()) return;
-    const R = Math.min(lyricsEdit.clientWidth, lyricsEdit.clientHeight) || 300;
+    const R = Math.min(panelW(), panelH());
     for (let k = 0; k < n; k++) {
       const s = document.createElement('div');
       s.className = 'ed-spark';
@@ -1043,7 +1145,7 @@
   const edBanda = (texto, dir) => {
     const banda = document.createElement('div');
     banda.className = 'ed-cinta-banda' + (dir < 0 ? ' rev' : '');
-    banda.style.fontSize = Math.max(12, lyricsEdit.clientHeight * 0.045).toFixed(0) + 'px';
+    banda.style.fontSize = Math.max(12, panelH() * 0.045).toFixed(0) + 'px';
     const track = document.createElement('span');
     track.className = 'ed-cinta-track';
     const uni = (texto.toUpperCase() + ' • ').repeat(6);
@@ -1106,8 +1208,8 @@
 
   const edTrozos = (stack, words, durMs) => {
     const trozos = edPartir(words);
-    const H = lyricsEdit.clientHeight || 400;
-    const W = lyricsEdit.clientWidth || 600;
+    const H = panelH();
+    const W = panelW();
 
     /* Cada trozo ocupa su turno dentro de lo que dura el verso. El sostén
        recomendado es de 600-900 ms; si la línea no da para tanto se reparte
@@ -1118,10 +1220,18 @@
     // altura fija: los trozos se apilan en la misma posición, no en cascada
     caja.style.setProperty('--turno', Math.round(turno) + 'ms');
 
+    /* El ÚLTIMO trozo no se retira: se queda puesto hasta que entre la
+       línea siguiente. Los trozos se relevan dentro de lo que dura el verso
+       (`durMs`, con tope de 7 s en duracionLinea), pero el verso de verdad
+       puede durar mucho más —un puente instrumental, el último verso de la
+       canción con treinta segundos de cola—, y como la animación `ed-trozo`
+       termina en opacity 0 con fill-mode `both`, al acabar los turnos el
+       panel se quedaba EN BLANCO el resto de la línea. Ese era el "se queda
+       en blanco si te quedas mirando la letra". */
     trozos.forEach((tr, k) => {
       const texto = tr.join(' ');
       const div = document.createElement('div');
-      div.className = 'ed-trozo';
+      div.className = 'ed-trozo' + (k === trozos.length - 1 ? ' ed-trozo-fin' : '');
       // se escala por el trozo MÁS LARGO de todos para que no bailen de tamaño
       div.style.setProperty('--d', Math.round(k * turno) + 'ms');
       const idxClave = tr.reduce((mx, w, j) => (edLargo(w) > edLargo(tr[mx]) ? j : mx), 0);
@@ -1149,8 +1259,8 @@
 
     // que el bloque entero quepa: limita por ancho de la fila más larga
     // y por alto según cuántas filas hay
-    const H = lyricsEdit.clientHeight || 400;
-    const W = lyricsEdit.clientWidth || 600;
+    const H = panelH();
+    const W = panelW();
     const masLarga = filas.reduce((mx, f) => Math.max(mx, f.join(' ').length), 1);
     let fs = Math.min((W * 0.92) / (masLarga * 0.6), (H * 0.8) / (filas.length * 1.25));
     fs = Math.max(18, Math.min(fs, H * 0.2));
@@ -1244,7 +1354,7 @@
      espectro real debajo (getBands: FFT en vivo u onda idle), anillos sonar
      y notas satélite orbitando. El RAF muere solo cuando la escena sale. */
   const renderInstrumental = (stack) => {
-    const H = lyricsEdit.clientHeight;
+    const H = panelH();
     const esc = document.createElement('div');
     esc.className = 'ed-inst';
 
@@ -1349,10 +1459,23 @@
                       'sal-flash',     // corte seco con destello
                       'sal-encoge'];   // se va hacia dentro
 
+  /* ── Lo que hay pintado AHORA en el modo edit ──
+     El panel se pinta UNA vez por verso y hasta ahora nadie comprobaba que
+     esa única pintada siguiera ahí. Estas tres variables son lo que mira el
+     vigilante de tick(): qué verso se pintó, con qué nodo, y si el panel
+     tenía tamaño al medirlo. */
+  let edStack = null;      // el .ed-stack vivo
+  let edIdx = -3;          // índice de la línea que pintó (nunca coincide al arrancar)
+  let edMedidoVacio = false;   // se midió con el panel oculto: hay que repetirlo
+
   const renderEdit = (i) => {
     /* TODAS las semillas del render usan el índice canónico, no el de la
        línea: así un estribillo repetido sale idéntico cada vuelta. */
     const ci = edCanon(i);
+    // se apunta ANTES de pintar: si una rama fallara, el vigilante no
+    // entraría en bucle intentando repintar la misma línea cada frame
+    edIdx = i;
+    edStack = null;
 
     // la línea anterior colapsa con una salida elegida por línea
     // (.ed-fondo del invertido vive fuera del stack: se despide igual)
@@ -1375,6 +1498,10 @@
     stack.style.setProperty('--top', ED_TOPS[semilla(ci, 7, ED_TOPS.length)] + '%');
     stack.style.setProperty('--tilt', (semilla(ci, 11, 7) - 3) + 'deg');
     lyricsEdit.appendChild(stack);
+    edStack = stack;
+    // ¿el panel estaba tapado (otra pestaña) al calcular los tamaños? Entonces
+    // esta pintada no vale y el vigilante la repite en cuanto se vea.
+    edMedidoVacio = !lyricsEdit.clientHeight;
     // El stack todavía está vacío: se mide cuando las ramas lo hayan llenado.
     requestAnimationFrame(() => ajustarAncho(stack));
 
@@ -1411,21 +1538,71 @@
       }
 
       if (fx === 'ed-deletreo') {
-        /* cada letra GIGANTE en secuencia rápida, y al final la palabra entera */
-        const H = lyricsEdit.clientHeight;
-        const letras = [...text.replace(/\s+/g, '').toUpperCase()].slice(0, 12);
-        const pasoL = Math.min(170, Math.max(80, 1300 / letras.length));
-        const fsL = Math.min(lyricsEdit.clientWidth * 0.5, H * 0.5);
-        letras.forEach((ch) => {
-          const d = document.createElement('div');
-          d.className = 'ed-letrona';
-          d.textContent = ch;
-          d.style.fontSize = fsL.toFixed(0) + 'px';
-          d.style.setProperty('--d', Math.round(delay) + 'ms');
-          delay += pasoL;
-          stack.appendChild(d);
-        });
-        delay += 120;
+        /* DELETREO: una PALABRA letra a letra, gigante, y de remate el verso.
+
+           Estaba mal por cuatro sitios, y los cuatro se veían:
+
+           1. NO deletreaba una palabra: deletreaba el VERSO ENTERO sin
+              espacios y cortado a 12 caracteres. Como `caps` deja pasar
+              hasta 7 palabras, "y si me quedo aquí" salía letra a letra
+              como Y-S-I-M-E-Q-U-E-D-O-A-Q. Un churro cortado a media
+              palabra no se lee como deletreo, se lee como error. Ahora se
+              deletrea LA PALABRA MÁS LARGA del verso, que es la que el
+              resto del motor ya trata como la importante (lo mismo que
+              hace `idxGrande` en la rama de frases).
+           2. Las letras se PISABAN. La animación dura 300 ms y el paso era
+              de 108-170 ms, así que durante la mitad de su vida cada letra
+              compartía sitio con la siguiente — dos letronas superpuestas
+              en el mismo punto, que es exactamente lo que hace que no se
+              lea nada. Ahora la duración sale del paso (`--dur`): cada
+              letra se ha ido justo cuando entra la siguiente. Ese relevo
+              limpio ES el efecto.
+           3. IGNORABA lo que dura el verso. Gastaba hasta ~1,7 s fijos, así
+              que en canciones rápidas el remate —la palabra entera, o sea
+              el chiste— aparecía cuando el verso ya se había ido. Ahora el
+              presupuesto sale de `durMs`: el 55% para el deletreo y el
+              resto para que el remate se vea. Si no da ni para dos
+              letras, no se deletrea y entra directo el remate: mejor un
+              golpe normal que un deletreo a medias.
+           4. Deletreaba comas, tildes sueltas y signos, y con `--top` en
+              36% la letrona (media pantalla de alta) podía salir cortada
+              por arriba. Se filtra a letras/números y se centra el stack. */
+        const H = panelH();
+        // la letrona ocupa media pantalla: aquí la posición al azar no vale
+        stack.style.setProperty('--top', '47%');
+        stack.style.setProperty('--tilt', '0deg');
+
+        /* Presupuesto: el deletreo nunca se come más de la mitad larga del
+           verso, y con tope propio para los versos eternos. */
+        const budget = Math.max(0, Math.min(durMs * 0.55, durMs - 620, 1600));
+        const maxLetras = Math.min(10, Math.floor(budget / 95));
+
+        /* La palabra: la más larga QUE QUEPA en el presupuesto. Si ninguna
+           cabe (versos de una sola palabra larguísima) no se recorta a lo
+           bruto — se salta el deletreo, porque deletrear "IMPORTANT" de
+           "IMPORTANTE" canta más que no deletrear. */
+        const limpia = (s) => s.replace(/[^\p{L}\p{N}]/gu, '');
+        const caben = words.map(limpia).filter((w) => w.length >= 2 && w.length <= maxLetras);
+        const palabra = caben.reduce((mx, w) => (w.length > mx.length ? w : mx), '');
+
+        const letras = [...palabra.toUpperCase()];
+        if (letras.length) {
+          const pasoL = Math.min(190, Math.max(95, budget / letras.length));
+          const fsL = Math.min(panelW() * 0.5, H * 0.5);
+          letras.forEach((ch) => {
+            const d = document.createElement('div');
+            d.className = 'ed-letrona';
+            d.textContent = ch;
+            d.style.fontSize = fsL.toFixed(0) + 'px';
+            d.style.setProperty('--d', Math.round(delay) + 'ms');
+            // sin esto las letras se solapan: la clave del arreglo
+            d.style.setProperty('--dur', Math.round(pasoL) + 'ms');
+            delay += pasoL;
+            stack.appendChild(d);
+          });
+          delay += 120;
+        }
+
         const filasD = edFilas(words);
         const tamsD = edTamanos(filasD);
         filasD.forEach((fila, r) => {
@@ -1573,12 +1750,12 @@
       p.className = 'ed-frase ' + fx;
 
       /* tamaño con garantía de que TODA la frase quepa en el cuadro */
-      const H = lyricsEdit.clientHeight;
-      const Wutil = lyricsEdit.clientWidth * 0.85;
+      const H = panelH();
+      const Wutil = panelW() * 0.85;
       // tope proporcional a la altura: en el panel queda igual que siempre
       // (~36px), pero a pantalla completa (modo cine) crece con el espacio
-      const fcap = Math.max(36, lyricsEdit.clientHeight * 0.075);
-      let fsize = Math.max(18, Math.min(fcap, lyricsEdit.clientWidth / 15));
+      const fcap = Math.max(36, H * 0.075);
+      let fsize = Math.max(18, Math.min(fcap, panelW() / 15));
       const altoEstimado = () => {
         if (fx === 'ed-escalera' || fx === 'ed-poema') {
           // vertical: una palabra por renglón (renglón ≈ 1.7× por --fs y line-height)
@@ -1676,8 +1853,8 @@
       lyricsEdit.innerHTML = '<p class="lyrics-empty">Esta letra no está sincronizada — el modo edit necesita tiempos. Usa la vista ≡ lista.</p>';
     }
     activeIdx = -2;   // fuerza repintado inmediato de la vista elegida
-    const audio = window.PlayerCore && window.PlayerCore.audio;
-    if (audio && parsedLines.length) tick(audio.currentTime);
+    edIdx = -3;
+    repintarAhora();
   };
   if (modeBtn) {
     modeBtn.addEventListener('click', () => {
@@ -1843,9 +2020,26 @@
   window.addEventListener('resize', () => {
     clearTimeout(edResizeTimer);
     edResizeTimer = setTimeout(() => {
-      if ((editMode || forceEdit) && activeIdx >= 0) renderEdit(activeIdx);
+      if ((editMode || forceEdit) && activeIdx >= 0 && !labOpen) pintarEdit(activeIdx);
     }, 250);
   });
+
+  /* El panel cambia de tamaño también al VOLVER a la pestaña de letras: las
+     pestañas inactivas son display:none, o sea 0×0, y lo que se pintó
+     mientras estabas en buscar o en la cola salió con medidas de cero. El
+     vigilante de tick() lo arregla en cuanto suena el siguiente frame, pero
+     con la música en pausa no hay frames — de ahí este observador. */
+  if (window.ResizeObserver) {
+    let obsTimer = null;
+    new ResizeObserver(() => {
+      clearTimeout(obsTimer);
+      obsTimer = setTimeout(() => {
+        if (labOpen || !lyricsEdit.clientHeight) return;
+        if (!(editMode || forceEdit) || activeIdx < 0) return;
+        if (edPerdido(activeIdx)) pintarEdit(activeIdx);
+      }, 120);
+    }).observe(lyricsEdit);
+  }
 
   // Búsqueda binaria: antes se recorrían TODAS las líneas en cada frame.
   const buscarIdx = (t) => {
@@ -1901,21 +2095,42 @@
   };
 
   /* ---- Karaoke: la línea activa se va tiñendo palabra a palabra ----
-     El LRC solo trae el arranque de cada verso, así que el reparto va por
-     longitud (letras + 1 por palabra), que es la aproximación estándar y se
-     ve clavada. La palabra que suena AHORA lleva .cantando; las ya cantadas,
-     .sung. Solo se tocan clases, nunca se reconstruye el DOM. */
-  // reparto por longitud: lo comparten la vista lista y el modo edit
-  const repartir = (els) => {
+     La palabra que suena AHORA lleva .cantando; las ya cantadas, .sung.
+     Solo se tocan clases: nunca se reconstruye el DOM.
+
+     De dónde salen los tiempos, por orden de preferencia:
+       1. el propio LRC, si es «mejorado» y trae marca por palabra;
+       2. el reparto por SÍLABAS dentro de lo que dura cantado el verso.
+     Devuelve [{ el, s }] con s = fracción del verso en la que entra. */
+  const repartir = (els, idx) => {
     if (!els.length) return [];
+    const linea = idx >= 0 ? parsedLines[idx] : null;
+    const out = new Array(els.length);
+
+    // 1) tiempos por palabra del propio LRC (solo si cuadran uno a uno)
+    const wt = linea && linea.words;
+    if (wt && wt.length === els.length) {
+      const dur = duracionCantada(idx);
+      let ant = 0;
+      for (let i = 0; i < els.length; i++) {
+        // monótono y dentro del verso: una marca rara no descoloca el resto
+        const s = Math.max(ant, Math.min(1, (wt[i] - linea.time) / dur));
+        out[i] = { el: els[i], s };
+        ant = s;
+      }
+      return out;
+    }
+
+    // 2) reparto por sílabas, con un coste fijo de arranque por palabra
     const pesos = new Array(els.length);
     let total = 0;
     for (let i = 0; i < els.length; i++) {
-      const p = (els[i].textContent || '').trim().length + 1;
+      const txt = (els[i].textContent || '').trim();
+      // una sola letra (revelado letra a letra) pesa igual que las demás
+      const p = txt.length <= 1 ? 1 : silabas(txt) + 0.45;
       pesos[i] = p;
       total += p;
     }
-    const out = new Array(els.length);
     let acc = 0;
     for (let i = 0; i < els.length; i++) {
       out[i] = { el: els[i], s: acc / total };
@@ -1924,10 +2139,22 @@
     return out;
   };
 
-  const prepararKaraoke = (ln) =>
-    repartir(Array.prototype.slice.call(ln.querySelectorAll('.w')));
+  const prepararKaraoke = (ln, idx) =>
+    repartir(Array.prototype.slice.call(ln.querySelectorAll('.w')), idx);
 
   let kIdx = -1, kSpans = null, kNext = 0;
+
+  /* Olvida el verso que se estaba tiñendo. Lo llaman limpiarLetra() y
+     renderLines(), o sea cada vez que llega una letra nueva.
+
+     Hacía falta: `kIdx` se comparaba con el índice de línea, y al cambiar de
+     canción el índice vuelve a ser 0 — el mismo que ya estaba—, así que no
+     entraba por el reset y el karaoke seguía usando los spans de la canción
+     ANTERIOR, que ya no están en el documento. Resultado: el verso salía
+     activo pero sin teñirse nada, y no se recuperaba hasta que el índice daba
+     la casualidad de cambiar a otro valor. */
+  const karaokeOlvidar = () => { kIdx = -1; kSpans = null; kNext = 0; };
+
   const karaokeReset = () => {
     if (kSpans) {
       for (let i = 0; i < kSpans.length; i++) kSpans[i].el.classList.remove('sung', 'cantando');
@@ -1945,17 +2172,15 @@
       const cache = ln._kw;
       kSpans = (cache && (!cache.length || cache[0].el.isConnected))
         ? cache
-        : (ln._kw = prepararKaraoke(ln));
+        : (ln._kw = prepararKaraoke(ln, idx));
     }
     if (!kSpans.length) return;
 
     const ini = parsedLines[idx].time;
-    // 0.88: el verso se termina de cantar algo antes de que entre el siguiente
-    const p = (t - ini) / (duracionLinea(idx) * 0.88);
+    const p = (t - ini) / duracionCantada(idx);
     if (p < 0) return;
     if (kNext && p < kSpans[kNext - 1].s) karaokeReset();   // saltó hacia atrás
 
-    if (kNext >= kSpans.length) return;
     let cambio = false;
     while (kNext < kSpans.length && p >= kSpans[kNext].s) {
       kSpans[kNext].el.classList.add('sung');
@@ -1998,20 +2223,19 @@
       if (!els.length) els = Array.prototype.slice.call(stack.querySelectorAll('.ed-titulo'));
       // fuera los separadores en blanco que mete el tecleo de ed-maquina
       els = els.filter((e) => (e.textContent || '').trim());
-      stack._kw = repartir(els);
+      stack._kw = repartir(els, idx);
       if (stack._kw.length > 1) stack.classList.add('ed-kara');
     }
     const ks = stack._kw;
     // con una sola palabra/fila no hay karaoke que valga: se queda encendida
     if (ks.length < 2) return;
 
-    const p = (t - parsedLines[idx].time) / (duracionLinea(idx) * 0.88);
+    const p = (t - parsedLines[idx].time) / duracionCantada(idx);
     if (p < 0) return;
     if (stack._kn && p < ks[stack._kn - 1].s) {
       for (let i = 0; i < ks.length; i++) ks[i].el.classList.remove('sung', 'cantando');
       stack._kn = 0;
     }
-    if (stack._kn >= ks.length) return;
 
     let cambio = false;
     while (stack._kn < ks.length && p >= ks[stack._kn].s) {
@@ -2052,8 +2276,63 @@
     }
   };
 
+  /* ── VIGILANTE del modo edit ──
+     La vista de lista se sostiene sola: todos los versos están en el DOM. La
+     de edit no: pinta UN verso y, si esa pintada se pierde, el panel se queda
+     en blanco hasta el verso siguiente (o para siempre, si la canción ya no
+     cambia de línea). Se perdía por varios caminos —renderLines() vacía
+     #lyricsEdit al llegar una letra nueva sin que cambie el índice, el cine
+     mueve el nodo de sitio, una salida se llevó el stack, o la pintada se
+     midió con la pestaña tapada—, y la única forma de recuperarlo era lo que
+     hacía el usuario: cambiar a lista y volver.
+     Ahora se comprueba en cada frame y se repinta solo. Barato: solo mira el
+     DOM, y únicamente mide el panel si la última pintada se hizo a ciegas. */
+  let edChequeo = 0;   // último sondeo de la comprobación que mide (ver abajo)
+  const edPerdido = (idx) => {
+    if (edIdx !== idx) return true;                       // lo pintado es de otra línea
+    if (!edStack || !edStack.isConnected) return true;    // ya no está en el documento
+    if (edStack.parentNode !== lyricsEdit) return true;   // el cine se lo llevó
+    if (edStack.dataset.out) return true;                 // marcado para irse, sin relevo
+    /* ¿vuelve a haber panel tras una pintada a ciegas? Esta es la ÚNICA
+       comprobación que mide, y medir obliga al navegador a rehacer el layout:
+       se sondea 4 veces por segundo, no 60. */
+    if (edMedidoVacio) {
+      const ahora = performance.now();
+      if (ahora - edChequeo > 250) {
+        edChequeo = ahora;
+        if (lyricsEdit.clientHeight) return true;
+      }
+    }
+    return false;
+  };
+
+  /* Si una rama del motor de efectos falla, el verso NO puede desaparecer:
+     se pone el texto pelado y la canción sigue. */
+  const edRespaldo = (i) => {
+    lyricsEdit.querySelectorAll('.ed-stack, .ed-fondo').forEach(v => v.remove());
+    const stack = document.createElement('div');
+    stack.className = 'ed-stack';
+    const p = document.createElement('div');
+    p.className = 'ed-frase';
+    p.style.fontSize = Math.max(18, Math.min(panelH() * 0.075, panelW() / 15)).toFixed(1) + 'px';
+    p.textContent = ((parsedLines[i] && parsedLines[i].text) || '').trim() || '♪';
+    stack.appendChild(p);
+    lyricsEdit.appendChild(stack);
+    edStack = stack;
+    edIdx = i;
+    edMedidoVacio = !lyricsEdit.clientHeight;
+  };
+
+  const pintarEdit = (i) => {
+    try { renderEdit(i); } catch (e) {
+      console.warn('[lyrics] falló el efecto de la línea', i, e);
+      try { edRespaldo(i); } catch (_) {}
+    }
+  };
+
   const tick = (currentTime) => {
     if (labOpen) return;   // el lab manda: la canción no pisa la demo
+    ultimoT = currentTime;   // la guardan applyMode / repintar / forceEdit
     if (!parsedLines.length || parsedLines[0].time < 0) return;
     // Apply user-adjustable offset: positive = letras se adelantan
     const t = currentTime + offset;
@@ -2066,7 +2345,7 @@
       /* MODO EDIT: solo la línea actual, gigante y con efectos
          (forceEdit = el modo cine lo activa sin tocar la preferencia) */
       if (modoEdit) {
-        if (idx >= 0) renderEdit(idx);
+        if (idx >= 0) pintarEdit(idx);
         else lyricsEdit.querySelectorAll('.ed-stack, .ed-fondo').forEach(v => {
           v.dataset.out = '1';
           v.classList.add('colapsa');
@@ -2075,6 +2354,8 @@
       } else {
         cambiarLinea(prev, idx);
       }
+    } else if (modoEdit && idx >= 0 && edPerdido(idx)) {
+      pintarEdit(idx);   // el vigilante: la pintada de esta línea se perdió
     }
 
     // Cada frame: el teñido palabra a palabra, en la vista que toque.
@@ -2196,16 +2477,21 @@
     repintar: () => {
       lyricsEdit.innerHTML = '';
       activeIdx = -2;
-      const audio = window.PlayerCore && window.PlayerCore.audio;
-      if (audio && parsedLines.length) tick(audio.currentTime);
+      edIdx = -3;
+      repintarAhora();
     },
-    // El modo cine fuerza el render tipo edit sin cambiar la preferencia
+
     forceEdit: (on) => {
       forceEdit = !!on;
       lyricsEdit.innerHTML = '';
-      activeIdx = -2;   // fuerza repintado inmediato
-      const audio = window.PlayerCore && window.PlayerCore.audio;
-      if (audio && parsedLines.length) tick(audio.currentTime);
+      activeIdx = -2;
+      edIdx = -3;
+      repintarAhora();
     },
   };
+
+
+
+
+
 })();

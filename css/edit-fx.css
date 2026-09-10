@@ -228,6 +228,15 @@
   14%  { opacity: 1; transform: scale(1)    translateY(0);      filter: none; }
   84%  { opacity: 1; transform: scale(1); filter: none; }
   100% { opacity: 0; transform: scale(0.97); filter: blur(3px); }
+}/* El último trozo entra igual pero NO se retira: se queda hasta que la
+   línea siguiente lo eche. Los turnos se reparten sobre lo que dura el
+   verso (7 s como mucho) y un verso puede durar mucho más —puente
+   instrumental, verso final con la cola de la canción—: sin esto el panel
+   se quedaba en blanco todo ese rato. */
+.ed-trozo.ed-trozo-fin { animation-name: ed-trozo-fin; }@keyframes ed-trozo-fin {
+  0%   { opacity: 0; transform: scale(1.14) translateY(0.06em); filter: blur(7px); }
+  14%  { opacity: 1; transform: scale(1)    translateY(0);      filter: none; }
+  100% { opacity: 1; transform: scale(1);                       filter: none; }
 }.ed-trozo .ed-pal {
   animation: none;               /* el turno lo lleva el trozo, no la palabra */
   opacity: 1;
@@ -879,7 +888,11 @@
   color: var(--accent);
   text-shadow: 0 0 20px var(--accent-glow), 0 0 60px var(--accent-glow),
                0.03em 0.03em 0 rgba(0, 0, 0, 0.6);
-  animation: ed-letrona 0.3s linear var(--d, 0ms) both;
+  /* La duración la pone lyrics.js (--dur = el paso del deletreo). Estaba
+     fija en 0,3 s con pasos de 0,10-0,17 s: cada letra seguía en pantalla
+     cuando entraba la siguiente, y como todas van al MISMO punto se veían
+     dos letronas superpuestas. Atada al paso, el relevo queda limpio. */
+  animation: ed-letrona var(--dur, 300ms) linear var(--d, 0ms) both;
   pointer-events: none;
 }@keyframes ed-letrona {
   0%   { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }

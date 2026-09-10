@@ -1041,7 +1041,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
 
 /* ----- KARAOKE: el verso activo se tiñe palabra a palabra -----
    El LRC solo marca el arranque de cada línea, así que lyrics.js reparte el
-   verso por longitud y va poniendo .sung / .cantando. Aquí solo se anima
+   verso por sílabas y va poniendo .sung / .cantando. Aquí solo se anima
    color y text-shadow: nada que dispare layout, y ni una sola capa nueva de
    composición sobre las que ya monta el revelado. */
 .lyrics-body.sync .lyric-line.active .w {
