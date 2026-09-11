@@ -36,7 +36,8 @@
   const clave = (t) => `${(t.artist || '').toLowerCase()}|||${(t.name || '').toLowerCase()}`;
 
   let actual = null;      // {fila, id, oidaBase, desde} de lo que suena ahora
-  let ticker = null;
+  let ticker = null;      // escribe en la base de datos cada 15 s
+  let contador = null;    // cuenta en memoria cada 2 s
 
   const ahoraSuena = () => {
     const PC = window.PlayerCore;
@@ -51,13 +52,21 @@
   /* Cuánto se ha oído. NO se usa la posición a secas: si adelantas al minuto
      3, la posición dice 180 s pero solo has oído unos segundos. Se acumula el
      tiempo real transcurrido mientras sonaba. */
+  let sonaba = false;
   const acumular = () => {
     if (!actual) return;
     const ahora = performance.now();
-    if (actual.desde != null && ahoraSuena()) {
+    /* Si VENÍA sonando, el tramo hasta este instante se oyó — aunque justo
+       ahora ya esté en pausa. Esto es lo que antes se perdía: el evento
+       `pause` llega cuando el audio YA se paró, así que `ahoraSuena()` era
+       false y el rato desde la última cuenta se tiraba entero. Con una
+       canción pausada a mitad eso bastaba para dejarla en 0 segundos oídos,
+       marcarla como saltada y que no apareciera nunca en las estadísticas. */
+    if (actual.desde != null && (ahoraSuena() || sonaba)) {
       actual.oida += (ahora - actual.desde) / 1000;
     }
-    actual.desde = ahoraSuena() ? ahora : null;
+    sonaba = ahoraSuena();
+    actual.desde = sonaba ? ahora : null;
   };
 
   const cerrar = async () => {
@@ -130,7 +139,22 @@
     const PC = window.PlayerCore;
     if (!PC || !PC.onTrack) { setTimeout(arrancar, 300); return; }
     PC.onTrack(alCambiar);
+    /* Contar es barato (una resta en memoria); escribir en la base de datos
+       no. Así que se cuenta cada dos segundos y se escribe cada quince.
+       Antes solo se contaba al escribir, y con eso cualquier pausa se tragaba
+       hasta 15 s de escucha. */
+    contador = setInterval(acumular, 2000);
     ticker = setInterval(guardarProgreso, 15000);
+    /* Y en el momento exacto de la pausa, sin esperar al tic: es el caso que
+       más se nota, porque quien pausa muchas veces se va. Con Spotify Connect
+       no hay <audio> al que escuchar — allí basta el contador de arriba. */
+    if (PC.audio && PC.audio.addEventListener) {
+      PC.audio.addEventListener('play', acumular);
+      /* Al pausar no basta con contar: hay que ESCRIBIR. Quien pausa muchas
+         veces cierra la pestaña ahí mismo, y el siguiente guardado periódico
+         no llega nunca. */
+      ['pause', 'ended'].forEach((ev) => PC.audio.addEventListener(ev, guardarProgreso));
+    }
     // Al cerrar o al esconder la pestaña, apuntar lo que llevaba oído
     window.addEventListener('pagehide', guardarProgreso);
     document.addEventListener('visibilitychange', () => { if (document.hidden) guardarProgreso(); });

@@ -105,6 +105,28 @@ a { color: var(--accent); text-decoration: none; }
   max-height: calc(100vh - 40px);
 }
 
+/* ==========================================================
+   LA VENTANA MANDA SOBRE SUS HIJOS, NO AL REVÉS
+
+   Las cuatro filas de la ventana (título, rejilla, controles y barra de
+   estado) son celdas de una rejilla, y una celda NO se encoge por debajo
+   de su contenido mientras no se le diga: `min-width: auto` es el valor
+   de fábrica. La barra de estado —mini-EQ + mensaje + ⌕ buscar + el
+   dispositivo + el reloj, todo en una línea— pedía 548 px de mínimo, así
+   que en cuanto la ventana era más estrecha que eso estiraba la columna
+   entera a 548 y el resto de la app se salía por la derecha… donde
+   `overflow: hidden` la cortaba en seco. En el móvil eso se comía el
+   reloj, el engranaje, la mitad de los controles y la barra de pestañas:
+   la app salía recortada y no había forma de llegar a lo cortado.
+
+   Con `min-width: 0` la celda puede encogerse y es cada fila la que
+   recorta lo suyo (la barra de estado ya lleva su propio `overflow` y sus
+   puntos suspensivos). Vale para las cuatro, no solo para la culpable de
+   hoy: cualquier fila a la que le crezca el contenido volvería a estirar
+   la ventana igual.
+   ========================================================== */
+.window > * { min-width: 0; }
+
 /* Manija de redimensión (esquina inferior derecha) más visible y "retro" */
 .window::after {
   content: "";
@@ -3176,6 +3198,10 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
   body { padding: 6px; align-items: stretch; }
   .window {
     width: 100%;
+    /* El `max-width: calc(100vw - 40px)` de escritorio deja 20 px de aire a
+       cada lado, que en un móvil de 390 px son 40 px de pantalla tirados y
+       una ventana más estrecha que el `width: 100%` de aquí arriba. */
+    max-width: 100%;
     height: calc(100vh - 12px);
     height: calc(100dvh - 12px);
   }

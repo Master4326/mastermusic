@@ -81,6 +81,34 @@
     return result.sort((a, b) => a.time - b.time);
   };
 
+  /* Reparte el `hidden` entre las dos vistas (lista y edit) según quién
+     manda ahora en el panel. Lo llama TODO el que enciende o apaga una de
+     las escenas de fuera, no solo applyMode().
+
+     AQUÍ ESTABA EL FALLO. Encender la escena NCS tapaba las dos vistas,
+     pero apagarla NO las destapaba: el reparto vivía únicamente dentro de
+     applyMode(), y ni renderLines() ni setEmpty() lo llamaban. O sea que
+     bastaba UNA canción sin letra para que el panel se quedara en blanco
+     el resto de la sesión: la letra de las siguientes se pedía, llegaba y
+     se pintaba… dentro de un elemento con `hidden` puesto. Se veía como
+     «desde que sale el efecto ya no sale la letra de ninguna», y solo
+     volvía tocando el botón de modo (✦/≡), que sí llama a applyMode().
+
+     Declaración `function` a propósito, igual que repintarAhora(): setIdle()
+     corre al arrancar el módulo, antes de que existan las const de abajo. */
+  function repartirHidden() {
+    /* Ni lista ni edit cuando manda una escena de las que van por fuera:
+       el reposo (sin canción) o la escena NCS (canción sin letra). */
+    const fuera = idleOn || ncsOn;
+    /* `forceEdit` cuenta igual que la preferencia, como en tick(): el modo
+       cine pinta en #lyricsEdit sin tocar `editMode`, así que sin esto un
+       cambio de canción con el cine abierto y la vista lista elegida
+       escondía la letra DENTRO del propio cine. */
+    const edit = editMode || forceEdit;
+    lyricsBody.hidden = fuera || edit;
+    lyricsEdit.hidden = fuera || !edit;
+  }
+
   /* ---- Estado en reposo (sin canción) ----
      Se muestra en los DOS modos: antes vivía dentro de #lyricsBody, que el
      modo edit oculta, y el panel quedaba en blanco. */
@@ -90,7 +118,8 @@
     idleOn = !!on;
     lyricsIdle.hidden = !idleOn;
     // mientras el reposo manda, ninguna de las dos vistas ocupa sitio
-    if (idleOn) { lyricsBody.hidden = true; lyricsEdit.hidden = true; setNcs(false); }
+    if (idleOn) setNcs(false);
+    repartirHidden();
   };
 
   /* ---- Escena de las canciones sin letra (estilo NCS, js/ncs.js) ----
@@ -103,6 +132,10 @@
     if (on && !S) return false;
     ncsOn = !!on;
     if (S) { if (ncsOn) S.mostrar(); else S.ocultar(); }
+    /* Encenderla tapa las dos vistas y apagarla las devuelve: el reparto va
+       AQUÍ, pegado al cambio de estado, y no en el que llame de turno —
+       apagarla y olvidarse de destapar es justo el bug que hubo. */
+    repartirHidden();
     return true;
   };
 
@@ -234,6 +267,26 @@
   // respondió "no existe" (404 u otro 4xx), o lanza si la red falla de verdad.
   // Timeout holgado: LRClib responde lento (~7s medidos), pero una petición
   // colgada de verdad se corta a los 12s y se reintenta.
+  /* ---- FRENO ANTE EL 429 DE LRCLIB ----
+
+     Un 429 dice literalmente «me estás pidiendo demasiado». La app hacía justo
+     lo contrario de lo que toca: reintentaba tres veces CADA petición y
+     volvía a empezar de cero cada 3 s. Medido: **84 peticiones en 60 s para
+     una sola canción**, y sin parar nunca. Así el castigo no se suelta jamás
+     y la letra deja de salir para el resto de la sesión — que es exactamente
+     lo que se veía: «llega un punto en que ya no sale la letra».
+
+     Pasó lo mismo con la API de Spotify en la v87 y la lección es la misma:
+     cuando el servidor dice «para», se para. `frenoHasta` es del módulo
+     entero a propósito — si LRClib frena, frena para TODAS las canciones, no
+     solo para la que se llevó el 429. */
+  let frenoHasta = 0;
+  const FRENO_DEF = 20;          // segundos, si el servidor no dice otra cosa
+  const RETRY_MIN = 3000;
+  const RETRY_MAX = 60000;
+  let esperaRetry = RETRY_MIN;   // reintento de red normal: 3s, 6, 12, 24, 48, 60…
+  const frenado = () => Date.now() < frenoHasta;
+
   const fetchJSON = async (url, { signal, retries = 2, timeout = 12000 } = {}) => {
     let lastErr = null;
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -245,7 +298,17 @@
       try {
         const res = await fetch(url, { signal: inner.signal });
         if (res.status === 404) return { notFound: true };
-        if (res.status === 429 || res.status >= 500) {
+        if (res.status === 429) {
+          /* Ni un intento más de esta misma petición: reintentar un 429 es
+             precisamente lo que lo mantiene encendido. `Retry-After` viene en
+             segundos cuando viene; si no, se esperan 20. */
+          const cab = parseInt(res.headers.get('Retry-After'), 10);
+          frenoHasta = Date.now() + Math.max(5000, (Number.isFinite(cab) ? cab : FRENO_DEF) * 1000);
+          const err = new Error('HTTP 429');
+          err.frenado = true;
+          throw err;
+        }
+        if (res.status >= 500) {
           lastErr = new Error('HTTP ' + res.status);   // transitorio → reintentar
         } else if (!res.ok) {
           return { notFound: true };                   // otro 4xx → sin resultado
@@ -256,6 +319,7 @@
         // AbortError del signal externo = canción reemplazada → propagar.
         // AbortError por timeout propio = intento lento → reintentar.
         if (signal && signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        if (e && e.frenado) throw e;   // el 429 sale por aquí: no se reintenta
         lastErr = e;
       } finally {
         clearTimeout(tId);
@@ -435,6 +499,8 @@
     clearTimeout(prefetchTimer);
     prefetchTimer = setTimeout(() => {
       try {
+        // Adelantar la siguiente es un lujo: si LRClib está frenando, ni eso.
+        if (frenado()) return;
         const st = window.PlayerCore && window.PlayerCore.state;
         if (!st || !Array.isArray(st.queue) || !st.queue.length) return;
         const nextPos = (st.queueIndex + 1) % st.queue.length;
@@ -450,12 +516,18 @@
     }, 4000);   // espera a que la búsqueda de la canción actual termine
   };
 
-  const fetchLyrics = async (track) => {
+  /* `forzar` lo usa SOLO el reintento programado de aquí abajo. Antes, para
+     poder reintentar la misma canción, se ponía `lastTrackKey = null`… y eso
+     abría la puerta de par en par: spotify.js pregunta por la canción actual
+     cada 2 s, así que con la clave borrada cada sondeo lanzaba una búsqueda
+     entera (6 peticiones) además del reintento. Con la clave intacta, el
+     único que puede reintentar es el temporizador, y manda el backoff. */
+  const fetchLyrics = async (track, forzar) => {
     const key = trackKey(track);
     // hay canción: se acabó el reposo (antes del corte por clave repetida,
     // para que reentrar en la misma pista también apague el panel de reposo)
     if (idleOn) { setIdle(false); applyMode(); }
-    if (key === lastTrackKey) return;   // misma canción ya resuelta: no parpadear
+    if (key === lastTrackKey && !forzar) return;   // misma canción ya resuelta: no parpadear
     lastTrackKey = key;
     songSalt = hashStr(key);   // secuencia de efectos propia de esta canción
 
@@ -481,11 +553,20 @@
       return;
     }
 
+    /* Si LRClib nos está frenando, no se le pide NADA hasta que pase el
+       castigo — ni siquiera de otra canción. Se dice en pantalla (mejor eso
+       que un «buscando…» eterno) y se programa un único reintento. */
+    if (frenado()) {
+      reintentarLuego(key, myReq, frenoHasta - Date.now(), true);
+      return;
+    }
+
     setEmpty('Buscando letra…');
 
     try {
       const lyricsData = await resolveLyrics(track, controller.signal);
       if (!isCurrent()) return;
+      esperaRetry = RETRY_MIN;       // salió bien: la espera vuelve a empezar
       cachePut(key, lyricsData);
       if (lyricsData) apply(lyricsData);
       else setSinLetra();
@@ -493,18 +574,34 @@
     } catch (e) {
       if (e && e.name === 'AbortError') return;   // reemplazada por otra canción: no tocar nada
       if (!isCurrent()) return;
-      // Fallo persistente de red. Permite reintentar y prográmalo una vez más,
-      // por si la conexión vuelve, siempre que sigamos en la misma canción.
-      setEmpty('Sin conexión para buscar letra. Reintentando…');
-      lastTrackKey = null;
-      retryTimer = setTimeout(() => {
-        const cur = window.PlayerCore && window.PlayerCore.state && window.PlayerCore.state.currentTrack;
-        if (myReq === reqSeq && cur && `${cur.artist}|||${cur.name}` === key) {
-          fetchLyrics(cur);
-        }
-      }, 3000);
+      if (e && e.frenado) {
+        reintentarLuego(key, myReq, Math.max(1000, frenoHasta - Date.now()), true);
+        return;
+      }
+      /* Fallo persistente de red. Se reintenta, pero cada vez más espaciado:
+         a 3 s fijos, una caída larga son 20 rondas por minuto contra un
+         servidor que no está. */
+      reintentarLuego(key, myReq, esperaRetry, false);
+      esperaRetry = Math.min(RETRY_MAX, esperaRetry * 2);
     }
   };
+
+  /* Un único reintento programado, con su aviso en pantalla. Nadie más vuelve
+     a pedir esta canción mientras tanto: la clave sigue puesta y el reintento
+     entra con `forzar`. */
+  function reintentarLuego(key, myReq, espera, esFreno) {
+    const seg = Math.max(1, Math.ceil(espera / 1000));
+    setEmpty(esFreno
+      ? `LRClib nos está frenando (demasiadas búsquedas) · reintento en ${seg} s`
+      : `Sin conexión para buscar letra · reintento en ${seg} s`);
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => {
+      const cur = window.PlayerCore && window.PlayerCore.state && window.PlayerCore.state.currentTrack;
+      if (myReq === reqSeq && cur && `${cur.artist}|||${cur.name}` === key) {
+        fetchLyrics(cur, true);
+      }
+    }, espera);
+  }
 
   const apply = (data) => {
     if (!data) return setSinLetra();
@@ -1845,11 +1942,7 @@
 
   /* ── alternar lista ↔ edit ── */
   const applyMode = () => {
-    /* Ni lista ni edit cuando manda una escena de las que van por fuera:
-       el reposo (sin canción) o la escena NCS (canción sin letra). */
-    const fuera = idleOn || ncsOn;
-    lyricsBody.hidden = fuera || editMode;
-    lyricsEdit.hidden = fuera || !editMode;
+    repartirHidden();   // la regla de quién ocupa el panel vive en un solo sitio
     modeBtn.textContent = editMode ? '≡' : '✦';
     modeBtn.title = editMode ? 'Volver a vista lista' : 'Modo edit (letra animada)';
     modeBtn.classList.toggle('on', editMode);

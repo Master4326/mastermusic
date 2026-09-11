@@ -1058,26 +1058,56 @@
   const winEl = document.querySelector('.window');
   const SIZE_KEY = 'mm_window_size';
 
-  // Restaura el tamaño que el usuario haya elegido antes
+  /* Hasta aquí se guardaba CUALQUIER cambio de tamaño, incluido el que hace
+     el propio navegador al estrecharse. Bastaba con encoger la ventana del
+     navegador una vez —o abrir la página en el móvil— para que la app se
+     quedara clavada en ese tamaño PARA SIEMPRE, también al volver a la
+     pantalla grande. Lo guardado por aquel código no se distingue de lo
+     elegido a mano, así que se tira una sola vez y se empieza de cero. */
+  const SIZE_LIMPIO = 'mm_window_size_v2';
   try {
-    const saved = JSON.parse(localStorage.getItem(SIZE_KEY) || 'null');
-    if (saved && saved.w && saved.h) {
-      winEl.style.width = saved.w + 'px';
-      winEl.style.height = saved.h + 'px';
+    if (!localStorage.getItem(SIZE_LIMPIO)) {
+      localStorage.removeItem(SIZE_KEY);
+      localStorage.setItem(SIZE_LIMPIO, '1');
     }
   } catch (_) {}
 
-  // Guarda el tamaño cada vez que el usuario arrastra la esquina
+  /* Restaura el tamaño que el usuario haya elegido antes, pero sin pasarse
+     de la pantalla de AHORA: lo que cabía en el monitor grande no cabe en el
+     portátil. Y en móvil no se restaura nada — allí manda la hoja de estilos
+     (`width: 100%`), que es la que sabe repartir el sitio. */
+  const CORTE_MOVIL = 760;   // el mismo del @media de style.css
+  try {
+    const saved = JSON.parse(localStorage.getItem(SIZE_KEY) || 'null');
+    if (saved && saved.w && saved.h && window.innerWidth > CORTE_MOVIL) {
+      winEl.style.width = Math.min(saved.w, window.innerWidth - 40) + 'px';
+      winEl.style.height = Math.min(saved.h, window.innerHeight - 40) + 'px';
+    }
+  } catch (_) {}
+
+  /* Guarda el tamaño cuando el usuario arrastra la esquina — y SOLO entonces.
+     La pista para distinguirlo: si la ventana cambia de tamaño a la vez que
+     la del navegador, no lo ha pedido nadie; es el `width: min(1080px, 100%)`
+     del CSS haciendo su trabajo, y congelarlo en píxeles se carga justo eso.
+     También se ignora la primera medición, que es el tamaño de fábrica. */
   if ('ResizeObserver' in window) {
     let saveTimer = null;
+    let primera = true;
+    let ultimoResizeNavegador = 0;
+    window.addEventListener('resize', () => { ultimoResizeNavegador = Date.now(); }, { passive: true });
     new ResizeObserver(() => {
+      if (primera) { primera = false; return; }
       if (winEl.classList.contains('maximized')) return;
+      if (Date.now() - ultimoResizeNavegador < 600) return;
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
-        localStorage.setItem(SIZE_KEY, JSON.stringify({
-          w: Math.round(winEl.offsetWidth),
-          h: Math.round(winEl.offsetHeight)
-        }));
+        if (Date.now() - ultimoResizeNavegador < 600) return;
+        try {
+          localStorage.setItem(SIZE_KEY, JSON.stringify({
+            w: Math.round(winEl.offsetWidth),
+            h: Math.round(winEl.offsetHeight)
+          }));
+        } catch (_) {}
       }, 250);
     }).observe(winEl);
   }
