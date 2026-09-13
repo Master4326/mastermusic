@@ -37,6 +37,7 @@
   let offsets = {};
   try { offsets = JSON.parse(localStorage.getItem('mm_lyrics_offsets') || '{}') || {}; } catch (_) { offsets = {}; }
   let offset = defaultOffset;
+
   let reqSeq = 0;             // se incrementa por petición; solo la última puede tocar la UI
   let activeController = null; // AbortController de la petición en curso
   let retryTimer = null;      // reintento diferido ante fallos de red
@@ -366,8 +367,13 @@
      código tienen texto plano y nada más, y no hay forma de distinguir «esta
      canción no tiene sincronía» de «se eligió mal». Así que las que no traen
      tiempos y son de antes de v2 se vuelven a pedir UNA vez; luego se guardan
-     ya marcadas y no se repite la consulta. */
-  const CACHE_V = 2;
+     ya marcadas y no se repite la consulta.
+
+     v3 (2026-09-13): el emparejado cambió entero (ahora puntúa versión,
+     etiqueta e idioma en vez de quedarse con «la que dure parecido»), así
+     que lo guardado por el motor viejo puede ser justo la versión
+     equivocada que se venía a arreglar: se tira y se vuelve a pedir. */
+  const CACHE_V = 3;
 
   const cacheGet = (key) => {
     const e = cache[key];
@@ -376,7 +382,7 @@
       if (Date.now() - (e.ts || 0) > NF_TTL) { delete cache[key]; return null; }
       return { notFound: true };
     }
-    if (!e.s && e.v !== CACHE_V) { delete cache[key]; return null; }   // ver CACHE_V
+    if (e.v !== CACHE_V) { delete cache[key]; return null; }   // ver CACHE_V
     e.ts = Date.now();   // toque LRU; se persiste en el próximo cacheSave
     return { syncedLyrics: e.s || null, plainLyrics: e.p || null };
   };
@@ -395,105 +401,298 @@
 
   const trackKey = (track) => `${track.artist}|||${track.name}`;
 
-  // Resuelve la letra de una pista contra LRClib. Las dos peticiones (match
-  // exacto y búsqueda difusa) salen EN PARALELO: si el match exacto acierta
-  // se usa ese; si no, la búsqueda ya viene en camino y no se espera doble.
-  // Devuelve el objeto de letra o null si no hay.
+  /* ==========================================================
+     EMPAREJADO: de la canción que suena a la ficha de LRClib
+
+     LRClib no es una base de datos limpia: para una canción hay 20 fichas
+     subidas por gente distinta, con el título escrito de diez maneras, el
+     álbum de un recopilatorio cualquiera y —lo importante— tiempos que no
+     siempre son los del máster que estás oyendo. Elegir mal tiene dos caras,
+     que son exactamente las dos quejas:
+       · «no es la misma letra» → se coló otra VERSIÓN (la española en vez de
+         la inglesa, el remix en vez del original, el directo en vez del
+         estudio). Antes pasaba porque el título se limpiaba DEMASIADO: la
+         búsqueda de «Bailando (English Version)» salía como «Bailando» y
+         LRClib devolvía, claro, la española.
+       · «no sincroniza» → dos fichas duran lo mismo pero una arranca 8 s
+         después que la otra (medido: hasta 7.9 s de diferencia entre fichas
+         de la MISMA duración). Elegir por duración a secas es tirar una
+         moneda.
+     Así que aquí no se elige «la primera que dure parecido»: se puntúan
+     todas las candidatas por duración, título, artista, álbum, etiqueta de
+     versión e idioma, y se desempata por consenso de arranque.
+     ========================================================== */
+
+  const normTxt = (s) => String(s == null ? '' : s).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[’'`´]/g, "'")
+    .replace(/[^a-z0-9' ]+/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+
+  /* Etiquetas de versión: lo que cambia la letra o los tiempos y por tanto
+     NO se puede tirar del título al buscar. */
+  const ETIQUETAS = [
+    ['english',      /\b(english|ingles)\b/],
+    ['spanish',      /\b(spanish|espanol|castellano)\b/],
+    ['portuguese',   /\b(portugues|portuguese|brazilian)\b/],
+    ['remix',        /\b(remix|rmx)\b/],
+    ['live',         /\b(live|en vivo|en directo|unplugged|mtv)\b/],
+    ['acoustic',     /\b(acoustic|acustic[ao])\b/],
+    ['spedup',       /\b(sped ?up|speed ?up|acelerad[ao]|nightcore)\b/],
+    ['slowed',       /\b(slowed|ralentizad[ao])\b/],
+    ['instrumental', /\b(instrumental)\b/],
+    ['karaoke',      /\b(karaoke|playback)\b/],
+    ['demo',         /\b(demo)\b/],
+    ['radioedit',    /\b(radio edit|radio version)\b/],
+    ['extended',     /\b(extended|club mix|dance mix)\b/],
+    ['cover',        /\b(cover|tribute)\b/],
+    ['orchestral',   /\b(orchestral|symphonic|sinfonic[ao])\b/],
+  ];
+  /* Las que REHACEN el arreglo mueven todos los tiempos: confundirlas es
+     peor que confundir un «radio edit» con su original. */
+  const ETIQ_REHACE = new Set(['remix', 'live', 'spedup', 'slowed', 'instrumental', 'karaoke', 'cover', 'acoustic', 'orchestral']);
+
+  /* Adornos que NO cambian ni una sílaba: fuera del título para buscar. */
+  const RUIDO = /\s*[\(\[][^)\]]*\b(feat|ft|featuring|with|con|remaster(ed)?|remasterizad[ao]|bonus|album version|original mix|explicit|clean|edicion|edition|deluxe|expanded|anniversary|reissue|mono|stereo|single version)\b[^)\]]*[\)\]]/gi;
+  const RUIDO_GUION = /\s+-\s+(feat|ft|featuring|with|con|remaster(ed)?\b.*|remasterizad[ao].*|bonus.*|album version|original mix|explicit|deluxe.*|expanded.*|anniversary.*|reissue.*|mono|stereo|single version)\s*.*$/i;
+
+  const etiquetasDe = (txt) => {
+    const t = normTxt(txt);
+    const out = [];
+    for (const [nombre, re] of ETIQUETAS) if (re.test(t)) out.push(nombre);
+    return out;
+  };
+
+  /* Parte el título en «qué canción es» (base), «cómo buscarla» (limpio, que
+     conserva la etiqueta de versión) y «qué versión es» (tags). */
+  const partirTitulo = (nombre) => {
+    const crudo = String(nombre || '');
+    const tags = etiquetasDe(crudo);   // se leen del título ENTERO, antes de limpiar
+    let limpio = crudo.replace(RUIDO, ' ').replace(RUIDO_GUION, ' ').replace(/\s+/g, ' ').trim() || crudo;
+    let base = limpio;
+    for (const [, re] of ETIQUETAS) {
+      base = base.replace(new RegExp('\\s*[\\(\\[][^)\\]]*' + re.source + '[^)\\]]*[\\)\\]]', 'gi'), ' ');
+    }
+    base = base.replace(/\s+-\s+.*$/, '').replace(/\s+/g, ' ').trim() || limpio;
+    return { limpio, base, tags };
+  };
+
+  // Spotify manda TODOS los artistas juntos ("A, B, C"); LRClib los escribe
+  // de diez formas distintas. Se comparan como conjuntos.
+  const artistasDe = (s) => String(s || '')
+    .split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b|\bcon\b|\//i)
+    .map((a) => normTxt(a)).filter(Boolean);
+
+  const fichas = (s) => normTxt(s).split(' ').filter(Boolean);
+  const dice = (a, b) => {
+    const A = fichas(a), B = new Set(fichas(b));
+    if (!A.length || !B.size) return 0;
+    let comunes = 0;
+    for (const t of A) if (B.has(t)) comunes++;
+    return (2 * comunes) / (A.length + B.size);
+  };
+
+  /* Idioma por palabras de función. Solo hace falta distinguir español de
+     inglés, y solo cuando el título pide uno de los dos a propósito. */
+  const ES_W = new Set('que de la el y no me te con por para mi tu se es un una como mas pero yo su lo los las en al del si ya cuando donde todo nada quiero amor corazon vida noche'.split(' '));
+  const EN_W = new Set("the and you i me to of in it is my that on for be we your this all just like don't can't i'm love night baby know".split(' '));
+  const idiomaDe = (txt) => {
+    const pal = normTxt(String(txt || '').replace(/\[[^\]]*\]/g, ' ')).split(' ');
+    let es = 0, en = 0;
+    for (const p of pal) { if (ES_W.has(p)) es++; if (EN_W.has(p)) en++; }
+    if (es + en < 8) return null;            // poca señal: mejor no opinar
+    if (es > en * 1.6) return 'es';
+    if (en > es * 1.6) return 'en';
+    return null;                             // bilingüe o dudoso
+  };
+
+  // Segundo del primer verso CON texto: la firma de arranque de una ficha.
+  const primerVerso = (x) => {
+    const m = (x && x.syncedLyrics || '').match(/\[(\d+):(\d+)[.:](\d+)\]\s*\S/);
+    return m ? (+m[1] * 60 + +m[2] + +('0.' + m[3])) : null;
+  };
+
+  const puntuar = (cand, ctx) => {
+    const dur = +cand.duration || 0;
+    const dt = ctx.duration ? Math.abs(dur - ctx.duration) : 0;
+
+    // La duración es la señal más fiable que hay, pero no la única.
+    let sDur;
+    if (!ctx.duration || !dur) sDur = 0.5;
+    else if (dt <= 2) sDur = 1;
+    else if (dt <= 5) sDur = 0.8;
+    else if (dt <= 12) sDur = 0.45;
+    else if (dt <= 30) sDur = 0.12;
+    else sDur = 0;
+
+    const sTit = Math.max(dice(ctx.base, partirTitulo(cand.trackName || '').base),
+                          dice(ctx.base, cand.trackName || ''),
+                          // LRClib guarda muchas fichas como «Artista - Título»
+                          dice(ctx.base, (cand.trackName || '').split(/\s+-\s+/).pop()));
+
+    const artCand = artistasDe(cand.artistName || '');
+    let comunes = 0;
+    for (const a of ctx.artistas) if (artCand.some((b) => b.includes(a) || a.includes(b))) comunes++;
+    const sArt = ctx.artistas.length ? comunes / ctx.artistas.length : 0.5;
+
+    const sAlb = ctx.album
+      ? Math.max(dice(ctx.album, cand.albumName || ''),
+                 normTxt(cand.albumName || '').includes(normTxt(ctx.album)) ? 0.8 : 0)
+      : 0.3;
+
+    /* La etiqueta se busca en título Y álbum: media LRClib guarda la versión
+       inglesa como «Bailando» con álbum «Bailando (English Version)». */
+    const tagsCand = new Set(etiquetasDe(cand.trackName || '').concat(etiquetasDe(cand.albumName || '')));
+    let sTag = 1;
+    for (const t of ctx.tags) if (!tagsCand.has(t)) sTag -= 0.55;        // pedimos esa versión y no lo es
+    tagsCand.forEach((t) => {                                            // es una versión que no pedimos
+      if (ctx.tags.indexOf(t) === -1) sTag -= ETIQ_REHACE.has(t) ? 0.6 : 0.3;
+    });
+    sTag = Math.max(-1.5, sTag);
+
+    const sSync = cand.syncedLyrics ? 1 : (cand.instrumental ? 0.6 : 0);
+
+    let total = sDur * 3.2 + sTit * 1.6 + sArt * 1.2 + sAlb * 0.8 + sTag * 2.4 + sSync * 1.5;
+
+    // Guarda de idioma: «English Version» con letra en español está mal por
+    // mucho que dure lo mismo (es LITERALMENTE el caso que reportó el usuario).
+    if (ctx.tags.indexOf('english') >= 0 || ctx.tags.indexOf('spanish') >= 0) {
+      const quiere = ctx.tags.indexOf('english') >= 0 ? 'en' : 'es';
+      const tiene = idiomaDe(cand.syncedLyrics || cand.plainLyrics || '');
+      if (tiene && tiene !== quiere) total -= 4;
+      else if (tiene === quiere) total += 0.8;
+    }
+
+    return { cand, total, dt, sTit, sArt };
+  };
+
+  /* Desempate por consenso de arranque. Entre fichas que puntúan casi igual,
+     la que arranca en un segundo distinto al de todas las demás suele ser la
+     mal sincronizada (o la de otro máster): la mayoría manda. */
+  const consenso = (rank) => {
+    const cabeza = rank.filter((r) => r.total >= rank[0].total - 0.45 && r.cand.syncedLyrics);
+    if (cabeza.length < 3) return rank;
+    const t = cabeza.map((r) => primerVerso(r.cand)).filter((v) => v != null).sort((a, b) => a - b);
+    if (t.length < 3) return rank;
+    const med = t[Math.floor(t.length / 2)];
+    for (const r of rank) {
+      const p = primerVerso(r.cand);
+      if (p == null) continue;
+      const d = Math.abs(p - med);
+      if (d <= 0.6) r.total += 0.35;
+      else if (d > 3) r.total -= 0.5;
+    }
+    return rank.sort((a, b) => b.total - a.total);
+  };
+
+  /* Resuelve la letra de una pista contra LRClib. Las dos peticiones (ficha
+     exacta y búsqueda) salen EN PARALELO; la tercera —la red ancha— solo se
+     lanza si lo que ha llegado no convence, para no volver al 429.
+     Devuelve la ficha elegida de LRClib, o null si no hay nada. */
   const resolveLyrics = async (track, signal) => {
+    const { limpio, base, tags } = partirTitulo(track.name);
+    const ctx = {
+      base, tags,
+      artistas: artistasDe(track.artist),
+      album: track.album || '',
+      duration: +track.duration || 0,
+    };
+    const principal = (track.artist || '').split(',')[0].trim();
+
     const params = new URLSearchParams({
       track_name: track.name || '',
       artist_name: track.artist || '',
       album_name: track.album || '',
     });
     if (track.duration) params.append('duration', String(Math.round(track.duration)));
-    // Búsqueda difusa: Spotify manda TODOS los artistas juntos ("A, B, C") y
-    // títulos con "(feat. X)" / "- Remastered", que en LRClib no encuentran
-    // nada. Para la difusa: solo el artista principal y el título limpio.
-    const primaryArtist = (track.artist || '').split(',')[0].trim();
-    const cleanName = (track.name || '')
-      .replace(/\s*[\(\[][^)\]]*\b(feat|ft|with|remaster|version|edit|live|deluxe)\b[^)\]]*[\)\]]/gi, '')
-      .replace(/\s+-\s+(feat|ft|with|remaster(ed)?|version|edit|live|deluxe).*$/i, '')
-      .replace(/\s+/g, ' ').trim() || (track.name || '');
-    const sParams = new URLSearchParams({
-      track_name: cleanName,
-      artist_name: primaryArtist,
-    });
+    // OJO: la búsqueda va con el título limpio de adornos pero CON la etiqueta
+    // de versión. Quitarla era el bug de «Bailando (English Version)».
+    const sParams = new URLSearchParams({ track_name: limpio, artist_name: principal });
 
     const getP = fetchJSON(`https://lrclib.net/api/get?${params}`, { signal });
     const searchP = fetchJSON(`https://lrclib.net/api/search?${sParams}`, { signal });
-    searchP.catch(() => {});   // evita unhandledrejection si el exacto gana
+    getP.catch(() => {});      // cualquiera de las dos puede fallar sola:
+    searchP.catch(() => {});   // se recogen abajo, sin unhandledrejection
 
-    let lyricsData = null;
-    let planB = null;     // el exacto SIN tiempos: sirve solo si no hay nada mejor
-    let getErr = null;
+    const pool = [];
+    const vistos = new Set();
+    /* `ancha` marca lo que viene de la búsqueda por texto libre. Esa red es
+       ancha de verdad: pesca fichas con el título escrito de otra forma (lo
+       que se busca), pero también canciones que no tienen nada que ver. Por
+       eso se anota de dónde salió cada una y luego se le exige parecido. */
+    const meter = (x, ancha) => {
+      if (!x || x.id == null || vistos.has(x.id)) return;
+      if (!x.syncedLyrics && !x.plainLyrics && !x.instrumental) return;
+      vistos.add(x.id);
+      pool.push(ancha ? Object.assign({ __ancha: 1 }, x) : x);
+    };
+    /* Una ficha de la red ancha solo cuenta si el título se parece de verdad
+       (o si al menos el artista casa y el título no es de otro planeta). Sin
+       esto, una canción que NO tiene letra en LRClib acabaría enseñando la
+       letra de otra cosa, que es peor que decir «no hay». */
+    const creible = (r) => !r.cand.__ancha || r.sTit >= 0.45 || (r.sArt >= 0.5 && r.sTit >= 0.25);
+
+    let err = null;
     try {
       const got = await getP;
-      const d = (got && got.data) ? got.data : null;
-      /* SOLO nos quedamos con el resultado exacto si trae TIEMPOS (o si es un
-         instrumental, que entonces no hay nada que sincronizar).
-
-         Aquí estaba el fallo: LRClib tiene varias fichas por canción y la que
-         casa exacta con álbum y duración puede ser una que solo guarda el
-         texto plano. La app la aceptaba y se paraba ahí, sin llegar a mirar
-         la búsqueda — y salía «esta letra no está sincronizada» aunque LRClib
-         SÍ tuviera la letra con tiempos.
-         Caso real (San Lucas, de Kevin Kaarl): el exacto devuelve una ficha
-         sin sincronía, y la búsqueda trae 17 versiones CON sincronía, una de
-         ellas con la misma duración clavada. */
-      if (d && (d.syncedLyrics || d.instrumental)) lyricsData = d;
-      else planB = d;
+      if (got && got.data) meter(got.data);
     } catch (e) {
       if (e && e.name === 'AbortError') throw e;
-      getErr = e;   // el exacto falló de red; aún puede salvarnos la búsqueda
+      err = e;
+    }
+    try {
+      const s = await searchP;
+      if (s && Array.isArray(s.data)) s.data.forEach(meter);
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw e;
+      // si las DOS fallaron de red, que lo maneje el reintento de fetchLyrics
+      if (err && !pool.length) throw err;
+      if (!pool.length) throw e;
     }
 
-    if (!lyricsData) {
-      let s;
+    let rank = pool.map((c) => puntuar(c, ctx)).sort((a, b) => b.total - a.total);
+    const convence = (r) => r && r.total >= 6.5 && r.dt <= 12;
+
+    /* Red ancha: el buscador por texto libre encuentra las fichas con el
+       título escrito de otra forma («J Balvin, Willy William - Mi Gente ft.
+       Beyoncé»), que la búsqueda por campos no ve. Cuesta una petición, así
+       que solo sale cuando hace falta. */
+    if (!convence(rank[0])) {
       try {
-        s = await searchP;
+        const q = [principal, base].filter(Boolean).join(' ');
+        const rq = await fetchJSON(`https://lrclib.net/api/search?${new URLSearchParams({ q })}`, { signal });
+        if (rq && Array.isArray(rq.data)) rq.data.forEach((x) => meter(x, true));
+        rank = pool.map((c) => puntuar(c, ctx)).sort((a, b) => b.total - a.total).filter(creible);
       } catch (e) {
         if (e && e.name === 'AbortError') throw e;
-        if (planB) return planB;   // sin búsqueda, mejor el plano que nada
-        throw getErr || e;         // ambas fallaron → que lo maneje el reintento
-      }
-      const arr = s && s.data;
-      if (Array.isArray(arr) && arr.length) {
-        // Prefiere letra sincronizada Y con duración parecida a la pista real:
-        // un resultado de otra versión (remix, en vivo, radio edit) trae los
-        // tiempos corridos y la letra queda desfasada toda la canción.
-        const dur = +track.duration || 0;
-        const masCercano = (list) => {
-          if (!list.length) return null;
-          if (!dur) return list[0];
-          let best = list[0], bestDiff = Infinity;
-          for (const x of list) {
-            const diff = Math.abs((+x.duration || 0) - dur);
-            if (diff < bestDiff) { bestDiff = diff; best = x; }
-          }
-          return best;
-        };
-        const conTiempos = masCercano(arr.filter(x => x.syncedLyrics));
-        /* Si el exacto ya nos dio la letra (aunque sea plana) y lo único
-           sincronizado que hay dura MUY distinto, es otra versión: sus tiempos
-           irían corridos toda la canción y se leería peor que sin ellos. En
-           ese caso se queda el exacto. Con 30 s de margen esto casi nunca
-           salta — las duraciones de LRClib suelen ir clavadas — pero evita
-           pegarle a una canción los tiempos de un remix. */
-        const lejos = conTiempos && planB && dur
-          && Math.abs((+conTiempos.duration || 0) - dur) > 30;
-
-        lyricsData = (conTiempos && !lejos ? conTiempos : null)
-          || planB                                    // el exacto, aunque sea plano
-          || masCercano(arr.filter(x => x.plainLyrics))
-          || arr[0];
+        // la red ancha es un extra: si falla, nos quedamos con lo que había
       }
     }
-    return lyricsData || planB || null;
+
+    if (!rank.length) return null;
+    rank = consenso(rank);
+
+    // Entre el mejor y uno igual de bueno pero CON tiempos, mandan los tiempos.
+    const mejor = rank[0];
+    const conSync = rank.find((r) => r.cand.syncedLyrics);
+    const elegido = (!mejor.cand.syncedLyrics && conSync && conSync.total >= mejor.total - 1.2)
+      ? conSync : mejor;
+
+    return elegido.cand;
   };
 
-  // Precarga en caché la letra de la SIGUIENTE canción de la cola local,
-  // para que al cambiar de pista aparezca al instante. Silencioso: no toca
-  // la UI y cualquier fallo se ignora (se buscará normal cuando suene).
+  /* Deja la letra de UNA pista lista en la caché, sin tocar la pantalla.
+     Cualquier fallo se ignora: si no llegó, se pedirá cuando suene. */
+  const precargar = (t) => {
+    const key = trackKey(t);
+    if (cacheGet(key) !== null) return;      // ya está (o ya se sabe que no hay)
+    resolveLyrics(t, undefined)
+      .then((d) => cachePut(key, d))
+      .catch(() => {});
+  };
+
+  // Precarga la letra de la SIGUIENTE canción de la cola local, para que al
+  // cambiar de pista aparezca al instante.
   let prefetchTimer = null;
   const prefetchNext = () => {
     clearTimeout(prefetchTimer);
@@ -507,11 +706,7 @@
         if (nextPos === st.queueIndex) return;
         const nt = st.tracks[st.queue[nextPos]];
         if (!nt || nt.spotify) return;
-        const key = trackKey(nt);
-        if (cacheGet(key) !== null) return;
-        resolveLyrics(nt, undefined)
-          .then(d => cachePut(key, d))
-          .catch(() => {});
+        precargar(nt);
       } catch (_) {}
     }, 4000);   // espera a que la búsqueda de la canción actual termine
   };
@@ -2502,10 +2697,15 @@
       } else {
         localStorage.setItem('mm_lyrics_offset', String(offset));
       }
-      // Force re-evaluation immediately
+      // que el cambio se vea YA, sin esperar al próximo verso
       activeIdx = -2;
-      const audio = window.PlayerCore && window.PlayerCore.audio;
-      if (audio) tick(audio.currentTime);
+      /* Con el segundo que vio el último tick, NO con audio.currentTime: en
+         Spotify Connect la música no suena en el <audio> de la página, así
+         que ahí currentTime es 0 y ajustar la sincronía saltaba al primer
+         verso de la canción. Misma trampa que ya documenta `ultimoT`. */
+      repintarAhora();
+      // la UI del ajuste de config vive en seven.js: que se entere
+      window.dispatchEvent(new CustomEvent('mm:lyrics-offset', { detail: offset }));
     },
   };
 
@@ -2550,15 +2750,13 @@
        precarga no llegó, se pedirá normal cuando suene. */
     prefetch: (track) => {
       if (!track || !track.name || !track.artist) return;
-      const key = trackKey(track);
-      if (cacheGet(key) !== null) return;      // ya está (o ya se sabe que no hay)
-      resolveLyrics(track, undefined)
-        .then((d) => cachePut(key, d))
-        .catch(() => {});
+      if (frenado()) return;      // si LRClib nos frena, ni los lujos
+      precargar(track);
     },
     // ajustes → datos → limpiar caché (localStorage ya lo borra settings.js;
     // esto tira además la copia que este módulo tiene en memoria)
     clearCache: () => { cache = {}; },
+
     // Estado de sincronización (lo consume el modo cine)
     getSync: () => ({ lines: parsedLines, idx: activeIdx }),
     isEditMode: () => editMode,
