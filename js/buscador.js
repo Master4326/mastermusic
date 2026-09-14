@@ -196,6 +196,8 @@
       hacer: () => { const b = document.getElementById('cinemaBtn'); if (b) b.click(); } },
     { n: 'modo edit (letra animada)', alias: 'efectos tiktok', ico: '✦',
       hacer: () => { const b = document.getElementById('lyricsModeBtn'); if (b) b.click(); } },
+    { n: 'letra ancha', alias: 'esconder caratula portada ancho completo w', ico: '◧',
+      hacer: () => { const b = document.getElementById('anchoBtn'); if (b) b.click(); } },
     { n: 'silenciar', alias: 'mute volumen cero', ico: '🔇',
       hacer: () => {
         const st = PC() && PC().state;

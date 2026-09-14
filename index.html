@@ -50,6 +50,19 @@
         </div>
         <span class="title-text">MASTER MUSIC</span>
       </div>
+      <!-- AHORA SUENA · el chip que sustituye a la columna izquierda cuando
+           está puesta la LETRA ANCHA (botón ◧ o tecla W). Vive en la barra de
+           título a propósito: es la única barra que no se esconde nunca, así
+           que la carátula y el nombre siguen a la vista mientras la letra se
+           queda con el ancho entero. Pulsarlo devuelve la vista normal. -->
+      <button class="np-chip" id="npChip" hidden
+              title="Volver a la vista normal — la carátula regresa a su columna (W)">
+        <span class="npc-cover" id="npChipCover" aria-hidden="true">♪</span>
+        <span class="npc-meta">
+          <span class="npc-title" id="npChipTitle">Sin canción</span>
+          <span class="npc-artist" id="npChipArtist"></span>
+        </span>
+      </button>
       <div class="title-right">
         <button class="tb-btn" title="Minimizar">_</button>
         <button class="tb-btn" title="Maximizar">▢</button>
@@ -151,6 +164,12 @@
                  fantasma, aura tras la línea activa y ondas en cada golpe.
                  Todo por debajo del texto (z-index) y sin capturar clics. -->
             <div class="la-cover" id="laCover"></div>
+            <!-- ONDAS DE SONIDO estilo NCS · lo pinta js/fondo.js leyendo el
+                 espectro del visualizador y el ritmo de beat.js. Va justo
+                 encima de la carátula difuminada y por debajo de todo lo
+                 demás: esto es EL FONDO, no un adorno más. Lo enciende y lo
+                 apaga el ajuste «ambiente» de config ⚙. -->
+            <canvas class="la-ncs" id="laNcs" aria-hidden="true"></canvas>
             <div class="la-suelo" id="laSuelo"></div>
             <div class="la-eq" id="laEq"></div>
             <div class="la-circular" id="laCircular"></div>
@@ -359,6 +378,18 @@
 
           <div class="settings-block">
             <h3>~ apariencia ~</h3>
+            <!-- AMBIENTE · qué se ve por detrás de la letra. «ondas» es la
+                 escena nueva estilo NCS (js/fondo.js); «clásico» deja la
+                 carátula difuminada de siempre; «liso» apaga las dos. -->
+            <div class="set-row">
+              <span class="set-label">ambiente</span>
+              <div class="seg" data-set="ambiente"
+                   title="Lo que se ve detrás de la letra: ondas de sonido estilo NCS, la carátula difuminada de siempre, o nada.">
+                <button class="seg-btn" data-val="ondas">ondas</button>
+                <button class="seg-btn" data-val="clasico">clásico</button>
+                <button class="seg-btn" data-val="liso">liso</button>
+              </div>
+            </div>
             <div class="set-row">
               <span class="set-label">pantalla crt</span>
               <div class="seg" data-set="crt">
@@ -544,6 +575,7 @@
               <kbd>M</kbd><span>silenciar</span>
               <kbd>1 … 6</kbd><span>cambiar de pestaña</span>
               <kbd>L</kbd><span>letra</span>
+              <kbd>W</kbd><span>letra ancha (esconde la carátula)</span>
               <kbd>F</kbd><span>buscar en spotify</span>
               <kbd>B</kbd><span>listas</span>
               <kbd>Q</kbd><span>cola</span>
@@ -646,6 +678,13 @@
               </g>
             </svg>
           </button>
+          <!-- LETRA ANCHA · esconde la columna de la carátula y deja el panel
+               entero para la letra. La carátula y el nombre no se pierden: se
+               mudan al chip de la barra de título. Va aquí, con ✦ y ⛶, porque
+               es lo mismo que ellos —una forma de ver— y porque así el panel
+               de la letra se queda limpio. -->
+          <button class="ctrl-btn vol-btn side-btn" id="anchoBtn"
+                  title="Letra ancha: esconde la carátula y deja todo el ancho para la letra (W)">◧</button>
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" title="Modo edit (letra animada)">✦</button>
           <!-- ⚗ Lab de efectos DESACTIVADO por ahora (quitar "hidden" para reactivar; el código en lyrics.js queda intacto) -->
           <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn" title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
@@ -809,6 +848,9 @@
   <script defer src="js/ambient.js"></script>
   <!-- escena de las canciones sin letra: solo pinta, lee beat.js igual que ambient -->
   <script defer src="js/ncs.js"></script>
+  <!-- ONDAS DEL FONDO · le pide el espectro al visualizador y el ritmo a
+       beat.js, así que va después de los dos. Solo pinta. -->
+  <script defer src="js/fondo.js"></script>
   <!-- Carátula y mandos en el sistema (overlay de Windows, pantalla de
        bloqueo, auriculares). Es lo único que quedó de la tanda 8. -->
   <script defer src="js/mediasession.js"></script>

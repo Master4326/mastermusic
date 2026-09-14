@@ -28,6 +28,11 @@
        directamente de localStorage, igual que el micrófono: mismo nombre y
        mismo formato, sin traducciones por el medio. */
     radio:  { key: 'mm_radio', def: 'on' },
+    /* AMBIENTE · qué se ve detrás de la letra. «ondas» es la escena estilo
+       NCS de js/fondo.js, «clasico» la carátula difuminada de siempre y
+       «liso» ninguna de las dos. Lo lee fondo.js por la clase del <body>,
+       no de localStorage: así basta con pulsar para que cambie. */
+    ambiente: { key: 'mm_ambiente', def: 'ondas' },
     // La intensidad del modo edit NO es un ajuste: lyrics.js la deduce sola
     // del ritmo de cada línea y de los graves (ver intensidadAuto).
   };
@@ -67,6 +72,9 @@
       aplicarMovimiento();
     } else if (id === 'lyrics') {
       root.style.setProperty('--lyrics-scale', String(LYRICS_SCALE[v] || 1));
+    } else if (id === 'ambiente') {
+      body.classList.toggle('fondo-ondas', v === 'ondas');
+      body.classList.toggle('fondo-liso', v === 'liso');
     } else if (id === 'mic') {
       /* Se le avisa al visualizador para que enseñe o esconda el botón ◈
          sin recargar — y sobre todo para que SUELTE el micrófono en el

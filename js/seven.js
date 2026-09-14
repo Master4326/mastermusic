@@ -523,6 +523,78 @@
     marqTimer = setTimeout(montarMarquesinas, 200);
   });
 
+  /* ==========================================================
+     LETRA ANCHA · botón ◧ (o tecla W)
+
+     La columna de la carátula se recoge y la letra se queda con el ancho
+     entero de la ventana. Lo que se esconde no desaparece: la carátula y
+     el nombre se mudan al chip de la barra de título, que es la única
+     barra que no se esconde nunca.
+
+     El botón vive con ✦ y ⛶ —las otras dos formas de ver— y no en el
+     panel de la letra, que se queda limpio.
+     ========================================================== */
+  const anchoBtn = document.getElementById('anchoBtn');
+  const npChip = document.getElementById('npChip');
+  const npChipCover = document.getElementById('npChipCover');
+  const npChipTitle = document.getElementById('npChipTitle');
+  const npChipArtist = document.getElementById('npChipArtist');
+  const vizSyncBtn = document.getElementById('vizSyncBtn');
+  // dónde vivía el ◈ antes de mudarlo: hay que saber a dónde devolverlo
+  const vizSyncCasa = vizSyncBtn ? vizSyncBtn.parentNode : null;
+  const ANCHO_KEY = 'mm_letra_ancha';
+
+  const pintarChip = () => {
+    if (!npChip) return;
+    const pc = window.PlayerCore;
+    const t = pc && pc.state ? pc.state.currentTrack : null;
+    if (npChipCover) {
+      npChipCover.style.backgroundImage = t && t.cover ? `url('${t.cover}')` : '';
+      // con carátula, la nota ♪ sobra; sin ella, es lo único que se ve
+      npChipCover.textContent = t && t.cover ? '' : '♪';
+    }
+    if (npChipTitle) npChipTitle.textContent = t ? t.name : 'Sin canción';
+    if (npChipArtist) npChipArtist.textContent = t ? (t.artist || '') : '';
+  };
+
+  const aplicarAncho = (on) => {
+    body.classList.toggle('letra-ancha', on);
+    if (anchoBtn) {
+      anchoBtn.classList.toggle('on', on);
+      anchoBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    if (npChip) npChip.hidden = !on;
+    /* El ◈ del espectro se muda con la columna escondida: es EL botón de
+       quien oye por Spotify Connect (sin él el detector va a ciegas) y
+       dejarlo dentro del marco del visualizador lo haría desaparecer. */
+    if (vizSyncBtn && vizSyncCasa && anchoBtn) {
+      vizSyncBtn.classList.toggle('en-mandos', on);
+      if (on) anchoBtn.parentNode.insertBefore(vizSyncBtn, anchoBtn);
+      else vizSyncCasa.appendChild(vizSyncBtn);
+    }
+    pintarChip();
+    /* Al volver a la vista normal el título se mide otra vez: mientras
+       estuvo escondido medía 0 y la marquesina no podía saber si cabía. */
+    montarMarquesinas();
+    // el lienzo de las ondas acaba de cambiar de tamaño
+    if (window.FondoModule && window.FondoModule.medir) window.FondoModule.medir();
+  };
+
+  const alternarAncho = () => {
+    const on = !body.classList.contains('letra-ancha');
+    aplicarAncho(on);
+    try { localStorage.setItem(ANCHO_KEY, on ? 'true' : 'false'); } catch (_) {}
+    if (window.SevenStatus) {
+      window.SevenStatus(on ? '▣ letra ancha · la carátula está arriba a la derecha'
+                            : '▣ vista normal');
+    }
+  };
+
+  if (anchoBtn) anchoBtn.addEventListener('click', alternarAncho);
+  // el chip ES la columna recogida: pulsarlo la devuelve
+  if (npChip) npChip.addEventListener('click', alternarAncho);
+  aplicarAncho(localStorage.getItem(ANCHO_KEY) === 'true');
+
   /* ---------- Barra de pestañas que se esconde sola ----------
      Como los controles del modo cine: sin tocar nada 2,5 s, la barra se
      recoge y la letra gana su sitio. SOLO cuando manda la pestaña de la
@@ -586,6 +658,7 @@
     const firma = t ? `${t.id}|${t.cover || ''}|${t.album || ''}|${t.name}|${t.artist || ''}` : '';
     if (firma === coverFirma) return;
     coverFirma = firma;
+    pintarChip();
 
     if (!t) {
       coverArt.style.backgroundImage = '';
@@ -1143,6 +1216,9 @@
     if (e.key === 'l' || e.key === 'L') {
       const lyricsTab = document.querySelector('.tab[data-tab="lyrics"]');
       if (lyricsTab) lyricsTab.click();
+    } else if (e.key === 'w' || e.key === 'W') {
+      // letra ancha: esconde la columna de la carátula, o la devuelve
+      alternarAncho();
     } else if (e.key === ',' || e.key === 's') {
       const setTab = document.querySelector('.tab[data-tab="settings"]');
       if (setTab) setTab.click();
