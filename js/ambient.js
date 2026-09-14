@@ -254,14 +254,23 @@
 
   const panelVisible = () => tabLyrics && tabLyrics.classList.contains('active');
 
+  /* Todo por `escribir`, no por `el.style` a pelo. El memo vive colgado del
+     elemento: si se apaga saltándoselo, el memo se queda creyendo el último
+     valor pintado y, al volver, la primera escritura que coincida con él se
+     descarta — el elemento se queda apagado hasta que el valor cambie de
+     verdad. Se notaba poco cuando esto solo corría al quedarse en silencio;
+     ahora también se apaga al abrir el modo cine, así que tiene que cerrar. */
   const apagarPanel = () => {
     [laMarco, laEstrobo, laCover, laSuelo, laCircular].forEach((el) => {
-      if (el) el.style.opacity = '0';
+      escribir(el, 'opacity', '0');
     });
-    barras.forEach((b) => { b.style.transform = 'scaleY(0.03)'; });
+    barras.forEach((b) => { escribir(b, 'transform', 'scaleY(0.03)'); });
+    /* Los destellos NO llevan memo: su opacidad la mueve una animación de la
+       API (`el.animate`), no `escribir`. Apagarlos por el memo los dejaría
+       creyendo que ya están a 0 mientras la animación los enciende. */
     destellos.forEach((d) => { d.hasta = 0; d.el.style.opacity = '0'; });
-    if (lyricsEdit) lyricsEdit.style.transform = '';
-    if (lyricsBody) lyricsBody.style.transform = '';
+    escribir(lyricsEdit, 'transform', '');
+    escribir(lyricsBody, 'transform', '');
   };
 
   /* ---------- Pintado del panel ---------- */
@@ -419,9 +428,30 @@
 
   let ultimoPintado = 0;
 
+  /* Con el MODO CINE abierto, todo lo que pinta este módulo —los tres focos
+     del fondo y las nueve capas del panel de la letra— queda debajo de una
+     capa opaca a pantalla completa (`.cinema`, z-index 9000, `background:
+     #000`). Seguir pintándolo era trabajo puro tirado, y no poco: medido con
+     el cine abierto en el móvil, este bucle seguía escribiendo unas 55
+     variables por segundo y moviendo tres manchas desenfocadas a pantalla
+     completa que no veía nadie.
+
+     Se comprueba aquí y no se para el bucle desde cinema.js a propósito: así
+     sigue valiendo aunque el cine se abra o se cierre por cualquier vía (el
+     botón, Esc, F11, el propio `fullscreenchange`), y al cerrar vuelve en el
+     frame siguiente sin tener que arrancar nada. El visualizador ya resuelve
+     lo mismo con su IntersectionObserver; a este módulo le faltaba. */
+  let tapadoPorCine = false;
+
   const bucle = () => {
     raf = requestAnimationFrame(bucle);
     if (document.hidden) return;
+    if (document.body.classList.contains('cinema-open')) {
+      // se apaga UNA vez, para no dejar nada pintado debajo, y a callar
+      if (!tapadoPorCine) { tapadoPorCine = true; apagar(); apagarPanel(); }
+      return;
+    }
+    tapadoPorCine = false;
     const ahoraMs = performance.now();
     if (window.MMPerf && window.MMPerf.salta(relojPintado, ahoraMs)) return;
     /* Tiempo desde el frame que SÍ se pintó: con el tope de 30 fps del

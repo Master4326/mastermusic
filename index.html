@@ -407,10 +407,21 @@
                 <button class="seg-btn" data-val="xl">XL</button>
               </div>
             </div>
-            <!-- TIPOGRAFÍA · los botones los pinta js/fonts.js, cada uno en su
-                 propia fuente. Añadir una fuente se hace allí, en CATALOGO. -->
-            <span class="set-label solo">tipografía</span>
-            <div class="font-picker" id="fontPicker"></div>
+            <!-- TIPOGRAFÍA · antes había aquí una PARED de botones, uno por
+                 fuente y todos al lado. Con 38 no cabe: ahora esta fila
+                 enseña la puesta (dibujada en su propia letra) y abre la
+                 galería, que es donde están todas guardadas y ordenadas por
+                 categoría. La galería la monta js/fonts.js colgada del <body>,
+                 como la paleta de Ctrl+K. Añadir una fuente se hace allí, en
+                 CATALOGO: la tarjeta y la descarga salen solas. -->
+            <div class="set-row">
+              <span class="set-label">tipografía</span>
+              <button class="font-abrir" id="fontAbrir" type="button"
+                      title="Ver todas las tipografías: anime, juegos, series y cine…">
+                <span class="fa-nombre" id="fontActual">Playfair Display</span>
+                <span class="fa-mas" aria-hidden="true">ver todas ▸</span>
+              </button>
+            </div>
             <div class="font-preview" id="fontPreview" aria-hidden="true">
               <span class="fp-past">y aunque no estés</span>
               <span class="fp-now">te sigo cantando igual</span>

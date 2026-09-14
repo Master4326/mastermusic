@@ -1075,11 +1075,21 @@
   /* Restaura el tamaño que el usuario haya elegido antes, pero sin pasarse
      de la pantalla de AHORA: lo que cabía en el monitor grande no cabe en el
      portátil. Y en móvil no se restaura nada — allí manda la hoja de estilos
-     (`width: 100%`), que es la que sabe repartir el sitio. */
+     (`width: 100%`), que es la que sabe repartir el sitio.
+
+     El corte NO puede ser solo el ancho. Un teléfono TUMBADO mide 844, 915 o
+     932 px de ancho: pasaba de los 760 y se le encasquetaba encima el tamaño
+     guardado del escritorio, peleándose con las reglas de móvil de la hoja.
+     Se mira el lado CORTO (que en un teléfono es siempre el pequeño, gírese
+     como se gire) y, como en js/perf.js, también si el puntero es grueso. */
   const CORTE_MOVIL = 760;   // el mismo del @media de style.css
+  const esMovil = () => {
+    try { if (window.matchMedia('(pointer: coarse)').matches) return true; } catch (_) {}
+    return Math.min(window.innerWidth, window.innerHeight) <= CORTE_MOVIL;
+  };
   try {
     const saved = JSON.parse(localStorage.getItem(SIZE_KEY) || 'null');
-    if (saved && saved.w && saved.h && window.innerWidth > CORTE_MOVIL) {
+    if (saved && saved.w && saved.h && !esMovil()) {
       winEl.style.width = Math.min(saved.w, window.innerWidth - 40) + 'px';
       winEl.style.height = Math.min(saved.h, window.innerHeight - 40) + 'px';
     }

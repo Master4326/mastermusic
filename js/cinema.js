@@ -85,7 +85,11 @@
 
   const construirDestellos = () => {
     if (!destellos || destPool.length) return;
-    for (let i = 0; i < DEST_POOL; i++) {
+    /* Cuántos, según el aparato (js/perf.js). Cada destello es un nodo con
+       dos pseudoelementos y tres sombras: 26 de ellos en un teléfono son 78
+       capas con glow esperando turno. */
+    const cuantos = window.MMPerf ? window.MMPerf.cuantos(DEST_POOL) : DEST_POOL;
+    for (let i = 0; i < cuantos; i++) {
       const d = document.createElement('span');
       d.className = 'cin-destello';
       destellos.appendChild(d);
@@ -93,19 +97,80 @@
     }
   };
 
+  /* ══════ Disparar un destello SIN forzar el layout ══════
+
+     El truco de toda la vida —quitar la clase, leer `offsetWidth`, volver a
+     ponerla— obliga al navegador a rehacer el layout de TODO el documento
+     ahí mismo, y esto se dispara hasta tres veces por frame con los
+     platillos. Medido con la sonda: abrir el cine pasaba de 34 a 123 layouts
+     en cinco segundos, y son síncronos, o sea que se comen el frame.
+
+     Lo primero que se probó —`getAnimations()[0].currentTime = 0`— no sirve
+     AQUÍ, y el motivo es propio de esta app: `.window` lleva
+     `container-type: size`, así que resolver estilo depende del layout del
+     contenedor y cualquier vaciado de estilo arrastra un layout detrás.
+     Medido: seguía en 91. Lo mismo le pasaría a `getComputedStyle`.
+
+     Lo que sí funciona es no preguntar NADA: se guarda la animación de cada
+     destello (son de un estanque fijo, así que son las mismas siempre) y se
+     rebobina con `cancel()` + `play()`. Ni lectura del DOM ni vaciado de
+     estilo. Los cuadros se escriben aquí en vez de leerlos del CSS porque
+     van con valores ya resueltos; es el mismo patrón que ya usan los
+     destellos de js/ambient.js. El `@keyframes cin-brillo` del CSS se queda
+     como respaldo para un navegador sin la API de animaciones. */
+  /* Tamaño del escenario de destellos. Se mide al abrir y al cambiar de
+     tamaño, NO en cada disparo: leerlo por disparo sería volver al mismo
+     problema por otra puerta. */
+  let fxW = 0, fxH = 0;
+  const medirFx = () => {
+    if (!destellos) return;
+    fxW = destellos.clientWidth || window.innerWidth;
+    fxH = destellos.clientHeight || window.innerHeight;
+  };
+
   const lanzarDestello = (fuerza) => {
-    if (!destPool.length) return;
+    if (!destPool.length || !destellos.animate) return;
     const d = destPool[destNext];
     destNext = (destNext + 1) % destPool.length;
-    // posición nueva por disparo; el nodo se reutiliza
-    d.style.setProperty('--x', (Math.random() * 100).toFixed(1) + '%');
-    d.style.setProperty('--y', (8 + Math.random() * 84).toFixed(1) + '%');
-    d.style.setProperty('--s', (0.5 + fuerza * 0.9).toFixed(2));
-    d.style.setProperty('--g', (Math.random() * 90).toFixed(0) + 'deg');
-    // reiniciar la animación: quitar clase, forzar reflow, volver a ponerla
-    d.classList.remove('on');
-    void d.offsetWidth;
-    d.classList.add('on');
+    if (!fxW) medirFx();
+
+    const s = 0.5 + fuerza * 0.9;
+    const g = Math.round(Math.random() * 90);
+    /* La posición va DENTRO del transform, no en `left`/`top`.
+
+       Escribir `left` y `top` ensucia el layout: con los platillos disparando
+       hasta tres destellos por frame, eso es un layout del documento entero
+       por frame. Un `translate` no toca layout — lo resuelve el compositor.
+       Medido en el móvil: 91 layouts en cinco segundos con el cine abierto,
+       contra 33 sin destellos; con translate se quedan en los 33.
+
+       Es lo mismo que ya hace el resto de la app: «se escribe transform, no
+       el alto: escribir el alto obliga a rehacer layout» (js/visualizer.js). */
+    const px = (Math.random() * fxW).toFixed(0);
+    const py = (fxH * (0.08 + Math.random() * 0.84)).toFixed(0);
+    const sitio = `translate(${px}px, ${py}px)`;
+    // mismos cuadros que @keyframes cin-brillo, con --s y --g ya resueltos
+    const cuadros = [
+      { opacity: 0, transform: `${sitio} rotate(${g}deg) scale(0.2)`, offset: 0 },
+      { opacity: Math.min(1, 0.30 + 0.38 * s),
+        transform: `${sitio} rotate(${g}deg) scale(${s.toFixed(2)})`, offset: 0.35 },
+      { opacity: 0, transform: `${sitio} rotate(${g}deg) scale(0.3)`, offset: 1 },
+    ];
+    /* La animación de cada destello se guarda y se rebobina con
+       `cancel()` + `play()`. Lo primero que se probó —quitar la clase, leer
+       `offsetWidth` y volver a ponerla, o `getAnimations()[0].currentTime=0`—
+       no vale AQUÍ, y el motivo es propio de esta app: `.window` lleva
+       `container-type: size`, así que resolver estilo depende del layout del
+       contenedor y cualquier vaciado de estilo arrastra un layout detrás.
+       Rebobinar una animación que ya se tiene en la mano no pregunta nada. */
+    const an = d._mmChispa;
+    if (an) {
+      an.effect.setKeyframes(cuadros);
+      an.cancel();
+      an.play();
+    } else {
+      d._mmChispa = d.animate(cuadros, { duration: 500, easing: 'ease-out', fill: 'forwards' });
+    }
   };
 
   /* El aura NO parpadea con cada bombo — eso es justo lo que se sentía como
@@ -114,6 +179,23 @@
      aura está recogida y quieta, y en un temazo está abierta y llena de
      color, pero sin saltos por golpe. */
   let auraE = 0, auraB = 0;
+
+  /* Redondeo a escalones. Parece un detalle y es el arreglo gordo del
+     parpadeo.
+
+     `--au-e` alimenta `opacity: calc(0.34 + 0.30 * var(--au-e))` del aura,
+     que lleva `transition: opacity 1.6s`. Con `.toFixed(3)` el valor cambiaba
+     en CASI TODOS los frames —medido: 34 escrituras por segundo—, así que un
+     fundido de 1,6 segundos se reiniciaba treinta y cuatro veces por segundo
+     y nunca llegaba a su destino. Y como la opacidad de un grupo que contiene
+     manchas con `mix-blend-mode` obliga a recomponer el grupo entero en un
+     búfer aparte, eso eran ~10 Mpx desenfocados y mezclados rehechos en cada
+     frame. Con escalones de 0,04 se escribe un puñado de veces por segundo y
+     es la TRANSICIÓN la que suaviza — que es justo su trabajo.
+
+     `--au-b` va dentro de los `@keyframes` de las manchas: cambiarlo obliga
+     además a recalcular los fotogramas clave de cuatro animaciones vivas. */
+  const escalon = (v, pasos) => (Math.round(v * pasos) / pasos).toFixed(3);
 
   const pintarRitmo = () => {
     const B = window.BeatModule && window.BeatModule.get ? window.BeatModule.get() : null;
@@ -129,12 +211,14 @@
     // suavizados MUY lentos a propósito: esto es el carácter del tema, no el golpe
     auraE += (B.energia - auraE) * 0.02;
     auraB += (Math.min(1, B.graves * 1.15) - auraB) * (B.graves > auraB ? 0.06 : 0.03);
-    escribirVar(aura, '--au-e', auraE.toFixed(3));
-    escribirVar(aura, '--au-b', auraB.toFixed(3));
+    escribirVar(aura, '--au-e', escalon(auraE, 25));   // pasos de 0,04
+    escribirVar(aura, '--au-b', escalon(auraB, 20));   // pasos de 0,05
 
     // los destellos de los platillos se quedan: son finos y no ciegan
     if (B.brilloAhora && B.brilloFuerza > 0.25) {
-      const n = 1 + Math.round(B.brilloFuerza * 2);
+      // en el móvil, uno por golpe: tres eran tres animaciones nuevas por frame
+      const tope = window.MMPerf && window.MMPerf.movil() ? 1 : 3;
+      const n = Math.min(tope, 1 + Math.round(B.brilloFuerza * 2));
       for (let i = 0; i < n; i++) lanzarDestello(B.brilloFuerza);
     }
   };
@@ -245,6 +329,7 @@
   // ---- Onda de progreso: espectro real + porción reproducida en acento ----
   let wW = 0, wH = 0, dpr = 1;
   const sizeWave = () => {
+    medirFx();          // el escenario de los destellos se mide aquí mismo
     if (!wave) return;
     const rect = wave.getBoundingClientRect();
     if (!rect.width) return;
@@ -261,7 +346,10 @@
     wave.height = Math.floor(wH * dpr);
     waveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
-  window.addEventListener('resize', () => { if (open) sizeWave(); });
+  window.addEventListener('resize', () => { if (open) sizeWave(); }, { passive: true });
+  /* Girar el teléfono no siempre manda un `resize` con el viewport ya
+     asentado. Con las dos se vuelve a medir seguro, y medir es barato. */
+  window.addEventListener('orientationchange', () => { if (open) setTimeout(sizeWave, 120); });
 
   /* Acento cacheado: esto se leía con getComputedStyle EN CADA FRAME, o sea
      60 recálculos de estilo forzados por segundo solo para saber un color que
@@ -308,27 +396,46 @@
     // progreso: espejo de la barra principal (vale para local y Spotify)
     const pct = arrastrando ? arrastrePct
       : (mainFill ? (parseFloat(mainFill.style.width) || 0) / 100 : 0);
-    const bw = 3, gap = 2;
+    /* Ancho de barra según lo ancha que sea la pantalla. Con 3 px fijos, la
+       onda —que cruza la pantalla ENTERA— salían 384 barras en full hd y 688
+       en un ultrawide, cada una con su relleno y su sombra. Además de caro,
+       a 3 px por barra sobre 3.440 px de ancho el dibujo se ve emborronado. */
+    const gap = 2;
+    const bw = wW > 2200 ? 5 : wW > 1400 ? 4 : 3;
     const n = Math.max(24, Math.floor(wW / (bw + gap)));
     const bands = window.VisualizerModule && window.VisualizerModule.getBands
       ? window.VisualizerModule.getBands(64) : null;
     const ac = acento();
     const mid = wH / 2;
-    for (let i = 0; i < n; i++) {
+    /* El glow por barra es lo caro de aquí: `shadowBlur` en canvas es un
+       desenfoque de verdad que Skia rehace en CADA `fillRect`, y encima se
+       reasignaba barra a barra, lo que invalida su caché de pintado. Se pasa
+       dos veces —primero lo no reproducido sin sombra, luego lo reproducido
+       con la sombra puesta UNA vez— y en el móvil directamente sin sombra. */
+    const conGlow = !(window.MMPerf && window.MMPerf.movil());
+    const alto = (i) => {
       // mapeo triangular: graves al centro (joroba), agudos hacia los bordes
       const d = Math.abs(i - (n - 1) / 2) / ((n - 1) / 2);
       const b = Math.min(63, Math.round(Math.pow(d, 1.25) * 63));
       const v = bands ? bands[b] : 0.08;
-      const h = Math.max(2, Math.min(wH - 2, v * wH * 0.94));
+      return Math.max(2, Math.min(wH - 2, v * wH * 0.94));
+    };
+    const corte = pct * wW;
+
+    waveCtx.shadowBlur = 0;
+    waveCtx.fillStyle = 'rgba(232, 236, 255, 0.22)';
+    for (let i = 0; i < n; i++) {
       const x = i * (bw + gap);
-      if ((x + bw / 2) / wW <= pct) {
-        waveCtx.fillStyle = ac;
-        waveCtx.shadowColor = ac;
-        waveCtx.shadowBlur = 6;
-      } else {
-        waveCtx.fillStyle = 'rgba(232, 236, 255, 0.22)';
-        waveCtx.shadowBlur = 0;
-      }
+      if (x + bw / 2 <= corte) continue;
+      const h = alto(i);
+      waveCtx.fillRect(x, mid - h / 2, bw, h);
+    }
+    waveCtx.fillStyle = ac;
+    if (conGlow) { waveCtx.shadowColor = ac; waveCtx.shadowBlur = 6; }
+    for (let i = 0; i < n; i++) {
+      const x = i * (bw + gap);
+      if (x + bw / 2 > corte) break;
+      const h = alto(i);
       waveCtx.fillRect(x, mid - h / 2, bw, h);
     }
 
@@ -449,8 +556,13 @@
       if (timeTot) timeTot.textContent = fmt(dur);
     }
     const sonando = !!(p.state.isPlaying || (p.audio && !p.audio.paused));
-    if (playIco) playIco.hidden = sonando;
-    if (pauseIco) pauseIco.hidden = !sonando;
+    /* `hidden` como PROPIEDAD no existe en SVG: es de HTMLElement, y estos
+       dos iconos son <svg>. `playIco.hidden = true` creaba una propiedad
+       suelta en el objeto y no tocaba el atributo, así que el ▶ y el ⏸ se
+       pintaban LOS DOS, uno debajo del otro, y no cambiaban nunca al dar a
+       play. Con el atributo (y la regla CSS que lo acompaña) sí. */
+    if (playIco) playIco.toggleAttribute('hidden', sonando);
+    if (pauseIco) pauseIco.toggleAttribute('hidden', !sonando);
   };
 
   /* Tope de fotogramas: este bucle repinta el aura, la onda y el ritmo del

@@ -100,9 +100,18 @@ a { color: var(--accent); text-decoration: none; }
   /* Permite agrandar/encoger la ventana arrastrando la esquina inferior derecha */
   resize: both;
   min-width: 320px;
-  min-height: 420px;
+  /* El suelo de 420 px existe para que en un escritorio la ventana no se
+     pueda encoger hasta quedar ridícula. Pero un TELÉFONO EN HORIZONTAL
+     mide 360-430 px de ALTO: allí el suelo hacía la ventana más alta que la
+     pantalla y, como `html, body` llevan `overflow: hidden`, lo que sobraba
+     por abajo —la fila de botones y la barra de estado— quedaba fuera de
+     alcance, sin scroll ni forma de llegar. Con `min()` el suelo cede en
+     cuanto la pantalla es más baja que él, que es exactamente cuando estorba.
+     Los 40 px descontados son el `padding: 20px` del body. */
+  min-height: min(420px, calc(100dvh - 40px));
   max-width: calc(100vw - 40px);
   max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
 }
 
 /* ==========================================================
@@ -2377,6 +2386,14 @@ body.cinema-open #fxLabBtn { pointer-events: none; opacity: 0.3; }
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  /* Las tres cosas que se apilan en el pie —la onda, el bloque de controles
+     y el mensaje/los puntos del hueco instrumental— se miden desde aquí, con
+     un solo número cada una. Antes cada una llevaba su `bottom` a ojo (12vh
+     el mensaje, 15vh los puntos, y los controles en `clamp`) y se pisaban:
+     medido, «♪ ♪ ♪» caía ENCIMA del bloque de play en TODOS los tamaños —en
+     full hd, en vertical y en horizontal. */
+  --cin-onda: clamp(44px, 9vh, 84px);   /* alto de la onda del pie */
+  --cin-ctl: 54px;                      /* alto del bloque de controles */
 }
 .cinema[hidden] { display: none; }
 
@@ -2546,11 +2563,12 @@ body.playing .cinema-disc { animation-play-state: running; }
   z-index: 2;   /* por encima de la palabra clave (0) y de los fantasmas (1) */
 }
 
-/* Mensaje cuando no hay letra sincronizada */
+/* Mensaje cuando no hay letra sincronizada. Va JUSTO ENCIMA del bloque de
+   controles: con `12vh` se le montaba encima en todos los tamanos. */
 .cinema-msg {
   position: absolute;
   left: 0; right: 0;
-  bottom: 12vh;
+  bottom: calc(var(--cin-onda) + 14px + var(--cin-ctl) + 14px);
   text-align: center;
   font-family: 'VT323', monospace;
   font-size: clamp(18px, 2.6vw, 30px);
@@ -2694,10 +2712,14 @@ body.playing .cinema-disc { animation-play-state: running; }
   overflow: hidden;
 }
 .cin-destellos { position: absolute; inset: 0; }
+/* El SITIO de cada destello va dentro del `transform` que le pone cinema.js,
+   no en `left`/`top`: escribir left/top ensucia el layout, y con los
+   platillos se disparan hasta tres por frame. Aquí solo queda el punto en el
+   origen; la animación lo coloca, lo gira y lo hincha de una vez. */
 .cin-destello {
   position: absolute;
-  left: var(--x, 50%);
-  top: var(--y, 50%);
+  left: 0;
+  top: 0;
   width: 4px; height: 4px;
   border-radius: 50%;
   background: #fff;
@@ -2716,14 +2738,10 @@ body.playing .cinema-disc { animation-play-state: running; }
 }
 .cin-destello::before { width: 22px; height: 1px; }
 .cin-destello::after  { width: 1px; height: 22px; }
-.cin-destello.on {
-  animation: cin-brillo 0.5s ease-out forwards;
-}
-@keyframes cin-brillo {
-  0%   { opacity: 0;   transform: rotate(var(--g, 0deg)) scale(0.2); }
-  35%  { opacity: calc(0.30 + 0.38 * var(--s, 0.6)); transform: rotate(var(--g, 0deg)) scale(var(--s, 0.8)); }
-  100% { opacity: 0;   transform: rotate(var(--g, 0deg)) scale(0.3); }
-}
+/* El brillo de cada destello lo anima cinema.js con la API de animaciones
+   (los mismos tres cuadros que había aquí en @keyframes cin-brillo), porque
+   así puede rebobinarlo sin preguntarle nada al DOM. Aquí ya no queda regla
+   de animación: mismo camino que los destellos de js/ambient.js. */
 
 /* El velo toma el color de la carátula (--dyn-1 lo pone colors.js) en vez
    de ser negro plano: la canción baña toda la pantalla. */
@@ -2938,7 +2956,8 @@ body.playing .cin-brillo { animation-play-state: running; }
 .cinema-gap {
   position: absolute;
   left: 0; right: 0;
-  bottom: 15vh;
+  /* el mismo hueco que el mensaje: nunca salen los dos a la vez */
+  bottom: calc(var(--cin-onda) + 14px + var(--cin-ctl) + 14px);
   z-index: 2;
   display: flex;
   gap: 18px;
@@ -2995,7 +3014,7 @@ body.playing .cin-brillo { animation-play-state: running; }
 .cinema-ctl {
   position: absolute;
   left: 50%;
-  bottom: calc(clamp(44px, 9vh, 84px) + 14px);
+  bottom: calc(var(--cin-onda) + 14px);
   transform: translateX(-50%);
   z-index: 4;
   display: flex;
@@ -3022,6 +3041,11 @@ body.playing .cin-brillo { animation-play-state: running; }
   transition: color 0.15s, transform 0.15s;
 }
 .cin-btn svg { width: 18px; height: 18px; }
+/* Un <svg> con el atributo `hidden` NO se esconde solo: medido, el ⏸ del
+   cine salía con `display: block` y 22 px de alto teniendo el atributo
+   puesto desde el HTML. Es el mismo caso que `.ctrl-btn[hidden]` de más
+   arriba, pero para los iconos del cine. */
+.cin-btn svg[hidden] { display: none !important; }
 .cin-btn:hover { color: var(--accent); transform: scale(1.14); }
 .cin-play { color: var(--accent); }
 .cin-play svg { width: 22px; height: 22px; }
@@ -3037,13 +3061,98 @@ body.reduce-motion .cinema { transition: none; }
 /* el aura se queda, quieta: es color de ambiente, no movimiento */
 body.reduce-motion .cinema-aura { opacity: 0.34; }
 
+/* ══════════════════════════════════════════════════════════
+   RECORTES DEL CINE — lo que le faltaba por completo
+
+   El resto de la app lleva desde hace tiempo sus mitigaciones por nivel
+   (`body.perf-movil`, `body.perf-bajo`, `body.pantalla-grande`, las pone
+   js/perf.js). El modo cine no tenía NI UNA: en un teléfono y en un monitor
+   de 2K corría exactamente lo mismo que en 1080p. Medido con la sonda, con
+   el cine abierto:
+
+     · cuatro `.au-blob` a pantalla completa —1.478, 1.682, 1.477 y 1.031 px
+       de lado en 1080p; 1.958 px en un ultrawide— cada uno con `blur(70px)`
+       Y `mix-blend-mode: screen`. Son ~10 Mpx desenfocados Y MEZCLADOS que
+       hay que rehacer en cada frame, porque las cuatro manchas llevan su
+       propia animación de `transform` corriendo siempre.
+     · en un teléfono TUMBADO las manchas pasan de 300 px a 739 px de lado:
+       de 1,4 a 6,4 Mpx mezclados, 4,5 veces más trabajo solo por girar el
+       aparato. De ahí que el cine se atragante justo en horizontal.
+     · el tiempo de recálculo de estilo subía un 65 % y el de tarea un 75 %
+       al abrir el cine en el móvil.
+
+   La mezcla es lo primero que se va en el móvil: `mix-blend-mode` obliga a
+   componer el grupo en un búfer aparte y mezclarlo mancha a mancha, y con
+   la opacidad del aura por debajo de 1 las manchas ya están aisladas — o
+   sea que lo único que aporta es el brillo DONDE SE SOLAPAN. Se compensa
+   con un pelín más de opacidad y no se nota.
+   ══════════════════════════════════════════════════════════ */
+
+/* --- Pantalla grande (más de ~2,6 Mpx: 2K en adelante) ---
+   Aquí no hace falta tocar la mezcla; lo que ahoga es la superficie. Se
+   quita la mancha más grande y se recorta el radio, que es lo que cuesta
+   (el coste de un desenfoque sube con el CUADRADO del radio). */
+body.pantalla-grande .au-blob { filter: blur(calc(40px * var(--fondo-escala, 1))); }
+body.pantalla-grande .au-blob.b3 { display: none; }
+/* La carátula del fondo lleva `blur(42px)` a pantalla completa y `cin-zoom`
+   le cambiaba la escala sin parar, lo que obliga a REHACER el desenfoque
+   entero en cada frame. Se queda quieta, con la escala ya puesta para que
+   siga cubriendo (mismo trato que `.la-cover` en el panel de la letra).
+   cinema.js hace lo propio consultando MMPerf.fondoFijo(). */
+body.pantalla-grande .cinema-bg {
+  animation: none;
+  transform: scale(1.12);
+}
+
+/* --- Móvil, o cualquier aparato que haya bajado de escalón --- */
+body.perf-movil .au-blob {
+  /* sin mezcla: es lo más caro y lo que menos se ve */
+  mix-blend-mode: normal;
+  filter: blur(30px);
+  /* `will-change` reservaba una textura permanente por mancha —unos 11 MB
+     cada una— y en un teléfono eso es memoria de GPU que acaba desalojada y
+     vuelta a subir: justo el tirón que se quería evitar. Sin mezcla, la
+     animación de transform ya se compone sola sin pedir nada. */
+  will-change: auto;
+  opacity: 0.72;
+}
+body.perf-movil .au-blob.b3,
+body.perf-movil .au-blob.b4 { display: none; }
+body.perf-movil .cinema-bg {
+  animation: none;
+  transform: scale(1.12);
+  filter: blur(22px) saturate(1.35) brightness(0.5);
+}
+/* El grano es una capa a pantalla completa que se recompone cuatro veces
+   por segundo para un ruido con 0,045 de opacidad: en el móvil no se ve y
+   se paga entero. */
+body.perf-movil .cinema-grano { display: none; }
+/* Las rayas del velo son un degradado que se repite cada 3 px sobre TODA la
+   pantalla: en un teléfono a ×3 eso es un rasterizado enorme para un efecto
+   que a esa densidad ni se distingue. */
+body.perf-movil .cinema-veil {
+  background:
+    linear-gradient(180deg,
+      rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 32%,
+      rgba(0,0,0,0.2) 68%, rgba(0,0,0,0.72) 100%),
+    radial-gradient(ellipse at 50% 55%, transparent 35%, var(--dyn-1, #1a1f4a) 130%);
+}
+
+/* --- Aparato modesto: se queda el ambiente, se va el adorno --- */
+body.perf-bajo .au-blob { filter: blur(20px); }
+body.perf-bajo .au-blob.b2 { display: none; }
+/* La palabra clave es texto de hasta 300 px con `-webkit-text-stroke`
+   animando escala durante 3,4 s: cada paso vuelve a rasterizar el contorno. */
+body.perf-bajo .cinema-clave { display: none; }
+body.perf-bajo .cinema-vineta { display: none; }
+
 /* Onda de progreso al pie: espectro que baila con la música;
    lo reproducido se pinta de acento, el resto queda tenue */
 .cinema-wave {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   width: 100%;
-  height: clamp(44px, 9vh, 84px);
+  height: var(--cin-onda);
   z-index: 2;
   display: block;
   cursor: pointer;
@@ -3919,29 +4028,254 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
    hace falta explicar cómo es ninguna. Debajo, tres versos de
    mentira enseñan cómo quedará el panel de verdad.
    ========================================================== */
-.font-picker {
+/* ==========================================================
+   TIPOGRAFÍA DE LA LETRA · la fila y la galería
+
+   Antes esto era `.font-picker`: quince botones uno al lado de otro con
+   `flex-wrap`, o sea una pared de seis renglones metida en los ajustes, y
+   las quince fuentes descargándose de golpe en cuanto la pared asomaba.
+   Ahora en los ajustes hay UNA fila con la puesta, y todas viven en una
+   galería aparte con buscador y categorías (la monta js/fonts.js).
+   ========================================================== */
+.font-abrir {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.font-chip {
-  font-size: 18px;
-  line-height: 1.35;
-  padding: 3px 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 10px;
   background: var(--bg-panel-2);
+  border: 2px solid var(--border-dark);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.font-abrir:hover, .font-abrir:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+/* El nombre se dibuja EN su propia fuente (se la pone el JS): así se ve
+   cuál está puesta sin tener que leerla. */
+.fa-nombre {
+  font-size: 19px;
+  line-height: 1.3;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fa-mas {
+  flex-shrink: 0;
+  font-family: 'VT323', monospace;
+  font-size: 15px;
+  letter-spacing: 1px;
+  color: var(--accent);
+}
+
+/* ---- La galería ---- */
+.fuentes {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(10px, 6vh, 70px) 14px 14px;
+}
+.fuentes[hidden] { display: none; }
+.fuentes-fondo {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 22, 0.78);
+  backdrop-filter: blur(3px);
+}
+.fuentes-caja {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: min(640px, 88vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 34px var(--accent-glow), 0 18px 60px rgba(0, 0, 0, .6),
+              inset 1px 1px 0 var(--border-pixel);
+  animation: paletaEntra .16s ease-out both;
+}
+body.reduce-motion .fuentes-caja { animation: none; }
+
+/* Categorías: anime, juegos, series y cine… */
+.fuentes-grupos {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  background: var(--bg-panel-2);
+  border-bottom: 2px solid var(--border-dark);
+  /* una sola fila que se arrastra: envolverlas volvería a ser una pared */
+  scrollbar-width: thin;
+}
+.fg-chip {
+  flex: 0 0 auto;
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+  letter-spacing: 1px;
+  line-height: 1.2;
+  padding: 5px 12px;
+  min-height: 32px;
+  background: var(--bg-frame);
   border: 2px solid var(--border-dark);
   color: var(--text-dim);
   cursor: pointer;
-  /* Las fuentes llegan de Google una por una: sin esto, cada botón daría un
-     brinco de ancho al cambiar de la de reserva a la suya. */
-  transition: color 0.2s ease-out, border-color 0.2s ease-out;
+  white-space: nowrap;
 }
-.font-chip:hover { color: var(--text); border-color: var(--border-pixel); }
-.font-chip.active {
+.fg-chip:hover { color: var(--text); border-color: var(--border-pixel); }
+.fg-chip.on {
   color: var(--bg-deep);
   background: var(--accent);
   border-color: var(--accent);
   box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.fuentes-lista {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(228px, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+.fuentes-vacio {
+  grid-column: 1 / -1;
+  padding: 26px 10px;
+  text-align: center;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.fuente-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px 11px;
+  background: var(--bg-panel-2);
+  border: 2px solid var(--border-dark);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+/* ⚠️ La tarjeta NO lleva `overflow: hidden`, y no es un descuido.
+
+   Con él puesto, las tarjetas salían de 29 px con la muestra y la nota a
+   CERO, y las 14 filas cabían justas en el alto de la lista — parecía que la
+   rejilla las comprimía. La causa es una regla del modelo de caja que muerde
+   dos veces: **un elemento con el overflow recortado tiene mínimo automático
+   CERO**, no el de su contenido.
+     · la tarjeta, como celda de la rejilla, podía encoger hasta nada → la
+       fila se dimensionaba a casi cero;
+     · y dentro, la muestra y la nota (que sí recortan) podían encogerse a
+       cero también.
+   Cada hijo recorta ya lo suyo —puntos suspensivos en la muestra, dos líneas
+   en la nota—, así que a la tarjeta no le hace falta recortar nada. Y
+   `flex-shrink: 0` remata: ningún hijo cede su alto. */
+.fuente-card > * { flex-shrink: 0; min-width: 0; }
+/* Y el ancho SÍ se limita, que es la otra mitad de la historia: la muestra va
+   en `nowrap`, así que su ancho mínimo es la frase entera. Sin esto la
+   tarjeta se ensanchaba hasta donde pidiera la frase —en el móvil la nota se
+   salía por la derecha en vez de partirse en dos líneas— porque el mínimo
+   automático de una celda es su contenido. `min-width: 0` toca solo el eje
+   horizontal; el vertical se queda como debe. */
+.fuente-card { min-width: 0; }
+.fuente-card:hover, .fuente-card:focus-visible {
+  border-color: var(--border-pixel);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+.fuente-card.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+.fc-cab {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: 'VT323', monospace;
+  line-height: 1.2;
+}
+.fc-nombre {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+  color: var(--text);
+  letter-spacing: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fc-grupo {
+  flex-shrink: 0;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+.fc-tic {
+  flex-shrink: 0;
+  width: 14px;
+  font-size: 13px;
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent-glow);
+  opacity: 0;
+}
+.fuente-card.on .fc-tic { opacity: 1; }
+/* La muestra: el resto de la tarjeta es interfaz, esto es LA FUENTE. El
+   font-family, el grosor y las mayúsculas se los pone el JS desde CATALOGO. */
+.fc-muestra {
+  font-size: 21px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* mientras la hoja de Google llega se ve la de reserva; sin transición el
+     cambio es un brinco seco */
+  transition: color 0.2s ease-out;
+}
+.fuente-card.on .fc-muestra {
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent-glow);
+}
+.fc-nota {
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  line-height: 1.25;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* En el móvil, una tarjeta por renglón y la caja a pantalla casi completa */
+@media (max-width: 560px) {
+  .fuentes { padding: 0; }
+  .fuentes-caja {
+    width: 100%;
+    max-height: 100dvh;
+    height: 100dvh;
+    border-width: 0;
+  }
+  .fuentes-lista { grid-template-columns: 1fr; }
+  .fg-chip { min-height: 36px; }       /* objetivo de toque */
+}
+/* Teléfono tumbado: dos columnas y tarjetas más bajas, que de alto no sobra */
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 1100px) {
+  .fuentes { padding: 0; }
+  .fuentes-caja { width: 100%; height: 100dvh; max-height: 100dvh; border-width: 0; }
+  .fc-nota { display: none; }
 }
 .font-preview {
   margin-top: 10px;
@@ -5083,25 +5417,119 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   .playback-bar { padding: 6px 10px; }
 }
 
-/* Teléfono en horizontal: una sola columna dejaba la letra en una rendija
-   de tres renglones. Con dos columnas estrechas se lee de verdad — es la
-   postura en la que se ve una letra acompañando la música. */
-@media (orientation: landscape) and (max-height: 520px) and (max-width: 1000px) {
+/* ══════════════════════════════════════════════════════════
+   TELÉFONO EN HORIZONTAL — la app entera, no un trozo
+
+   Lo que estaba mal (y por qué no lo cazó nadie): TODO el repaso de móvil
+   vive en `@media (max-width: 760px)` y en `(orientation: portrait) and
+   (max-width: 760px)`. Un teléfono tumbado mide 844, 915 o 932 px de ancho,
+   así que NO entraba en ninguna de las dos y se quedaba con las reglas de
+   escritorio:
+
+     · `.window { min-height: 420px }` sobre una pantalla de 360-430 px de
+       alto → la ventana más alta que el teléfono. Medido: a 740×360 la
+       ventana salía de 420 px y play, anterior, siguiente, ✦ y ⛶ caían
+       fuera de la pantalla. Con `html, body { overflow: hidden }` no hay
+       scroll: lo cortado era, literalmente, inalcanzable.
+     · `body { padding: 20px }` y `align-items: center` → la ventana
+       centrada desbordaba por ARRIBA y por ABAJO a la vez, y el botón ⌕
+       buscar de la barra de estado se iba de la pantalla (medido a 844×390
+       y a 915×412).
+     · `.volume-ctl { position: absolute; right: 6px }` seguía flotando
+       encima de la fila y tapaba los botones de al lado.
+     · Ningún objetivo de toque: botones de 32×26 px.
+     · Sin `env(safe-area-inset-*)`: tumbado, la muesca se come el lado.
+
+   La regla de la ventana es lo único imprescindible; el resto es lo mismo
+   que ya hacía la consulta de vertical, traído aquí.
+   ══════════════════════════════════════════════════════════ */
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 1100px) {
+  /* --- 1) que la app QUEPA: esto es el arreglo, lo demás es acabado --- */
+  body {
+    padding: 4px;
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+    /* tumbado, la muesca y la barra de gestos están a los LADOS */
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+    align-items: stretch;
+  }
+  .window {
+    width: 100%;
+    max-width: 100%;
+    /* `dvh` y no `vh`: en el móvil `vh` es el viewport GRANDE (el de la
+       barra del navegador escondida), así que nunca recortaba nada. */
+    height: calc(100dvh - 8px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height: 0;
+    max-height: none;
+    resize: none;                 /* el tirador de la esquina estorba al dedo */
+  }
+
+  /* --- 2) reparto del sitio: dos columnas estrechas para que la letra se lea --- */
   .main-grid {
     display: grid;
-    grid-template-columns: clamp(110px, 22vw, 190px) 1fr;
+    grid-template-columns: clamp(96px, 20vw, 170px) 1fr;
     gap: 8px;
     padding: 8px;
     overflow: hidden;
+    min-height: 0;
   }
-  .left-panel { flex-direction: column; flex-wrap: nowrap; gap: 6px; }
+  .left-panel { flex-direction: column; flex-wrap: nowrap; gap: 6px; min-height: 0; }
   .cover-frame { width: 100%; }
   .visualizer-frame { display: none; }
-  .right-panel { flex: 1 1 auto; min-height: 0; }
+  .right-panel { flex: 1 1 auto; min-height: 340px; min-height: 0; }
   .track-info { flex: 0 0 auto; }
   .playback-bar { padding: 4px 10px; gap: 4px; }
-  .status-bar { display: none; }   /* 24 px que valen más para la letra */
-  .tab { min-height: 32px; padding: 5px 10px; }
+  /* La fila de controles y la barra de estado se pintan por encima y
+     conservan su sitio pase lo que pase arriba (igual que en vertical). */
+  .playback-bar,
+  .status-bar { position: relative; z-index: 3; }
+
+  /* --- 3) la fila de botones, para el dedo --- */
+  /* El volumen iba en `position: absolute` y se montaba sobre ♥ ✦ ⛶.
+     Aquí entra en la fila como uno más. */
+  .volume-ctl {
+    position: static;
+    transform: none;
+    margin-left: 2px;
+    flex: 0 0 auto;
+  }
+  /* En el móvil el volumen se controla con los botones físicos. La barra y
+     la bocina se van (en horizontal sobra menos sitio aún que en vertical:
+     `@media (hover: none)` las dejaba fijas en 90 px), pero ✦ y ⛶ se quedan
+     — son los dos botones por los que se abre la letra y el cine. */
+  .volume-ctl .vol-pct,
+  .volume-ctl .volume-bar,
+  .volume-ctl #volBtn { display: none; }
+  /* …salvo con Spotify Connect: ahí el volumen que suena es el del aparato
+     remoto y los botones físicos del teléfono no lo tocan. */
+  body.spotify-conectado .volume-ctl #volBtn { display: flex; }
+  /* `wrap` mandaba los últimos botones a un segundo renglón que la ventana
+     recortaba: se PERDÍAN. Un solo renglón que siempre cabe. */
+  .controls-row {
+    flex-wrap: nowrap;
+    gap: clamp(2px, 1.2vw, 10px);
+    padding: 0 2px;
+  }
+  /* Alto 38 px: menos que los 42 de vertical porque aquí la pantalla es
+     baja, pero por encima del mínimo con el que el pulgar acierta. */
+  .controls-row .ctrl-btn {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 32px;
+    max-width: 54px;
+    height: 38px;
+  }
+  .controls-row .play-btn {
+    flex: 1.35 1 0;
+    max-width: 70px;
+    height: 40px;
+  }
+  .ctrl-btn svg { width: 46%; height: 46%; }
+  .play-btn svg { width: 50%; height: 50%; }
+  /* el ✦ y el ⛶ son glifos, no SVG: que no se queden enanos */
+  .side-btn { font-size: 18px; min-width: 34px; height: 32px; }
+  .tab { min-height: 32px; padding: 5px 10px; display: inline-flex; align-items: center; }
 }
 
 /* Botones del pie de las estadísticas */
@@ -5493,12 +5921,11 @@ body.reduce-motion .paleta-caja { animation: none; }
   .tab-txt { display: none; }
 }
 
-/* Teléfono en horizontal · la regla de más arriba escondía la barra de
-   estado ENTERA para regalarle 24 px a la letra. Con el buscador dentro eso
-   dejaba de ser 24 px de adorno: se llevaba por delante el único botón que
-   abre el buscador sin teclado. Se queda la barra, pero solo con el botón:
-   el texto de estado y el reloj son justo lo prescindible aquí. */
-@media (orientation: landscape) and (max-height: 520px) and (max-width: 1000px) {
+/* Teléfono en horizontal · la barra de estado se queda, pero solo con el
+   botón: el ⌕ es el único que abre el buscador sin teclado, y el texto de
+   estado y el reloj son justo lo prescindible cuando la pantalla es baja.
+   Mismos umbrales que el bloque grande de más arriba. */
+@media (orientation: landscape) and (max-height: 560px) and (max-width: 1100px) {
   .status-bar {
     display: flex;
     padding-top: 0;
