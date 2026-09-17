@@ -438,6 +438,17 @@
                 <button class="seg-btn" data-val="xl">XL</button>
               </div>
             </div>
+            <!-- TRADUCCIÓN · el mando vive AQUÍ y no encima de la letra: el
+                 panel de la letra se queda limpio, sin barras ni cajas
+                 nuevas. Lo que hace lo explica el título del grupo. -->
+            <div class="set-row">
+              <span class="set-label">traducción</span>
+              <div class="seg" data-set="trad"
+                   title="Pone la letra en español, en pequeño y debajo de cada verso. Las canciones que ya están en español se quedan como están.">
+                <button class="seg-btn" data-val="on">español</button>
+                <button class="seg-btn" data-val="off">no</button>
+              </div>
+            </div>
             <!-- TIPOGRAFÍA · antes había aquí una PARED de botones, uno por
                  fuente y todos al lado. Con 38 no cabe: ahora esta fila
                  enseña la puesta (dibujada en su propia letra) y abre la
@@ -824,6 +835,11 @@
   <script defer src="js/vendor/jsmediatags.min.js"></script>
   <script defer src="js/db.js"></script>
   <script defer src="js/lyrics.js"></script>
+  <!-- TRADUCTOR · pone la letra en español debajo de cada verso. Va DETRÁS de
+       lyrics.js sin problema: los dos son `defer`, o sea que se ejecutan en
+       orden y antes de que suene nada, y lyrics.js solo pregunta por
+       window.Traductor cuando ya hay una canción puesta. -->
+  <script defer src="js/traductor.js"></script>
   <script defer src="js/spotify.js"></script>
   <script defer src="js/library.js"></script>
   <script defer src="js/app.js"></script>

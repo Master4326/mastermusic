@@ -27,6 +27,14 @@
     tick(ultimoT);
   }
   let lastTrackKey = null;
+  /* TRADUCCIÓN AL ESPAÑOL (config ⚙ → letras → traducción).
+     `tradLines` va alineada con `parsedLines`: cadena vacía = ese verso no
+     tiene traducción (todavía, o nunca: los ♪ y lo que el traductor no supo).
+     El trabajo sucio —red, caché, que cuadren las líneas— vive en
+     js/traductor.js; aquí solo se pide y se pinta. */
+  let tradLines = [];
+  let tradReq = 0;            // token: solo la última petición puede pintar
+  let tradCtrl = null;        // AbortController de la traducción en curso
   let userScrolledRecently = false;
   let scrollTimer = null;
   let autoScrolling = false;   // true while our own smooth-scroll is animating
@@ -201,6 +209,7 @@
     gapMap = new Map();
     gapAct = null;
     karaokeOlvidar();
+    tradReset();
   };
 
   /* Mensajes de paso ("buscando…", "sin conexión…"): estos SÍ son texto,
@@ -259,6 +268,105 @@
     activeIdx = -2;
     edIdx = -3;
     karaokeOlvidar();
+    pedirTraduccion();
+  };
+
+  /* ══════════ TRADUCCIÓN AL ESPAÑOL ══════════
+     La letra en su idioma manda y la traducción va DEBAJO, pequeña: es un
+     subtítulo, no una segunda letra. Por eso no se sustituye el verso — el
+     que canta quiere ver lo que suena y entender lo que dice, las dos cosas.
+
+     Cómo se cuelga del DOM: en la vista lista, cada traducción es un HERMANO
+     del verso (`.lyric-trad` justo detrás de su `.lyric-line`) y nunca un
+     hijo. El motor de efectos vacía y rehace el innerHTML de la línea activa
+     en cada cambio de verso (ver decorateLine/restoreLine): cualquier cosa
+     metida dentro moriría ahí, y encima el karaoke reparte los spans `.w` de
+     la línea contando lo que hay dentro. Fuera no estorba a ninguno de los
+     dos. En el modo edit ✦ hay UN solo `.ed-trad` al pie del panel, que se
+     reescribe verso a verso — y como vive dentro de #lyricsEdit, se muda al
+     cine con él sin tener que enterarse. */
+  const tradActiva = () => !!(window.Traductor && window.Traductor.activa());
+
+  const tradReset = () => {
+    tradLines = [];
+    tradReq++;
+    if (tradCtrl) { try { tradCtrl.abort(); } catch (_) {} tradCtrl = null; }
+    lyricsBody.querySelectorAll('.lyric-trad').forEach((n) => n.remove());
+    lyricsEdit.querySelectorAll('.ed-trad').forEach((n) => n.remove());
+  };
+
+  const tradNodos = () => (lineNodes.length ? lineNodes
+    : Array.prototype.slice.call(lyricsBody.querySelectorAll('.lyric-line')));
+
+  const pintarTrad = () => {
+    const nodos = tradNodos();
+    for (let i = 0; i < nodos.length; i++) {
+      const ln = nodos[i];
+      if (!ln) continue;
+      const txt = tradLines[i] || '';
+      let nodo = ln.nextElementSibling;
+      if (!nodo || !nodo.classList.contains('lyric-trad')) nodo = null;
+      if (!txt) { if (nodo) nodo.remove(); continue; }
+      if (!nodo) {
+        nodo = document.createElement('div');
+        nodo.className = 'lyric-trad';
+        nodo.setAttribute('aria-hidden', 'true');   // el lector de pantalla ya lee el verso
+        ln.insertAdjacentElement('afterend', nodo);
+      }
+      if (nodo.textContent !== txt) nodo.textContent = txt;
+    }
+    if (editMode || forceEdit) pintarTradEdit(edIdx);
+  };
+
+  const pintarTradEdit = (i) => {
+    const txt = (i >= 0 && tradLines[i]) || '';
+    let nodo = lyricsEdit.querySelector('.ed-trad');
+    if (!txt) { if (nodo) nodo.remove(); return; }
+    if (!nodo) {
+      nodo = document.createElement('div');
+      nodo.className = 'ed-trad';
+      nodo.setAttribute('aria-hidden', 'true');
+      lyricsEdit.appendChild(nodo);
+    }
+    if (nodo.dataset.txt === txt) return;
+    nodo.dataset.txt = txt;
+    nodo.textContent = txt;
+    // reinicia la animación de entrada: mismo nodo, verso nuevo
+    nodo.classList.remove('entra');
+    void nodo.offsetWidth;
+    nodo.classList.add('entra');
+  };
+
+  const pedirTraduccion = () => {
+    tradReset();
+    if (!tradActiva() || !window.Traductor) return;
+    if (!parsedLines.length) return;
+    const mio = tradReq;
+    const key = lastTrackKey;
+    tradCtrl = new AbortController();
+    const textos = parsedLines.map((l) => l.text);
+    /* El `onAvance` es lo que hace que esto se note rápido: la traducción va
+       apareciendo bloque a bloque (y lo que ya estaba en caché, de golpe) en
+       vez de saltar entera cuando termina la canción entera de traducirse. */
+    window.Traductor.traducir(textos, {
+      key,
+      signal: tradCtrl.signal,
+      onAvance: (lineas) => {
+        if (mio !== tradReq) return;
+        tradLines = lineas;
+        pintarTrad();
+      },
+    }).then((res) => {
+      if (mio !== tradReq) return;
+      tradCtrl = null;
+      if (!res) return;              // ya estaba en español: no hay nada que enseñar
+      tradLines = res.lineas;
+      pintarTrad();
+    }).catch(() => {
+      /* Se calla a propósito. Sin traducción la letra se ve igual de bien:
+         no hay por qué gastar la barra de estado en contarlo. */
+      if (mio === tradReq) tradCtrl = null;
+    });
   };
 
   // GET con reintentos suaves ante fallos transitorios (cortes de red, 429,
@@ -811,6 +919,7 @@
         .join('');
       lyricsEdit.innerHTML = '<p class="lyrics-empty">Esta letra no está sincronizada — el modo edit necesita tiempos. Usa la vista ≡ lista.</p>';
       applyMode();          // la escena podía estar encendida: reparte el hidden
+      pedirTraduccion();    // sin tiempos también se traduce: es la misma letra
     } else {
       setSinLetra();
     }
@@ -2621,6 +2730,9 @@
       console.warn('[lyrics] falló el efecto de la línea', i, e);
       try { edRespaldo(i); } catch (_) {}
     }
+    /* Fuera del try de arriba y con el suyo propio: la traducción es un
+       adorno y no puede, ni fallando, mandar el verso al respaldo pelado. */
+    try { pintarTradEdit(i); } catch (_) {}
   };
 
   const tick = (currentTime) => {
@@ -2639,11 +2751,15 @@
          (forceEdit = el modo cine lo activa sin tocar la preferencia) */
       if (modoEdit) {
         if (idx >= 0) pintarEdit(idx);
-        else lyricsEdit.querySelectorAll('.ed-stack, .ed-fondo').forEach(v => {
-          v.dataset.out = '1';
-          v.classList.add('colapsa');
-          setTimeout(() => v.remove(), 500);
-        });
+        else {
+          lyricsEdit.querySelectorAll('.ed-stack, .ed-fondo').forEach(v => {
+            v.dataset.out = '1';
+            v.classList.add('colapsa');
+            setTimeout(() => v.remove(), 500);
+          });
+          // antes del primer verso no hay nada que subtitular
+          lyricsEdit.querySelectorAll('.ed-trad').forEach(v => v.remove());
+        }
       } else {
         cambiarLinea(prev, idx);
       }
@@ -2766,6 +2882,13 @@
        no tenga que re-deducir la regla al cerrarse: la condición (reposo,
        escena NCS, modo elegido) vive en un solo sitio. */
     refreshMode: () => applyMode(),
+    /* config ⚙ → letras → traducción. Al encenderla se pide la de la canción
+       que está sonando (la caché la devuelve al instante si ya se tradujo);
+       al apagarla se quitan los subtítulos sin tocar la letra. */
+    refrescarTrad: () => {
+      if (tradActiva()) pedirTraduccion();
+      else tradReset();
+    },
     /* Vuelve a pintar la línea de ahora sin tocar el modo. Lo llama
        js/fonts.js al terminar de bajar una tipografía: el modo edit calcula
        sus tamaños MIDIENDO el texto, y lo que midió con la fuente de reserva

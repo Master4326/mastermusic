@@ -33,6 +33,13 @@
        «liso» ninguna de las dos. Lo lee fondo.js por la clase del <body>,
        no de localStorage: así basta con pulsar para que cambie. */
     ambiente: { key: 'mm_ambiente', def: 'ondas' },
+    /* TRADUCCIÓN · la letra en español, en pequeño debajo de cada verso.
+       Apagada por defecto a propósito: gasta red y no tiene sentido en una
+       canción que ya está en español (js/traductor.js lo detecta solo y no
+       pide nada, pero el que solo oye música en español no debería ni
+       enterarse). La lee traductor.js directamente de localStorage, igual
+       que el micrófono y «sigue sonando». */
+    trad:   { key: 'mm_trad', def: 'off' },
     // La intensidad del modo edit NO es un ajuste: lyrics.js la deduce sola
     // del ritmo de cada línea y de los graves (ver intensidadAuto).
   };
@@ -75,6 +82,13 @@
     } else if (id === 'ambiente') {
       body.classList.toggle('fondo-ondas', v === 'ondas');
       body.classList.toggle('fondo-liso', v === 'liso');
+    } else if (id === 'trad') {
+      /* Que se vea en la canción que YA está sonando, sin cambiar de tema:
+         encendida pide la traducción (instantánea si está en caché) y
+         apagada quita los subtítulos en el acto. */
+      if (window.LyricsModule && window.LyricsModule.refrescarTrad) {
+        window.LyricsModule.refrescarTrad();
+      }
     } else if (id === 'mic') {
       /* Se le avisa al visualizador para que enseñe o esconda el botón ◈
          sin recargar — y sobre todo para que SUELTE el micrófono en el
@@ -129,7 +143,11 @@
     try { raw = localStorage.getItem('mm_lyrics_cache') || ''; } catch (_) {}
     let n = 0;
     try { n = Object.keys(JSON.parse(raw || '{}')).length; } catch (_) {}
-    el.textContent = raw ? `${n} letras · ${kb(raw.length)}` : 'vacía';
+    // las traducciones son parte de lo mismo: se guardan y se tiran juntas
+    const t = (window.Traductor && window.Traductor.tam) ? window.Traductor.tam() : { n: 0, bytes: 0 };
+    const total = raw.length + t.bytes;
+    if (!total) { el.textContent = 'vacía'; return; }
+    el.textContent = `${n} letras${t.n ? ` · ${t.n} traducidas` : ''} · ${kb(total)}`;
   };
 
   const pintarTamLib = async () => {
@@ -152,6 +170,7 @@
     try {
       localStorage.removeItem('mm_lyrics_cache');
       if (window.LyricsModule && window.LyricsModule.clearCache) window.LyricsModule.clearCache();
+      if (window.Traductor && window.Traductor.limpiar) window.Traductor.limpiar();
     } catch (_) {}
     pintarTamCache();
     if (window.SevenStatus) window.SevenStatus('▣ caché de letras vaciada');

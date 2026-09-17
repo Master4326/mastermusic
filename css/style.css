@@ -725,6 +725,59 @@ body.perf-tactil .tab-bar.se-esconde::after {
   filter: none;
 }
 
+/* ----- TRADUCCIÓN AL ESPAÑOL (config ⚙ → letras → traducción) -----
+   Un subtítulo, no una segunda letra: más pequeño, más apagado y pegado al
+   verso del que cuelga. La jerarquía tiene que estar clarísima de un vistazo
+   — lo que se canta arriba, lo que quiere decir abajo — porque el que está
+   cantando sigue la de arriba y solo baja la vista cuando le hace falta.
+
+   Es HERMANA de .lyric-line, nunca hija (lyrics.js rehace el innerHTML de la
+   línea activa en cada verso), así que se ilumina con el selector de
+   hermano adyacente: la activa manda sobre la suya.
+
+   `text-transform: none` a propósito: la letra puede ir en MAYÚSCULAS por la
+   tipografía elegida, y una traducción a gritos se lee fatal. */
+.lyrics-body .lyric-trad {
+  padding: 0 0 2px 26px;
+  margin: -4px 0 4px;
+  font-size: 0.58em;
+  line-height: 1.4;
+  font-style: italic;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+  opacity: 0.5;
+  max-width: 100%;
+  word-wrap: break-word;
+  /* el clic para saltar al segundo es del verso: el subtítulo lo deja pasar */
+  pointer-events: none;
+  transform: scale(0.98);
+  transform-origin: left center;
+  transition:
+    color 0.3s ease-out,
+    opacity 0.4s ease-out,
+    transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.5s ease-out;
+}
+.lyrics-body .lyric-line.past + .lyric-trad {
+  opacity: 0.22;
+  transform: scale(0.94);
+  filter: blur(1px);
+}
+.lyrics-body .lyric-line.active + .lyric-trad {
+  color: var(--text);
+  opacity: 0.92;
+  transform: scale(1.06) translateX(3px);
+  filter: none;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+  animation: trad-entra 0.5s ease-out;
+}
+@keyframes trad-entra {
+  from { opacity: 0; transform: scale(0.98) translateY(-3px); }
+  to   { opacity: 0.92; transform: scale(1.06) translateX(3px); }
+}
+
 /* ----- Revelado palabra a palabra en la línea activa (estilo edit) -----
    lyrics.js parte la línea activa en spans .w con --d (delay escalonado)
    y --sx (signo alternante -1/1 para efectos con dirección).
@@ -1254,6 +1307,46 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
   text-transform: var(--lyrics-caps, none);
 }
 .lyrics-edit .lyrics-empty { padding: 0 24px; }
+
+/* TRADUCCIÓN EN EL MODO EDIT ✦ (y en el cine ⛶, que se lleva este panel
+   entero con todo lo que tenga dentro).
+
+   Aquí hay UN solo subtítulo, al pie, y se reescribe verso a verso. Va
+   suelto en #lyricsEdit y NO dentro del .ed-stack: el stack se coloca a una
+   altura distinta en cada línea, se inclina, y encima se lo llevan las
+   cámaras y las salidas. Un subtítulo que baila con la cámara no se puede
+   leer — y el subtítulo es justo lo que se lee cuando no entiendes la letra.
+   Al pie y quieto, siempre en el mismo sitio.
+
+   `bottom` con margen de sobra: el modo edit centra sus versos alrededor del
+   47% del panel (ED_TOPS en lyrics.js llega al 58%), así que abajo queda
+   sitio libre y nunca se pisan. */
+.lyrics-edit .ed-trad {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: 5%;
+  z-index: 4;
+  text-align: center;
+  font-size: clamp(12px, 1.5cqw, 24px);
+  line-height: 1.35;
+  font-style: italic;
+  font-weight: normal;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  opacity: 0.62;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+}
+.lyrics-edit .ed-trad.entra {
+  animation: ed-trad-entra 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ed-trad-entra {
+  from { opacity: 0; transform: translateY(8px); filter: blur(3px); }
+  to   { opacity: 0.62; transform: translateY(0); filter: none; }
+}
+body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62; }
 
 
 /* títulos letra a letra */
@@ -2561,6 +2654,14 @@ body.playing .cinema-disc { animation-play-state: running; }
   position: absolute;
   inset: 0;
   z-index: 2;   /* por encima de la palabra clave (0) y de los fantasmas (1) */
+}
+/* En el cine el panel ocupa la pantalla entera, y abajo del todo están la
+   onda y los controles. El 5% de siempre dejaría el subtítulo encima de
+   ellos: aquí se sube por encima del mobiliario del cine, con la misma
+   cuenta que usan el aviso de «sin letra sincronizada» y los fantasmas. */
+.cinema-stage .lyrics-edit .ed-trad {
+  bottom: calc(var(--cin-onda) + 14px + var(--cin-ctl) + 18px);
+  font-size: clamp(13px, 1.25vw, 22px);
 }
 
 /* Mensaje cuando no hay letra sincronizada. Va JUSTO ENCIMA del bloque de
