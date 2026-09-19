@@ -158,6 +158,12 @@
     }
     estado(`♫ ${nuevos.length} ${nuevos.length === 1 ? 'canción importada' : 'canciones importadas'}`
       + (repes ? ` · ${repes} repetida${repes === 1 ? '' : 's'} que ya estaba${repes === 1 ? '' : 'n'}` : ''));
+    /* Y te deja DELANTE de lo que acabas de importar. Importar desde
+       configuración dejaba la música en «tu música» —otra pestaña, otra
+       colección— y la única señal era una línea en la barra de estado que
+       se iba a los 4 segundos: parecía que el botón no había hecho nada. */
+    if (window.MMNav) window.MMNav.ir('library');
+    if (window.LibraryModule && window.LibraryModule.irA) window.LibraryModule.irA('mine');
   };
 
   // ---- Load persisted library from IndexedDB ----
@@ -768,8 +774,11 @@
          CSS lo devuelve solo cuando de verdad hace falta. */
       document.body.classList.toggle('spotify-conectado', !!connected);
       el.spotifyConnectBtn.classList.toggle('connected', connected);
+      /* Conectado decía «spotify conectado», que es un ESTADO, no lo que
+         pasa al pulsarlo — y lo que pasa es que cierra la sesión. Un
+         botón tiene que decir lo que hace antes de que lo pulses. */
       el.spotifyConnectBtn.innerHTML = connected
-        ? `<span class="bracket">[</span> spotify conectado <span class="bracket">]</span>`
+        ? `<span class="bracket">[</span> spotify conectado · salir <span class="bracket">]</span>`
         : `<span class="bracket">[</span> conectar spotify <span class="bracket">]</span>`;
     },
   };

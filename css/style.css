@@ -1576,6 +1576,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 /* ----- Library tab ----- */
 .library-actions {
   display: flex;
+  flex-wrap: wrap;      /* en un teléfono los dos botones no caben en fila */
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -1755,18 +1756,37 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   font-variant-numeric: tabular-nums;
 }
 
-/* ----- Settings tab ----- */
+/* ----- Settings tab -----
+   Cada bloque es una SECCIÓN con nombre, y el nombre se queda pegado
+   arriba mientras lees la sección: bajando por una lista larga, saber en
+   qué sección estás es la mitad de no perderse. (La otra mitad es el
+   índice de la cabecera, que se enciende solo.) */
 .settings-block {
-  margin-bottom: 20px;
+  margin-bottom: 22px;
+  scroll-margin-top: 10px;
 }
+.settings-block:last-of-type { margin-bottom: 8px; }
 .settings-block h3 {
-  font-size: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
   color: var(--magenta);
-  margin-bottom: 8px;
+  margin: 0 -20px 10px;
+  padding: 6px 20px 7px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-dark);
   font-family: 'Press Start 2P', monospace;
   font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+/* Aterrizar en una sección con el teclado no debe dibujar un cerco
+   alrededor del título: el foco va ahí solo para que el lector de
+   pantalla siga leyendo desde el sitio correcto. */
+.settings-block h3:focus { outline: none; }
+.settings-block h3:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 .color-swatches {
   display: flex;
@@ -4436,52 +4456,94 @@ body.reduce-motion .fuentes-caja { animation: none; }
   text-transform: var(--lyrics-caps, none);
 }
 .font-preview span { display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+/* Los tamaños llevan --lyrics-scale, que es lo que mueven S · M · L · XL.
+   Sin él la muestra solo obedecía a la tipografía: elegir XL no movía un
+   píxel aquí, y los cuatro botones parecían muertos. */
 .fp-past, .fp-next {
-  font-size: calc(16px * var(--lyrics-font-scale, 1));
+  font-size: calc(16px * var(--lyrics-scale, 1) * var(--lyrics-font-scale, 1));
   color: var(--text-muted);
   opacity: 0.45;
 }
 .fp-past { filter: blur(1px); }
 .fp-next { filter: blur(0.5px); }
 .fp-now {
-  font-size: calc(24px * var(--lyrics-font-scale, 1));
+  font-size: calc(24px * var(--lyrics-scale, 1) * var(--lyrics-font-scale, 1));
   font-weight: var(--lyrics-weight-on, 700);
   color: var(--accent);
   text-shadow: 0 0 6px var(--accent-glow), 0 0 14px var(--accent-glow);
 }
-/* Etiqueta de una fila de ajustes. Antes las etiquetas usaban .set-hint — la
-   MISMA pinta que los párrafos de explicación — y no se distinguía el nombre
-   del ajuste de una nota al pie. Ahora la etiqueta se lee como etiqueta: más
-   grande, en la fuente de la interfaz, y todas alineadas a la misma columna. */
+/* El subtítulo traducido, con la misma pinta que lleva bajo la letra de
+   verdad: sale solo con «traducción → español» puesta. */
+.fp-trad {
+  font-size: calc(14px * var(--lyrics-scale, 1) * var(--lyrics-font-scale, 1));
+  font-style: italic;
+  font-weight: normal;
+  text-transform: none;
+  color: var(--text-muted);
+  opacity: 0.7;
+  padding-left: 14px;
+}
+.fp-trad[hidden] { display: none; }
+/* ==========================================================
+   UNA FILA DE AJUSTES
+
+   Era un flex con `flex-wrap`: la etiqueta a la izquierda y el control
+   detrás, pero cada fila se partía por donde le cabía, así que los
+   controles no caían nunca en la misma columna y el ojo tenía que
+   buscarlos uno a uno. Ahora es una REJILLA de tres columnas fijas:
+
+       etiqueta  |  el control  |  [ver ▸]
+
+   Todas las etiquetas alineadas, todos los controles en su columna, y
+   la tercera reservada para el botón que te lleva a ver el efecto. En
+   una ventana estrecha la etiqueta se pone encima y el control debajo,
+   que es como se lee en un teléfono.
+   ========================================================== */
 .set-label {
   font-family: 'VT323', monospace;
   font-size: 17px;
   letter-spacing: 1px;
   line-height: 1.4;
   color: var(--text-dim);
-  min-width: 92px;
-  flex-shrink: 0;
-}
-.set-label.solo {          /* la que va ENCIMA de su control, no al lado */
-  display: block;
-  min-width: 0;
-  margin: 12px 0 5px;
 }
 .set-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(86px, 150px) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;      /* antes lo ponía cada fila con un style="" a mano */
+  gap: 5px 12px;
+  padding: 7px 6px;
+  margin: 0 -6px;
+  transition: background 0.14s ease-out;
 }
-.set-row:last-child { margin-bottom: 0; }
-.set-row .retro-btn { flex-shrink: 0; }
+.set-row + .set-row { border-top: 1px dashed var(--border-dark); }
+/* Posarse encima ata la etiqueta con su control: en una lista de filas
+   parecidas, saber cuál estás tocando es medio acierto menos. */
+.set-row:hover,
+.set-row:focus-within { background: var(--bg-panel-2); }
+.set-row:hover .set-label,
+.set-row:focus-within .set-label { color: var(--text); }
+/* Filas de dos pisos (fondo, sincronía): la etiqueta se alinea arriba */
+.set-row-alta { align-items: start; }
+.set-row-alta .set-label { padding-top: 4px; }
+.set-campo { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.set-row .retro-btn { justify-self: start; }
+/* El número de la sección «datos»: cuántas letras, cuántas pistas */
+.set-dato {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
 /* «carátula / manual» del fondo: en fila, al lado de su etiqueta */
 .bg-options { flex-direction: row; align-items: center; margin-bottom: 0; }
 
-/* Desfase de sincronía */
-.offset-ctl { display: flex; align-items: center; gap: 8px; }
-.offset-ctl input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+/* Desfase de sincronía.
+   `min-width: 0` y el wrap no son adorno: sin ellos la fila no podía
+   encogerse por debajo de sus 120 px de barra + los cuatro botones, se
+   desbordaba de su celda de la rejilla y en un móvil el [ver ▸] salía
+   ENCIMA del botón «0». */
+.offset-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.offset-ctl input[type="range"] { flex: 1 1 90px; min-width: 70px; accent-color: var(--accent); }
 .offset-val {
   font-family: 'VT323', monospace;
   font-size: 18px;
@@ -6283,4 +6345,502 @@ body.reduce-motion .la-ncs { display: none; }
      con el color del título, que es lo que se mira. */
   #queueList .q-now .sp-name,
   #libList .sp-now .sp-name { color: var(--accent); }
+}
+
+/* ==========================================================
+   ══════════════════════════════════════════════════════════
+   CONFIGURACIÓN · CABECERA, ÍNDICE Y SALIDA
+   ══════════════════════════════════════════════════════════
+
+   Lo que reportó el usuario: «la gente se pierde o no puede volver».
+   Era verdad, y no era culpa suya. Configuración eran ocho bloques
+   seguidos dentro de un panel que rueda, sin cabecera, sin índice y
+   sin ninguna salida a la vista: la única forma de salir era la barra
+   de pestañas de arriba del todo — que además se esconde sola.
+
+   La solución no es esconder opciones, es orientarse dentro de ellas:
+
+     · La cabecera (.cfg-head) NO rueda. Siempre tienes a mano la
+       salida, el buscador y el índice.
+     · El título de cada sección se queda pegado (position: sticky)
+       mientras lees esa sección: nunca se pierde el «dónde estoy».
+     · Cada fila es una rejilla de tres columnas —etiqueta, control y
+       [ver ▸]— así que todo cae en su sitio y el ojo no tiene que
+       buscar dos veces.
+   ========================================================== */
+
+:root {
+  /* El rojo de «esto borra algo». No sale de la paleta viva a
+     propósito: el aviso de peligro tiene que decir lo mismo con
+     cualquier carátula. */
+  --peligro: #ff6b6b;
+}
+
+/* El panel manda sobre .tab-content: aquí la que rueda es .cfg-cuerpo,
+   no el contenedor entero — si no, la cabecera se iría con el scroll y
+   estaríamos donde estábamos. */
+#tab-settings.active {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.cfg-head {
+  flex: 0 0 auto;
+  padding: 8px 20px 0;
+  background: var(--bg-panel-2);
+  border-bottom: 2px solid var(--border-dark);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  position: relative;
+  z-index: 4;
+}
+.cfg-head-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ----- ◂ volver ----- */
+.cfg-volver {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+  letter-spacing: 1px;
+  color: var(--accent);
+  background: var(--bg-frame);
+  border: 2px solid var(--border-light);
+  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  text-shadow: 0 0 4px var(--accent-glow);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.cfg-volver:hover { background: var(--border-pixel); color: var(--text); }
+.cfg-volver:active { transform: translate(1px, 1px); }
+.cv-flecha { transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.cfg-volver:hover .cv-flecha { transform: translateX(-3px); }
+body.reduce-motion .cv-flecha { transition: none; }
+
+/* ----- ⌕ buscar un ajuste ----- */
+.cfg-buscar {
+  flex: 1 1 120px;
+  min-width: 80px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  background: var(--bg-deep);
+  border: 2px solid var(--border-dark);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cfg-buscar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.cfg-buscar-ico { color: var(--text-muted); font-size: 15px; line-height: 1; }
+.cfg-buscar input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+.cfg-buscar input::placeholder { color: var(--text-muted); }
+.cfg-buscar-x {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.cfg-buscar-x:hover { color: var(--accent); }
+
+/* ----- ? las explicaciones ----- */
+.cfg-ayuda {
+  flex-shrink: 0;
+  width: 30px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'VT323', monospace;
+  font-size: 19px;
+  color: var(--text-dim);
+  background: var(--bg-frame);
+  border: 2px solid var(--border-light);
+  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  cursor: pointer;
+}
+.cfg-ayuda:hover { color: var(--text); }
+.cfg-ayuda[aria-pressed="true"] {
+  color: var(--bg-deep);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ----- El índice de secciones -----
+   Se desliza a lo ancho cuando no caben: en un teléfono son siete
+   pastillas y la fila no se puede partir sin comerse la pantalla. */
+.cfg-indice {
+  display: flex;
+  gap: 5px;
+  margin-top: 7px;
+  padding-bottom: 7px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  /* Se difumina por el borde derecho: así se VE que hay más índice a la
+     derecha. Una fila cortada en seco parece una fila que se acaba. */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
+          mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
+}
+.cfg-indice::-webkit-scrollbar { display: none; }
+.cfg-chip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  background: var(--bg-panel);
+  border: 2px solid var(--border-dark);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.cfg-chip:hover { color: var(--text); border-color: var(--border-pixel); }
+.cfg-chip.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 7px var(--accent-glow);
+  text-shadow: 0 0 5px var(--accent-glow);
+}
+.cc-ico { opacity: 0.85; }
+
+/* ----- El cuerpo, que es lo único que rueda -----
+   `position: relative` no es decoración: js/ajustes-ui.js mide el
+   offsetTop de cada sección CONTRA este contenedor para saber a dónde
+   saltar y qué pastilla encender. */
+.cfg-cuerpo {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px 24px;
+}
+
+/* ----- [ver ▸] · el ajuste que te lleva a donde se ve ----- */
+.set-ver {
+  justify-self: end;
+  padding: 2px 8px;
+  font-family: 'VT323', monospace;
+  font-size: 15px;
+  letter-spacing: 1px;
+  /* Se ve SIN posar el ratón: con el dedo no hay hover, y un botón que
+     solo aparece al pasar por encima es un botón que en un teléfono no
+     existe. Al posarse o al enfocarlo se enciende, nada más. */
+  color: var(--text-dim);
+  background: none;
+  border: 2px solid var(--border-dark);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.14s, border-color 0.14s, transform 0.14s;
+}
+.set-row:hover .set-ver,
+.set-row:focus-within .set-ver { color: var(--accent); border-color: var(--border-pixel); }
+.set-ver:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateX(2px);
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+body.reduce-motion .set-ver { transition: none; }
+body.reduce-motion .set-ver:hover { transform: none; }
+
+/* ----- Las explicaciones del «?» -----
+   Están siempre en el HTML una vez montadas, pero solo se ven con el
+   interruptor puesto: el panel limpio es el estado por defecto. */
+.set-ayuda {
+  display: none;
+  grid-column: 1 / -1;
+  margin: 3px 0 0;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+#tab-settings.cfg-con-ayuda .set-ayuda { display: block; }
+.set-ayuda-suelta { margin: -6px 0 10px; }
+
+/* Nada encaja con lo que buscas */
+.cfg-vacio {
+  text-align: center;
+  padding: 34px 10px;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+/* Enter en el buscador salta al primer resultado: un latido para que se
+   vea DÓNDE aterrizaste, que si no el salto parece que no ha pasado. */
+@keyframes cfg-late {
+  0%, 100% { box-shadow: none; }
+  25%      { box-shadow: inset 0 0 0 2px var(--accent); }
+  55%      { box-shadow: none; }
+  80%      { box-shadow: inset 0 0 0 2px var(--accent); }
+}
+.set-row-late { animation: cfg-late 0.9s ease-out; }
+body.reduce-motion .set-row-late {
+  animation: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* Borrar es borrar: el botón lo dice antes de que lo pulses */
+.retro-btn.peligro { color: var(--peligro); text-shadow: 0 0 4px rgba(255, 107, 107, 0.45); }
+.retro-btn.peligro .bracket { color: inherit; }
+.retro-btn.peligro:hover { background: var(--peligro); color: var(--bg-deep); text-shadow: none; }
+
+/* El foco se VE. Media pantalla de ajustes se maneja con el tabulador y
+   hasta ahora el navegador ponía su anillo por defecto, que sobre este
+   fondo azul oscuro casi no se distingue. */
+#tab-settings :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------------------------
+   VENTANA ESTRECHA · la etiqueta se pone ENCIMA de su control
+
+   Con 320 px de ancho, «pantalla crt» + tres botones + [ver ▸] en una
+   línea no cabe de ninguna manera: los botones se partían y quedaban
+   dos filas desalineadas. Apilado se lee como una ficha.
+   ---------------------------------------------------------- */
+@container win (max-width: 720px) {
+  .set-row { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; }
+  .set-row > .set-label { grid-column: 1 / -1; }
+  .set-row-alta .set-label { padding-top: 0; }
+  .cfg-cuerpo { padding: 0 12px 24px; }
+  .cfg-head { padding: 8px 12px 0; }
+  .settings-block h3 { margin-left: -12px; margin-right: -12px; padding-left: 12px; padding-right: 12px; }
+  /* «◂ volver a tus listas» no deja sitio al buscador: se queda en
+     «◂ volver» y el destino sigue entero en el title y en el aria-label. */
+  .cv-dest { display: none; }
+}
+@media (max-width: 700px) {
+  .set-row { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; }
+  .set-row > .set-label { grid-column: 1 / -1; }
+  .set-row-alta .set-label { padding-top: 0; }
+  .cfg-cuerpo { padding: 0 12px 24px; }
+  .cfg-head { padding: 8px 12px 0; }
+  .settings-block h3 { margin-left: -12px; margin-right: -12px; padding-left: 12px; padding-right: 12px; }
+  .cv-dest { display: none; }
+  /* Objetivos de toque: con el dedo, 2 px de padding no se aciertan */
+  .seg-btn { padding: 5px 13px; }
+  .cfg-chip { padding: 5px 11px; }
+  .set-ver { padding: 5px 9px; }
+}
+
+/* ==========================================================
+   ══════════════════════════════════════════════════════════
+   ❝ COMPARTIR LA LETRA · el panel de la tarjeta
+   ══════════════════════════════════════════════════════════
+
+   Mismo molde que la galería de tipografías y la paleta de Ctrl+K:
+   una capa colgada del <body>, con su fondo oscuro y su caja con el
+   borde de acento. Va así y no dentro del panel de la letra por la
+   regla de siempre — la letra se queda limpia, sin barras ni cajas
+   nuevas encima.
+
+   Dentro, dos columnas: la tarjeta (un <canvas> que es EXACTAMENTE lo
+   que se va a compartir, no una aproximación en HTML) y los mandos.
+   En un teléfono se ponen una debajo de otra, con la tarjeta arriba.
+   ========================================================== */
+.comp {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(10px, 5vh, 60px) 14px 14px;
+}
+.comp[hidden] { display: none; }
+.comp-fondo {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 22, 0.8);
+  backdrop-filter: blur(3px);
+}
+.comp-caja {
+  position: relative;
+  width: min(900px, 100%);
+  max-height: min(720px, 90vh);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 3px solid var(--accent);
+  box-shadow: 0 0 34px var(--accent-glow), 0 18px 60px rgba(0, 0, 0, .6),
+              inset 1px 1px 0 var(--border-pixel);
+  animation: paletaEntra .16s ease-out both;
+}
+body.reduce-motion .comp-caja { animation: none; }
+
+.comp-cab {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: var(--bg-panel-2);
+  border-bottom: 2px solid var(--border-dark);
+}
+.comp-tit {
+  flex: 1;
+  font-family: 'VT323', monospace;
+  font-size: 19px;
+  letter-spacing: 1px;
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+
+.comp-cuerpo {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 46%) minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+/* ----- La vista previa ----- */
+.comp-vista {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+}
+.comp-lienzo {
+  display: block;
+  max-width: 100%;
+  /* El alto manda: una tarjeta de historia (9:16) tiene que caber
+     entera sin empujar los mandos fuera de la caja. */
+  max-height: min(460px, 56vh);
+  width: auto;
+  height: auto;
+  border: 2px solid var(--border-dark);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
+  background: var(--bg-deep);
+}
+
+/* ----- La columna de mandos ----- */
+.comp-lado {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.comp-ayuda {
+  margin: 0;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Los versos. Es una lista larga y hay que poder recorrerla sin que
+   la caja crezca: rueda ella, no el panel entero. */
+.comp-versos {
+  flex: 1 1 auto;
+  min-height: 120px;
+  max-height: 210px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg-panel-2);
+  border: 2px solid var(--border-dark);
+}
+.comp-verso {
+  flex: 0 0 auto;
+  text-align: left;
+  padding: 5px 8px;
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  line-height: 1.35;
+  color: var(--text-dim);
+  background: none;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+.comp-verso:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+.comp-verso.on {
+  color: var(--bg-deep);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.comp-vacio {
+  margin: auto;
+  padding: 14px 8px;
+  text-align: center;
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.comp-opts { display: flex; flex-direction: column; gap: 6px; }
+/* Misma rejilla que una fila de configuración: etiqueta + control.
+   No se reutiliza .set-row porque aquel vive dentro de #tab-settings
+   y arrastra sus bordes y su hover. */
+.comp-fila {
+  display: grid;
+  grid-template-columns: minmax(62px, 88px) minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 10px;
+}
+.comp-fila[hidden] { display: none; }
+
+.comp-acciones { display: flex; flex-wrap: wrap; gap: 6px; }
+.comp-acciones .retro-btn { flex: 0 0 auto; }
+
+/* El foco se ve, igual que en configuración */
+.comp :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ----------------------------------------------------------
+   Ventana estrecha: una columna, la tarjeta arriba.
+   Dos columnas de 46% en un teléfono dejan la tarjeta del tamaño de
+   un sello y los versos en tiras de tres letras.
+   ---------------------------------------------------------- */
+@media (max-width: 720px) {
+  .comp { padding: 8px 8px 8px; }
+  .comp-caja { max-height: 94vh; }
+  .comp-cuerpo { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 10px; }
+  .comp-lienzo { max-height: min(320px, 38vh); }
+  .comp-versos { max-height: 150px; }
+  /* objetivos de toque */
+  .comp-verso { padding: 8px 9px; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .comp { padding: 6px; }
+  .comp-lienzo { max-height: 62vh; }
+  .comp-versos { min-height: 80px; max-height: 110px; }
 }

@@ -340,30 +340,76 @@
 
         <!-- SETTINGS TAB -->
         <!-- ==========================================================
-             AJUSTES · SOLO LAS OPCIONES.
-             Cada fila es: una etiqueta corta (.set-label) + su control.
-             Nada de párrafos explicando lo que ya dice el propio botón —
-             lo que de verdad haga falta aclarar va en su `title`, que
-             sale al posar el ratón y no ocupa sitio.
+             AJUSTES · SOLO LAS OPCIONES, PERO CON SALIDA Y CON MAPA.
+
+             Cada fila es: una etiqueta corta (.set-label) + su control, y
+             si el efecto se ve en OTRA pestaña, un [ver ▸] que te lleva.
+             Nada de párrafos explicando lo que ya dice el propio botón:
+             la explicación vive en el `title` y solo se despliega si
+             pulsas el «?» de la cabecera — que es justo lo que faltaba en
+             el móvil, donde no hay ratón que pueda posarse encima.
+
+             La cabecera (.cfg-head) no se va con el scroll: dentro
+             siempre tienes «volver», el buscador de ajustes y el índice
+             de secciones. Antes esto era un rollo de 250 líneas sin
+             principio ni fin, y quien bajaba no sabía ni dónde estaba ni
+             cómo salir. La cabecera la monta js/ajustes-ui.js.
              ========================================================== -->
         <div class="tab-content" id="tab-settings">
-          <div class="settings-block">
+
+          <div class="cfg-head">
+            <div class="cfg-head-fila">
+              <!-- LA SALIDA. Vuelve a la pestaña de la que viniste, con su
+                   nombre puesto: no es lo mismo «volver» que «volver a la
+                   letra». El engranaje hace lo mismo, y Esc también. -->
+              <button class="cfg-volver" id="cfgVolver" type="button"
+                      title="Volver a donde estabas (Esc)">
+                <span class="cv-flecha" aria-hidden="true">◂</span>
+                <span class="cv-txt">volver</span>
+                <!-- El destino va aparte porque en un teléfono se retira:
+                     «◂ volver a tus listas» no deja sitio al buscador. -->
+                <span class="cv-dest" id="cfgVolverTxt"></span>
+              </button>
+
+              <div class="cfg-buscar">
+                <span class="cfg-buscar-ico" aria-hidden="true">⌕</span>
+                <input type="text" id="cfgFiltro" autocomplete="off" spellcheck="false"
+                       placeholder="buscar ajuste…" aria-label="Buscar un ajuste" />
+                <button class="cfg-buscar-x" id="cfgFiltroX" type="button" hidden
+                        title="Borrar la búsqueda" aria-label="Borrar la búsqueda">✕</button>
+              </div>
+
+              <button class="cfg-ayuda" id="cfgAyuda" type="button" aria-pressed="false"
+                      title="Enseñar debajo de cada ajuste lo que hace">
+                <span aria-hidden="true">?</span>
+              </button>
+            </div>
+
+            <!-- El índice lo pinta js/ajustes-ui.js leyendo las secciones:
+                 añadir un bloque nuevo no obliga a tocar esta lista. -->
+            <nav class="cfg-indice" id="cfgIndice" aria-label="Secciones de configuración"></nav>
+          </div>
+
+          <div class="cfg-cuerpo" id="cfgCuerpo">
+
+          <section class="settings-block" id="cfg-musica" data-titulo="música" data-ico="♪">
             <h3>~ música ~</h3>
             <div class="library-actions">
               <input type="file" id="fileInput" accept="audio/*" multiple hidden />
               <!-- IMPORTAR · el <input> llevaba aquí escondido desde siempre y
                    NADIE lo abría: la única forma de meter música era arrastrar
                    archivos a la ventana, cosa que en un teléfono no se puede
-                   hacer. O sea que en el móvil la música local era inalcanzable. -->
-              <button class="retro-btn" id="importBtn" title="Añadir mp3, wav, ogg, flac o m4a de tu equipo">
+                   hacer. O sea que en el móvil la música local era inalcanzable.
+                   Al acabar te deja en «tu música», con lo importado delante. -->
+              <button class="retro-btn" id="importBtn" title="Añadir mp3, wav, ogg, flac o m4a de tu equipo. Al terminar te lleva a «tu música».">
                 <span class="bracket">[</span> importar música <span class="bracket">]</span>
               </button>
               <button class="retro-btn" id="spotifyConnectBtn"
-                      title="Si el corazón ♥ dice que no tiene permiso, desconecta y vuelve a conectar.">
+                      title="Conecta tu cuenta para buscar, ver tus listas y usar el corazón ♥. Estando conectado, este mismo botón cierra la sesión (pregunta antes).">
                 <span class="bracket">[</span> conectar spotify <span class="bracket">]</span>
               </button>
             </div>
-            <div class="set-row">
+            <div class="set-row" data-buscar="autoplay radio parecidas siguiente cola encolar automatico">
               <span class="set-label">sigue sonando</span>
               <!-- settings.js define esta opción (`radio`) desde que existe
                    «sigue sonando», pero no había botones: quedaba encendida
@@ -373,15 +419,16 @@
                 <button class="seg-btn" data-val="on">sí</button>
                 <button class="seg-btn" data-val="off">no</button>
               </div>
+              <button class="set-ver" type="button" data-ver="queue">ver ▸</button>
             </div>
-          </div>
+          </section>
 
-          <div class="settings-block">
+          <section class="settings-block" id="cfg-apariencia" data-titulo="apariencia" data-ico="◈">
             <h3>~ apariencia ~</h3>
             <!-- AMBIENTE · qué se ve por detrás de la letra. «ondas» es la
                  escena nueva estilo NCS (js/fondo.js); «clásico» deja la
                  carátula difuminada de siempre; «liso» apaga las dos. -->
-            <div class="set-row">
+            <div class="set-row" data-buscar="ambiente fondo ondas ncs caratula difuminada liso clasico">
               <span class="set-label">ambiente</span>
               <div class="seg" data-set="ambiente"
                    title="Lo que se ve detrás de la letra: ondas de sonido estilo NCS, la carátula difuminada de siempre, o nada.">
@@ -389,74 +436,81 @@
                 <button class="seg-btn" data-val="clasico">clásico</button>
                 <button class="seg-btn" data-val="liso">liso</button>
               </div>
+              <button class="set-ver" type="button" data-ver="lyrics">ver ▸</button>
             </div>
-            <div class="set-row">
+            <div class="set-row" data-buscar="crt scanlines pantalla tubo retro curva brillo">
               <span class="set-label">pantalla crt</span>
-              <div class="seg" data-set="crt">
+              <div class="seg" data-set="crt"
+                   title="El acabado de monitor viejo: líneas de barrido, curvatura y brillo de fósforo sobre toda la ventana.">
                 <button class="seg-btn" data-val="full">completo</button>
                 <button class="seg-btn" data-val="soft">sutil</button>
                 <button class="seg-btn" data-val="off">apagado</button>
               </div>
             </div>
-            <div class="set-row">
+            <div class="set-row" data-buscar="listas filas altura densidad compactas comodas espacio">
               <span class="set-label">listas</span>
-              <div class="seg" data-set="rows">
+              <div class="seg" data-set="rows"
+                   title="Cuánto respira cada fila de las listas (tu música, la cola, los resultados). Compactas caben más; cómodas se aciertan mejor con el dedo.">
                 <button class="seg-btn" data-val="compact">compactas</button>
                 <button class="seg-btn" data-val="normal">normal</button>
                 <button class="seg-btn" data-val="cozy">cómodas</button>
               </div>
+              <button class="set-ver" type="button" data-ver="library">ver ▸</button>
             </div>
-            <div class="set-row">
+            <div class="set-row" data-buscar="movimiento animaciones reduce motion mareo scanlines vinilo">
               <span class="set-label">movimiento</span>
               <div class="seg" data-set="motion"
-                   title="«menos» detiene scanlines, notas flotantes, vinilo y destellos. La letra sigue igual.">
+                   title="«menos» detiene scanlines, notas flotantes, vinilo y destellos. La letra sigue igual. «automático» hace lo que diga tu sistema.">
                 <button class="seg-btn" data-val="auto">automático</button>
                 <button class="seg-btn" data-val="full">completo</button>
                 <button class="seg-btn" data-val="less">menos</button>
               </div>
             </div>
-            <div class="set-row">
+            <div class="set-row" data-buscar="microfono espectro visualizador sync escuchar permiso">
               <span class="set-label">micrófono</span>
               <!-- La otra opción que settings.js definía sin botones. Manda el
                    botón ◈ del espectro; apagada, el visualizador ni lo enseña. -->
               <div class="seg" data-set="mic"
-                   title="Deja que el espectro escuche por el micrófono (botón ◈). En el móvil abrir el micrófono baja el volumen de la música: solo vale la pena si suena en OTRO aparato.">
+                   title="Deja que el espectro escuche por el micrófono (botón ◈, al lado del visualizador). En el móvil abrir el micrófono baja el volumen de la música: solo vale la pena si suena en OTRO aparato.">
                 <button class="seg-btn" data-val="on">permitir</button>
                 <button class="seg-btn" data-val="off">no</button>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div class="settings-block">
+          <section class="settings-block" id="cfg-letra" data-titulo="letras" data-ico="♫">
             <h3>~ letras ~</h3>
-            <div class="set-row">
+            <div class="set-row" data-buscar="tamano letra grande pequena texto size">
               <span class="set-label">tamaño</span>
-              <div class="seg" data-set="lyrics">
+              <div class="seg" data-set="lyrics"
+                   title="Lo grande que se ve la letra en su panel. La muestra de aquí abajo cambia contigo.">
                 <button class="seg-btn" data-val="s">S</button>
                 <button class="seg-btn" data-val="m">M</button>
                 <button class="seg-btn" data-val="l">L</button>
                 <button class="seg-btn" data-val="xl">XL</button>
               </div>
+              <button class="set-ver" type="button" data-ver="lyrics">ver ▸</button>
             </div>
             <!-- TRADUCCIÓN · el mando vive AQUÍ y no encima de la letra: el
                  panel de la letra se queda limpio, sin barras ni cajas
                  nuevas. Lo que hace lo explica el título del grupo. -->
-            <div class="set-row">
+            <div class="set-row" data-buscar="traduccion espanol subtitulos idioma ingles traducir">
               <span class="set-label">traducción</span>
               <div class="seg" data-set="trad"
                    title="Pone la letra en español, en pequeño y debajo de cada verso. Las canciones que ya están en español se quedan como están.">
                 <button class="seg-btn" data-val="on">español</button>
                 <button class="seg-btn" data-val="off">no</button>
               </div>
+              <button class="set-ver" type="button" data-ver="lyrics">ver ▸</button>
             </div>
             <!-- TIPOGRAFÍA · antes había aquí una PARED de botones, uno por
                  fuente y todos al lado. Con 38 no cabe: ahora esta fila
                  enseña la puesta (dibujada en su propia letra) y abre la
                  galería, que es donde están todas guardadas y ordenadas por
-                 categoría. La galería la monta js/fonts.js colgada del <body>,
+                 categoría. La galería la monta js/fonts.js colgada del body,
                  como la paleta de Ctrl+K. Añadir una fuente se hace allí, en
                  CATALOGO: la tarjeta y la descarga salen solas. -->
-            <div class="set-row">
+            <div class="set-row" data-buscar="tipografia fuente font letra anime juegos series cine">
               <span class="set-label">tipografía</span>
               <button class="font-abrir" id="fontAbrir" type="button"
                       title="Ver todas las tipografías: anime, juegos, series y cine…">
@@ -464,76 +518,84 @@
                 <span class="fa-mas" aria-hidden="true">ver todas ▸</span>
               </button>
             </div>
+            <!-- LA MUESTRA · tamaño, tipografía y traducción se ven aquí
+                 mismo, sin cambiar de pestaña. Antes solo respondía a la
+                 tipografía: elegir S o XL no movía ni un píxel y parecía
+                 que esos cuatro botones estuvieran muertos. -->
             <div class="font-preview" id="fontPreview" aria-hidden="true">
               <span class="fp-past">y aunque no estés</span>
               <span class="fp-now">te sigo cantando igual</span>
+              <span class="fp-trad" id="fpTrad" hidden>así se vería traducido</span>
               <span class="fp-next">como la primera vez</span>
             </div>
-            <span class="set-label solo" title="Adelanta o atrasa la letra. Se guarda por canción.">sincronía</span>
-            <div class="offset-ctl">
-              <button class="retro-btn small" id="offsetMinus" title="Atrasar 0.25s">−</button>
-              <input type="range" id="offsetSlider" min="-5" max="5" step="0.05" value="0" />
-              <button class="retro-btn small" id="offsetPlus" title="Adelantar 0.25s">+</button>
-              <span class="offset-val" id="offsetValue">+0.00s</span>
-              <button class="retro-btn small" id="offsetReset" title="Volver a cero">0</button>
+            <div class="set-row set-row-alta" data-buscar="sincronia desfase offset adelantar atrasar retraso">
+              <span class="set-label" title="Adelanta o atrasa la letra. Se guarda por canción.">sincronía</span>
+              <div class="offset-ctl">
+                <button class="retro-btn small" id="offsetMinus" title="Atrasar 0.25s">−</button>
+                <input type="range" id="offsetSlider" min="-5" max="5" step="0.05" value="0"
+                       aria-label="Desfase de la letra en segundos" />
+                <button class="retro-btn small" id="offsetPlus" title="Adelantar 0.25s">+</button>
+                <span class="offset-val" id="offsetValue">+0.00s</span>
+                <button class="retro-btn small" id="offsetReset" title="Volver a cero">0</button>
+              </div>
+              <button class="set-ver" type="button" data-ver="lyrics">ver ▸</button>
             </div>
-          </div>
+          </section>
 
           <!-- Los tres colores estaban en tres bloques sueltos con el botón de
                restablecer en un cuarto. Aquí van juntos: es UNA cosa. -->
-          <div class="settings-block">
+          <section class="settings-block" id="cfg-colores" data-titulo="colores" data-ico="▩">
             <h3>~ colores ~</h3>
-            <div class="set-row">
+            <div class="set-row" data-buscar="acento color principal caratula auto tema">
               <span class="set-label">acento</span>
               <div class="color-swatches">
                 <button class="swatch swatch-auto" id="accentAuto" title="auto (color de la carátula de cada canción)">A</button>
-                <button class="swatch" data-color="cyan" style="--c:#5ce1e6"></button>
-                <button class="swatch" data-color="green" style="--c:#22ff77"></button>
-                <button class="swatch" data-color="pink" style="--c:#ff77c8"></button>
-                <button class="swatch" data-color="orange" style="--c:#ff9b5c"></button>
-                <button class="swatch" data-color="purple" style="--c:#b58cff"></button>
-                <button class="swatch" data-color="red" style="--c:#ff5c5c"></button>
-                <button class="swatch" data-color="yellow" style="--c:#ffe45c"></button>
-                <button class="swatch" data-color="white" style="--c:#ffffff"></button>
+                <button class="swatch" data-color="cyan" style="--c:#5ce1e6" title="cian"></button>
+                <button class="swatch" data-color="green" style="--c:#22ff77" title="verde"></button>
+                <button class="swatch" data-color="pink" style="--c:#ff77c8" title="rosa"></button>
+                <button class="swatch" data-color="orange" style="--c:#ff9b5c" title="naranja"></button>
+                <button class="swatch" data-color="purple" style="--c:#b58cff" title="morado"></button>
+                <button class="swatch" data-color="red" style="--c:#ff5c5c" title="rojo"></button>
+                <button class="swatch" data-color="yellow" style="--c:#ffe45c" title="amarillo"></button>
+                <button class="swatch" data-color="white" style="--c:#ffffff" title="blanco"></button>
                 <label class="swatch custom-swatch" title="elige cualquier color">
                   <span class="custom-label">+</span>
-                  <input type="color" id="customAccent" value="#5ce1e6">
+                  <input type="color" id="customAccent" value="#5ce1e6" aria-label="Color de acento personalizado">
                 </label>
               </div>
             </div>
 
-            <div class="set-row">
+            <div class="set-row set-row-alta" data-buscar="fondo pantalla color negro oscuro caratula manual">
               <span class="set-label">fondo</span>
-              <div class="bg-options">
-                <label class="radio-row">
-                  <input type="radio" name="bgMode" value="auto" id="bgAuto" checked />
-                  <span>carátula</span>
-                </label>
-                <label class="radio-row">
-                  <input type="radio" name="bgMode" value="manual" id="bgManual" />
-                  <span>manual</span>
-                </label>
-              </div>
-            </div>
-            <div class="set-row">
-              <span class="set-label"></span>
-              <div class="color-swatches">
-                <button class="swatch bg-preset" data-bg="#000000" style="--c:#000000" title="negro"></button>
-                <button class="swatch bg-preset" data-bg="#0a0e2e" style="--c:#0a0e2e" title="azul noche"></button>
-                <button class="swatch bg-preset" data-bg="#1a0033" style="--c:#1a0033" title="púrpura oscuro"></button>
-                <button class="swatch bg-preset" data-bg="#330011" style="--c:#330011" title="vino"></button>
-                <button class="swatch bg-preset" data-bg="#003322" style="--c:#003322" title="verde profundo"></button>
-                <button class="swatch bg-preset" data-bg="#332200" style="--c:#332200" title="ámbar"></button>
-                <button class="swatch bg-preset" data-bg="#1a1a1a" style="--c:#1a1a1a" title="gris oscuro"></button>
-                <button class="swatch bg-preset" data-bg="#ffffff" style="--c:#ffffff" title="blanco"></button>
-                <label class="swatch custom-swatch" title="elige cualquier color de fondo">
-                  <span class="custom-label">+</span>
-                  <input type="color" id="customBg" value="#0a0e2e">
-                </label>
+              <div class="set-campo">
+                <div class="bg-options">
+                  <label class="radio-row">
+                    <input type="radio" name="bgMode" value="auto" id="bgAuto" checked />
+                    <span>carátula</span>
+                  </label>
+                  <label class="radio-row">
+                    <input type="radio" name="bgMode" value="manual" id="bgManual" />
+                    <span>manual</span>
+                  </label>
+                </div>
+                <div class="color-swatches">
+                  <button class="swatch bg-preset" data-bg="#000000" style="--c:#000000" title="negro"></button>
+                  <button class="swatch bg-preset" data-bg="#0a0e2e" style="--c:#0a0e2e" title="azul noche"></button>
+                  <button class="swatch bg-preset" data-bg="#1a0033" style="--c:#1a0033" title="púrpura oscuro"></button>
+                  <button class="swatch bg-preset" data-bg="#330011" style="--c:#330011" title="vino"></button>
+                  <button class="swatch bg-preset" data-bg="#003322" style="--c:#003322" title="verde profundo"></button>
+                  <button class="swatch bg-preset" data-bg="#332200" style="--c:#332200" title="ámbar"></button>
+                  <button class="swatch bg-preset" data-bg="#1a1a1a" style="--c:#1a1a1a" title="gris oscuro"></button>
+                  <button class="swatch bg-preset" data-bg="#ffffff" style="--c:#ffffff" title="blanco"></button>
+                  <label class="swatch custom-swatch" title="elige cualquier color de fondo">
+                    <span class="custom-label">+</span>
+                    <input type="color" id="customBg" value="#0a0e2e" aria-label="Color de fondo personalizado">
+                  </label>
+                </div>
               </div>
             </div>
 
-            <div class="set-row">
+            <div class="set-row" data-buscar="texto color letra blanco amarillo contraste">
               <span class="set-label">texto</span>
               <div class="color-swatches">
                 <button class="swatch text-preset" data-text="#e8ecff" style="--c:#e8ecff" title="blanco azulado"></button>
@@ -544,38 +606,44 @@
                 <button class="swatch text-preset" data-text="#000000" style="--c:#000000" title="negro"></button>
                 <label class="swatch custom-swatch" title="color de texto personalizado">
                   <span class="custom-label">+</span>
-                  <input type="color" id="customText" value="#e8ecff">
+                  <input type="color" id="customText" value="#e8ecff" aria-label="Color de texto personalizado">
                 </label>
               </div>
             </div>
 
-            <button class="retro-btn small" id="resetColors" style="margin-top:4px">
-              <span class="bracket">[</span> restablecer colores <span class="bracket">]</span>
-            </button>
-          </div>
+            <div class="set-row" data-buscar="restablecer reset colores fabrica volver defecto">
+              <span class="set-label">volver a cero</span>
+              <button class="retro-btn small" id="resetColors"
+                      title="Deja acento, fondo y texto como salen de fábrica: siguiendo a la carátula de cada canción.">
+                <span class="bracket">[</span> restablecer colores <span class="bracket">]</span>
+              </button>
+            </div>
+          </section>
 
-          <div class="settings-block">
+          <section class="settings-block" id="cfg-datos" data-titulo="datos" data-ico="▤">
             <h3>~ datos ~</h3>
-            <div class="set-row">
+            <div class="set-row" data-buscar="cache letras lrclib traducciones borrar limpiar memoria">
+              <span class="set-label">caché de letras</span>
+              <span class="set-dato" id="cacheSize">—</span>
               <button class="retro-btn small" id="clearLyricsCache"
-                      title="Las letras guardadas para no volver a pedírselas a LRClib, que tarda.">
-                <span class="bracket">[</span> limpiar caché de letras <span class="bracket">]</span>
+                      title="Las letras guardadas para no volver a pedírselas a LRClib, que tarda. Se vuelven a bajar solas cuando hagan falta.">
+                <span class="bracket">[</span> limpiar <span class="bracket">]</span>
               </button>
-              <span class="set-label" id="cacheSize">—</span>
             </div>
-            <div class="set-row">
-              <button class="retro-btn small" id="clearLibrary"
-                      title="Solo la música que importaste tú. No toca nada de Spotify.">
-                <span class="bracket">[</span> borrar música importada <span class="bracket">]</span>
+            <div class="set-row" data-buscar="biblioteca musica importada borrar local mp3 disco">
+              <span class="set-label">música importada</span>
+              <span class="set-dato" id="librarySize">—</span>
+              <button class="retro-btn small peligro" id="clearLibrary"
+                      title="Solo la música que importaste tú. No toca nada de Spotify ni los archivos de tu disco.">
+                <span class="bracket">[</span> borrar <span class="bracket">]</span>
               </button>
-              <span class="set-label" id="librarySize">—</span>
             </div>
-          </div>
+          </section>
 
           <!-- Solo las teclas que EXISTEN de verdad. Las de compartir (P),
                mini flotante (N), grabar (R) y temporizador (T) se fueron con
                share/pip/rec/extras: seguían aquí anunciando nada. -->
-          <div class="settings-block">
+          <section class="settings-block" id="cfg-teclas" data-titulo="atajos" data-ico="⌨">
             <h3>~ atajos de teclado ~</h3>
             <div class="keys-grid">
               <kbd>ctrl + K</kbd><span><b>buscar en todo</b> (o la tecla <kbd>/</kbd>)</span>
@@ -591,14 +659,17 @@
               <kbd>B</kbd><span>listas</span>
               <kbd>Q</kbd><span>cola</span>
               <kbd>H</kbd><span>historial</span>
-              <kbd>S</kbd><span>configuración</span>
-              <kbd>esc</kbd><span>cerrar el buscador o el modo cine</span>
+              <kbd>S</kbd><span>configuración (y otra vez para volver)</span>
+              <kbd>esc</kbd><span>cerrar el buscador o el cine — y volver desde configuración</span>
             </div>
-          </div>
+          </section>
 
-          <div class="settings-block">
+          <section class="settings-block" id="cfg-acerca" data-titulo="acerca" data-ico="▣">
             <h3>~ acerca ~</h3>
             <p class="about-text">MASTER MUSIC v1.0</p>
+          </section>
+
+          <p class="cfg-vacio" id="cfgVacio" hidden>▒ ningún ajuste se llama así ▒</p>
           </div>
         </div>
       </section>
@@ -697,6 +768,13 @@
           <button class="ctrl-btn vol-btn side-btn" id="anchoBtn"
                   title="Letra ancha: esconde la carátula y deja todo el ancho para la letra (W)">◧</button>
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" title="Modo edit (letra animada)">✦</button>
+          <!-- ❝ COMPARTIR LA LETRA · elige los versos y sale una imagen con
+               la carátula, el título y esos versos. Va aquí, con ✦ ◧ ⛶,
+               porque el panel de la letra se queda limpio: el panel de
+               compartir lo cuelga js/compartir.js del <body>, como la
+               galería de tipografías. -->
+          <button class="ctrl-btn vol-btn side-btn" id="compartirBtn"
+                  title="Compartir la letra como imagen: carátula, título y los versos que elijas">❝</button>
           <!-- ⚗ Lab de efectos DESACTIVADO por ahora (quitar "hidden" para reactivar; el código en lyrics.js queda intacto) -->
           <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn" title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
           <button class="ctrl-btn vol-btn side-btn" id="cinemaBtn" title="Modo cine: letra animada + carátula girando (Esc para salir)">⛶</button>
@@ -865,6 +943,14 @@
   <!-- tipografía de la letra: va DESPUÉS de settings.js (comparte el bloque
        de ajustes) y después de lyrics.js, a quien le pide el repintado -->
   <script defer src="js/fonts.js"></script>
+  <!-- La cabecera de configuración (volver, buscar, índice, «?»). Va al
+       final de los tres: lee las secciones y las filas YA montadas, y
+       pregunta por window.MMNav, que monta seven.js. -->
+  <script defer src="js/ajustes-ui.js"></script>
+  <!-- ❝ la tarjeta para compartir la letra. Después de lyrics.js (le pide
+       los versos), de fonts.js (le pide la tipografía puesta) y de
+       seven.js (le pide los colores que ya están en el CSS). -->
+  <script defer src="js/compartir.js"></script>
   <script defer src="js/cinema.js"></script>
   <script defer src="js/colors.js"></script>
   <script defer src="js/ambient.js"></script>

@@ -161,12 +161,17 @@
      Se declaran con `hacer` perezoso: al montarse el módulo puede que
      PlayerCore todavía no esté, y guardar la referencia ahora la dejaría
      congelada en `undefined` para toda la sesión. */
+  /* Por MMNav y no por un `.click()` en la pestaña: el engranaje es un
+     interruptor (dentro de configuración te SACA), así que simularle un
+     clic para «ir a ajustes» te echaba fuera si ya estabas dentro. */
   const irPestania = (n) => {
+    if (window.MMNav) { window.MMNav.ir(n); return; }
     const t = document.querySelector(`.tab[data-tab="${n}"]`);
     if (t) t.click();
   };
 
   const TEMP = () => window.Temporizador;
+  const AJU = () => window.MMAjustes;
 
   /* ---------- Compartir lo que suena ----------
      La otra mitad de lo que hace js/entradas.js: si a esta app se le puede
@@ -264,7 +269,13 @@
       alias: 'cancelar apagado dormir sleep timer', ico: '◷',
       hacer: () => TEMP().quitar(),
     }] : []),
-    { n: 'compartir lo que suena', alias: 'enviar mandar enlace link copiar', ico: '⇥',
+    /* Dos formas de compartir, y la de la imagen va primero porque es
+       la que la gente quiere: el enlace pelado sirve para «escucha
+       esto», la tarjeta sirve para enseñar el verso. */
+    { n: 'compartir la letra (imagen)', alias: 'tarjeta foto captura verso instagram estado story postal', ico: '❝',
+      hacer: () => (window.MMCompartir ? window.MMCompartir.abrir() : compartirActual()) },
+    { n: 'compartir el enlace de la canción',
+      alias: 'enviar mandar link copiar url spotify lo que suena', ico: '⇥',
       hacer: () => compartirActual() },
     { n: 'ver mi música', alias: 'biblioteca local importada mp3', ico: '♪',
       hacer: () => verColeccion('mine', 'tu música') },
@@ -281,8 +292,23 @@
     { n: 'ver mi historial', alias: 'estadisticas mas escuchadas stats', ico: '▤',
       hacer: () => irPestania('stats') },
     { n: 'ver la letra', alias: 'lyrics', ico: '♫', hacer: () => irPestania('lyrics') },
-    { n: 'ajustes', alias: 'configuracion opciones colores tipografia', ico: '⚙',
+    /* AJUSTES · uno por sección. Con `MMAjustes.abrir` el buscador deja de
+       soltarte al principio de una lista larga y te pone delante de lo que
+       pediste. Van al final de los mandos a propósito: sin nada escrito
+       solo salen los seis primeros, así que esto no llena la lista de
+       arranque — aparece cuando lo buscas, que es cuando sirve. */
+    { n: 'ajustes', alias: 'configuracion opciones preferencias', ico: '⚙',
       hacer: () => irPestania('settings') },
+    { n: 'ajustes · colores', alias: 'acento fondo texto tema paleta configuracion', ico: '⚙',
+      hacer: () => AJU() ? AJU().abrir('colores') : irPestania('settings') },
+    { n: 'ajustes · letras', alias: 'tamaño tipografia fuente traduccion sincronia configuracion', ico: '⚙',
+      hacer: () => AJU() ? AJU().abrir('letra') : irPestania('settings') },
+    { n: 'ajustes · apariencia', alias: 'ambiente crt movimiento microfono listas configuracion', ico: '⚙',
+      hacer: () => AJU() ? AJU().abrir('apariencia') : irPestania('settings') },
+    { n: 'ajustes · datos', alias: 'cache letras borrar biblioteca memoria configuracion', ico: '⚙',
+      hacer: () => AJU() ? AJU().abrir('datos') : irPestania('settings') },
+    { n: 'ajustes · atajos de teclado', alias: 'teclas shortcuts ayuda configuracion', ico: '⌨',
+      hacer: () => AJU() ? AJU().abrir('teclas') : irPestania('settings') },
     { n: conSpotify() ? 'desconectar spotify' : 'conectar spotify', alias: 'cuenta sesion login', ico: '◈',
       hacer: () => SP() && SP().connect() },
   ];

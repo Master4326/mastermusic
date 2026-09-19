@@ -5,9 +5,35 @@
 (() => {
   'use strict';
 
-  // ---------- Tab switching ----------
+  /* ==========================================================
+     NAVEGACIÓN · UN SOLO SITIO QUE CAMBIA DE PESTAÑA
+
+     Antes cada módulo hacía `querySelector('.tab[…]').click()` por su
+     cuenta. Funcionaba, pero nadie apuntaba de DÓNDE venías, así que no
+     había vuelta posible: quien abría configuración desde la letra se
+     quedaba dentro buscando la salida.
+
+     Y peor: los botones que actúan en OTRO panel —el ✦ del modo edit, el
+     ◧ de letra ancha— cambiaban algo que no se veía, porque seguías
+     mirando otra pestaña. Para quien lo pulsa, un botón que no enseña su
+     efecto es un botón roto. Ahora todo pasa por `activarTab`, que apunta
+     la pestaña anterior, y `window.MMNav` es la puerta para los demás
+     módulos: pulsar algo te LLEVA a donde ese algo pasa.
+     ========================================================== */
   const tabs = document.querySelectorAll('.tab');
   const contents = document.querySelectorAll('.tab-content');
+
+  // Cómo se llama cada pestaña cuando hay que decirlo en una frase
+  // («◂ volver a la letra», «▣ guardado · ver en la cola»).
+  const NOMBRE_TAB = {
+    lyrics:   'la letra',
+    search:   'buscar',
+    library:  'tus listas',
+    queue:    'la cola',
+    stats:    'el historial',
+    settings: 'configuración',
+  };
+
   // Semántica para lectores de pantalla: la barra ya es role="tablist"
   tabs.forEach(t => {
     t.setAttribute('role', 'tab');
@@ -15,23 +41,62 @@
     t.setAttribute('aria-selected', t.classList.contains('active') ? 'true' : 'false');
   });
   contents.forEach(c => c.setAttribute('role', 'tabpanel'));
+
+  const cualTab = () => {
+    const t = document.querySelector('.tab.active');
+    return t ? t.dataset.tab : '';
+  };
+
+  let tabAnterior = '';
+
+  const activarTab = (nombre) => {
+    const destino = [...tabs].find(x => x.dataset.tab === nombre);
+    if (!destino) return false;
+    const previa = cualTab();
+    // Ya estás ahí: no se pisa la vuelta con la pestaña actual
+    if (previa === nombre) return true;
+    if (previa) tabAnterior = previa;
+    tabs.forEach(x => {
+      const on = x === destino;
+      x.classList.toggle('active', on);
+      x.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    contents.forEach(c => c.classList.toggle('active', c.id === 'tab-' + nombre));
+    if (nombre === 'queue') renderQueue();   // refresco inmediato al abrir la cola
+    if (nombre === 'library' && window.LibraryModule) window.LibraryModule.open();
+    if (nombre === 'stats' && window.StatsModule) window.StatsModule.open();
+    if (nombre === 'search') {               // foco directo al buscador
+      const inp = document.getElementById('spotifySearchInput');
+      if (inp && !inp.closest('[hidden]')) setTimeout(() => inp.focus(), 0);
+    }
+    /* Quien quiera enterarse (la cabecera de configuración, por ejemplo)
+       escucha este aviso en vez de sondear la clase `.active`. */
+    document.dispatchEvent(new CustomEvent('mm:tab', { detail: { tab: nombre, desde: previa } }));
+    return true;
+  };
+
+  const volverTab = () => activarTab(tabAnterior || 'lyrics');
+
   tabs.forEach(t => {
     t.addEventListener('click', () => {
-      const name = t.dataset.tab;
-      tabs.forEach(x => {
-        x.classList.toggle('active', x === t);
-        x.setAttribute('aria-selected', x === t ? 'true' : 'false');
-      });
-      contents.forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
-      if (name === 'queue') renderQueue();   // refresco inmediato al abrir la cola
-      if (name === 'library' && window.LibraryModule) window.LibraryModule.open();
-      if (name === 'stats' && window.StatsModule) window.StatsModule.open();
-      if (name === 'search') {               // foco directo al buscador
-        const inp = document.getElementById('spotifySearchInput');
-        if (inp && !inp.closest('[hidden]')) setTimeout(() => inp.focus(), 0);
-      }
+      /* El engranaje es un INTERRUPTOR: pulsarlo DENTRO de configuración
+         te devuelve de donde viniste. Antes no hacía nada, y quedarse
+         pulsando el mismo botón sin respuesta es exactamente la sensación
+         de estar atrapado que había que quitar. */
+      if (t.dataset.tab === 'settings' && cualTab() === 'settings') { volverTab(); return; }
+      activarTab(t.dataset.tab);
     });
   });
+
+  /* La puerta para el resto de los módulos. `ir` no falla en silencio:
+     devuelve false si esa pestaña no existe. */
+  window.MMNav = {
+    ir: activarTab,
+    actual: cualTab,
+    anterior: () => tabAnterior,
+    volver: volverTab,
+    nombre: (n) => NOMBRE_TAB[n] || n,
+  };
 
   // ---------- Color theme (presets + custom pickers) ----------
   const STORAGE_KEYS = {
@@ -314,12 +379,20 @@
       localStorage.setItem(STORAGE_KEYS.BG_MODE, 'manual');
     }
   });
+  /* Cuál está puesto. El acento ya se marcaba; el fondo y el texto no, y
+     doce cuadritos iguales sin ninguno encendido no dicen en cuál estás:
+     el usuario pulsaba, el fondo cambiaba y el panel seguía igual de
+     mudo que antes. Se marcan con la misma clase .active del acento. */
+  const marcarBg = (hex) => {
+    bgPresets.forEach(s => s.classList.toggle('active', !!hex && s.dataset.bg === hex));
+  };
   bgPresets.forEach(b => {
     b.addEventListener('click', () => {
       const hex = b.dataset.bg;
       bgManual.checked = true;
       applyBgManual(hex);
       customBg.value = hex;
+      marcarBg(hex);
       localStorage.setItem(STORAGE_KEYS.BG_MODE, 'manual');
       localStorage.setItem(STORAGE_KEYS.BG_COLOR, hex);
     });
@@ -327,9 +400,13 @@
   customBg.addEventListener('input', (e) => {
     bgManual.checked = true;
     applyBgManual(e.target.value);
+    marcarBg(e.target.value);
     localStorage.setItem(STORAGE_KEYS.BG_MODE, 'manual');
     localStorage.setItem(STORAGE_KEYS.BG_COLOR, e.target.value);
   });
+  // «carátula» devuelve el mando al color de la portada: ningún preset
+  // manda ya, y ninguno debe quedarse encendido diciendo lo contrario.
+  bgAuto.addEventListener('change', () => { if (bgAuto.checked) marcarBg(null); });
 
   // Text color presets + custom
   const textPresets = document.querySelectorAll('.text-preset');
@@ -343,14 +420,21 @@
     root.style.removeProperty('--text-muted');
     localStorage.setItem(STORAGE_KEYS.TEXT, hex);
   };
+  const marcarTexto = (hex) => {
+    textPresets.forEach(s => s.classList.toggle('active', !!hex && s.dataset.text === hex));
+  };
   textPresets.forEach(b => {
     b.addEventListener('click', () => {
       const hex = b.dataset.text;
       setTextManual(hex);
       customText.value = hex;
+      marcarTexto(hex);
     });
   });
-  customText.addEventListener('input', (e) => setTextManual(e.target.value));
+  customText.addEventListener('input', (e) => {
+    setTextManual(e.target.value);
+    marcarTexto(e.target.value);
+  });
 
   // Lyrics offset slider
   const offsetSlider = document.getElementById('offsetSlider');
@@ -406,10 +490,13 @@
     // hasta la siguiente canción.
     if (window.CoverColors) window.CoverColors.refresh();
     updateActiveSwatch('auto');
+    marcarBg(null);
+    marcarTexto(null);
     bgAuto.checked = true;
     customAccent.value = '#5ce1e6';
     customBg.value = '#0a0e2e';
     customText.value = '#e8ecff';
+    if (window.SevenStatus) window.SevenStatus('▣ colores como de fábrica · siguen a la carátula');
   });
 
   // ---------- Restore saved settings ----------
@@ -435,12 +522,14 @@
     bgManual.checked = true;
     applyBgManual(savedBgColor);
     customBg.value = savedBgColor;
+    marcarBg(savedBgColor);
   } else {
     bgAuto.checked = true;
   }
   if (savedText) {
     applyText(savedText);
     customText.value = savedText;
+    marcarTexto(savedText);
   }
 
   // ---------- Clock ----------
@@ -584,6 +673,10 @@
     const on = !body.classList.contains('letra-ancha');
     aplicarAncho(on);
     try { localStorage.setItem(ANCHO_KEY, on ? 'true' : 'false'); } catch (_) {}
+    /* Se llama LETRA ancha: al encenderla te lleva a la letra. Pulsarla
+       desde configuración ensanchaba un panel que no estabas mirando, y
+       desde fuera eso es un botón que no hace nada. */
+    if (on) activarTab('lyrics');
     if (window.SevenStatus) {
       window.SevenStatus(on ? '▣ letra ancha · la carátula está arriba a la derecha'
                             : '▣ vista normal');
@@ -603,15 +696,11 @@
   const tabBar = document.querySelector('.tab-bar');
   let tabsTimer = null;
 
-  const tabActiva = () => {
-    const t = document.querySelector('.tab.active');
-    return t ? t.dataset.tab : '';
-  };
 
   const tactil = () => !!(window.MMPerf && window.MMPerf.tactil());
 
   const ocultarTabs = () => {
-    if (!tabBar || tabActiva() !== 'lyrics') return;
+    if (!tabBar || cualTab() !== 'lyrics') return;
     /* Con ratón: si el cursor está justo encima (a punto de pulsar el
        engranaje), esconderla sería una trampa — se re-arma y ya. En táctil
        no existe el hover, y además la barra deja un tirador visible, así
@@ -1234,40 +1323,40 @@
     });
   });
 
-  // ---------- Extra keyboard ----------
+  /* ---------- Extra keyboard ----------
+     Todos pasan por activarTab, que es el mismo camino que el ratón: así
+     la vuelta («de dónde vengo») se apunta también cuando cambias de
+     pestaña con el teclado. La única con trato aparte es la S, que hace
+     de interruptor igual que el engranaje. */
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT') return;
     if (e.key === 'l' || e.key === 'L') {
-      const lyricsTab = document.querySelector('.tab[data-tab="lyrics"]');
-      if (lyricsTab) lyricsTab.click();
+      activarTab('lyrics');
     } else if (e.key === 'w' || e.key === 'W') {
       // letra ancha: esconde la columna de la carátula, o la devuelve
       alternarAncho();
     } else if (e.key === ',' || e.key === 's') {
-      const setTab = document.querySelector('.tab[data-tab="settings"]');
-      if (setTab) setTab.click();
+      // entra y sale: la misma tecla es la puerta en los dos sentidos
+      if (cualTab() === 'settings') volverTab(); else activarTab('settings');
     } else if (e.key === 'q' || e.key === 'Q' || e.key === 'c' || e.key === 'C') {
-      const qTab = document.querySelector('.tab[data-tab="queue"]');
-      if (qTab) qTab.click();
+      activarTab('queue');
     } else if (e.key === 'f' || e.key === 'F') {
       /* La barra «/» ya NO viene aquí: se la queda el buscador universal
          (js/buscador.js), que mira en tu música, tus listas, tu historial y
          Spotify a la vez. Saltar a la pestaña de Spotify era mandarte a uno
          solo de los cuatro sitios donde puede estar lo que buscas. */
       e.preventDefault();
-      const sTab = document.querySelector('.tab[data-tab="search"]');
-      if (sTab) sTab.click();
+      activarTab('search');
     } else if (e.key === 'b' || e.key === 'B') {
-      const libTab = document.querySelector('.tab[data-tab="library"]');
-      if (libTab) libTab.click();
+      activarTab('library');
     } else if (e.key === 'h' || e.key === 'H') {
       // Historial. La 'l' ya era de lyrics y la 'b' de biblioteca.
-      const stTab = document.querySelector('.tab[data-tab="stats"]');
-      if (stTab) stTab.click();
+      activarTab('stats');
     } else if (['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+      // Los números VAN a su pestaña, no alternan: el 5 pulsado dos veces
+      // tiene que dejarte en configuración, no sacarte de ella.
       const map = { '1': 'lyrics', '2': 'search', '3': 'library', '4': 'queue', '5': 'settings', '6': 'stats' };
-      const tab = document.querySelector(`.tab[data-tab="${map[e.key]}"]`);
-      if (tab) tab.click();
+      activarTab(map[e.key]);
     }
   });
 

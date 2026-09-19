@@ -38,7 +38,11 @@
 
   const estado = (msg) => { if (window.SevenStatus) window.SevenStatus(msg); };
 
+  /* Por MMNav y no por un `.click()` en la pestaña: el engranaje es un
+     interruptor (dentro de configuración te SACA), así que simularle un
+     clic para «ir a ajustes» te echaba fuera si ya estabas dentro. */
   const irPestania = (n) => {
+    if (window.MMNav) { window.MMNav.ir(n); return; }
     const t = document.querySelector(`.tab[data-tab="${n}"]`);
     if (t) t.click();
   };

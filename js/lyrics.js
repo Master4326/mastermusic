@@ -2263,6 +2263,18 @@
       editMode = !editMode;
       localStorage.setItem('mm_lyrics_mode', editMode ? 'edit' : 'list');
       applyMode();
+      /* Y te LLEVA a la letra. Este botón vive en la barra de abajo, que se
+         ve desde cualquier pestaña: pulsarlo desde configuración encendía
+         el modo edit en un panel que no estabas mirando, así que parecía
+         que no funcionaba. (Con el cine abierto no hace falta: la letra ya
+         está a pantalla completa delante de todo.) */
+      const cine = document.getElementById('cinema');
+      const enCine = cine && !cine.hidden;
+      if (!enCine && window.MMNav) window.MMNav.ir('lyrics');
+      if (window.SevenStatus) {
+        window.SevenStatus(editMode ? '✦ modo edit · la letra en grande, con efectos'
+                                    : '≡ vista lista · la letra entera');
+      }
     });
     applyMode();
   }
@@ -2873,8 +2885,11 @@
     // esto tira además la copia que este módulo tiene en memoria)
     clearCache: () => { cache = {}; },
 
-    // Estado de sincronización (lo consume el modo cine)
-    getSync: () => ({ lines: parsedLines, idx: activeIdx }),
+    /* Estado de sincronización. Lo consume el modo cine (lines + idx) y
+       la tarjeta de compartir, que además necesita `trad`: los versos ya
+       traducidos, en el mismo orden que `lines`, para poder ofrecer la
+       tarjeta con subtítulo sin volver a pedirle nada a nadie. */
+    getSync: () => ({ lines: parsedLines, idx: activeIdx, trad: tradLines }),
     isEditMode: () => editMode,
     // ¿está puesta la escena de canción sin letra? (la consulta el cine)
     sinLetra: () => ncsOn,
