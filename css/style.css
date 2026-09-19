@@ -3539,6 +3539,23 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
   .title-text { font-size: 12px; }
 }
 
+/* ----------------------------------------------------------
+   TELÉFONO PEQUEÑO (360 px) CON LA LETRA ANCHA · el ◧ se retira
+
+   Con la letra ancha la fila de la derecha se llena: ◈ ◧ ✦ ❝ ⛶. En
+   360 px no caben los cinco ni encogiéndolos, y el que se salía de la
+   pantalla era el ⛶ del cine — un botón que existe y no se puede
+   tocar, que es el fallo que más veces ha dado esta barra.
+
+   Se retira el ◧ y no otro porque es el ÚNICO que tiene otra puerta:
+   con la letra ancha puesta, la carátula se muda al chip de la barra
+   de título, y ese chip ya devuelve la vista normal al pulsarlo (y la
+   tecla W sigue igual). Los otros cuatro no tienen sustituto.
+   ---------------------------------------------------------- */
+@media (max-width: 400px) {
+  body.letra-ancha #anchoBtn { display: none; }
+}
+
 /* ==========================================================
    Vinyl mode — carátula giratoria (botón opcional)
    ========================================================== */
@@ -5558,7 +5575,20 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
     max-width: 58px;
     height: 42px;
   }
-  .controls-row .volume-ctl { flex: 0 0 auto; }
+  /* El grupo de la derecha (◧ ✦ ❝ ⛶, y el ◈ cuando la letra va ancha)
+     TIENE que poder encoger. Con `flex: 0 0 auto` no cedía un píxel: al
+     añadir el ❝ de compartir, en un teléfono de 390 px con la letra
+     ancha el último botón —el ⛶ del cine— se salía de la pantalla y
+     quedaba literalmente intocable. La fila es `nowrap` a propósito (un
+     segundo renglón lo recorta la ventana y los botones se PIERDEN), así
+     que el hueco que falta lo tiene que repartir el propio flex. */
+  .controls-row .volume-ctl { flex: 0 1 auto; min-width: 0; }
+  /* 28 px de ancho por 42 de alto: el alto es lo que decide si el pulgar
+     acierta, y es el mismo que el resto de la fila. Con 30 no cabían los
+     cinco en un teléfono de 360 y el ⛶ se salía por siete píxeles. */
+  .volume-ctl .side-btn { flex: 0 1 auto; min-width: 28px; }
+  /* Y el ◈ deja de pedir sitio para su palabra cuando comparte fila */
+  body.letra-ancha .viz-sync.en-mandos { padding: 0 5px; font-size: 13px; }
   .controls-row .play-btn {
     flex: 1.35 1 0;
     max-width: 76px;
