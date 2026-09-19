@@ -1,4 +1,6 @@
 {
+  "_comentario_id": "NO cambiar: sin id, el navegador usa start_url como identidad de la app instalada. Este es el mismo valor, asi que quien ya la tuviera instalada la conserva; otro valor la convertiria en una app distinta.",
+  "id": "./index.html",
   "name": "MASTER MUSIC · Reproductor",
   "short_name": "MASTER MUSIC",
   "description": "Reproductor de música retro-futurista con letras sincronizadas. Modo local y modo Spotify.",
@@ -11,6 +13,59 @@
   "background_color": "#0a0e2e",
   "theme_color": "#0a0e2e",
   "categories": ["music", "entertainment"],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "shortcuts": [
+    {
+      "name": "Buscar",
+      "short_name": "Buscar",
+      "description": "Abrir el buscador universal",
+      "url": "./index.html?ir=buscar",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Mi música",
+      "short_name": "Mi música",
+      "description": "Tus listas y tu música importada",
+      "url": "./index.html?ir=listas",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Historial",
+      "short_name": "Historial",
+      "description": "Lo que has escuchado y tus más puestas",
+      "url": "./index.html?ir=historial",
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "share_target": {
+    "action": "./index.html",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "./index.html",
+      "accept": {
+        "audio/mpeg": [".mp3"],
+        "audio/mp4": [".m4a"],
+        "audio/aac": [".aac"],
+        "audio/ogg": [".ogg"],
+        "audio/flac": [".flac"],
+        "audio/x-flac": [".flac"],
+        "audio/wav": [".wav"],
+        "audio/x-wav": [".wav"],
+        "audio/webm": [".weba"]
+      },
+      "icons": [{ "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" }],
+      "launch_type": "single-client"
+    }
+  ],
   "icons": [
     {
       "src": "assets/icon-192.png",

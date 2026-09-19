@@ -25,6 +25,29 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ==========================================================
+   EL ATRIBUTO `hidden` GANA SIEMPRE
+
+   La regla que trae el navegador para `[hidden]` es `display: none` sin peso
+   ninguno, así que **cualquier** `.clase { display: flex }` la pisa y el
+   elemento se queda a la vista con el atributo puesto. Todo el JS de esta app
+   esconde cosas con `el.hidden = true`, o sea que el fallo es silencioso: el
+   código cree que lo escondió y en pantalla sigue ahí, vacío.
+
+   Ya había cinco parches sueltos repartidos por el archivo —.ctrl-btn[hidden],
+   .cinema[hidden], .dev-menu[hidden], .fuentes[hidden], .fx-lab[hidden]— cada
+   uno puesto el día que se notó el suyo. Y aun así se habían colado CUATRO,
+   encontrados barriendo el DOM pestaña por pestaña:
+
+     #libHead     la cabecera del detalle («‹ ♪ PLAYLIST ▶»), que salía encima
+                  de «mi música» con el título en blanco
+     #libMore     «[ seguir cargando ]» con las tres canciones ya cargadas
+     #libFiltroFila  la fila del filtro, vacía
+     #spotifyRecientes  los buscados recientes
+
+   Una sola regla arriba del todo y esta familia entera se acaba. */
+[hidden] { display: none !important; }
+
 html, body {
   height: 100%;
   overflow: hidden;
@@ -6221,3 +6244,43 @@ body.fondo-liso .la-circular,
 body.fondo-liso .la-estrobo { display: none; }
 
 body.reduce-motion .la-ncs { display: none; }
+
+/* ==========================================================
+   FILAS DE LISTA EN EL MÓVIL — que se lea el título
+
+   Medido en un teléfono de 390 px: la fila tiene 310 px y se los repartían
+   siete columnas (número 22 · carátula 38 · TÍTULO · duración 24 · ＋ 30 ·
+   ▶ 30 · ✕ 24). Al título le quedaban **62 px**, o sea ocho letras: «Mi
+   canc…», «Otra qu…», «La terc…». Imposible saber cuál es cuál, que es lo
+   único que una lista tiene que dejar claro.
+
+   Se van los tres pasajeros que no hacen falta en un teléfono:
+   · el NÚMERO de orden — se ve el orden, se cuenta solo;
+   · la DURACIÓN — no cambia la decisión de a cuál darle, y cuando suena ya
+     está en la barra de abajo;
+   · el ▶ — la fila entera ya reproduce al tocarla, así que era un botón
+     para hacer lo mismo que el sitio donde está puesto.
+
+   Se quedan ＋ (encolar) y ✕ (quitar), que son acciones de verdad y no
+   tienen otra forma de hacerse. El título pasa de 62 a ~168 px.
+   ========================================================== */
+@media (max-width: 480px) {
+  #libList .sp-idx,
+  #libList .sp-dur,
+  #libList .sp-play,
+  #spotifyResults .sp-idx,
+  #spotifyResults .sp-dur,
+  #spotifyResults .sp-play,
+  #queueList .sp-idx,
+  #queueList .sp-dur { display: none; }
+
+  /* Sin el número delante, la fila necesita su propio respiro a la izquierda */
+  #libList .sp-result,
+  #spotifyResults .sp-result,
+  #queueList .sp-result { padding-left: 8px; }
+
+  /* La que suena se marcaba con el ▶ del número, que ya no está: se dice
+     con el color del título, que es lo que se mira. */
+  #queueList .q-now .sp-name,
+  #libList .sp-now .sp-name { color: var(--accent); }
+}

@@ -1940,6 +1940,35 @@
     return '◈ sigue sonando · parecidas a «' + m.semilla.name + '»';
   };
 
+  /* ---- Lo de hace nada no vuelve ----
+     La app apunta cada escucha en tu equipo (js/historial.js), y eso es un
+     dato que ninguna radio de las de fuera tiene: lo que YA has oído estos
+     días. Antes de armar la lista se leen las escuchas recientes y sus uris
+     entran directamente en `vistas`, o sea que la mezcla las salta.
+
+     Tres días y no más: a la semana, volver a oír algo que te gustó es un
+     acierto, no un fallo. Y la canción que acabas de elegir no cuenta —esa
+     la pediste tú—, solo lo que vendría DETRÁS.
+
+     Se cachea diez minutos: leer el historial entero en cada canción que se
+     pone sería trabajo de sobra para algo que cambia tan despacio. */
+  const RECIENTES_DIAS = 3;
+  const RECIENTES_TTL = 600000;
+  let recientes = { uris: null, t: 0 };
+
+  const urisRecientes = async () => {
+    if (recientes.uris && Date.now() - recientes.t < RECIENTES_TTL) return recientes.uris;
+    const set = new Set();
+    try {
+      if (window.Historial && window.Historial.leer) {
+        const escuchas = await window.Historial.leer(RECIENTES_DIAS);
+        (escuchas || []).forEach((e) => { if (e && e.uri) set.add(e.uri); });
+      }
+    } catch (e) { /* sin historial (o IndexedDB cerrada): la mezcla va igual */ }
+    recientes = { uris: set, t: Date.now() };
+    return set;
+  };
+
   /* Abre la sesión: busca las parecidas y devuelve la lista de uris que hay
      que mandar DETRÁS de la canción. Devuelve [] si no hay nada que poner
      (sin sesión, apagado, o la mezcla ya la cancelaron). */
@@ -1962,6 +1991,13 @@
       relevo: false,        // el aparato no admite listas: las ponemos de una en una
       relevando: false,
     };
+
+    /* Lo oído estos días entra en `vistas` antes de armar nada: así ni se
+       resuelve ni se manda. La semilla se quita después, que es la única que
+       sí puede repetirse — la acaba de elegir el usuario. */
+    const yaOidas = await urisRecientes();
+    if (mia !== mezclaSeq || !mezcla) return [];
+    yaOidas.forEach((u) => mezcla.vistas.add(u));
 
     if (window.Similares) {
       /* Con reloj: esto retrasa el play, así que se le da lo justo. Si

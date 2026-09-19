@@ -881,6 +881,13 @@
        el catálogo de SpotifyModule, tu historial) y los mandos que ofrece
        tienen que existir ya cuando se monta. -->
   <script defer src="js/buscador.js"></script>
+  <!-- ENTRADAS · las otras puertas de la app instalada: compartir desde el
+       móvil, abrir un mp3 con doble clic y los atajos del icono. Detrás del
+       buscador porque le pide prestado su lector de enlaces. -->
+  <!-- TEMPORIZADOR · «que se apague sola dentro de un rato». Suelto y sin
+       dependencias: los mandos del buscador lo llaman si está. -->
+  <script defer src="js/temporizador.js"></script>
+  <script defer src="js/entradas.js"></script>
 
   <!-- Registro del Service Worker (solo bajo http/https, no file://) -->
   <script>

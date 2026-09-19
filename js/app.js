@@ -23,6 +23,11 @@
   const savedVol = parseFloat(localStorage.getItem('mm_volume'));
   if (isFinite(savedVol)) state.volume = Math.max(0, Math.min(1, savedVol));
 
+  /* Lo puesto en esta sesión: lo usa «sigue sonando» para no dar vueltas
+     sobre las mismas cuatro canciones. Se declara aquí arriba porque quien
+     lo rellena es loadAndPlay, que está antes que el resto de ese motor. */
+  const puestasHoy = new Set();
+
   const audio = new Audio();
   audio.volume = state.volume;
 
@@ -268,6 +273,8 @@
   const loadAndPlay = (track) => {
     state.isPreview = false;
     state.currentTrack = track;
+    // Para que «sigue sonando» no dé vueltas sobre las mismas cuatro
+    if (track && track.id) puestasHoy.add(track.id);
     audio.src = track.url;
     audio.play().catch(() => {});
     state.isPlaying = true;
@@ -312,6 +319,105 @@
     updatePlayIcon();
   };
 
+  /* ---------- «Sigue sonando» con TU música ----------
+
+     Con Spotify, al acabar una canción suelta siguen otras parecidas (ver
+     js/spotify.js). Con la música importada no seguía nada: se acababa la
+     cola y silencio. Y es el mismo problema, solo que aquí no hay catálogo
+     del que tirar — hay lo que tú tengas.
+
+     Así que se pregunta lo mismo (js/similares.js: a qué se parece esta
+     canción) y se busca la respuesta DENTRO de tu biblioteca. Cuatro redes,
+     de la más fina a la más ancha, y la última no puede fallar:
+
+       1. una canción parecida que resulta que tienes
+       2. algo de un artista parecido que resulta que tienes
+       3. otra del MISMO artista que no hayas oído hoy
+       4. cualquiera que no hayas oído hoy, al azar
+
+     Todo esto solo si «sigue sonando» está encendido en config ⚙ —el mismo
+     interruptor que el de Spotify, `mm_radio`— y solo cuando la cola se
+     acaba de verdad: con repetir puesto, manda repetir. */
+  const plano = (s) => String(s || '').normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/[‐‑–—]/g, '-')
+    .toLowerCase().trim();
+
+  const nucleoDe = (s) => (window.Similares && window.Similares.nucleo)
+    ? window.Similares.nucleo(s) : plano(s);
+
+  const sigueEncendido = () => localStorage.getItem('mm_radio') !== 'off';
+
+  let buscandoLocal = false;
+
+  const sinOir = () => state.tracks.filter((t) => !puestasHoy.has(t.id));
+
+  const alAzar = (lista) => (lista.length ? lista[Math.floor(Math.random() * lista.length)] : null);
+
+  const siguienteDeLoTuyo = async (ultima) => {
+    if (!ultima || state.tracks.length < 2) return null;
+    /* La que acaba de sonar se cae SIEMPRE, la haya oído hoy o no: lo normal
+       es que ya esté en `puestasHoy`, pero no si venía de otra sesión o si
+       se borró el historial — y poner otra vez la que acaba de terminar es
+       el único fallo que se nota a la primera. */
+    const fuera = (lista) => lista.filter((t) => t.id !== ultima.id);
+    const noOidas = fuera(sinOir());
+    const candidatas = noOidas.length ? noOidas : fuera(state.tracks);
+    if (!candidatas.length) return null;
+
+    if (window.Similares) {
+      let r = null;
+      try { r = await window.Similares.deCancion({ name: ultima.name, artist: ultima.artist }); }
+      catch (e) { /* sin red: quedan las redes de abajo */ }
+
+      // 1) una parecida que tengas: se compara título + artista aplanados
+      const porNombre = new Map();
+      candidatas.forEach((t) => porNombre.set(nucleoDe(t.name) + '|' + plano(t.artist), t));
+      for (const rec of (r && r.canciones) || []) {
+        const t = porNombre.get(nucleoDe(rec.name) + '|' + plano(rec.artist));
+        if (t) return t;
+      }
+
+      // 2) algo de un artista parecido
+      const deArtista = new Map();
+      candidatas.forEach((t) => {
+        const k = plano(t.artist);
+        if (!deArtista.has(k)) deArtista.set(k, []);
+        deArtista.get(k).push(t);
+      });
+      for (const nombre of (r && r.artistas) || []) {
+        const suyas = deArtista.get(plano(nombre));
+        if (suyas && suyas.length) return alAzar(suyas);
+      }
+    }
+
+    // 3) del mismo artista · 4) cualquiera. Nunca devuelve silencio.
+    const mismas = candidatas.filter((t) => plano(t.artist) === plano(ultima.artist));
+    return alAzar(mismas.length ? mismas : candidatas);
+  };
+
+  const seguirConLoTuyo = async () => {
+    if (buscandoLocal) return;
+    buscandoLocal = true;
+    const ultima = state.currentTrack;
+    try {
+      const t = await siguienteDeLoTuyo(ultima);
+      if (!t) return;
+      /* Puede haber cambiado todo mientras se preguntaba por la red: si ya
+         hay otra cosa sonando, aquí no se mete nadie. */
+      if (state.isPlaying || state.currentTrack !== ultima) return;
+      const idx = state.tracks.findIndex((x) => x.id === t.id);
+      if (idx < 0) return;
+      state.queue.push(idx);
+      state.queueIndex = state.queue.length - 1;
+      loadAndPlay(t);
+      estado('◈ sigue sonando · ' + t.name + (t.artist ? ' — ' + t.artist : ''));
+    } finally {
+      buscandoLocal = false;
+    }
+  };
+
   const playNext = () => {
     if (spotifyActive()) { window.SpotifyModule.next(); return; }
     if (!state.queue.length) return;
@@ -319,7 +425,14 @@
     state.queueIndex++;
     if (state.queueIndex >= state.queue.length) {
       if (state.repeat === 'all') state.queueIndex = 0;
-      else { state.queueIndex = state.queue.length - 1; state.isPlaying = false; updatePlayIcon(); return; }
+      else {
+        state.queueIndex = state.queue.length - 1;
+        state.isPlaying = false;
+        updatePlayIcon();
+        // La cola se acabó: que la música siga con algo tuyo que pegue
+        if (sigueEncendido()) seguirConLoTuyo();
+        return;
+      }
     }
     loadAndPlay(state.tracks[state.queue[state.queueIndex]]);
   };

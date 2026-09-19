@@ -166,6 +166,44 @@
     if (t) t.click();
   };
 
+  const TEMP = () => window.Temporizador;
+
+  /* ---------- Compartir lo que suena ----------
+     La otra mitad de lo que hace js/entradas.js: si a esta app se le puede
+     compartir una canción, esta app tiene que poder compartir la suya.
+
+     Con una de Spotify se manda su enlace de verdad (el que abre cualquiera,
+     tenga esta app o no); con música tuya no hay enlace que valga, así que
+     va el título y el artista en texto. Si el aparato no tiene el menú de
+     compartir —los escritorios, casi siempre— se copia al portapapeles, que
+     es lo mismo con un paso más. */
+  const compartirActual = async () => {
+    const t = PC() && PC().state.currentTrack;
+    if (!t) { estado('✕ no hay nada sonando que compartir'); return; }
+
+    const id = t.uri && t.uri.startsWith('spotify:track:') ? t.uri.split(':')[2] : null;
+    const enlace = id ? 'https://open.spotify.com/track/' + id : '';
+    const titulo = t.name + (t.artist ? ' — ' + t.artist : '');
+    const datos = enlace
+      ? { title: titulo, text: titulo, url: enlace }
+      : { title: titulo, text: '♪ ' + titulo };
+
+    if (navigator.share) {
+      try { await navigator.share(datos); estado('⇥ compartido'); return; }
+      catch (e) {
+        // Cancelar el menú de compartir no es un fallo: no se dice nada
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+    const texto = enlace || ('♪ ' + titulo);
+    try {
+      await navigator.clipboard.writeText(texto);
+      estado(enlace ? '⇥ enlace copiado: ' + t.name : '⇥ copiado: ' + titulo);
+    } catch (e) {
+      estado('✕ este navegador no deja copiar ni compartir desde aquí');
+    }
+  };
+
   const verColeccion = (col, nombre) => {
     irPestania('library');
     if (LIB() && LIB().irA) LIB().irA(col);
@@ -212,6 +250,22 @@
         if (window.SevenQueueRefresh) window.SevenQueueRefresh();
         estado('▣ cola vaciada');
       } },
+    /* Temporizador. Tres plazos y el de quitar, que solo aparece cuando hay
+       algo que quitar — y de paso enseña lo que falta, que es la pregunta
+       que se hace todo el mundo dos minutos después de ponerlo. */
+    { n: 'apagar en 15 minutos', alias: 'temporizador dormir sueño sleep timer', ico: '◷',
+      hacer: () => TEMP() && TEMP().poner(15) },
+    { n: 'apagar en 30 minutos', alias: 'temporizador dormir sueño sleep timer', ico: '◷',
+      hacer: () => TEMP() && TEMP().poner(30) },
+    { n: 'apagar en 1 hora', alias: 'temporizador dormir sueño sleep timer 60', ico: '◷',
+      hacer: () => TEMP() && TEMP().poner(60) },
+    ...(TEMP() && TEMP().puesto() ? [{
+      n: 'quitar el temporizador (faltan ' + TEMP().texto() + ')',
+      alias: 'cancelar apagado dormir sleep timer', ico: '◷',
+      hacer: () => TEMP().quitar(),
+    }] : []),
+    { n: 'compartir lo que suena', alias: 'enviar mandar enlace link copiar', ico: '⇥',
+      hacer: () => compartirActual() },
     { n: 'ver mi música', alias: 'biblioteca local importada mp3', ico: '♪',
       hacer: () => verColeccion('mine', 'tu música') },
     { n: 'ver mis playlists', alias: 'listas spotify', ico: '≡',
@@ -402,12 +456,22 @@
     const enlace = String(crudo || '').match(ENLACE);
     if (enlace) out.push(deEnlace(enlace));
 
-    // 1) MANDOS — solo si se escribe algo; con el cuadro vacío van al final
+    /* 1) MANDOS — solo si se escribe algo; con el cuadro vacío van al final.
+
+       Con DOS frenos, y los dos salieron de mirar la lista de verdad: al
+       buscar «can» aparecían once mandos por delante de las canciones. El
+       culpable es la coincidencia floja de `puntuar` —las letras sueltas en
+       orden, que vale 60 y encaja a la fuerza en casi cualquier frase—: para
+       un título ajeno es una red que a veces pesca, pero para un mando es
+       ruido puro. Así que aquí se exige algo más que eso, y como mucho
+       cinco: quien busca un mando lo tiene en los primeros. */
     if (palabras.length) {
+      const mandos = [];
       MANDOS().forEach((m) => {
         const pts = puntuarCampos([[m.n, 1], [m.alias || '', 0.7]], palabras);
-        if (pts) out.push(deMando(m, pts + 40));   // +40: un mando exacto manda
+        if (pts >= 120) mandos.push(deMando(m, pts + 40));   // +40: un mando exacto manda
       });
+      mandos.sort((a, b) => b.pts - a.pts).slice(0, 5).forEach((f) => out.push(f));
     }
 
     // 2) TU MÚSICA — instantánea, ya está en memoria
@@ -466,7 +530,27 @@
       unicas.push(f);
       if (unicas.length >= 40) break;
     }
-    return unicas;
+
+    /* ---- AGRUPAR POR SECCIÓN ----
+       Ordenado solo por puntos, la lista salía a trozos: «mandos», luego
+       «spotify», luego «mandos» otra vez, luego «tu música», y «mandos» una
+       tercera vez. Con la cabecera repitiéndose en cada salto, leerla era
+       imposible y parecía rota.
+
+       Se agrupa SIN perder el orden: cada sección hereda la puntuación de su
+       mejor fila, así que la primera fila de la lista sigue siendo la mejor
+       de todas —lo que se pone al dar a Enter no cambia— y detrás va el
+       resto de su sección antes de pasar a la siguiente. */
+    const grupos = new Map();
+    unicas.forEach((f) => {
+      if (!grupos.has(f.seccion)) grupos.set(f.seccion, []);
+      grupos.get(f.seccion).push(f);
+    });
+    const ordenadas = [];
+    [...grupos.values()]
+      .sort((a, b) => b[0].pts - a[0].pts)     // manda la mejor fila de cada una
+      .forEach((g) => ordenadas.push(...g));
+    return ordenadas;
   };
 
   // ---------- Spotify, con respiro ----------
@@ -754,5 +838,17 @@
   document.addEventListener('DOMContentLoaded', cablearBoton);
   if (document.readyState !== 'loading') cablearBoton();
 
-  window.Buscador = { abrir, cerrar, alternar, abierto: () => abierto };
+  /* Busca un enlace de Spotify dentro de un texto cualquiera y lo abre.
+     Devuelve true si lo había. Lo usa js/entradas.js con lo que llega
+     compartido desde el móvil, que viene con ruido alrededor («Mira esta
+     canción: https://open.spotify.com/…»). Vive aquí y no allí para que
+     haya UNA sola definición de qué es un enlace de Spotify. */
+  const enlace = (texto) => {
+    const m = String(texto || '').match(ENLACE);
+    if (!m) return false;
+    abrirEnlace(m[1], m[2]);
+    return true;
+  };
+
+  window.Buscador = { abrir, cerrar, alternar, enlace, abierto: () => abierto };
 })();

@@ -729,7 +729,12 @@
     /* El nombre del aparato NO va aquí: lo enseña el chip #devChip, que
        además deja cambiarlo. Ponerlo en los dos sitios lo duplicaba, y este
        texto es `aria-live`: cada aviso volvería a cantar el dispositivo. */
-    return `${sonando ? '▶' : '❙❙'} ${titulo}${artista ? ' — ' + artista : ''}`;
+    /* El temporizador SÍ: mientras está puesto, lo que todo el mundo quiere
+       saber es cuánto queda, y este es el único sitio que se mira sin tener
+       que abrir nada. Desaparece solo cuando se cumple o se quita. */
+    const T = window.Temporizador;
+    const reloj = (T && T.puesto()) ? ' · ◷ ' + T.texto() : '';
+    return `${sonando ? '▶' : '❙❙'} ${titulo}${artista ? ' — ' + artista : ''}${reloj}`;
   };
 
   const pintarReposo = () => {
