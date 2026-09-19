@@ -311,6 +311,69 @@
     },
   });
 
+  /* ---------- Pegar un enlace de Spotify ----------
+
+     Copias un enlace en la app de Spotify («Compartir → Copiar enlace»), lo
+     pegas aquí y suena. Antes ese texto se mandaba tal cual a buscar, que
+     devuelve nada: un enlace no se parece al nombre de ninguna canción.
+
+     Valen las dos formas que documenta Spotify —la uri `spotify:track:…` y
+     la url `open.spotify.com/track/…`, con el `/intl-es/` que mete la web
+     cuando el idioma no es inglés— y el `?si=…` del final se ignora solo.
+
+     OJO con las mayúsculas: el id es base62 y `plano()` lo pasa todo a
+     minúsculas, así que esto tiene que mirar el texto CRUDO del cuadro. */
+  const ENLACE = /(?:spotify:|(?:https?:\/\/)?open\.spotify\.com\/(?:intl-[a-z-]+\/)?)(track|album|artist|playlist)[:/]([A-Za-z0-9]{22})/;
+
+  const COMO_SE_LLAMA = { track: 'canción', album: 'álbum', artist: 'artista', playlist: 'lista' };
+
+  const abrirEnlace = async (tipo, id) => {
+    if (!conSpotify()) { estado('✕ para abrir enlaces de spotify hay que conectar spotify'); return; }
+    estado('▣ abriendo el enlace…');
+    try {
+      if (tipo === 'track') {
+        // `GET /tracks/{id}` sigue vivo (lo que se retiró en feb-2026 es el
+        // de varias a la vez). Hace falta entero: «sigue sonando» necesita
+        // el nombre y el artista para buscar parecidas.
+        const t = await SP().api('/tracks/' + id);
+        SP().playTrack({
+          id: 'sp:' + t.id, uri: t.uri, name: t.name,
+          artist: (t.artists || []).map((a) => a.name).join(', '),
+          artistId: ((t.artists || [])[0] || {}).id || null,
+          album: t.album ? t.album.name : '',
+          duration: (t.duration_ms || 0) / 1000,
+          cover: t.album && t.album.images && t.album.images[0] ? t.album.images[0].url : null,
+          preview: t.preview_url || null, spotify: true,
+        });
+        return;
+      }
+      const ruta = tipo === 'album' ? '/albums/' : tipo === 'artist' ? '/artists/' : '/playlists/';
+      const d = await SP().api(ruta + id);
+      if (!d || !d.id) { estado('✕ ese enlace no lleva a ninguna parte'); return; }
+      irPestania('library');
+      LIB().abrir(tipo, {
+        id: d.id, uri: d.uri, name: d.name || '(sin nombre)',
+        cover: ((d.images || [])[0] || {}).url || null,
+        owner: (d.owner && d.owner.display_name) || (d.artists || []).map((a) => a.name).join(', ') || '',
+        total: (d.tracks && d.tracks.total) || d.total_tracks || 0,
+      });
+      estado('▤ ' + (d.name || 'abierto'));
+    } catch (e) {
+      estado('✕ no se pudo abrir el enlace · ' + ((e && e.message) || '').slice(0, 60));
+    }
+  };
+
+  const deEnlace = (m) => ({
+    seccion: 'enlace de spotify', ico: '⇥',
+    titulo: m[1] === 'track' ? 'poner esta canción' : 'abrir este ' + COMO_SE_LLAMA[m[1]],
+    sub: 'enlace pegado · ' + COMO_SE_LLAMA[m[1]],
+    /* Fuera de concurso: quien pega un enlace no quiere que se lo comparen
+       con su biblioteca, quiere eso y nada más. */
+    pts: 100000,
+    pista: m[1] === 'track' ? '▶ poner' : 'abrir',
+    accion: () => abrirEnlace(m[1], m[2]),
+  });
+
   const deHistorial = (h, pts) => ({
     seccion: 'ya lo has oído', ico: '↺', cover: h.cover, titulo: h.name,
     sub: (h.artist || '') + ' · ' + (h.veces === 1 ? '1 vez' : h.veces + ' veces'), pts,
@@ -331,9 +394,13 @@
   });
 
   // ---------- Reunir todo ----------
-  const recoger = async (q) => {
+  const recoger = async (q, crudo) => {
     const palabras = q.split(/\s+/).filter(Boolean);
     const out = [];
+
+    // 0) UN ENLACE PEGADO manda sobre todo lo demás
+    const enlace = String(crudo || '').match(ENLACE);
+    if (enlace) out.push(deEnlace(enlace));
 
     // 1) MANDOS — solo si se escribe algo; con el cuadro vacío van al final
     if (palabras.length) {
@@ -414,6 +481,12 @@
       const palabras = q.split(/\s+/).filter(Boolean);
       const nuevas = [];
 
+      /* Sin repetidas. Spotify manda la misma canción desde el single, el
+         disco y el recopilatorio, y aquí solo caben CINCO de cada clase: una
+         repetida es un hueco menos para una canción de verdad. Se queda la
+         primera, que es la mejor colocada para lo que se ha escrito. */
+      const nucleo = (window.Similares && window.Similares.nucleo) || plano;
+      const yaVistas = new Set();
       ((d && d.tracks && d.tracks.items) || []).filter(Boolean).forEach((it) => {
         const t = {
           id: 'sp:' + it.id, uri: it.uri, name: it.name,
@@ -424,6 +497,9 @@
           cover: it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : null,
           preview: it.preview_url || null, spotify: true,
         };
+        const clave = nucleo(t.name) + '|' + nucleo(t.artist);
+        if (yaVistas.has(clave)) return;
+        yaVistas.add(clave);
         nuevas.push(deSpotify(t, puntuarPista(t, palabras) || 100));
       });
 
@@ -529,8 +605,10 @@
 
   const refrescar = async () => {
     const mia = ++seqRecoger;
-    const q = plano(entrada.value);
-    const nuevas = await recoger(q);
+    const crudo = entrada.value;
+    const q = plano(crudo);
+    // El crudo va aparte para los enlaces: `plano()` les rompería el id
+    const nuevas = await recoger(q, crudo);
     if (mia !== seqRecoger) return;         // llegó otra mientras tanto
     // Mantener elegida la misma fila si sigue existiendo
     const antes = filas[elegida];
@@ -545,6 +623,10 @@
     clearTimeout(temporizador);
     refrescar();                       // lo tuyo, al instante
     const mia = ++seq;
+    /* Un enlace pegado no se busca: mandarle una url a `/search` gasta una
+       petición para no encontrar nada. La fila del enlace ya la puso
+       `recoger`. */
+    if (ENLACE.test(entrada.value)) { resSpotify = []; return; }
     /* Spotify va con 320 ms de respiro. Sin él, teclear «bad bunny» son diez
        peticiones y el 429 llega en dos búsquedas: ese freno ya costó caro
        una vez (ver el comentario del 429 en js/spotify.js). */

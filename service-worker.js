@@ -4,7 +4,7 @@
    y se pueda instalar en celular y PC.
    Sube el número de CACHE cuando cambies archivos del shell.
    ========================================================== */
-const CACHE = 'mastermusic-v102';
+const CACHE = 'mastermusic-v104';
 
 // Archivos locales que forman la app. Las pistas de música del
 // usuario NO se cachean aquí: viven en IndexedDB (ver js/db.js).
@@ -18,6 +18,7 @@ const SHELL = [
   './js/db.js',
   './js/lyrics.js',
   './js/traductor.js',
+  './js/similares.js',
   './js/spotify.js',
   './js/library.js',
   './js/historial.js',
@@ -70,10 +71,11 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
 
   // Nunca interceptamos llamadas a APIs externas (Spotify, LRClib, el
-  // traductor): siempre van a la red para datos en vivo. Cachear una
-  // traducción aquí además sería tirar el dinero dos veces — js/traductor.js
-  // ya guarda lo suyo en localStorage, por canción y sin repetir versos.
-  const isApi = /spotify\.com|lrclib\.net|scdn\.co|translate\.googleapis\.com|mymemory\.translated\.net/.test(url.hostname);
+  // traductor, ListenBrainz): siempre van a la red para datos en vivo.
+  // Cachear una traducción aquí además sería tirar el dinero dos veces —
+  // js/traductor.js ya guarda lo suyo en localStorage, por canción y sin
+  // repetir versos; y js/similares.js guarda sus MBID por su cuenta.
+  const isApi = /spotify\.com|lrclib\.net|scdn\.co|listenbrainz\.org|translate\.googleapis\.com|mymemory\.translated\.net/.test(url.hostname);
   if (isApi) return;
 
   // App shell propio -> network-first (siempre lo último cuando hay red,

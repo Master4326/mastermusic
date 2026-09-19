@@ -804,7 +804,10 @@
      `pos` (la posición dentro de la cola LOCAL) solo llega con música propia:
      es lo que permite sacar una canción de la cola, cosa que con Spotify
      Connect no se puede porque la cola es suya y su API no lo ofrece. */
-  const queueRow = (t, i, idx, now, pos) => `
+  /* `mezcla` marca las que ha puesto «sigue sonando». Es la diferencia entre
+     una cola que parece tuya y una que parece de la app: saber de un vistazo
+     cuáles elegiste tú y cuáles llegaron solas. */
+  const queueRow = (t, i, idx, now, pos, mezcla) => `
     <li class="sp-result ${idx >= 0 ? '' : 'sp-static'} ${now ? 'q-now sp-now' : ''}"
         ${idx >= 0 ? `data-idx="${idx}" tabindex="0" title="Sonar esta: ${escapeHtml(t.name)}"` : ''}
         ${idx >= 0 && t.id ? `data-track-id="${t.id}"` : ''}>
@@ -814,6 +817,7 @@
         <div class="sp-name">${escapeHtml(t.name)}</div>
         <div class="sp-artist">${escapeHtml(t.artist || 'desconocido')}</div>
       </div>
+      ${mezcla ? '<span class="q-mezcla" title="la puso «sigue sonando»">◈</span>' : ''}
       <div class="sp-dur">${formatTime(t.duration)}</div>
       ${pos != null ? `<button class="sp-del q-quitar" data-pos="${pos}" title="Quitar de la cola">✕</button>` : ''}
     </li>`;
@@ -826,12 +830,18 @@
     preview: it.preview_url || null,
     spotify: true,
     name: it.name || '(sin título)',
-    artist: (it.artists || []).map(a => a.name).filter(Boolean).join(', '),
+    // Un episodio de podcast no tiene artistas: en su sitio va el programa
+    artist: it.type === 'episode'
+      ? ((it.show && it.show.name) || 'podcast')
+      : (it.artists || []).map(a => a.name).filter(Boolean).join(', '),
     // Para «sigue sonando»: sin esto la radio solo puede buscar por nombre
     artistId: ((it.artists || [])[0] || {}).id || null,
     duration: (it.duration_ms || 0) / 1000,
-    cover: it.album && it.album.images && it.album.images.length
-      ? it.album.images[it.album.images.length - 1].url : null,
+    // La miniatura: la más pequeña del disco, o la del episodio si es podcast
+    cover: (() => {
+      const imgs = (it.album && it.album.images) || it.images || [];
+      return imgs.length ? imgs[imgs.length - 1].url : null;
+    })(),
   });
 
   /* Pinta la cola de Spotify. Sale de `renderQueue` porque ahora se llama
@@ -839,15 +849,24 @@
      si hace falta, con la cola entera que da la API. */
   const pintarCola = (sonando, items) => {
     filasCola = [];
+    const S = window.SpotifyModule;
+    /* De dónde sale lo que viene detrás. Con «sigue sonando» encendido la
+       cola se llena sola, y sin decirlo parecía cosa de magia (o de Spotify);
+       ahora se lee «parecidas a «tal»» y se entiende de una. */
+    const info = (S && S.mezcla) ? S.mezcla() : null;
+    const deLaMezcla = (uri) => !!(S && S.esDeLaMezcla && S.esDeLaMezcla(uri));
     let html = '';
     if (sonando) html += queueHead('sonando ahora') + queueRow(spTrack(sonando), 0, -1, true);
     html += queueHead('a continuación');
+    if (info && info.texto && items.length) {
+      html += `<li class="q-fuente sp-static">${escapeHtml(info.texto)}</li>`;
+    }
     html += items.length
       ? items.map((it, i) => {
           const t = spTrack(it);
           // sin uri no hay forma de pedirle a Spotify que la ponga
           const idx = t.uri ? filasCola.push(t) - 1 : -1;
-          return queueRow(t, i, idx, false);
+          return queueRow(t, i, idx, false, null, deLaMezcla(t.uri));
         }).join('')
       : queueEmpty('▒ nada más en la cola ▒');
     queueList.innerHTML = html;

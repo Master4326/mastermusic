@@ -11,6 +11,7 @@
     REFRESH: 'sp_refresh_token',
     EXPIRES: 'sp_expires_at',
     VERIFIER: 'sp_verifier',
+    STATE: 'sp_state',
     SCOPES: 'sp_scopes_v',
   };
 
@@ -45,12 +46,10 @@
     'user-modify-playback-state',
     'playlist-read-private',
     'playlist-read-collaborative',
-    /* Para la lista puente de la radio (ver `listaRadio`). Spotify SOLO
-       enciende su autoplay —el de verdad, el que pone artistas parecidos—
-       cuando lo que suena es un CONTEXTO; con una canción suelta (`uris`) se
-       calla al acabar. La única forma de darle un contexto a una canción
-       cualquiera es meterla en una playlist nuestra, y para eso hace falta
-       este permiso. Es `-private`: la lista se crea oculta. */
+    /* Para crear playlists de verdad (`crearPlaylist`) y para RETIRAR la
+       lista puente que dejaba la versión anterior de «sigue sonando» (ver
+       `limpiarListaPuente`). Ya no se crea ninguna lista a espaldas de
+       nadie: la cola se llena encolando, no fabricando playlists. */
     'playlist-modify-private',
     /* Para el ♥. Se pidió una vez en 2026-08 y se retiró porque
        `PUT /me/tracks` devolvía 403 con el permiso concedido y todo. La
@@ -143,12 +142,20 @@
     localStorage.setItem(STORAGE.VERIFIER, verifier);
     const challenge = base64url(await sha256(verifier));
 
+    /* `state`: un número al azar que va a Spotify y tiene que volver igual.
+       Es lo que la documentación pide para que nadie pueda empujarte a la
+       app un `code` que no pediste tú (CSRF). Faltaba: se mandaba la
+       autorización sin él y al volver se borraba de la URL sin mirarlo. */
+    const state = randomString(16);
+    try { localStorage.setItem(STORAGE.STATE, state); } catch (e) {}
+
     const params = new URLSearchParams({
       client_id: clientId,
       response_type: 'code',
       redirect_uri: REDIRECT_URI,
       code_challenge_method: 'S256',
       code_challenge: challenge,
+      state,
       scope: SCOPES,
     });
     window.location.href = `https://accounts.spotify.com/authorize?${params}`;
@@ -181,7 +188,39 @@
     try { localStorage.setItem(STORAGE.SCOPES, SCOPES_V); } catch (x) {}
     // limpieza de la marca que dejó el ❤ retirado (sesiones anteriores)
     try { localStorage.removeItem('mm_like_bloqueado'); } catch (x) {}
+    permisoCaducado = false;   // permiso nuevo: la sesión vuelve a estar viva
     return true;
+  };
+
+  /* -------- El permiso CADUCA (y no es lo mismo que fallar) --------
+
+     Dos formas de que renovar salga mal, y hasta ahora las dos se trataban
+     igual —devolver `false` y reintentar a los cinco minutos, para siempre—:
+
+     · Un fallo pasajero: sin red, Spotify de mantenimiento, un 500. Ahí
+       reintentar es exactamente lo que hay que hacer.
+     · Que el permiso ya NO valga. La documentación lo dice sin rodeos: los
+       refresh token «tienen una vida de 6 meses» que empieza cuando el
+       usuario autoriza y **no se alarga al renovarlos**; y el usuario puede
+       retirarlos cuando quiera desde su cuenta. En los dos casos Spotify
+       contesta `invalid_grant`, y ahí reintentar no arregla nada: hay que
+       volver a pasar por la pantalla de autorización.
+
+     Sin distinguirlas, a los seis meses la app se quedaba reintentando en
+     bucle y enseñando un «conecta spotify» que no explicaba nada. */
+  let permisoCaducado = false;
+
+  const olvidarPermiso = () => {
+    permisoCaducado = true;
+    try {
+      localStorage.removeItem(STORAGE.REFRESH);
+      localStorage.removeItem(STORAGE.TOKEN);
+      localStorage.removeItem(STORAGE.EXPIRES);
+    } catch (e) {}
+    clearTimeout(renovTimer);
+    try { window.PlayerCore.setSpotifyConnected(false); } catch (e) {}
+    setStatus('◎ el permiso de spotify caducó · pulsa [ conectar spotify ] para volver a entrar');
+    console.warn('[Spotify] invalid_grant: el refresh token ya no vale (caducado o retirado)');
   };
 
   const refreshToken = async () => {
@@ -193,13 +232,30 @@
       grant_type: 'refresh_token',
       refresh_token: refresh,
     });
-    const res = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    });
-    if (!res.ok) return false;
+    let res;
+    try {
+      res = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+    } catch (e) {
+      return false;                  // sin red: pasajero, se reintenta
+    }
+    if (!res.ok) {
+      /* `invalid_grant` = «ese permiso ya no existe». Es el único motivo por
+         el que NO se debe reintentar; la doc pide tirarlo y volver a pedir
+         autorización. Un 400 con otro motivo, o un 5xx, sí son para insistir. */
+      let motivo = '';
+      try { motivo = (await res.json()).error || ''; } catch (e) {}
+      if (motivo === 'invalid_grant') olvidarPermiso();
+      return false;
+    }
     const data = await res.json();
+    /* OJO: Spotify NO siempre devuelve un refresh token nuevo. `saveTokens`
+       solo pisa el guardado cuando viene uno («When a refresh token is not
+       returned, continue using the existing token»); si pisara con undefined,
+       la sesión moriría en la primera renovación. */
     saveTokens(data);
     return true;
   };
@@ -228,6 +284,8 @@
   const renovarAhora = async () => {
     // Si sale bien, `saveTokens` vuelve a programar sola con la caducidad nueva
     if (await refreshToken()) return;
+    // Caducado de verdad: insistir no lo arregla, y ya se ha avisado
+    if (permisoCaducado) return;
     console.warn('[Spotify] no se pudo renovar el token; se reintenta en 5 min');
     clearTimeout(renovTimer);
     renovTimer = setTimeout(renovarAhora, 300000);
@@ -235,6 +293,7 @@
 
   const programarRenovacion = () => {
     clearTimeout(renovTimer);
+    if (permisoCaducado) return;
     if (!localStorage.getItem(STORAGE.REFRESH)) return;
     const exp = parseInt(localStorage.getItem(STORAGE.EXPIRES) || '0', 10);
     /* Un minuto de margen. El mínimo de 5 s es para el caso de abrir la app
@@ -287,15 +346,30 @@
 
   const frenado = () => Math.max(0, bloqueadoHasta - Date.now());
 
-  const frenar = (res) => {
+  /* Dos cosas distintas contestan 429, y desde jul-2026 se distinguen:
+
+     · RITMO. Demasiadas peticiones en la ventana móvil de 30 segundos. Se
+       espera lo que diga `Retry-After` (o se dobla la espera) y se sigue.
+     · CUOTA AGOTADA. Desde jul-2026 el modo desarrollo cuenta la cuota **por
+       cuenta de desarrollador** (antes por Client ID) y, cuando se acaba,
+       contesta 429 con `"reason": "QUOTA_EXCEEDED"` en el cuerpo. Eso no se
+       arregla esperando cinco segundos: hay que dejarlo estar un buen rato.
+       Decirle al usuario «reintentando en 5s» ahí es mentirle. */
+  const frenar = (res, cuerpo) => {
+    const agotada = /QUOTA_EXCEEDED/.test(cuerpo || '');
     const cabecera = parseInt((res && res.headers.get('Retry-After')) || '0', 10);
-    esperaSeguida = cabecera > 0
-      ? Math.min(ESPERA_MAX, cabecera)
-      : Math.min(ESPERA_MAX, Math.max(ESPERA_MIN, esperaSeguida * 2 || ESPERA_MIN));
+    esperaSeguida = agotada
+      ? ESPERA_MAX
+      : (cabecera > 0
+        ? Math.min(ESPERA_MAX, cabecera)
+        : Math.min(ESPERA_MAX, Math.max(ESPERA_MIN, esperaSeguida * 2 || ESPERA_MIN)));
     bloqueadoHasta = Date.now() + esperaSeguida * 1000;
     console.warn(`[Spotify] 429: en pausa ${esperaSeguida}s` +
-      (cabecera > 0 ? ' (lo pide Retry-After)' : ' (sin Retry-After legible)'));
-    setStatus(`◷ spotify pidió esperar · reintentando en ${esperaSeguida}s`);
+      (agotada ? ' (CUOTA AGOTADA de la cuenta de desarrollador)'
+        : cabecera > 0 ? ' (lo pide Retry-After)' : ' (sin Retry-After legible)'));
+    setStatus(agotada
+      ? '◷ spotify agotó la cuota de tu app · tu música importada sigue funcionando'
+      : `◷ spotify pidió esperar · reintentando en ${esperaSeguida}s`);
   };
 
   // -------- Web API helpers --------
@@ -315,7 +389,14 @@
         ...(opts.headers || {}),
       },
     });
-    if (res.status === 429) { frenar(res); throw new Error('Spotify API 429: demasiadas peticiones'); }
+    if (res.status === 429) {
+      // El cuerpo dice si fue el ritmo o la cuota entera (ver `frenar`)
+      let cuerpo = '';
+      try { cuerpo = await res.text(); } catch (e) {}
+      frenar(res, cuerpo);
+      throw new Error('Spotify API 429: ' + (/QUOTA_EXCEEDED/.test(cuerpo)
+        ? 'cuota agotada' : 'demasiadas peticiones'));
+    }
     esperaSeguida = 0;                 // una respuesta buena limpia la cuenta
     if (res.status === 204) return null;
     if (!res.ok) {
@@ -544,6 +625,7 @@
        desde esta red, así que es la diferencia entre que la letra esté puesta
        al empezar la canción o que llegue por el primer estribillo. */
     ventana = state.track_window || null;
+    relevar(state);          // por si este aparato no admitió la lista entera
     const sig = ventana && ventana.next_tracks && ventana.next_tracks[0];
     if (sig && window.LyricsModule && window.LyricsModule.prefetch) {
       const clave = sig.uri || sig.id;
@@ -744,18 +826,33 @@
      forma, así que el mapeo y el pintado se escriben una sola vez; lo que sí
      cambia entre uno y otro es cómo se ancla el reloj, y eso se queda en cada
      lado (el sondeo compensa la latencia de red; el SDK no la tiene). */
-  const pistaDesde = (it) => ({
-    // El SDK deja `id` en null para algunas pistas; el uri nunca falta.
-    id: 'sp:' + (it.id || it.uri),
-    name: it.name,
-    artist: (it.artists || []).map((a) => a.name).join(', '),
-    album: it.album ? it.album.name : '',
-    duration: it.duration_ms / 1000,
-    cover: it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : null,
-    url: null,
-    spotify: true,
-    uri: it.uri,
-  });
+  /* PODCASTS. Lo que suena no siempre es una canción, y hasta ahora eso
+     dejaba la app como colgada: `GET /me/player` devuelve `item: null` para
+     un episodio salvo que se pida `additional_types=episode`, así que la
+     barra se quedaba con la última canción y el reloj parado — parecía
+     roto. Ahora se pide y se traduce: el episodio entra con el nombre del
+     programa donde iría el artista y su propia portada. La letra se busca
+     igual y no aparece ninguna, que es justo lo que debe pasar. */
+  const pistaDesde = (it) => {
+    const episodio = it && it.type === 'episode';
+    return {
+      // El SDK deja `id` en null para algunas pistas; el uri nunca falta.
+      id: 'sp:' + (it.id || it.uri),
+      name: it.name,
+      artist: episodio
+        ? ((it.show && it.show.name) || 'podcast')
+        : (it.artists || []).map((a) => a.name).join(', '),
+      album: episodio ? ((it.show && it.show.name) || '') : (it.album ? it.album.name : ''),
+      duration: (it.duration_ms || 0) / 1000,
+      cover: episodio
+        ? ((it.images && it.images[0] && it.images[0].url) || null)
+        : (it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : null),
+      url: null,
+      spotify: true,
+      podcast: episodio,
+      uri: it.uri,
+    };
+  };
 
   const pintarPista = (track) => {
     document.getElementById('npTitle').textContent = track.name;
@@ -790,11 +887,11 @@
     if (window.LyricsModule) window.LyricsModule.fetch(track);
     refrescarLike(track);
     /* Cambiar de canción es el ÚNICO momento en que la cola se acorta, así
-       que es aquí donde la radio se repone. Es lo que hace que no se acabe:
-       mientras la sesión siga viva, siempre quedan canciones por delante.
-       Vale para los dos caminos —el SDK y el sondeo—, porque los dos pasan
-       por aquí al cambiar de pista. */
-    if (radio) rellenarRadio();
+       que es aquí donde «sigue sonando» se repone. Es lo que hace que no se
+       acabe: mientras la sesión siga viva, siempre quedan canciones por
+       delante. Vale para los dos caminos —el SDK y el sondeo—, porque los
+       dos pasan por aquí al cambiar de pista. */
+    if (mezcla) rellenarMezcla();
   };
 
   const startPolling = () => {
@@ -809,7 +906,10 @@
     const poll = async () => {
       try {
         const t0 = performance.now();
-        const data = await api('/me/player');
+        /* `additional_types=episode`: sin él, con un podcast sonando la API
+           contesta `item: null` y la app se queda con la canción anterior
+           puesta y el reloj parado (ver `pistaDesde`). */
+        const data = await api('/me/player?additional_types=episode');
         const t1 = performance.now();
         // Los modos se leen aunque no haya pista sonando: puede haber un
         // aparato despierto y en pausa, y el aleatorio sigue teniendo estado.
@@ -1316,6 +1416,29 @@
      llegar a un artista ni a un disco. */
   let tipoBusqueda = 'track';
 
+  /* Spotify devuelve la MISMA canción tres y cuatro veces —el single, el
+     disco, el recopilatorio y el «Remastered»— y desde feb-2026 la búsqueda
+     de las apps en modo desarrollo trae diez resultados como mucho: cuatro
+     repetidas son cuatro sitios menos para encontrar lo que se busca.
+
+     Se deja la PRIMERA de cada canción, que es la que Spotify considera más
+     relevante para lo que se ha escrito. Por eso es seguro comparar por el
+     título sin paréntesis ni sufijos («Wonderwall - Live» = «Wonderwall»):
+     si de verdad buscabas la de directo, esa es la que sale primera y es la
+     que se queda. El artista entra en la comparación, así que una versión de
+     otro no se junta nunca con el original. */
+  const sinDuplicadas = (lista) => {
+    const nucleo = (window.Similares && window.Similares.nucleo)
+      || ((s) => String(s || '').toLowerCase().trim());
+    const vistas = new Set();
+    return lista.filter((t) => {
+      const k = nucleo(t.name) + '|' + nucleo(t.artist);
+      if (!k || vistas.has(k)) return false;
+      vistas.add(k);
+      return true;
+    });
+  };
+
   const doSearch = async (query) => {
     const q = query.trim();
     const mia = ++seqBusqueda;
@@ -1353,7 +1476,7 @@
       }
 
       const items = (data && data.tracks && data.tracks.items) || [];
-      searchResults = items.map(it => ({
+      searchResults = sinDuplicadas(items.map(it => ({
         id: 'sp:' + it.id,
         uri: it.uri,
         name: it.name,
@@ -1367,7 +1490,7 @@
         cover: it.album && it.album.images && it.album.images[0] ? it.album.images[0].url : null,
         preview: it.preview_url || null,
         spotify: true,
-      }));
+      })));
       renderResults(q);
       if (searchResults.length) anotarReciente(q);
     } catch (e) {
@@ -1416,9 +1539,9 @@
   // Reproduce un contexto entero (playlist / álbum), opcionalmente empezando
   // en una pista concreta. Así la cola de Spotify sigue con el resto.
   const playContext = async (contextUri, offsetUri) => {
-    // Una playlist o un álbum ya continúan solos: se apaga la radio para que
-    // no siga metiendo canciones detrás de otra cosa.
-    pararRadio();
+    // Una playlist o un álbum ya continúan solos: se apaga «sigue sonando»
+    // para que no siga metiendo canciones detrás de otra cosa.
+    pararMezcla();
     await arrancarSDK();          // que exista el aparato antes de apuntarle
     const body = { context_uri: contextUri };
     if (offsetUri) body.offset = { uri: offsetUri };
@@ -1429,49 +1552,70 @@
     startPolling();
   };
 
-  /* -------- «Sigue sonando»: cola automática --------
+  /* -------- «Sigue sonando»: lo que viene detrás, como en Spotify --------
 
      Poner una canción desde el buscador reproducía ESA y se acababa la
      música. En la app de Spotify no pasa: al terminar sigue con cosas
-     parecidas. Esto lo imita.
+     parecidas. Esto lo imita, y ha costado tres intentos llegar a la forma
+     buena — las dos primeras están contadas aquí porque el error era el
+     mismo cada vez: dejar rastro en la cuenta de quien solo quería oír una
+     canción.
 
-     NO se puede hacer como lo hace Spotify. `GET /recommendations` —el
-     endpoint que servía exactamente para esto— lleva muerto desde nov-2024 y
-     responde 403 a las apps creadas después. Y aunque `context_uri` acepta
-     artistas, `offset` **solo** funciona con álbum o playlist, así que
-     tampoco vale el truco de «pon esta canción y sigue con el artista».
+     ---- LOS DOS INTENTOS QUE NO VALÍAN ----
+     · v2 · LISTA PUENTE. Spotify solo enciende su autoplay cuando lo que
+       suena es un CONTEXTO (playlist o disco), así que se le fabricaba uno:
+       meter la canción en una playlist privada nuestra y reproducir esa.
+       Funcionaba, pero le aparecía una PLAYLIST NUEVA en su Spotify.
+       `limpiarListaPuente` (abajo) borra la que quedara.
+     · v3 · `POST /me/player/queue`, una llamada por canción. Nada que
+       borrar... pero Spotify distingue dos cosas en el panel de la derecha:
+         «Siguiente»                        ← lo que continúa solo
+         «Siguiente en la fila de reproducción» + [Borrar fila]
+                                            ← lo que alguien metió A MANO
+       Encolar cae en el segundo, y el usuario lo vio al primer vistazo:
+       parecía que la app le había llenado la fila de reproducción.
 
-     Así que la lista se arma a mano con lo que queda vivo:
-       · `GET /artists/{id}` → los géneros. Es el ÚNICO sitio donde están:
-         las pistas no los traen.
-       · `GET /search` con `artist:"…"` y `genre:"…"` → candidatas.
-       · `POST /me/player/queue` → a la cola, en orden.
+     ---- LO QUE HAY AHORA (v4) ----
+     La lista entera va DENTRO del propio play:
 
-     Solo salta con una canción SUELTA. Desde una playlist o un álbum se
-     reproduce en contexto y Spotify ya continúa con el resto por su cuenta.
+         PUT /me/player/play   { uris: [la elegida, parecida, parecida, …] }
+
+     Es la única forma que da la API de decir «y detrás de esta, estas»
+     formando parte de lo que suena. Aparecen bajo «Siguiente», sin botón de
+     borrar la fila, sin playlist y sin nada que limpiar después. La cola
+     sigue libre: si el usuario encola algo a mano, se pone delante de todo
+     esto, que es exactamente lo que hace Spotify.
+
+     De dónde salen las canciones: ListenBrainz (ver js/similares.js), tres
+     tandas en orden —parecidas de verdad, artistas afines y, de red de
+     seguridad, el género de `GET /artists/{id}`—. Las parecidas traen su id
+     de Spotify resuelto en lote, así que armar una lista de cincuenta no
+     cuesta NI UNA petición de Spotify.
 
      ---- NO SE ACABA ----
-     La primera versión encolaba diez canciones y se callaba: eso no es una
-     radio, es una lista corta. Ahora hay una SESIÓN de radio que sigue viva
-     mientras suene, y **en cada cambio de canción se rellena la cola** para
-     mantener siempre unas cuantas por delante. Mientras no pongas otra cosa,
-     no se termina.
+     Cincuenta canciones son unas tres horas. Cuando el reproductor llega a
+     la última (`next_tracks` vacío), `rellenarMezcla` manda otra lista que
+     empieza por LA QUE ESTÁ SONANDO, con `position_ms` en el punto exacto:
+     la música no se entera y detrás hay otras cincuenta.
 
-     La clave para que no se repita es el **`offset` de la búsqueda**: sin él,
-     `genre:"reggaeton"` devolvería SIEMPRE las mismas diez y la radio giraría
-     en bucle a los veinte minutos. Cada relleno va rotando entre las
-     consultas (género 1, género 2, artista…) y pasando de página, con `vistas`
-     guardando lo ya encolado para no repetir nunca. */
-  const RADIO_COLCHON = 5;   // cuántas mantener siempre por delante
-  const RADIO_INICIAL = 5;   // las de la primera tanda
-  let radioSeq = 0;          // poner otra cosa cancela la radio anterior
-  let radio = null;          // sesión viva: {generos, artista, vistas, turno…}
+     ---- SI EL APARATO IGNORA LA LISTA ----
+     Hubo reproductores que se quedaban solo con la primera uri. A los pocos
+     segundos se comprueba que de verdad hay algo detrás y, si no, se cae a
+     encolar a mano: peor de cara, pero mejor que quedarse en silencio. */
+  const LISTA_MAX = 49;       // cuántas van detrás de la elegida
+  const LISTA_MIN_OTRAS = 12; // si no hay parecidas, con esto basta para empezar
+  const LOTE_URIS = 30;       // cuántas parecidas se traducen a uri de una vez
+  const POR_ARTISTA = 2;      // tope de canciones seguidas del mismo artista
+  const ESPERA_SIMILARES = 2500;  // lo que se aguanta antes de dar al play
+
+  let mezclaSeq = 0;          // poner otra cosa cancela la mezcla anterior
+  let mezcla = null;          // sesión viva
 
   const radioEncendida = () => localStorage.getItem('mm_radio') !== 'off';
 
-  const pararRadio = () => { radioSeq++; radio = null; };
+  const pararMezcla = () => { mezclaSeq++; mezcla = null; };
 
-  const mezclar = (arr) => {
+  const barajar = (arr) => {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -1487,221 +1631,417 @@
       const d = await api('/search?type=track&limit=10&offset=' + (offset || 0)
         + '&q=' + encodeURIComponent(q));
       return ((d && d.tracks && d.tracks.items) || []).filter((x) => x && x.uri);
-    } catch (e) { return []; }      // que falle una no debe tumbar la radio
+    } catch (e) { return []; }      // que falle una no debe tumbar la mezcla
   };
 
-  /* Siguiente puñado de candidatas. Rota entre las consultas y va pasando
-     páginas; cuando una consulta se agota, la rotación pasa sola a la
-     siguiente y el `turno` sube, así que la radio nunca se queda seca. */
-  const masCandidatas = async () => {
-    const r = radio;
-    if (!r || !r.consultas.length) return [];
-    for (let intento = 0; intento < r.consultas.length * 2; intento++) {
-      const q = r.consultas[r.turno % r.consultas.length];
-      const pagina = Math.floor(r.turno / r.consultas.length);
-      r.turno++;
-      /* Tope del `offset` de Spotify: 1000, o sea 100 páginas por consulta.
-         Son unas 3.000 canciones — más de un día seguido de música—, pero si
-         alguien llega, la radio vuelve a empezar en vez de callarse: se
-         olvida lo ya puesto (menos lo que suena ahora) y se repite catálogo.
-         Repetirse a las 20 horas es mucho mejor que quedarse en silencio. */
-      if (pagina > 99) {
-        r.turno = 0;
-        r.vistas = new Set();
-        const actual = window.PlayerCore && window.PlayerCore.state.currentTrack;
-        if (actual && actual.uri) r.vistas.add(actual.uri);
+  /* Un nombre de artista puede traer comillas («The Quotes "Band"»), y una
+     comilla suelta dentro de `artist:"…"` rompe la consulta entera de
+     Spotify: se queda sin resultados y la tanda de artistas parecidos no
+     encola nada. Fuera comillas y barras. */
+  const paraConsulta = (s) => String(s || '').replace(/["\\]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Lo mínimo para mandar la lista y para poder nombrarla en la barra
+  const pistaCorta = (it) => ({
+    uri: it.uri,
+    name: it.name || '',
+    artist: (it.artists || []).map((a) => a.name).filter(Boolean).join(', '),
+  });
+
+  /* ---- Tanda 1: canciones parecidas ----
+     Las parecidas llegan con su MBID, no con su uri. La traducción va EN
+     LOTE —treinta de una— contra ListenBrainz, que publica el id de Spotify
+     de cada grabación. Es lo que hace que armar la lista no gaste cuota. */
+  const traducirLote = async () => {
+    const m = mezcla;
+    if (!m || !m.parecidas.length) return;
+    /* El trozo sale de la lista ANTES de nada. Si se devolviera sin sacarlo
+       —por ejemplo sin js/similares.js cargado— quien llama volvería a pedir
+       lo mismo eternamente: la lista nunca menguaría. */
+    const trozo = m.parecidas.splice(0, LOTE_URIS);
+    if (!window.Similares) return;
+    const mapa = await window.Similares.urisSpotify(trozo.map((x) => x.mbid));
+    if (m !== mezcla) return;               // pusieron otra cosa mientras
+    trozo.forEach((x) => {
+      const uri = mapa[x.mbid];
+      if (uri && !m.vistas.has(uri)) m.listas.push({ uri, name: x.name, artist: x.artist });
+    });
+  };
+
+  const deParecidas = async (n) => {
+    const m = mezcla;
+    const out = [];
+    if (!m) return out;
+    while (out.length < n) {
+      if (!m.listas.length) {
+        if (!m.parecidas.length) break;     // se acabaron: pasa a la tanda 2
+        await traducirLote();
+        if (m !== mezcla) return out;
         continue;
       }
-      const items = (await buscarPistas(q, pagina * 10)).filter((x) => !r.vistas.has(x.uri));
-      if (items.length) return items;
+      const p = m.listas.shift();
+      if (p && !m.vistas.has(p.uri)) out.push(p);
     }
-    return [];
+    return out;
   };
 
-  // Encola de verdad. Devuelve cuántas entraron.
-  const encolarPistas = async (lista, mia) => {
-    let n = 0;
-    for (const p of lista) {
-      if (mia !== radioSeq) return n;             // pusieron otra cosa
-      if (radio) radio.vistas.add(p.uri);
+  /* ---- Tanda 2: artistas parecidos ----
+     Una búsqueda por artista, y de cada uno solo un par de canciones: la
+     gracia es que la lista siga sonando variada, no que se convierta en el
+     grandes éxitos del primer artista que salga. `tope` limita las
+     búsquedas, que aquí sí cuestan cuota de Spotify. */
+  const deArtistas = async (n, tope) => {
+    const m = mezcla;
+    const out = [];
+    if (!m) return out;
+    let vueltas = 0;
+    while (out.length < n && m.artistas.length && vueltas < (tope || 3)) {
+      vueltas++;
+      const nombre = m.artistas.shift();
+      const items = await buscarPistas('artist:"' + paraConsulta(nombre) + '"', 0);
+      if (m !== mezcla) return out;
+      let deEste = 0;
+      barajar(items).forEach((it) => {
+        if (out.length >= n || deEste >= POR_ARTISTA || m.vistas.has(it.uri)) return;
+        out.push(pistaCorta(it));
+        deEste++;
+      });
+    }
+    return out;
+  };
+
+  /* ---- Tanda 3: el género (red de seguridad) ----
+     Los géneros solo viven en `GET /artists/{id}`; las pistas no los traen.
+     Se piden UNA vez y solo si de verdad hacen falta: con las dos tandas de
+     arriba funcionando, esta petición no llega a hacerse nunca. */
+  const asegurarGeneros = async () => {
+    const m = mezcla;
+    if (!m || m.generosPedidos) return;
+    m.generosPedidos = true;
+    let generos = [];
+    if (m.artistId) {
       try {
-        await api(conDestino('/me/player/queue?uri=' + encodeURIComponent(p.uri)), { method: 'POST' });
-        n++;
-      } catch (e) {
-        /* Un 429, o el aparato que se fue. Parar en seco: insistir con las
-           que quedan solo alargaría el castigo del freno. */
-        console.warn('[radio] cola cortada:', e && e.message);
-        break;
-      }
+        const a = await api('/artists/' + m.artistId);
+        generos = (a && a.genres) || [];
+      } catch (e) { /* sin géneros se tira solo del artista */ }
     }
-    return n;
+    if (m !== mezcla) return;
+    m.genero = generos[0] || null;
+    m.consultas = generos.slice(0, 3).map((g) => 'genre:"' + g + '"');
+    if (m.semilla.artist) m.consultas.push('artist:"' + paraConsulta(m.semilla.artist) + '"');
   };
 
-  /* El relleno. Lo llama `notarCambio` en CADA cambio de canción, que es el
-     único momento en que la cola se acorta. Con el SDK sabemos exactamente
-     cuántas quedan por delante (`next_tracks`); sonando en otro aparato no
-     hay forma de saberlo sin gastar peticiones, así que se repone una por
-     canción, que mantiene el colchón igual de lleno. */
-  const rellenarRadio = async () => {
-    if (!radio || radio.rellenando || !radioEncendida()) return;
-    const faltan = (sdkActivo && ventana && Array.isArray(ventana.next_tracks))
-      ? RADIO_COLCHON - ventana.next_tracks.length
-      : 1;
-    if (faltan <= 0) return;
-
-    radio.rellenando = true;
-    const mia = radioSeq;
-    try {
-      let puestas = 0;
-      // Dos vueltas como mucho: si en dos no salió nada, se deja para el
-      // siguiente cambio de canción en vez de insistir aquí.
-      for (let v = 0; v < 2 && puestas < faltan; v++) {
-        const cand = await masCandidatas();
-        if (mia !== radioSeq) return;
-        if (!cand.length) break;
-        puestas += await encolarPistas(mezclar(cand).slice(0, faltan - puestas), mia);
+  /* Rota entre las consultas y va pasando páginas. La clave para que no se
+     repita es el `offset`: sin él, `genre:"reggaeton"` devolvería SIEMPRE las
+     mismas diez y esto giraría en bucle a los veinte minutos. */
+  const deGenero = async (n, tope) => {
+    const m = mezcla;
+    const out = [];
+    if (!m || !m.consultas.length) return out;
+    for (let intento = 0; intento < (tope || 4) && out.length < n; intento++) {
+      const q = m.consultas[m.turno % m.consultas.length];
+      const pagina = Math.floor(m.turno / m.consultas.length);
+      m.turno++;
+      /* Tope del `offset` de Spotify: 1000, o sea 100 páginas por consulta.
+         Son unas 3.000 canciones —más de un día seguido de música—, pero si
+         alguien llega, vuelve a empezar en vez de callarse: se olvida lo ya
+         puesto (menos lo que suena ahora) y se repite catálogo. */
+      if (pagina > 99) {
+        m.turno = 0;
+        m.vistas = new Set();
+        const actual = window.PlayerCore && window.PlayerCore.state.currentTrack;
+        if (actual && actual.uri) m.vistas.add(actual.uri);
+        continue;
       }
-      if (puestas && window.SevenQueueRefresh) window.SevenQueueRefresh();
+      const items = await buscarPistas(q, pagina * 10);
+      if (m !== mezcla) return out;
+      barajar(items).forEach((it) => {
+        if (out.length < n && !m.vistas.has(it.uri)) out.push(pistaCorta(it));
+      });
+    }
+    return out;
+  };
+
+  /* Arma la lista que va detrás de la canción. Las tres tandas en orden,
+     rellenando con la siguiente lo que falte. Todo lo que sale de aquí entra
+     en `vistas`: la lista de dentro de tres horas no repetirá nada de esta. */
+  const armarLista = async (n) => {
+    const m = mezcla;
+    if (!m) return [];
+    const out = [];
+    const sumar = (lista, fuente) => {
+      if (!out.length && lista.length) m.fuente = fuente;   // quien abre, manda
+      lista.forEach((p) => {
+        if (out.length >= n || !p || !p.uri) return;
+        /* Contra `vistas` (lo ya puesto en toda la sesión) y contra la propia
+           tanda: dos grabaciones distintas pueden apuntar a la misma canción
+           de Spotify, y ponerla dos veces seguidas se nota. */
+        if (m.vistas.has(p.uri) || out.some((q) => q.uri === p.uri)) return;
+        out.push(p);
+      });
+    };
+
+    sumar(await deParecidas(n), 'parecidas');
+    if (m !== mezcla) return [];
+
+    /* Las otras dos tandas NO aspiran a cincuenta: cada canción suya cuesta
+       una búsqueda de Spotify, y con una docena hay música de sobra para
+       tres cuartos de hora — para entonces lo normal es que se haya puesto
+       otra cosa. Las parecidas sí llenan la lista entera: son gratis. */
+    const meta = Math.max(out.length, Math.min(n, LISTA_MIN_OTRAS));
+    if (out.length < meta) {
+      sumar(await deArtistas(meta - out.length, 4), 'artistas');
+      if (m !== mezcla) return [];
+    }
+    if (out.length < meta) {
+      await asegurarGeneros();
+      if (m !== mezcla) return [];
+      sumar(await deGenero(meta - out.length, 4), 'genero');
+    }
+
+    out.forEach((p) => { m.vistas.add(p.uri); m.puestas.add(p.uri); });
+    return out;
+  };
+
+  /* Manda a sonar una lista: la primera suena ya y el resto queda detrás,
+     en «Siguiente». `desde` (ms) sirve para retomar la que ya sonaba en el
+     punto exacto, que es como se repone la mezcla sin que se note.
+
+     SIN `offset`: el OpenAPI de Spotify es explícito —«Only available when
+     context_uri corresponds to an album or playlist object»—, así que con
+     `uris` no pinta nada y podría ser un 400. `position_ms` sí vale, y se
+     aplica a la primera de la lista, que es lo que hace falta.
+
+     CUÁNTAS CABEN: la especificación NO documenta un tope para `uris`. Como
+     nadie promete nada, si la lista larga se la devuelven se reintenta con
+     veinte y, en el peor caso, con la canción sola: mejor sonar sin mezcla
+     que no sonar. */
+  const sonarLista = async (uris, desde) => {
+    const cuerpo = (lista) => {
+      const c = { uris: lista };
+      if (desde > 0) c.position_ms = Math.floor(desde);
+      return JSON.stringify(c);
+    };
+    try {
+      await api(conDestino('/me/player/play'), { method: 'PUT', body: cuerpo(uris) });
+      return uris.length;
+    } catch (e) {
+      const msg = String((e && e.message) || '');
+      // Un 400/413 con lista larga huele a tope no documentado; lo demás no
+      if (uris.length <= 20 || !/API (400|413|414)/.test(msg)) throw e;
+      console.warn('[mezcla] la lista larga no entró (' + uris.length + '); pruebo con 20:', msg);
+      try {
+        await api(conDestino('/me/player/play'), { method: 'PUT', body: cuerpo(uris.slice(0, 20)) });
+        return 20;
+      } catch (e2) {
+        await api(conDestino('/me/player/play'), { method: 'PUT', body: cuerpo(uris.slice(0, 1)) });
+        return 1;
+      }
+    }
+  };
+
+  /* El minuto por el que va lo que suena, interpolado entre sondeos. Vivía
+     suelto dentro de la API pública; ahora hace falta también aquí dentro,
+     para reponer la mezcla SIN que la canción salte de sitio. */
+  const posicionActual = () => {
+    if (!progStamp || !lastIsPlaying) return progBase;
+    const sec = progBase + (performance.now() - progStamp) / 1000;
+    return progDur ? Math.min(progDur, sec) : sec;
+  };
+
+  // Cuántas quedan por delante, cuando se puede saber sin gastar peticiones
+  const porDelante = () => ((sdkActivo && ventana && Array.isArray(ventana.next_tracks))
+    ? ventana.next_tracks.length : null);
+
+  /* Red de seguridad. Hay reproductores que de una lista de uris se quedan
+     con la PRIMERA y tiran el resto: está reportado desde 2020 contra el
+     reproductor web (issue 1437 del repo de la API de Spotify, archivado en
+     read-only sin respuesta), y es justo el reproductor que usa esta app
+     cuando la música suena en la pestaña. Si a los pocos segundos no hay
+     nada detrás, se enciende el MODO RELEVO.
+
+     Lo que NO se hace es caer a `POST /me/player/queue`: eso llenaría la
+     «fila de reproducción» del usuario, que es exactamente lo que se quitó. */
+  const vigilarLista = async (mia, cuantas) => {
+    if (!cuantas) return;
+    await new Promise((r) => setTimeout(r, 4000));
+    if (mia !== mezclaSeq || !mezcla) return;
+    const hay = porDelante();
+    if (hay === null || hay > 0) return;          // o no se sabe, o sí llegó
+    mezcla.relevo = true;
+    console.warn('[mezcla] este aparato no admite listas; sigo en modo relevo');
+  };
+
+  /* EL RELEVO. La lista sigue viva aquí dentro y la siguiente se manda
+     cuando la de ahora termina. Se nota igual que la pone Spotify, salvo por
+     el respiro de un segundo entre canción y canción — y solo pasa en los
+     aparatos que no admiten listas.
+
+     Cómo se sabe que una canción se ha acabado con este reproductor: manda
+     un estado EN PAUSA, con la posición en CERO y con esa misma canción ya
+     en `previous_tracks`. Las tres cosas a la vez; con menos, pausar al
+     principio de una canción dispararía el relevo. */
+  const relevar = (state) => {
+    if (!mezcla || !mezcla.relevo || mezcla.relevando) return;
+    const tw = (state && state.track_window) || {};
+    const actual = tw.current_track;
+    if (!actual || !state.paused || (state.position || 0) !== 0) return;
+    if (!(tw.previous_tracks || []).some((x) => x && x.uri === actual.uri)) return;
+
+    const i = mezcla.emitidas.indexOf(actual.uri);
+    if (i < 0 || i + 1 >= mezcla.emitidas.length) return;
+    mezcla.relevando = true;
+    /* Se manda el resto ENTERO, no solo la siguiente: si el aparato mejora
+       —o era cosa de un día— la lista entra y el relevo deja de hacer falta
+       sin que nadie tenga que enterarse. */
+    sonarLista(mezcla.emitidas.slice(i + 1))
+      .catch((e) => console.warn('[mezcla] el relevo no salió:', e && e.message))
+      .finally(() => { if (mezcla) mezcla.relevando = false; });
+  };
+
+  /* La reposición. `notarCambio` la llama en cada cambio de canción; solo
+     hace algo cuando ya suena la ÚLTIMA de la lista. Entonces manda una
+     lista nueva que empieza por esa misma, en el segundo por el que va, así
+     que lo único que cambia es que detrás vuelve a haber cincuenta. */
+  const rellenarMezcla = async () => {
+    if (!mezcla || mezcla.rellenando || !radioEncendida()) return;
+    const actual = window.PlayerCore && window.PlayerCore.state.currentTrack;
+    if (!actual || !actual.uri) return;
+    /* Se mira contra NUESTRA lista, no contra lo que diga el aparato: con la
+       música sonando en el móvil no hay forma de saber cuántas quedan por
+       delante sin gastar una petición en cada canción. Si lo que suena es la
+       última que mandamos, es que se acaba. */
+    if (actual.uri !== mezcla.emitidas[mezcla.emitidas.length - 1]) return;
+
+    mezcla.rellenando = true;
+    const mia = mezclaSeq;
+    try {
+      const mas = await armarLista(LISTA_MAX);
+      if (mia !== mezclaSeq || !mas.length) return;
+      mezcla.emitidas = [actual.uri, ...mas.map((p) => p.uri)];
+      await sonarLista(mezcla.emitidas, posicionActual() * 1000);
+      if (window.SevenQueueRefresh) window.SevenQueueRefresh();
+    } catch (e) {
+      console.warn('[mezcla] no se pudo reponer:', e && e.message);
     } finally {
-      if (radio) radio.rellenando = false;
+      if (mezcla) mezcla.rellenando = false;
     }
   };
 
-  /* ==========================================================
-     EL AUTOPLAY DE VERDAD DE SPOTIFY (lista puente)
-
-     Todo lo de arriba es una imitación: buscar por género y encolar. Está
-     bien, pero no es lo que hace la app de Spotify — allí pones una canción
-     de Kevin Kaarl y detrás llegan Ed Maverick, Milo j, Esperón. Eso lo
-     decide el motor de recomendaciones de Spotify, y a ese motor no se llega
-     por la API (`GET /recommendations` está muerto desde nov-2024).
-
-     PERO hay una puerta: **Spotify solo enciende su autoplay cuando lo que
-     suena es un CONTEXTO** (playlist o álbum). Con `uris: [una canción]` la
-     música se para al acabar — es una limitación conocida y reportada desde
-     hace años. Con una playlist, Spotify pone sus recomendaciones detrás.
-
-     Así que a la canción suelta se le fabrica un contexto: una playlist
-     privada nuestra, SIEMPRE LA MISMA, en la que se mete solo la canción que
-     se va a poner, y se reproduce esa playlist. A partir de ahí manda el
-     autoplay de Spotify: el de verdad, el mismo de la app.
-
-     Cuesta 3 peticiones en vez de 1 (comprobar la lista, meter la canción,
-     reproducir) y a cambio la radio la pone Spotify entera: cero peticiones
-     después. Sale MÁS BARATO que la imitación por género, que gastaba una
-     docena.
-
-     Dos avisos honestos:
-     · Crea UNA playlist privada en la cuenta del usuario. Se reutiliza para
-       siempre y se sobrescribe en cada canción; no se acumula nada.
-     · Depende de que el usuario tenga el «Autoplay» encendido en Spotify. Si
-       no lo tiene, no llega nada — y para eso está `vigilarAutoplay`, que lo
-       comprueba y enciende la radio por género como red de seguridad.
-     ========================================================== */
-  const CLAVE_LISTA = 'sp_lista_radio';
-  const NOMBRE_LISTA = 'MASTER MUSIC · radio';
-  const DESC_LISTA = 'La usa tu reproductor para que Spotify siga con música parecida. '
-    + 'Se sobrescribe con cada canción; puedes borrarla cuando quieras.';
-
-  const listaRadio = async () => {
-    let id = localStorage.getItem(CLAVE_LISTA);
-    if (id) {
-      // Pudo borrarla desde Spotify: se comprueba antes de darla por buena
-      try { await api('/playlists/' + id); return id; }
-      catch (e) { try { localStorage.removeItem(CLAVE_LISTA); } catch (x) {} }
+  // Lo que se lee en la barra de estado y en la cabecera de la cola.
+  const textoMezcla = () => {
+    const m = mezcla;
+    if (!m) return '';
+    if (m.fuente === 'genero') {
+      return m.genero
+        ? '◈ sigue sonando · ' + m.genero
+        : '◈ sigue sonando · más de ' + (m.semilla.artist || 'lo mismo');
     }
-    const d = await api('/me/playlists', {
-      method: 'POST',
-      body: JSON.stringify({ name: NOMBRE_LISTA, public: false, description: DESC_LISTA }),
-    });
-    id = d && d.id;
-    if (id) { try { localStorage.setItem(CLAVE_LISTA, id); } catch (x) {} }
-    return id || null;
+    if (m.fuente === 'artistas') return '◈ sigue sonando · artistas como ' + (m.semilla.artist || '');
+    return '◈ sigue sonando · parecidas a «' + m.semilla.name + '»';
   };
 
-  // Devuelve true si consiguió poner la canción por la lista puente.
-  const playPorPuente = async (t) => {
+  /* Abre la sesión: busca las parecidas y devuelve la lista de uris que hay
+     que mandar DETRÁS de la canción. Devuelve [] si no hay nada que poner
+     (sin sesión, apagado, o la mezcla ya la cancelaron). */
+  const prepararMezcla = async (t, mia) => {
+    mezcla = {
+      semilla: { name: t.name, artist: (t.artist || '').split(',')[0].trim(), uri: t.uri },
+      artistId: t.artistId || null,
+      parecidas: [],       // {name, artist, mbid} sin traducir a uri
+      listas: [],          // ya traducidas, listas para mandar
+      artistas: [],        // nombres, para la tanda 2
+      consultas: [],       // género, para la tanda 3
+      turno: 0,
+      generosPedidos: false,
+      genero: null,
+      fuente: null,
+      vistas: new Set([t.uri]),
+      puestas: new Set(),
+      emitidas: [],
+      rellenando: false,
+      relevo: false,        // el aparato no admite listas: las ponemos de una en una
+      relevando: false,
+    };
+
+    if (window.Similares) {
+      /* Con reloj: esto retrasa el play, así que se le da lo justo. Si
+         ListenBrainz tarda más de la cuenta se arranca sin él y la lista se
+         arma con lo que haya (artistas o género). */
+      try {
+        const r = await Promise.race([
+          window.Similares.deCancion({ name: t.name, artist: t.artist }),
+          new Promise((res) => setTimeout(() => res(null), ESPERA_SIMILARES)),
+        ]);
+        if (mia !== mezclaSeq || !mezcla) return [];
+        if (r) {
+          mezcla.parecidas = r.canciones || [];
+          mezcla.artistas = r.artistas || [];
+        }
+      } catch (e) {
+        console.warn('[mezcla] sin recomendaciones de fuera, tiro del género:', e && e.message);
+        if (mia !== mezclaSeq || !mezcla) return [];
+      }
+    }
+
+    const lista = await armarLista(LISTA_MAX);
+    if (mia !== mezclaSeq || !mezcla) return [];
+    mezcla.emitidas = [t.uri, ...lista.map((p) => p.uri)];
+    return lista;
+  };
+
+  /* Elegir una de las que vienen detrás no debe cargarse la mezcla: se manda
+     otra vez la lista, empezando por ella. Así saltar tres canciones hacia
+     adelante deja intacto todo lo que venía después, como en Spotify. */
+  const seguirDesde = async (uri) => {
+    const m = mezcla;
+    if (!m) return false;
+    const i = m.emitidas.indexOf(uri);
+    if (i < 0) return false;
     try {
-      const id = await listaRadio();
-      if (!id) return false;
-      // PUT reemplaza el contenido entero: la lista siempre tiene 1 canción
-      await api('/playlists/' + id + '/items', {
-        method: 'PUT', body: JSON.stringify({ uris: [t.uri] }),
-      });
-      await api(conDestino('/me/player/play'), {
-        method: 'PUT', body: JSON.stringify({ context_uri: 'spotify:playlist:' + id }),
-      });
+      await sonarLista(m.emitidas.slice(i));
       return true;
     } catch (e) {
-      console.warn('[radio] la lista puente no salió, se tira de la radio propia:', e && e.message);
+      console.warn('[mezcla] no se pudo seguir desde ahí:', e && e.message);
       return false;
     }
   };
 
-  /* Red de seguridad. Si el usuario tiene el autoplay apagado en Spotify, o
-     si a Spotify no le apetece recomendar nada, la lista puente deja la
-     música muriéndose igual. Se mira una vez, a los segundos, y si detrás no
-     hay nada se enciende la radio por género. */
-  const vigilarAutoplay = async (t) => {
-    await new Promise((r) => setTimeout(r, 7000));
-    if (!radioEncendida() || radio) return;         // ya hay radio propia puesta
-    if (lastTrackId && t.id && lastTrackId !== t.id) return;   // ya cambiaron de canción
-    let hay = 1;
-    if (sdkActivo && ventana && Array.isArray(ventana.next_tracks)) {
-      hay = ventana.next_tracks.length;
-    } else {
-      // Sonando en otro aparato no se sabe sin preguntar: una petición, una vez
+  /* ---- Limpieza de la lista puente (v2) ----
+     Quien usara aquella versión tiene en su Spotify una playlist llamada
+     «MASTER MUSIC · radio» que ya no sirve para nada. Esto la retira.
+
+     Para Spotify, dejar de seguir una playlist propia ES borrarla: no hay
+     endpoint de borrado, es lo mismo que hace su botón. Lo que SÍ cambió es
+     por dónde se pide: `DELETE /playlists/{id}/followers` está **deprecado**
+     («Use Remove Items from Library instead», dice su propio OpenAPI) y las
+     apps en modo desarrollo lo perdieron en feb-2026. El bueno es el de la
+     biblioteca, el mismo que usa el ♥ de aquí al lado, que acepta uris de
+     playlist:  `DELETE /me/library?uris=spotify:playlist:{id}`.
+     El viejo se deja de reserva por si la cuenta va con cuota extendida.
+
+     Se intenta una sola vez: el id se borra de localStorage ANTES de pedir
+     nada, así que si falla no se queda reintentando en cada arranque. */
+  const CLAVE_LISTA_VIEJA = 'sp_lista_radio';
+
+  const limpiarListaPuente = async () => {
+    let id = null;
+    try { id = localStorage.getItem(CLAVE_LISTA_VIEJA); } catch (e) { return; }
+    if (!id) return;
+    try { localStorage.removeItem(CLAVE_LISTA_VIEJA); } catch (e) {}
+    try {
       try {
-        const d = await api('/me/player/queue');
-        hay = ((d && d.queue) || []).length;
-      } catch (e) { return; }                       // ante la duda, no meter mano
+        await api('/me/library?uris=' + encodeURIComponent('spotify:playlist:' + id), { method: 'DELETE' });
+      } catch (e) {
+        await api('/playlists/' + id + '/followers', { method: 'DELETE' });
+      }
+      console.info('[mezcla] retirada la lista puente que dejaba la versión anterior');
+      setStatus('◈ quitada de tu spotify la lista «MASTER MUSIC · radio» que dejaba la versión anterior');
+    } catch (e) {
+      /* Si no se pudo (ya la borró a mano, token justo, lo que sea) no se
+         insiste: es una lista con una canción, y avisar de esto al abrir la
+         app sería ruido. Queda en la consola por si alguien mira. */
+      console.warn('[mezcla] no se pudo retirar la lista puente:', e && e.message);
     }
-    if (hay > 0) return;                            // Spotify ya puso lo suyo
-    console.warn('[radio] el autoplay de Spotify no puso nada; enciendo la radio por género');
-    radiar(t);
-  };
-
-  // Abre la sesión de radio a partir de la canción que se acaba de poner.
-  const radiar = async (t) => {
-    if (!radioEncendida() || !t || !t.uri) return;
-    pararRadio();
-    const mia = radioSeq;
-
-    let generos = [];
-    if (t.artistId) {
-      try {
-        const a = await api('/artists/' + t.artistId);
-        generos = (a && a.genres) || [];
-      } catch (e) { /* sin géneros se tira solo del artista */ }
-    }
-    if (mia !== radioSeq) return;
-
-    const artista = (t.artist || '').split(',')[0].trim();
-    /* El orden de las consultas es el orden en que la radio va tirando. El
-       género delante: es lo que pidió el usuario («música del género»), y
-       poniendo el artista primero la radio empezaría pareciendo un disco
-       suyo. El artista se queda como una consulta más de la rotación. */
-    const consultas = generos.slice(0, 3).map((g) => 'genre:"' + g + '"');
-    if (artista) consultas.push('artist:"' + artista + '"');
-    if (!consultas.length) return;
-
-    radio = {
-      consultas,
-      turno: 0,
-      vistas: new Set([t.uri]),
-      rellenando: false,
-      genero: generos[0] || null,
-    };
-
-    const cand = await masCandidatas();
-    if (mia !== radioSeq || !radio) return;
-    const puestas = await encolarPistas(mezclar(cand).slice(0, RADIO_INICIAL), mia);
-    if (mia !== radioSeq || !puestas) return;
-
-    setStatus(radio.genero
-      ? '◈ radio de ' + radio.genero + ' · seguirá sola al acabar'
-      : '◈ radio encendida · seguirá sola al acabar');
-    if (window.SevenQueueRefresh) window.SevenQueueRefresh();
   };
 
   // contextUri (opcional): reproduce la pista dentro de su playlist/álbum
@@ -1714,19 +2054,51 @@
        vez esto no cuesta nada (devuelve la promesa ya resuelta). */
     await arrancarSDK();
     try {
-      /* Canción suelta y radio encendida: se pone por la LISTA PUENTE para
-         que Spotify encienda su autoplay de verdad. Si eso falla (permiso
-         que falta, red, lo que sea) se cae al play de siempre. */
-      let porPuente = false;
-      if (!contextUri && radioEncendida()) porPuente = await playPorPuente(t);
-
-      if (!porPuente) {
-        // Suena aquí mismo si el SDK arrancó; si no, en el aparato que haya
-        const body = contextUri
-          ? { context_uri: contextUri, offset: { uri: t.uri } }
-          : { uris: [t.uri] };
-        await api(conDestino('/me/player/play'), { method: 'PUT', body: JSON.stringify(body) });
+      /* Elegir una de las que ya venían detrás NO rehace la mezcla: se
+         reanuda desde ahí y lo que había después sigue intacto. Es lo que
+         pasa en Spotify al pulsar algo de «Siguiente». */
+      if (!contextUri && mezcla && mezcla.puestas.has(t.uri) && await seguirDesde(t.uri)) {
+        lastTrackId = null;
+        lastIsPlaying = true;
+        window.PlayerCore.state.isPreview = false;
+        startPolling();
+        setStatus('▶ ' + t.name);
+        return;
       }
+
+      /* Canción suelta: las parecidas se buscan ANTES del play, porque van
+         dentro de él (`uris: [esta, y las que siguen]`). Es lo que hace que
+         aparezcan en «Siguiente» y no en la fila de reproducción. Cuesta
+         cerca de un segundo de espera —y ni eso si ya se puso antes, que el
+         MBID está guardado—; a cambio no hay que tocar nada después.
+
+         Aquí vivió antes el desvío por la LISTA PUENTE, que fabricaba una
+         playlist en la cuenta del usuario. Ni rastro. */
+      const conMezcla = !contextUri && radioEncendida();
+      pararMezcla();                 // lo que hubiera sonando detrás, cancelado
+      const mia = mezclaSeq;
+      let detras = [];
+      if (conMezcla) {
+        detras = await prepararMezcla(t, mia);
+        if (mia !== mezclaSeq) return;         // pusieron otra cosa mientras
+      }
+
+      if (contextUri) {
+        await api(conDestino('/me/player/play'), {
+          method: 'PUT',
+          body: JSON.stringify({ context_uri: contextUri, offset: { uri: t.uri } }),
+        });
+      } else {
+        /* `sonarLista` puede haber tenido que recortar (ver allí). Se ajusta
+           lo que decimos y lo que creemos que suena detrás a lo que de verdad
+           entró: prometer cuarenta y nueve y que haya una es peor que nada. */
+        const entraron = await sonarLista([t.uri, ...detras.map((p) => p.uri)]);
+        if (entraron - 1 < detras.length) {
+          detras = detras.slice(0, Math.max(0, entraron - 1));
+          if (mezcla) mezcla.emitidas = [t.uri, ...detras.map((p) => p.uri)];
+        }
+      }
+
       lastTrackId = null;          // fuerza al polling a refrescar la canción
       lastIsPlaying = true;
       window.PlayerCore.state.isPreview = false;
@@ -1734,21 +2106,14 @@
       setStatus(destino() && somos(destino())
         ? '▶ sonando aquí: ' + t.name
         : '▶ reproduciendo en Spotify: ' + t.name);
-      /* Canción suelta: que al acabar no se quede la app en silencio. Si fue
-         por la lista puente, la radio la pone Spotify y aquí solo se vigila
-         que de verdad haya puesto algo; si no hubo puente, se enciende la
-         nuestra. Sin `await`: la música ya suena y esto va por detrás. */
-      if (!contextUri && radioEncendida()) {
-        if (porPuente) {
-          pararRadio();            // manda Spotify: que la nuestra no estorbe
-          /* Con retraso, como el aviso de «seguir donde ibas»: la barra de
-             estado repinta el nombre de la canción en su repaso de cada
-             500 ms y se comería este mensaje. */
-          setTimeout(() => setStatus('◈ radio de spotify · seguirá sola al acabar'), 900);
-          vigilarAutoplay(t);
-        } else {
-          radiar(t);
-        }
+
+      if (detras.length) {
+        /* Con retraso, como el aviso de «seguir donde ibas»: la barra de
+           estado repinta el nombre de la canción en su repaso de cada 500 ms
+           y se comería este mensaje. */
+        setTimeout(() => setStatus(textoMezcla() + ' · ' + detras.length + ' detrás'), 900);
+        if (window.SevenQueueRefresh) setTimeout(window.SevenQueueRefresh, 1200);
+        vigilarLista(mia, detras.length);      // sin await: va por detrás
       }
     } catch (e) {
       // Fallback: preview de 30s por el reproductor local
@@ -2079,9 +2444,10 @@
         ultimaPrecarga = null;
         clearTimeout(renovTimer);
         olvidarUltimo();
-        pararRadio();
-        // La lista puente es de la cuenta que se va: su id no vale para otra
-        try { localStorage.removeItem(CLAVE_LISTA); } catch (x) {}
+        pararMezcla();
+        /* El id de la lista puente de la v2 es de la cuenta que se va: si
+           quedaba apuntado no vale para la siguiente. */
+        try { localStorage.removeItem(CLAVE_LISTA_VIEJA); } catch (x) {}
         stopPolling();
         showSearchBlock(false);
         searchResults = [];
@@ -2108,17 +2474,33 @@
       window.history.replaceState({}, '', url.pathname);
     }
     if (code) {
-      const ok = await exchangeCode(code);
+      /* El `state` que vuelve tiene que ser el que mandamos (ver `startAuth`).
+         Si no cuadra, ese `code` no salió de aquí: se tira sin canjearlo. Se
+         acepta que NO venga ninguno por las sesiones a medias de antes de que
+         esto existiera — un `state` guardado y otro distinto de vuelta sí es
+         motivo para parar. */
+      const vuelta = url.searchParams.get('state');
+      const mio = localStorage.getItem(STORAGE.STATE);
+      try { localStorage.removeItem(STORAGE.STATE); } catch (e) {}
       url.searchParams.delete('code');
       url.searchParams.delete('state');
       window.history.replaceState({}, '', url.pathname);
-      if (ok) await loadUser();
+      if (mio && vuelta && vuelta !== mio) {
+        console.warn('[Spotify] el `state` de vuelta no es el nuestro; no se canjea el código');
+        setStatus('✕ la vuelta de spotify no cuadra · pulsa [ conectar spotify ] otra vez');
+      } else if (await exchangeCode(code)) {
+        await loadUser();
+      }
     } else if (isLoggedIn()) {
       await loadUser();
     } else if (localStorage.getItem(STORAGE.REFRESH)) {
       if (await refreshToken()) await loadUser();
     }
     wireSearch();
+    /* Con calma: al arrancar hay cola de peticiones (usuario, biblioteca,
+       reproductor) y esto no corre ninguna prisa — es una limpieza que se
+       hace UNA vez en la vida de cada cuenta. */
+    if (isLoggedIn()) setTimeout(limpiarListaPuente, 6000);
   };
 
   window.SpotifyModule = {
@@ -2130,6 +2512,13 @@
     // Escribir en Spotify: el ♥ y crear playlists de verdad
     crearPlaylist,
     puedeGuardar: () => !likeMuerto,
+    /* «Sigue sonando», para que la pestaña «cola» pueda contar de dónde sale
+       lo que viene detrás y marcar las que ha puesto ella. Se devuelve una
+       copia plana: nadie de fuera debe poder tocar la sesión. */
+    mezcla: () => ((mezcla && mezcla.puestas.size)
+      ? { fuente: mezcla.fuente, semilla: { ...mezcla.semilla }, genero: mezcla.genero, texto: textoMezcla() }
+      : null),   // sin nada detrás no hay nada que contar
+    esDeLaMezcla: (uri) => !!(mezcla && uri && mezcla.puestas.has(uri)),
     /* La cola sin gastar una sola petición: sonando aquí, el SDK ya dice lo
        que viene detrás. Devuelve null cuando la música va por otro aparato, y
        entonces quien pregunte tira de `/me/player/queue` como siempre. */

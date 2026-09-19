@@ -3953,6 +3953,28 @@ body.perf-tactil .sp-queue { opacity: 1; }
   margin: 14px 0 6px;
 }
 .q-section:first-child { margin-top: 0; }
+
+/* «Sigue sonando»: una línea que dice de dónde salen las que llegaron solas
+   («parecidas a …», «artistas como …», el género), y un ◈ en cada una de
+   ellas. Es el mismo símbolo con el que la barra de estado la anuncia, para
+   que se lea igual en los dos sitios. */
+.q-fuente {
+  list-style: none;
+  font-family: 'VT323', monospace;
+  font-size: 15px;
+  color: var(--accent);
+  opacity: .72;
+  margin: -2px 0 8px;
+  padding-left: 2px;
+  cursor: default;
+}
+.q-mezcla {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--accent);
+  opacity: .5;
+  margin-right: 6px;
+}
 .q-now { border-color: var(--border-pixel); background: var(--bg-panel-2); }
 .q-now .sp-idx { color: var(--accent); }
 .q-now .sp-name { color: var(--accent); }

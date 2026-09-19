@@ -369,7 +369,7 @@
                    «sigue sonando», pero no había botones: quedaba encendida
                    para siempre y sin forma de apagarla. -->
               <div class="seg" data-set="radio"
-                   title="Al poner una canción suelta del buscador, encolar otras parecidas para que la música no se pare al acabar.">
+                   title="Al poner una canción suelta del buscador, que detrás vengan otras parecidas —las que escucha la misma gente— para que la música no se pare al acabar. Salen en «Siguiente», como el autoplay de Spotify: no crea ninguna playlist ni te llena la fila de reproducción.">
                 <button class="seg-btn" data-val="on">sí</button>
                 <button class="seg-btn" data-val="off">no</button>
               </div>
@@ -840,6 +840,12 @@
        orden y antes de que suene nada, y lyrics.js solo pregunta por
        window.Traductor cuando ya hay una canción puesta. -->
   <script defer src="js/traductor.js"></script>
+  <!-- SIMILARES · a qué se parece cada canción (ListenBrainz). Es de donde
+       «sigue sonando» saca lo que va detrás desde que se quitó la playlist
+       puente. Delante de spotify.js por orden de lectura: los dos son
+       `defer` y spotify.js solo pregunta por window.Similares cuando ya hay
+       una canción sonando. -->
+  <script defer src="js/similares.js"></script>
   <script defer src="js/spotify.js"></script>
   <script defer src="js/library.js"></script>
   <script defer src="js/app.js"></script>
