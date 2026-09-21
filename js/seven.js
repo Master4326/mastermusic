@@ -96,6 +96,13 @@
     anterior: () => tabAnterior,
     volver: volverTab,
     nombre: (n) => NOMBRE_TAB[n] || n,
+    /* «volver a el historial» era lo que salía escrito en el botón de
+       config: el nombre se pegaba a una «a» suelta y en español `a + el`
+       es `al`. Lo arregla quien construye la frase, no quien la dice. */
+    hacia: (n) => {
+      const d = NOMBRE_TAB[n] || n;
+      return d.startsWith('el ') ? 'al ' + d.slice(3) : 'a ' + d;
+    },
   };
 
   // ---------- Color theme (presets + custom pickers) ----------
@@ -784,6 +791,7 @@
     const applyVinyl = (on) => {
       body.classList.toggle('vinyl-mode', on);
       vinylToggle.classList.toggle('active', on);
+      vinylToggle.setAttribute('aria-pressed', on ? 'true' : 'false');
     };
     applyVinyl(localStorage.getItem('mm_vinyl') === 'true');
     vinylToggle.addEventListener('click', () => {
@@ -887,6 +895,15 @@
     `<li class="sp-empty" style="line-height:1.6">${msg}</li>`;
 
   const queueHead = (txt) => `<li class="q-section">${txt}</li>`;
+
+  /* El consejo de un estado vacío tiene que servir en el aparato que lo
+     lee. «pulsa ctrl+K» en un teléfono es un consejo imposible: no hay
+     teclas. Va un BOTÓN, que sirve en los dos sitios, y el atajo se
+     queda al lado solo donde existe un teclado que lo tenga. */
+  const botonBuscar = (txt) =>
+    `<button type="button" class="retro-btn small q-vacio-buscar">`
+    + `<span class="bracket">[</span> ${txt} <span class="bracket">]</span></button>`
+    + (window.MMPerf && window.MMPerf.tactil() ? '' : ' <kbd>ctrl+K</kbd>');
 
   /* Las pistas que hay pintadas ahora mismo, en el mismo orden que las filas.
      La fila guarda solo su número (`data-idx`) y el objeto entero vive aquí:
@@ -1055,13 +1072,18 @@
     const desde = st.queueIndex + 1;
     const up = (st.queue || []).slice(desde).map(ix => st.tracks[ix]).filter(Boolean);
     filasCola = [];
+    /* El rótulo «a continuación» solo cuando hay algo que encabezar: sin
+       nada puesto, el panel ya se titula «♫ a continuación» tres líneas
+       más arriba y salía la misma frase dos veces seguidas. */
     queueList.innerHTML = (cur ? queueHead('sonando ahora') + queueRow(cur, 0, -1, true) : '')
-      + queueHead('a continuación')
+      + ((cur || up.length) ? queueHead('a continuación') : '')
       + (up.length
           ? up.map((t, i) => queueRow(t, i, filasCola.push(t) - 1, false, desde + i)).join('')
           : queueEmpty(cur
-              ? '▒ no hay más canciones en cola ▒<br><span class="sp-empty-tip">añade con el ＋ de cualquier lista, o con <kbd>shift+enter</kbd> en el buscador</span>'
-              : '▒ reproduce algo para ver la cola ▒<br><span class="sp-empty-tip">pulsa <kbd>ctrl+K</kbd> y escribe lo que quieras oír</span>'));
+              ? '▒ no hay más canciones en cola ▒<br><span class="sp-empty-tip">'
+                + botonBuscar('buscar algo más') + '</span>'
+              : '▒ reproduce algo para ver la cola ▒<br><span class="sp-empty-tip">'
+                + botonBuscar('buscar música') + '</span>'));
     pintarDesde();
   };
 
@@ -1178,6 +1200,14 @@
     queueList.addEventListener('click', (e) => {
       // Quitar de la cola va ANTES: el ✕ está dentro de la fila, y la fila
       // entera reproduce. Sin cortar aquí, quitar pondría la canción.
+      /* El botón del estado vacío: es la única salida que ofrece una cola
+         vacía, y con el dedo era literalmente un cartel que decía «pulsa
+         una tecla que no tienes». */
+      if (e.target.closest('.q-vacio-buscar')) {
+        e.stopPropagation();
+        if (window.Buscador) window.Buscador.abrir();
+        return;
+      }
       const quitar = e.target.closest('.q-quitar');
       if (quitar) {
         e.stopPropagation();
@@ -1308,20 +1338,83 @@
     }).observe(winEl);
   }
 
+  /* ---------- Maximizar, y que se quede maximizada ----------
+     El tamaño arrastrado a mano se guardaba desde siempre; el maximizado
+     no. O sea que en un monitor de 1920 la app abría SIEMPRE como una
+     cajita de 1080×720 en medio de la pantalla, con dos tercios del
+     monitor a oscuras, y había que acordarse de darle al ▢ cada vez. Un
+     ajuste que hay que repetir en cada visita no es un ajuste.
+
+     En móvil no se guarda ni se restaura: allí la ventana ya ocupa la
+     pantalla entera por CSS y `maximized` solo estorbaría. */
+  const MAX_KEY = 'mm_window_max';
+  const guardarMax = () => {
+    if (esMovil()) return;
+    try { localStorage.setItem(MAX_KEY, winEl.classList.contains('maximized') ? '1' : '0'); } catch (_) {}
+  };
+  const alternarMax = () => {
+    winEl.classList.toggle('maximized');
+    guardarMax();
+    /* Al maximizar, el tamaño en píxeles que pudiera llevar puesto estorba
+       al volver: `maximized` gana con !important mientras dura, pero al
+       restaurar reaparecería el tamaño viejo aunque la pantalla sea otra. */
+    actualizarMaxBtn();
+  };
+  const actualizarMaxBtn = () => {
+    const on = winEl.classList.contains('maximized');
+    document.querySelectorAll('.tb-btn').forEach(b => {
+      if (b.dataset.win !== 'max') return;
+      b.title = on ? 'Restaurar el tamaño de ventana' : 'Maximizar: la app ocupa toda la pantalla';
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      b.setAttribute('aria-label', b.title);
+    });
+  };
+  try {
+    if (!esMovil() && localStorage.getItem(MAX_KEY) === '1') winEl.classList.add('maximized');
+  } catch (_) {}
+  actualizarMaxBtn();
+
   // ---------- Title bar buttons ----------
   document.querySelectorAll('.tb-btn').forEach(b => {
     b.addEventListener('click', () => {
-      if (b.classList.contains('tb-close')) {
-        if (confirm('¿Cerrar MASTER MUSIC?')) window.close();
-      } else if (b.title === 'Maximizar') {
-        // Agranda la ventana para llenar toda la pantalla, o la restaura
-        winEl.classList.toggle('maximized');
-      } else if (b.title === 'Minimizar') {
-        // Restaura el tamaño normal guardado
+      const que = b.dataset.win;
+      if (que === 'close') {
+        /* `window.close()` solo funciona si a la pestaña la abrió un script
+           (o si es la app instalada). En una pestaña normal el navegador lo
+           ignora, así que esto era un `confirm()` bloqueante seguido de NADA:
+           decías «sí, cerrar» y la app seguía ahí. Ahora hace lo que de
+           verdad se pide al cerrar un reproductor —callar la música— y dice
+           por qué la ventana sigue puesta, sin diálogo del sistema. */
+        const pc = window.PlayerCore;
+        if (pc && pc.playing && pc.playing()) pc.togglePlay();
+        window.close();
+        setTimeout(() => {
+          if (document.hidden) return;
+          updateStatus('▣ música en pausa · el navegador no deja cerrar esta pestaña desde la página (ctrl + W)');
+        }, 80);
+      } else if (que === 'max') {
+        alternarMax();
+      } else if (que === 'min') {
+        // Devuelve el tamaño de ventana normal
         winEl.classList.remove('maximized');
+        guardarMax();
+        actualizarMaxBtn();
       }
     });
   });
+
+  /* Doble clic en la barra de título = maximizar. Es el gesto de cualquier
+     ventana desde Windows 95, y evita tener que acertar con el ▢, que mide
+     22 px. No se cuenta el doble clic sobre los botones ni sobre el chip de
+     «ahora suena», que ya hacen lo suyo. */
+  const barraTitulo = document.querySelector('.title-bar');
+  if (barraTitulo) {
+    barraTitulo.addEventListener('dblclick', (e) => {
+      if (e.target.closest('button')) return;
+      if (esMovil()) return;
+      alternarMax();
+    });
+  }
 
   /* ---------- Extra keyboard ----------
      Todos pasan por activarTab, que es el mismo camino que el ratón: así
@@ -1329,13 +1422,17 @@
      pestaña con el teclado. La única con trato aparte es la S, que hace
      de interruptor igual que el engranaje. */
   document.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT') return;
+    /* El mismo juez que los mandos del reproductor (js/teclas.js): así
+       Ctrl+B no abre los marcadores Y salta a «listas» a la vez, y un
+       <textarea> no se come los atajos. */
+    const T = window.MMTeclas;
+    if (T ? !T.libre(e) : e.target.tagName === 'INPUT') return;
     if (e.key === 'l' || e.key === 'L') {
       activarTab('lyrics');
     } else if (e.key === 'w' || e.key === 'W') {
       // letra ancha: esconde la columna de la carátula, o la devuelve
       alternarAncho();
-    } else if (e.key === ',' || e.key === 's') {
+    } else if (e.key === ',' || e.key === 's' || e.key === 'S') {
       // entra y sale: la misma tecla es la puerta en los dos sentidos
       if (cualTab() === 'settings') volverTab(); else activarTab('settings');
     } else if (e.key === 'q' || e.key === 'Q' || e.key === 'c' || e.key === 'C') {
@@ -1433,7 +1530,10 @@
     tip.className = 'prog-tip';
     tip.textContent = '0:00';
     progBar.appendChild(tip);
-    progBar.addEventListener('mousemove', (e) => {
+    /* `pointermove` y no `mousemove`: con el dedo el globito es lo único
+       que dice a dónde vas mientras arrastras, porque el dedo tapa el
+       riel. Con ratón funciona exactamente igual que antes. */
+    progBar.addEventListener('pointermove', (e) => {
       const rect = progBar.getBoundingClientRect();
       if (!rect.width) return;
       const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));

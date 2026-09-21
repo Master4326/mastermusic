@@ -121,11 +121,17 @@
           <button class="paleta-x" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>
         </div>
         <ul class="paleta-lista" role="listbox"></ul>
+        <!-- El pie explicaba CUATRO atajos de teclado… también en un
+             teléfono, donde no hay ninguna de esas teclas. Ahí lo que hay
+             que contar es otra cosa: que la fila pone la canción y que el
+             ＋ la mete a continuación. Lo reparte el CSS con la clase
+             body.perf-tactil, así que no hay dos pies que mantener. -->
         <div class="paleta-pie">
-          <span><kbd>↑↓</kbd> moverse</span>
-          <span><kbd>enter</kbd> poner</span>
-          <span><kbd>shift</kbd>+<kbd>enter</kbd> a continuación</span>
-          <span><kbd>esc</kbd> cerrar</span>
+          <span class="pie-teclado"><kbd>↑↓</kbd> moverse</span>
+          <span class="pie-teclado"><kbd>enter</kbd> poner</span>
+          <span class="pie-teclado"><kbd>shift</kbd>+<kbd>enter</kbd> a continuación</span>
+          <span class="pie-teclado"><kbd>esc</kbd> cerrar</span>
+          <span class="pie-dedo">toca una fila para <b>ponerla</b> · el <b>＋</b> la pone <b>a continuación</b></span>
         </div>
       </div>`;
     document.body.appendChild(raiz);

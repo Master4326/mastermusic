@@ -782,11 +782,17 @@
   let rafId = null;
 
   const paintProgress = (sec) => {
+    if (window.LyricsModule) window.LyricsModule.tick(sec);
+    /* Mientras el dedo tiene agarrada la barra manda el dedo: este reloj
+       corre a 60 fps y le arrancaría el tirador de la mano. */
+    if (document.body.classList.contains('barra-agarrada')) return;
     const pct = progDur ? Math.min(100, (sec / progDur) * 100) : 0;
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressThumb').style.left = pct + '%';
     document.getElementById('timeCurrent').textContent = formatTime(sec);
-    if (window.LyricsModule) window.LyricsModule.tick(sec);
+    const PC = window.PlayerCore;
+    if (PC && PC.pintarRestante) PC.pintarRestante(sec, progDur);
+    if (PC && PC.ariaBarra) PC.ariaBarra(sec, progDur);
   };
 
   let ultimaAncla = 0;   // último re-anclaje contra el reproductor de la pestaña
@@ -1373,7 +1379,7 @@
         : `<li class="sp-empty sp-empty-inicio">
              <span class="sp-empty-ico">♫</span>
              <b>busca lo que quieras oír</b>
-             <span class="sp-empty-tip">canción, artista o las dos cosas · <kbd>F</kbd> abre esto desde cualquier sitio</span>
+             <span class="sp-empty-tip">canción, artista o las dos cosas<span class="pie-teclado"> · <kbd>F</kbd> abre esto desde cualquier sitio</span></span>
            </li>`;
       return;
     }

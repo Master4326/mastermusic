@@ -63,11 +63,16 @@
           <span class="npc-artist" id="npChipArtist"></span>
         </span>
       </button>
+      <!-- Los tres de la esquina se repartían por el `title` («if (b.title
+           === 'Maximizar')»), o sea que cambiar el texto del globito los
+           dejaba mudos. Ahora cada uno lleva escrito lo que es. -->
       <div class="title-right">
-        <button class="tb-btn" title="Minimizar">_</button>
-        <button class="tb-btn" title="Maximizar">▢</button>
-        <button class="tb-btn tb-close" title="Cerrar">✕</button>
-        
+        <button class="tb-btn" data-win="min" aria-label="Devolver el tamaño de ventana normal"
+                title="Devolver el tamaño de ventana normal">_</button>
+        <button class="tb-btn" data-win="max" aria-label="Maximizar: la app ocupa toda la pantalla"
+                title="Maximizar: la app ocupa toda la pantalla (o doble clic en esta barra)">▢</button>
+        <button class="tb-btn tb-close" data-win="close" aria-label="Cerrar: para la música"
+                title="Cerrar: para la música">✕</button>
       </div>
     </div>
 
@@ -78,7 +83,9 @@
       <section class="left-panel">
 
         <div class="cover-frame">
-          <button class="vinyl-toggle" id="vinylToggle" title="Modo vinilo (carátula giratoria)">◉</button>
+          <button class="vinyl-toggle" id="vinylToggle" aria-pressed="false"
+                  aria-label="Modo vinilo: la carátula gira como un disco"
+                  title="Modo vinilo (carátula giratoria)">◉</button>
           <div class="cover-inner" id="coverInner">
             <div class="cover-art" id="coverArt">
               <span class="cover-placeholder">♪</span>
@@ -148,7 +155,7 @@
             </svg><span class="tab-txt">historial</span>
           </button>
           <span class="tab-right">
-            <button class="tab icon-tab tab-gear" data-tab="settings" title="Configuración (S)">
+            <button class="tab icon-tab tab-gear" data-tab="settings" aria-label="Configuración" title="Configuración (S)">
               <svg viewBox="0 0 24 24">
                 <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.6-.22l-2.39.96a7.06 7.06 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.63.94l-2.39-.96a.49.49 0 0 0-.6.22L2.69 8.86a.49.49 0 0 0 .12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.21.37.3.6.22l2.39-.96c.5.37 1.04.7 1.63.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.63-.94l2.39.96c.23.08.48 0 .6-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/>
               </svg>
@@ -192,24 +199,34 @@
             </div>
             <h4 class="li-mark" data-txt="MASTER MUSIC">MASTER MUSIC</h4>
             <p class="li-sub">la letra aparecerá aquí, sincronizada al segundo</p>
+            <!-- LAS TRES PUERTAS · son BOTONES, no carteles.
+                 Tenían pinta de botón —marco, icono, brillo que las cruza— y
+                 no hacían nada: los tres textos eran instrucciones de
+                 escritorio («ctrl+K», «arrastra tus mp3», «tecla S») en la
+                 primera pantalla que ve alguien que abre la app. En un
+                 teléfono eso es un callejón sin salida: no hay teclas que
+                 pulsar ni nada que arrastrar, y la música local y Spotify se
+                 quedaban escondidos en config. Ahora cada una hace lo que
+                 dice, y js/lyrics.js les cambia el texto cuando se toca con
+                 el dedo. -->
             <div class="li-ways">
               <!-- El buscador va PRIMERO: es la puerta única a todo lo demás,
                    y es lo que nadie encuentra solo si no se le dice. -->
-              <div class="li-way">
+              <button type="button" class="li-way" id="idleBuscar">
                 <span class="li-ico" aria-hidden="true">⌕</span>
                 <b>ctrl + K</b>
                 <em>busca en todo</em>
-              </div>
-              <div class="li-way">
+              </button>
+              <button type="button" class="li-way" id="idleImportar">
                 <span class="li-ico" aria-hidden="true">♫</span>
                 <b>arrastra tus mp3</b>
                 <em>o [ importar música ]</em>
-              </div>
-              <div class="li-way">
+              </button>
+              <button type="button" class="li-way" id="idleSpotify">
                 <span class="li-ico" aria-hidden="true">◈</span>
                 <b>conecta spotify</b>
                 <em>en config ⚙ · tecla S</em>
-              </div>
+              </button>
             </div>
             <p class="li-tip" id="lyricsIdleTip"></p>
           </div>
@@ -679,17 +696,24 @@
     <div class="playback-bar">
       <div class="progress-row">
         <span class="time" id="timeCurrent">0:00</span>
-        <div class="progress-bar" id="progressBar">
+        <!-- Se AGARRA y se arrastra (js/app.js). Y es un `slider` de verdad:
+             con el tabulador se llega, y las flechas ya movían ±5 s. -->
+        <div class="progress-bar" id="progressBar" role="slider" tabindex="0"
+             aria-label="Posición de la canción"
+             aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00 de 0:00">
           <div class="progress-bg">
             <div class="progress-fill" id="progressFill"></div>
             <div class="progress-thumb" id="progressThumb"></div>
           </div>
         </div>
-        <span class="time" id="timeTotal">0:00</span>
+        <!-- El de la derecha se PULSA: cambia entre lo que dura y lo que
+             queda (-1:12), que es la pregunta que uno se hace de verdad. -->
+        <button type="button" class="time time-total" id="timeTotal"
+                title="Lo que dura la canción — pulsa para ver lo que queda">0:00</button>
       </div>
 
       <div class="controls-row">
-        <button class="ctrl-btn" id="shuffleBtn" title="Aleatorio">
+        <button class="ctrl-btn" id="shuffleBtn" aria-pressed="false" aria-label="Aleatorio" title="Aleatorio">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="16 3 21 3 21 8"/>
             <line x1="4" y1="20" x2="21" y2="3"/>
@@ -698,13 +722,13 @@
             <line x1="4" y1="4" x2="9" y2="9"/>
           </svg>
         </button>
-        <button class="ctrl-btn" id="prevBtn" title="Anterior">
+        <button class="ctrl-btn" id="prevBtn" aria-label="Canción anterior" title="Anterior (shift + ←)">
           <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
             <polygon points="19 20 9 12 19 4 19 20"/>
             <rect x="4" y="4" width="2.6" height="16"/>
           </svg>
         </button>
-        <button class="ctrl-btn play-btn" id="playBtn" title="Play/Pausa">
+        <button class="ctrl-btn play-btn" id="playBtn" aria-label="Reproducir" title="Reproducir / pausa (espacio)">
           <span id="playIcon">
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
               <polygon points="7 4 20 12 7 20 7 4"/>
@@ -717,13 +741,13 @@
             </svg>
           </span>
         </button>
-        <button class="ctrl-btn" id="nextBtn" title="Siguiente">
+        <button class="ctrl-btn" id="nextBtn" aria-label="Canción siguiente" title="Siguiente (shift + →)">
           <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
             <polygon points="5 4 15 12 5 20 5 4"/>
             <rect x="17.4" y="4" width="2.6" height="16"/>
           </svg>
         </button>
-        <button class="ctrl-btn" id="repeatBtn" title="Repetir">
+        <button class="ctrl-btn" id="repeatBtn" aria-pressed="false" aria-label="Repetir" title="Repetir">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="17 1 21 5 17 9"/>
             <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
@@ -738,7 +762,8 @@
              nuevo /me/library) y hasta la regla .ctrl-btn.like-on en el CSS.
              Le faltaba el botón. Lo enseña y lo esconde él según si la
              canción es de Spotify y si la cuenta tiene permiso. -->
-        <button class="ctrl-btn like-btn" id="likeBtn" title="Guardar en Tus me gusta" hidden>♡</button>
+        <button class="ctrl-btn like-btn" id="likeBtn" aria-pressed="false"
+                aria-label="Guardar en Tus me gusta" title="Guardar en Tus me gusta" hidden>♡</button>
 
         <!-- VOLUMEN: icono discreto, la barra se despliega al pasar el mouse -->
         <div class="volume-ctl" id="volumeCtl">
@@ -749,7 +774,7 @@
               <div class="volume-thumb" id="volumeThumb"></div>
             </div>
           </div>
-          <button class="ctrl-btn vol-btn" id="volBtn" title="Silenciar (M)">
+          <button class="ctrl-btn vol-btn" id="volBtn" aria-label="Silenciar" title="Silenciar (M)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"/>
               <path class="vol-wave1" d="M15 9.7a3.4 3.4 0 0 1 0 4.6"/>
@@ -765,19 +790,30 @@
                mudan al chip de la barra de título. Va aquí, con ✦ y ⛶, porque
                es lo mismo que ellos —una forma de ver— y porque así el panel
                de la letra se queda limpio. -->
-          <button class="ctrl-btn vol-btn side-btn" id="anchoBtn"
+          <button class="ctrl-btn vol-btn side-btn" id="anchoBtn" aria-pressed="false"
+                  aria-label="Letra ancha: esconde la carátula y deja todo el ancho para la letra"
                   title="Letra ancha: esconde la carátula y deja todo el ancho para la letra (W)">◧</button>
-          <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" title="Modo edit (letra animada)">✦</button>
+          <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" aria-pressed="false"
+                  aria-label="Modo edit: la letra a pantalla completa, animada"
+                  title="Modo edit (letra animada)">✦</button>
           <!-- ❝ COMPARTIR LA LETRA · elige los versos y sale una imagen con
                la carátula, el título y esos versos. Va aquí, con ✦ ◧ ⛶,
                porque el panel de la letra se queda limpio: el panel de
                compartir lo cuelga js/compartir.js del <body>, como la
                galería de tipografías. -->
           <button class="ctrl-btn vol-btn side-btn" id="compartirBtn"
+                  aria-label="Compartir la letra como imagen"
                   title="Compartir la letra como imagen: carátula, título y los versos que elijas">❝</button>
-          <!-- ⚗ Lab de efectos DESACTIVADO por ahora (quitar "hidden" para reactivar; el código en lyrics.js queda intacto) -->
-          <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn" title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
-          <button class="ctrl-btn vol-btn side-btn" id="cinemaBtn" title="Modo cine: letra animada + carátula girando (Esc para salir)">⛶</button>
+          <!-- ⚗ Lab de efectos · nace con `hidden` y lo destapa js/lyrics.js
+               SOLO en local (127.0.0.1 / file:). En la página publicada no
+               aparece: es herramienta de taller, no de quien viene a oír
+               música. Lleva su nombre igual, porque en local sí se lee. -->
+          <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn"
+                  aria-label="Laboratorio de efectos: probar las animaciones sin música"
+                  title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
+          <button class="ctrl-btn vol-btn side-btn" id="cinemaBtn"
+                  aria-label="Modo cine: letra a pantalla completa con la carátula girando"
+                  title="Modo cine: letra animada + carátula girando (Esc para salir)">⛶</button>
         </div>
       </div>
     </div>
@@ -910,6 +946,11 @@
        simplemente no lo ejecutaba nadie. Si vuelve a desaparecer de aquí, lo
        canta `assets/check-modulos.js`. -->
   <script defer src="js/perf.js"></script>
+  <!-- TECLAS · de quién es cada tecla. Los mandos (app.js) y las pestañas
+       (seven.js) preguntan aquí antes de quedarse con una tecla, para no
+       robársela al navegador (Ctrl+B, Ctrl+H…) ni al botón que tiene el
+       foco. Va lo primero porque los dos cargan después. -->
+  <script defer src="js/teclas.js"></script>
   <script defer src="js/vendor/jsmediatags.min.js"></script>
   <script defer src="js/db.js"></script>
   <script defer src="js/lyrics.js"></script>

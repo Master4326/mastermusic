@@ -150,6 +150,66 @@
 
   setIdle(true);   // arranque: aún no hay canción
 
+  /* ══════════════════════════════════════════════════════════
+     LAS TRES PUERTAS DEL REPOSO · que hagan lo que dicen
+     ══════════════════════════════════════════════════════════
+     Tenían forma de botón y eran carteles. Peor: los tres textos eran
+     instrucciones de teclado y de ratón —«ctrl + K», «arrastra tus mp3»,
+     «tecla S»— puestas en la PRIMERA pantalla que ve alguien que abre la
+     app. En un teléfono no hay teclas ni se puede arrastrar nada, así que
+     la pantalla de bienvenida no ofrecía UNA sola forma de empezar a oír
+     música: las dos puertas de verdad (importar y Spotify) viven dentro de
+     config ⚙, que es justo donde nadie mira.
+
+     Ahora se pulsan. Y con el dedo cambian de texto: decirle «ctrl + K» a
+     un teléfono es no decirle nada. */
+  const cablearPuertas = () => {
+    const dedo = !!(window.MMPerf && window.MMPerf.tactil());
+
+    const puerta = (id, textos, accion) => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      if (dedo && textos) {
+        const t = b.querySelector('b'), s = b.querySelector('em');
+        if (t) t.textContent = textos[0];
+        if (s) s.textContent = textos[1];
+      }
+      b.title = textos ? textos[2] : '';
+      b.addEventListener('click', accion);
+    };
+
+    puerta('idleBuscar', ['buscar', 'tu música, tus listas y spotify',
+                          'Buscar en todo: tu música, tus listas, tu historial y spotify'],
+      () => { if (window.Buscador) window.Buscador.abrir(); });
+
+    /* Pasa por el botón de config en vez de abrir el <input> a pelo: ahí
+       está lo que hay que hacer DESPUÉS de importar (llevarte a «tu
+       música» con lo nuevo delante), y duplicarlo aquí sería tener dos
+       sitios que se desincronizan. */
+    puerta('idleImportar', ['elige tus mp3', 'los de este teléfono',
+                            'Añadir mp3, wav, ogg, flac o m4a de tu equipo'],
+      () => { const imp = document.getElementById('importBtn'); if (imp) imp.click(); });
+
+    puerta('idleSpotify', ['conecta spotify', 'tu cuenta premium',
+                           'Conectar tu cuenta de Spotify para buscar y ver tus listas'],
+      () => {
+        const S = window.SpotifyModule;
+        if (!S) return;
+        /* Ya conectado, «conectar» no tiene sentido: lo útil entonces es
+           ir a buscar, que es para lo que se conecta uno. */
+        if (S.isLoggedIn && S.isLoggedIn()) {
+          if (window.MMNav) window.MMNav.ir('search');
+          return;
+        }
+        S.connect();
+      });
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', cablearPuertas, { once: true });
+  } else {
+    cablearPuertas();
+  }
+
   // Consejos que rotan despacio: el panel vacío deja de ser un panel muerto.
   if (lyricsIdle) {
     const tipEl = document.getElementById('lyricsIdleTip');
@@ -2250,6 +2310,8 @@
     modeBtn.textContent = editMode ? '≡' : '✦';
     modeBtn.title = editMode ? 'Volver a vista lista' : 'Modo edit (letra animada)';
     modeBtn.classList.toggle('on', editMode);
+    modeBtn.setAttribute('aria-pressed', editMode ? 'true' : 'false');
+    modeBtn.setAttribute('aria-label', modeBtn.title);
     lyricsEdit.innerHTML = '';
     if (editMode && parsedLines.length && parsedLines[0].time < 0) {
       lyricsEdit.innerHTML = '<p class="lyrics-empty">Esta letra no está sincronizada — el modo edit necesita tiempos. Usa la vista ≡ lista.</p>';

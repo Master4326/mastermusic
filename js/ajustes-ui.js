@@ -60,12 +60,13 @@
     if (!txtVolver || !nav()) return;
     const prev = nav().anterior();
     const donde = prev ? nav().nombre(prev) : '';
-    txtVolver.textContent = donde ? 'a ' + donde : '';
+    // `hacia` contrae la preposición: «al historial», no «a el historial»
+    txtVolver.textContent = prev ? nav().hacia(prev) : '';
     if (btnVolver) {
       /* El `title` lleva el destino entero aunque el botón lo esconda por
          falta de sitio, y el aria-label también: un «volver» a secas no
          dice nada leído en voz alta. */
-      const frase = donde ? 'Volver a ' + donde + ' (Esc)' : 'Volver a donde estabas (Esc)';
+      const frase = donde ? 'Volver ' + nav().hacia(prev) + ' (Esc)' : 'Volver a donde estabas (Esc)';
       btnVolver.title = frase;
       btnVolver.setAttribute('aria-label', frase);
     }

@@ -92,12 +92,24 @@
   const UI = "'VT323', monospace";
   const MARCA = "'Press Start 2P', monospace";
 
+  /* ---------- La traducción, del tamaño que le toca ----------
+     En la letra de verdad el subtítulo va al 0,58 del verso y en su misma
+     tipografía (.lyric-trad, en css/style.css). La tarjeta lo tenía al
+     0,42 y en la fuente de la interfaz: al mirarla en pequeño —que es
+     como se mira una tarjeta— no se leía. */
+  const TRAD_RATIO = 0.58;
+  const TRAD_MIN = 26;        // suelo, en píxeles de tarjeta (la tarjeta mide 1080)
+  const TRAD_TRACK = '0.01em';
+  const TRAD_LINEAS = 3;      // más de tres líneas ya no es un subtítulo
+  const TAM_MIN = 28;         // lo más pequeño que se deja el verso
+
   /* Un `ctx.font` con una familia sin resolver no falla: dibuja con la
      de reserva. Hay que esperarlas de una en una. */
   const fuentesListas = async () => {
     if (!document.fonts || !document.fonts.load) return;
     const f = fuenteLetra();
-    const pedir = [`700 64px ${f.familia}`, `40px ${UI}`, `16px ${MARCA}`];
+    const pedir = [`700 64px ${f.familia}`, `italic 40px ${f.familia}`,
+      `40px ${UI}`, `16px ${MARCA}`];
     try {
       await Promise.all(pedir.map((p) => document.fonts.load(p, 'Ag')));
     } catch (_) { /* si una no llega, se pinta con lo que haya */ }
@@ -305,46 +317,77 @@
       return;
     }
 
-    /* Tamaño automático: se empieza grande y se baja hasta que el
-       bloque entra. Un tamaño fijo obliga a elegir entre que un verso
-       corto se vea ridículo o que cinco largos se salgan. */
-    if ('letterSpacing' in ctx) ctx.letterSpacing = f.track;
-    let tam = formato === 'historia' ? 82 : 70;
-    let bloque = null;
-    while (tam >= 30) {
-      ctx.font = `${f.peso} ${tam}px ${f.familia}`;
-      const interlinea = tam * 1.3;
-      const tamTrad = Math.round(tam * 0.42);
+    /* ---------- Tamaño automático ----------
+       Se empieza grande y se baja hasta que el bloque entra. Un tamaño
+       fijo obliga a elegir entre que un verso corto se vea ridículo o
+       que cinco largos se salgan.
+
+       LA TRADUCCIÓN ERA LA HERMANA POBRE de la tarjeta: iba al 0,42 del
+       verso, en la tipografía de la interfaz —una de píxeles, que en
+       pequeño es la que peor aguanta— y con el color más apagado que
+       tiene la app. En una tarjeta de 1080 que se mira a un tercio de su
+       tamaño, eso no es un subtítulo: es una raya gris. Y el aire era el
+       mismo antes que después, así que cada traducción acababa pegada al
+       verso de ABAJO, como si fuera el título del siguiente.
+
+       Ahora es lo que ya es en la letra de verdad (.lyric-trad): la
+       MISMA tipografía del verso, cursiva, al 0,58 y con el color del
+       texto solo un poco bajado —en la letra, la traducción del verso
+       que suena se ilumina, y en la tarjeta TODOS los versos son «el que
+       suena»—, pegada a su verso, separada del siguiente y con una
+       barrita de acento que dice de quién cuelga. */
+    const medir = (tamV, capTrad, apretado) => {
+      const interlinea = tamV * (apretado ? 1.16 : 1.3);
+      /* El 0,58 de la letra, pero sin dejar que se quede en nada cuando
+         el verso encoge: por debajo de cierto tamaño el subtítulo sube
+         hasta el 0,72 —sigue siendo claramente el segundo, y se lee—. */
+      const tamTrad = Math.max(Math.round(tamV * TRAD_RATIO),
+        Math.min(TRAD_MIN, Math.round(tamV * 0.72)));
+      const interTrad = tamTrad * (apretado ? 1.2 : 1.34);
+      const sangria = Math.round(tamV * 0.34);
+      const aireTrad = Math.round(tamV * (apretado ? 0.1 : 0.18));
+      const aireVerso = Math.round(tamV * (apretado ? 0.38 : 0.62));
       const trozos = [];
       let total = 0;
-      for (const v of elegidos) {
-        const t = f.caps ? String(v.text).toUpperCase() : v.text;
-        const lineas = envolver(t, anchoUtil);
-        total += lineas.length * interlinea;
+      elegidos.forEach((v, n) => {
+        ctx.font = `${f.peso} ${tamV}px ${f.familia}`;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = f.track;
+        const lineas = envolver(f.caps ? String(v.text).toUpperCase() : v.text, anchoUtil);
+        let altoV = lineas.length * interlinea;
         let tl = [];
         if (conTrad && v.trad) {
-          ctx.font = `italic ${tamTrad}px ${UI}`;
-          tl = envolver(v.trad, anchoUtil).slice(0, 2);
-          total += tl.length * (tamTrad * 1.3) + 8;
-          ctx.font = `${f.peso} ${tam}px ${f.familia}`;
+          ctx.font = `italic ${tamTrad}px ${f.familia}`;
+          if ('letterSpacing' in ctx) ctx.letterSpacing = TRAD_TRACK;
+          tl = envolver(v.trad, anchoUtil - sangria);
+          /* Si hay que cortar, se corta CON puntos suspensivos. Antes se
+             tiraban las líneas de más en silencio y la traducción se
+             quedaba a mitad de frase, como si el traductor fuera manco. */
+          if (tl.length > capTrad) {
+            tl = tl.slice(0, capTrad);
+            tl[capTrad - 1] = tl[capTrad - 1].replace(/[\s,;:.]+$/, '') + '…';
+          }
+          altoV += aireTrad + tl.length * interTrad;
         }
-        total += tam * 0.42;         // aire entre versos
+        total += altoV + (n < elegidos.length - 1 ? aireVerso : 0);
         trozos.push({ lineas, tl });
+      });
+      return { tam: tamV, trozos, interlinea, tamTrad, interTrad, sangria, aireTrad, aireVerso, total };
+    };
+
+    let bloque = null;
+    const tamMax = formato === 'historia' ? 82 : 70;
+    for (const cap of [TRAD_LINEAS, 2]) {
+      for (let t = tamMax; t >= TAM_MIN; t -= 2) {
+        const b = medir(t, cap, false);
+        if (b.total <= alto) { bloque = b; break; }
       }
-      if (total <= alto) { bloque = { trozos, interlinea, tamTrad, total }; break; }
-      tam -= 4;
+      if (bloque) break;
     }
-    if (!bloque) {
-      ctx.font = `${f.peso} 30px ${f.familia}`;
-      tam = 30;
-      const interlinea = 39;
-      bloque = {
-        trozos: elegidos.map((v) => ({
-          lineas: envolver(f.caps ? String(v.text).toUpperCase() : v.text, anchoUtil), tl: [],
-        })),
-        interlinea, tamTrad: 14, total: alto,
-      };
-    }
+    /* Ni al mínimo entra (cinco versos largos, cada uno con su
+       traducción): se aprieta la interlínea. Antes, en este caso, la
+       tarjeta se quedaba SIN traducción y sin decir ni mu. */
+    if (!bloque) bloque = medir(TAM_MIN, 2, true);
+    const tam = bloque.tam;
 
     /* Dónde empieza el primer verso. Se calcula ANTES de la comilla
        porque la comilla va pegada a él: colgada arriba del todo, a
@@ -360,27 +403,41 @@
     if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
     ctx.fillText('❝', P - 4, y0 - tam * 0.62);
     ctx.restore();
-    if ('letterSpacing' in ctx) ctx.letterSpacing = f.track;
 
     let y = y0;
     ctx.textAlign = 'left';
     bloque.trozos.forEach(({ lineas, tl }) => {
       ctx.font = `${f.peso} ${tam}px ${f.familia}`;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = f.track;
       ctx.fillStyle = texto;
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.5)';
       ctx.shadowBlur = 14;
       lineas.forEach((l) => { ctx.fillText(l, P, y); y += bloque.interlinea; });
       ctx.restore();
+
       if (tl.length) {
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-        ctx.font = `italic ${bloque.tamTrad}px ${UI}`;
-        ctx.fillStyle = mudo;
-        y += 8;
-        tl.forEach((l) => { ctx.fillText(l, P + 6, y); y += bloque.tamTrad * 1.3; });
-        if ('letterSpacing' in ctx) ctx.letterSpacing = f.track;
+        y += bloque.aireTrad;
+        const primera = y;
+        ctx.save();
+        ctx.font = `italic ${bloque.tamTrad}px ${f.familia}`;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = TRAD_TRACK;
+        ctx.fillStyle = texto;
+        ctx.globalAlpha = 0.78;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 12;
+        tl.forEach((l) => { ctx.fillText(l, P + bloque.sangria, y); y += bloque.interTrad; });
+        ctx.restore();
+        /* La barrita de acento: dice «esto cuelga del verso de arriba»
+           sin gastar ni un punto de tamaño en decirlo. */
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = acento;
+        ctx.fillRect(P + 1, primera - bloque.tamTrad * 0.84, 3,
+          (tl.length - 1) * bloque.interTrad + bloque.tamTrad * 1.05);
+        ctx.restore();
       }
-      y += tam * 0.42;
+      y += bloque.aireVerso;
     });
     if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
   };

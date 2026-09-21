@@ -294,18 +294,23 @@
     if (!t) {
       el.npTitle.textContent = 'Sin canción';
       el.npArtist.textContent = '— ningún artista —';
-      el.timeTotal.textContent = '0:00';
+      pintarRestante(0, 0);
       return;
     }
     // Cambiar npTitle dispara el refresco de carátula/álbum en seven.js
     el.npTitle.textContent = t.name;
     el.npArtist.textContent = t.artist || '—';
-    el.timeTotal.textContent = formatTime(t.duration);
+    pintarRestante(position(), t.duration);
   };
 
   const updatePlayIcon = () => {
     el.playIcon.hidden = state.isPlaying;
     el.pauseIcon.hidden = !state.isPlaying;
+    /* El icono cambia, el nombre también: leído en voz alta, «Reproducir»
+       con la canción sonando es una mentira. */
+    const q = state.isPlaying ? 'Pausar' : 'Reproducir';
+    el.playBtn.setAttribute('aria-label', q);
+    el.playBtn.title = q + ' (espacio)';
   };
 
   // ¿La canción actual se reproduce vía Spotify Connect?
@@ -454,14 +459,18 @@
 
   // ---- Audio events ----
   audio.addEventListener('timeupdate', () => {
+    if (window.LyricsModule) window.LyricsModule.tick(audio.currentTime);
+    // mientras el dedo tiene agarrada la barra, manda el dedo
+    if (document.body.classList.contains('barra-agarrada')) return;
     const pct = (audio.currentTime / (audio.duration || 1)) * 100;
     el.progressFill.style.width = pct + '%';
     el.progressThumb.style.left = pct + '%';
     el.timeCurrent.textContent = formatTime(audio.currentTime);
-    if (window.LyricsModule) window.LyricsModule.tick(audio.currentTime);
+    pintarRestante(audio.currentTime, audio.duration);
+    ariaBarra(audio.currentTime, audio.duration);
   });
   audio.addEventListener('loadedmetadata', () => {
-    el.timeTotal.textContent = formatTime(audio.duration);
+    pintarRestante(audio.currentTime, audio.duration);
     if (state.currentTrack) state.currentTrack.duration = audio.duration;
   });
   audio.addEventListener('ended', playNext);
@@ -519,11 +528,15 @@
 
   const pintarShuffle = () => {
     el.shuffleBtn.classList.toggle('active', state.shuffle);
+    el.shuffleBtn.setAttribute('aria-pressed', state.shuffle ? 'true' : 'false');
+    el.shuffleBtn.title = state.shuffle ? 'Aleatorio: encendido' : 'Aleatorio: apagado';
   };
   const pintarRepeat = () => {
     el.repeatBtn.classList.toggle('active', state.repeat !== 'off');
     el.repeatBtn.classList.toggle('repeat-one', state.repeat === 'one');
     el.repeatBtn.title = { off: 'Repetir', all: 'Repetir todo', one: 'Repetir una' }[state.repeat];
+    el.repeatBtn.setAttribute('aria-pressed', state.repeat !== 'off' ? 'true' : 'false');
+    el.repeatBtn.setAttribute('aria-label', el.repeatBtn.title);
   };
 
   const setShuffle = (on) => {
@@ -551,19 +564,103 @@
     setRepeat({ off: 'all', all: 'one', one: 'off' }[state.repeat]);
   });
 
-  // Progress bar seek
-  const seekFromEvent = (e) => {
+  /* ══════════════════════════════════════════════════════════
+     LA BARRA DE PROGRESO · agarrar y arrastrar
+     ══════════════════════════════════════════════════════════
+     Solo escuchaba `click`: se podía saltar a un punto de un toque, pero
+     no ARRASTRAR. Y arrastrar es como se busca de verdad un trozo de una
+     canción —el estribillo, el verso que quieres compartir—, porque se ve
+     a dónde vas ANTES de soltar. Sin eso, buscar un momento concreto era
+     clic, oír, corregir, clic, oír… La barra de volumen, tres metros más
+     allá en el mismo archivo, sí se arrastraba desde siempre.
+
+     Mientras el dedo la tiene agarrada manda ella: `body.barra-agarrada`
+     avisa a los dos que pintan la barra (el `timeupdate` de aquí abajo y
+     el reloj interpolado de js/spotify.js) para que no le peleen el
+     tirador al dedo. Al soltar, un solo salto. */
+  const segDeEvento = (e) => {
     const rect = el.progressBar.getBoundingClientRect();
-    const x = (e.clientX || (e.touches && e.touches[0].clientX) || 0) - rect.left;
-    const pct = Math.max(0, Math.min(1, x / rect.width));
-    if (spotifyActive()) {
-      const durMs = (state.currentTrack.duration || 0) * 1000;
-      if (durMs) window.SpotifyModule.seek(pct * durMs);
-      return;
-    }
-    if (audio.duration) audio.currentTime = pct * audio.duration;
+    if (!rect.width) return 0;
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    return pct * (duration() || 0);
   };
-  el.progressBar.addEventListener('click', seekFromEvent);
+
+  /* Pinta la barra en un punto sin tocar la reproducción: es lo que se ve
+     mientras se arrastra. */
+  const pintarBarra = (sec) => {
+    const dur = duration();
+    const pct = dur ? Math.max(0, Math.min(100, (sec / dur) * 100)) : 0;
+    el.progressFill.style.width = pct + '%';
+    el.progressThumb.style.left = pct + '%';
+    el.timeCurrent.textContent = formatTime(sec);
+    // con «lo que queda» puesto, también tiene que seguir al dedo
+    pintarRestante(sec, dur);
+    ariaBarra(sec, dur);
+  };
+
+  /* Lo que oye quien no ve la barra. `role="slider"` sin valor vivo no
+     dice nada, así que el valor se refresca desde los dos sitios que la
+     pintan (aquí y js/spotify.js). */
+  const ariaBarra = (sec, dur) => {
+    const b = el.progressBar;
+    if (!b) return;
+    b.setAttribute('aria-valuenow', String(Math.round(sec || 0)));
+    b.setAttribute('aria-valuemax', String(Math.round(dur || 0)));
+    b.setAttribute('aria-valuetext', formatTime(sec) + ' de ' + formatTime(dur));
+  };
+
+  let agarrada = false;
+  el.progressBar.addEventListener('pointerdown', (e) => {
+    if (!duration()) return;
+    e.preventDefault();
+    agarrada = true;
+    document.body.classList.add('barra-agarrada');
+    try { el.progressBar.setPointerCapture(e.pointerId); } catch (_) {}
+    pintarBarra(segDeEvento(e));
+  });
+  el.progressBar.addEventListener('pointermove', (e) => {
+    if (!agarrada) return;
+    pintarBarra(segDeEvento(e));
+  });
+  const soltar = (e) => {
+    if (!agarrada) return;
+    agarrada = false;
+    document.body.classList.remove('barra-agarrada');
+    seekTo(segDeEvento(e));
+  };
+  el.progressBar.addEventListener('pointerup', soltar);
+  el.progressBar.addEventListener('pointercancel', () => {
+    agarrada = false;
+    document.body.classList.remove('barra-agarrada');
+  });
+
+  /* ---- El número de la derecha: lo que dura, o lo que queda ----
+     Pulsarlo cambia entre «3:34» y «-1:12», como en cualquier reproductor
+     desde hace treinta años. La pregunta que uno se hace de verdad no es
+     cuánto dura la canción, sino cuánto le queda —para saber si da tiempo
+     a algo antes de que se acabe—. Se recuerda entre visitas. */
+  const RESTANTE_KEY = 'mm_tiempo_restante';
+  let verRestante = false;
+  try { verRestante = localStorage.getItem(RESTANTE_KEY) === '1'; } catch (_) {}
+
+  const pintarRestante = (sec, dur) => {
+    if (!el.timeTotal) return;
+    const d = isFinite(dur) && dur > 0 ? dur : duration();
+    el.timeTotal.textContent = (verRestante && d)
+      ? '-' + formatTime(Math.max(0, d - (sec || 0)))
+      : formatTime(d);
+    el.timeTotal.title = verRestante
+      ? 'Lo que queda de la canción — pulsa para ver lo que dura'
+      : 'Lo que dura la canción — pulsa para ver lo que queda';
+  };
+
+  if (el.timeTotal) {
+    el.timeTotal.addEventListener('click', () => {
+      verRestante = !verRestante;
+      try { localStorage.setItem(RESTANTE_KEY, verRestante ? '1' : '0'); } catch (_) {}
+      pintarRestante(position(), duration());
+    });
+  }
 
   // ---- Volumen ----
   let lastNonZeroVol = state.volume > 0 ? state.volume : 0.7;
@@ -577,6 +674,8 @@
     el.volBtn.classList.toggle('muted', state.volume === 0);
     el.volBtn.classList.toggle('low', state.volume > 0 && state.volume < 0.5);
     el.volBtn.title = state.volume === 0 ? 'Activar sonido (M)' : 'Silenciar (M)';
+    el.volBtn.setAttribute('aria-label',
+      (state.volume === 0 ? 'Activar sonido' : 'Silenciar') + ' · volumen ' + pct + '%');
   };
 
   // Spotify Connect: mandar el volumen con debounce para no saturar la API
@@ -676,14 +775,25 @@
 
   paintVolume();
 
-  // Keyboard
+  /* ---- Teclado ----
+     Quién se queda con cada tecla lo decide js/teclas.js, que es el mismo
+     juez que usan las pestañas: así un Ctrl+H no cambia de pantalla Y abre
+     el historial del navegador a la vez, y el espacio con el foco en un
+     botón pulsa ESE botón en vez de pausar.
+
+     Y el salto de ±5 s va por `seekTo`, no por `audio.currentTime`: con
+     Spotify Connect el sonido no pasa por el navegador, así que mover el
+     <audio> mudo de esta pestaña no adelantaba nada. Las flechas eran el
+     único mando que no se había enterado del desvío. */
   document.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT') return;
+    const T = window.MMTeclas;
+    if (T ? !T.libre(e) : e.target.tagName === 'INPUT') return;
+    if (T && T.activaFoco(e)) return;
     if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
     else if (e.code === 'ArrowRight' && e.shiftKey) playNext();
     else if (e.code === 'ArrowLeft' && e.shiftKey) playPrev();
-    else if (e.code === 'ArrowRight') audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5);
-    else if (e.code === 'ArrowLeft') audio.currentTime = Math.max(0, audio.currentTime - 5);
+    else if (e.code === 'ArrowRight') seekTo(position() + 5);
+    else if (e.code === 'ArrowLeft') seekTo(position() - 5);
     else if (e.code === 'ArrowUp') { e.preventDefault(); setVolume(state.volume + 0.05); }
     else if (e.code === 'ArrowDown') { e.preventDefault(); setVolume(state.volume - 0.05); }
     else if (e.code === 'KeyM') setVolume(state.volume > 0 ? 0 : lastNonZeroVol);
@@ -719,6 +829,12 @@
     if (spotifyActive()) { window.SpotifyModule.seek(s * 1000); return; }
     if (audio.duration) audio.currentTime = s;
   };
+
+  /* Primer pintado del número de la derecha: aquí abajo y no donde se
+     define, porque `pintarRestante` pregunta por `duration()`, que se
+     declara en este mismo tramo. */
+  pintarRestante(0, 0);
+  ariaBarra(0, 0);
 
   /* ---- Aviso de cambio de canción ----
      La sesión de medios y el mini flotante necesitan enterarse de que cambió
@@ -760,6 +876,9 @@
     playing,
     isSpotify: () => !!spotifyActive(),
     formatTime,
+    // las usa js/spotify.js, que pinta la misma barra desde su reloj
+    ariaBarra,
+    pintarRestante,
     onTrack: (fn) => {
       if (typeof fn !== 'function') return;
       trackSubs.push(fn);

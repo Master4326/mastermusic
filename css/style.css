@@ -103,9 +103,21 @@ a { color: var(--accent); text-decoration: none; }
 /* ==========================================================
    WINDOW (the whole app frame)
    ========================================================== */
+/* EL TAMAÑO DE FÁBRICA · 1080×720 se eligió cuando una pantalla normal
+   era de 1366×768, donde llenaba casi todo. En un monitor de 1920×1080 —o
+   en cualquier portátil de hoy— esos 1080 px son poco más de la mitad del
+   ancho: la app abría como una cajita en medio de una pantalla negra, con
+   la letra en una columna estrecha y la carátula del tamaño de un sello.
+   Se resolvía a mano con el ▢ … en cada visita, porque tampoco se guardaba
+   (ahora sí, ver `mm_window_max` en js/seven.js).
+
+   Con `min()` el tope solo manda cuando la pantalla da para tanto, así que
+   esto no le quita sitio a nadie: en pantallas pequeñas sigue ganando el
+   `100%` de siempre, y la ventana sigue siendo una ventana —con su marco,
+   su aire alrededor y su esquina para arrastrar—, no un pantallazo. */
 .window {
-  width: min(1080px, 100%);
-  height: min(720px, calc(100vh - 40px));
+  width: min(1440px, 100%);
+  height: min(900px, calc(100vh - 40px));
   background: var(--bg-window);
   border: 2px solid var(--border-light);
   box-shadow:
@@ -1936,9 +1948,21 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 }
 .progress-bar {
   flex: 1;
-  padding: 5px 0;
+  /* 5 px de alto útil para agarrar una barra de 12 es pedirle puntería a
+     un dedo. El riel sigue midiendo lo mismo; lo que crece es la zona que
+     escucha, que es invisible y no mueve nada de sitio. */
+  padding: 9px 0;
   cursor: pointer;
+  /* mientras se arrastra, el navegador no debe entender «desplazar la
+     página» ni sacar el menú de selección */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
+/* Llega el tabulador: sin esto el contorno del navegador se pierde detrás
+   del riel oscuro. */
+.progress-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Marco biselado, como los botones retro */
 .progress-bg {
   height: 12px;
@@ -2019,7 +2043,38 @@ body.playing .progress-fill::before {
   transition: opacity 0.15s;
   pointer-events: none;
 }
-.progress-bar:hover .progress-thumb { opacity: 1; }
+.progress-bar:hover .progress-thumb,
+.progress-bar:focus-visible .progress-thumb,
+body.barra-agarrada .progress-thumb { opacity: 1; }
+/* Agarrada: el tirador crece un poco y el riel se enciende, para que se
+   vea que el dedo la lleva (y no que la app va sola). */
+body.barra-agarrada .progress-thumb {
+  width: 10px; height: 22px;
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+body.barra-agarrada .progress-bg {
+  box-shadow:
+    inset 1px 1px 0 rgba(0, 0, 0, 0.85),
+    0 1px 0 var(--border-hi),
+    0 0 12px var(--accent-glow);
+}
+/* El globito del minuto se queda puesto mientras se arrastra (seven.js lo
+   mueve con el ratón; con el dedo no hay hover que lo encienda). */
+body.barra-agarrada .prog-tip { opacity: 1; }
+
+/* ---------- El número de la derecha, que ahora se pulsa ----------
+   Era un <span>. Como <button> hereda el tamaño y la tipografía de .time,
+   pero hay que devolverle el aire que el navegador le quita y decirle que
+   se puede tocar. */
+.time-total {
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  line-height: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: color .12s, border-color .12s, text-shadow .12s;
+}
+.time-total:hover { border-color: var(--accent-dim); }
+.time-total:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .controls-row {
   display: flex;
@@ -4661,7 +4716,13 @@ body.reduce-motion .tab-content.active { animation: none; }
   z-index: 40;
 }
 .progress-bar:hover .prog-tip { opacity: 1; }
-@media (hover: none) { .prog-tip { display: none; } }
+/* Con el dedo no hay «pasar por encima», así que el globito no salía
+   nunca… salvo en el único momento en que hace más falta que con ratón:
+   mientras se arrastra, cuando el propio dedo tapa la barra. */
+@media (hover: none) {
+  .prog-tip { display: none; }
+  body.barra-agarrada .prog-tip { display: block; bottom: calc(100% + 14px); }
+}
 
 /* Esqueletos de carga: mejor que la palabra "cargando" */
 .skel {
@@ -4792,7 +4853,28 @@ body.reduce-motion .skel-line { animation: none; }
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 0 var(--border-dark);
   font-family: 'Share Tech Mono', monospace;
   overflow: hidden;
+  /* Eran <div>: el centrado y el color los heredaban del panel, y un
+     <button> no hereda ninguno de los dos. */
+  text-align: center;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease, border-color .12s, box-shadow .12s;
 }
+/* Ahora que se pulsan, tienen que contestar al dedo y al ratón */
+.li-way:hover,
+.li-way:focus-visible {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 0 var(--accent-dim), 0 0 18px var(--accent-glow);
+  transform: translateY(-2px);
+}
+.li-way:active {
+  transform: translateY(2px);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 1px 0 var(--border-dark);
+}
+body.reduce-motion .li-way:hover,
+body.reduce-motion .li-way:focus-visible,
+body.reduce-motion .li-way:active { transform: none; }
 /* barrido de luz que cruza las tarjetas por turnos */
 .li-way::after {
   content: '';
@@ -5542,6 +5624,13 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   .right-panel { flex: 1 1 auto; min-height: 0; }
   .visualizer-frame { min-height: 46px; max-height: 58px; }
 
+  /* Las tres puertas, en columna y TODAS IGUALES. Al ser flex con
+     `min-width`, cada una medía lo que medía su texto y quedaban tres
+     tarjetas de anchos distintos, una debajo de otra: parecía un error de
+     maquetación más que tres opciones al mismo nivel. */
+  .li-ways { flex-direction: column; align-items: center; }
+  .li-way { width: min(300px, 88%); }
+
   /* El volumen dejaba de caber: iba en posición absoluta a la derecha y con
      ❤ ✦ ⛶ ⋯ se montaba encima del botón de siguiente. En vertical entra en
      la fila como uno más y, si no cabe, la fila reparte en dos renglones. */
@@ -6074,7 +6163,16 @@ body.reduce-motion .paleta-caja { animation: none; }
   font-size: 12px;
   line-height: 1;
 }
-.paleta-mas:hover { color: var(--bg-deep); background: var(--accent); border-color: var(--accent); }
+.paleta-mas:hover,
+.paleta-mas:focus-visible { color: var(--bg-deep); background: var(--accent); border-color: var(--accent); }
+/* Con el dedo, 26 px pegados a una fila que PONE la canción es una
+   trampa: fallar el ＋ no es «no pasa nada», es que suena otra cosa. */
+body.perf-tactil .paleta-mas { width: 40px; height: 40px; font-size: 17px; }
+
+/* El pie de la paleta habla del aparato que lo está leyendo */
+.pie-dedo { display: none; }
+body.perf-tactil .pie-teclado { display: none; }
+body.perf-tactil .pie-dedo { display: inline; }
 /* La pista de la derecha («▶ poner», «abrir») solo en la fila elegida: en
    todas a la vez es una columna de ruido que nadie lee. */
 .paleta-pista {
@@ -6151,12 +6249,40 @@ body.reduce-motion .paleta-caja { animation: none; }
    iconos y el engranaje dejan de caber. */
 @container win (max-width: 860px) {
   .tab-txt { display: none; }
+  .tab.active .tab-txt { display: inline; }
 }
 
 /* Y en un teléfono, donde la ventana ocupa toda la pantalla, por si el
    navegador no entiende consultas de contenedor. */
 @media (max-width: 700px) {
   .tab-txt { display: none; }
+  .tab.active .tab-txt { display: inline; }
+}
+
+/* ----------------------------------------------------------
+   …PERO LA PESTAÑA EN LA QUE ESTÁS CONSERVA SU NOMBRE
+
+   Quitar los cinco nombres a la vez devolvía el problema que esos
+   nombres vinieron a resolver, y justo donde más duele: en un teléfono
+   quedaban seis iconos pelados (♪ ⌕ ▤ ≡ ▥ ⚙) y encima NO hay ratón que
+   posar para que salga el globito. O sea que en el móvil no había forma
+   humana de saber cuál era cuál — ni siquiera en cuál estabas.
+
+   Enseñar solo el de la activa cuesta un nombre de ancho y contesta la
+   pregunta importante («¿dónde estoy?»), que es el patrón de cualquier
+   barra inferior de app. El tope en `em` es el seguro: «historial» es el
+   más largo, y en un teléfono de 320 px se recorta él antes que dejar a
+   las demás pestañas fuera de la barra. */
+.tab.active .tab-txt {
+  max-width: 9ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Debajo de 380 px el nombre estorba más de lo que ayuda: la barra
+   prefiere seis iconos que le quepan a cinco y medio. */
+@media (max-width: 379px) {
+  .tab.active .tab-txt { display: none; }
 }
 
 /* Teléfono en horizontal · la barra de estado se queda, pero solo con el
