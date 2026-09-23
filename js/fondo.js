@@ -1,14 +1,26 @@
 /* ==========================================================
-   LA ONDA DE LA LETRA (estilo NCS)
+   LA ONDA DE LA LETRA · hilos de seda
 
-   Cintas de sonido con su reflejo que cruzan el panel sumando luz sobre
-   el fondo oscuro — las de los vídeos de NoCopyrightSounds de 2015-2017.
+   Una ola hecha de hilos finos —cinco en el ordenador, menos en aparatos
+   flojos— que se trenzan entre ellos, cada uno con su halo suave. Es la
+   ola del lienzo de diseño del 22-sep que el usuario señaló como «muy
+   bonita»; sustituye a las cintas NCS con reflejo, velo relleno, raya de
+   horizonte y aura por bombo, que se veían cargadas.
 
-   PERO no son un fondo suelto: la onda SALE DEL VERSO QUE SE ESTÁ
-   CANTANDO. Se pone a su altura, se abre a su alrededor dejándole un
-   hueco limpio, y ruge a los lados. Al cambiar de verso, la onda se muda
-   con él. Es lo que pidió el usuario: «que las letras tengan la onda de
-   música, y no eso de fondo».
+   La ola SALE DEL VERSO QUE SE ESTÁ CANTANDO: se pone a su altura, se
+   ABRE a su alrededor —los hilos lo rodean por arriba y por abajo, como
+   un ojo, y a los lados vuelven a trenzarse— y se enciende en los flancos
+   con el tono claro del acento. Al cambiar de verso la boca viaja con él:
+   así la ola «recorre la letra de la canción», que es lo que el usuario
+   echó de menos de la v116 cuando la v117 la hacía pasar por detrás del
+   texto. Lo pidió así desde el principio: «que las letras tengan la onda
+   de música, y no eso de fondo».
+
+   Regla de la casa (ver ambient.js y el cine): el fondo NO parpadea por
+   golpe. Por eso aquí la música mueve la FORMA —la ola crece, corre y
+   salta con el bombo, sobre todo con ◈ sync— pero la LUZ solo cambia de
+   carácter despacio, en segundos. Los hilos bailan; no se encienden y
+   apagan (ver «LA MÚSICA», más abajo).
 
    Funciona igual en las dos vistas porque lo único que necesita es la
    CAJA del texto que hay pintado:
@@ -23,9 +35,9 @@
    da su onda de reposo — así el fondo nunca se queda muerto) y el ritmo
    de js/beat.js. Este módulo solo dibuja.
 
-   Por qué un <canvas> y no más capas CSS: son ~250 puntos que se mueven
-   en cada frame. Con divs eso serían 250 escrituras de estilo por frame;
-   aquí es un trazo por cinta y se acabó.
+   Por qué un <canvas> y no más capas CSS: son ~500 puntos que se mueven
+   en cada frame. Con divs eso serían 500 escrituras de estilo por frame;
+   aquí es un trazo por hilo y se acabó.
 
    Lo enciende y lo apaga el ajuste «ambiente» de config ⚙ (settings.js
    pone `body.fondo-ondas`). El usuario puede volver al fondo de siempre
@@ -81,14 +93,16 @@
   window.addEventListener('resize', medir, { passive: true });
 
   /* ==========================================================
-     COLOR · el acento manda, y de él sale el segundo tono
+     COLOR · el acento manda, y de él salen sus tonos
 
-     Los vídeos de NCS nunca son de un solo color: la onda va de un tono
-     al de al lado (cian→violeta, naranja→rosa). Aquí el primero es el
-     acento de la app —que en «auto» lo saca colors.js de la carátula, o
-     sea que cambia con cada canción— y el segundo es ese mismo tono
-     girado 46° en el círculo cromático. Así la pareja pega SIEMPRE,
-     salga el acento de donde salga.
+     Como en el lienzo de diseño: el hilo va en el acento de la app —que
+     en «auto» lo saca colors.js de la carátula, o sea que cambia con cada
+     canción— y se aclara hacia el tono luminoso del MISMO color donde la
+     ola brilla (a los lados del verso). Antes el segundo tono era el
+     acento girado 46° (cian→violeta, a lo NCS); junto a la letra, que va
+     en el acento, eso eran dos colores peleando. Un giro de 13° y mucha
+     más luz dan brillo sin cambiar de familia. `colC` es casi blanco:
+     el destello que recorre el hilo principal.
      ========================================================== */
   const aRgb = (c) => {
     if (!c) return null;
@@ -134,7 +148,8 @@
 
   let colFirma = '';
   let colA = [92, 225, 230];
-  let colB = [140, 130, 255];
+  let colB = [180, 245, 248];
+  let colC = [225, 250, 252];
   let colT = 0;
 
   const revisarColor = (ahora) => {
@@ -151,22 +166,21 @@
        grises indistinguibles: se le pone un suelo de saturación para que la
        pareja siga leyéndose como dos colores. */
     const sat = Math.max(s, 0.45);
-    colA = deHsl(h, sat, Math.max(l, 0.55));
-    colB = deHsl(h + 0.128, Math.min(1, sat * 1.05), Math.max(l, 0.62));
+    const luz = clamp(l, 0.52, 0.68);
+    colA = deHsl(h, sat, luz);
+    colB = deHsl(h + 0.035, sat * 0.92, Math.min(0.86, luz + 0.2));
+    colC = mezcla(colB, [255, 255, 255], 0.55);
     degradado = null;
   };
 
   const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
-
-  const gradiente = () => {
-    if (degradado) return degradado;
-    const g = ctx.createLinearGradient(0, 0, W, 0);
-    g.addColorStop(0, rgba(colA, 1));
-    g.addColorStop(0.5, rgba(colB, 1));
-    g.addColorStop(1, rgba(colA, 1));
-    degradado = g;
-    return g;
-  };
+  function mezcla(a, b, t) {
+    return [
+      Math.round(a[0] + (b[0] - a[0]) * t),
+      Math.round(a[1] + (b[1] - a[1]) * t),
+      Math.round(a[2] + (b[2] - a[2]) * t),
+    ];
+  }
 
   /* ==========================================================
      ESPECTRO
@@ -314,250 +328,279 @@
   };
 
   /* ==========================================================
-     LAS CINTAS
-     Cada una lleva su onda viajera propia (dos senos de periodos
-     distintos, que es lo que hace que no se vea «de máquina»), su parte
-     de espectro y su velocidad. Las de detrás son anchas, lentas y casi
-     transparentes; la de delante, fina y brillante.
+     LOS HILOS
+     Todos comparten una OLA GRANDE —dos senos lentos, la misma para
+     todos—, y cada uno le suma su propia ondulación con su fase. Por eso
+     se leen como una sola ola hecha de hebras que se cruzan y se vuelven
+     a separar, y no como cinco rayas sueltas: es la trenza del lienzo.
 
-     `det` = cuánto le afecta el detalle del espectro. La cinta del fondo
-     apenas lo nota (se mueve sola, dando ambiente) y la de delante lo
-     sigue de cerca: ese contraste es lo que hace que el conjunto se vea
-     vivo en vez de ver tres copias de lo mismo.
+     `dy` es el carril de cada hilo: sin él, con la música en calma, se
+     juntan todos en una sola raya (lo que ya le pasaba a las cintas).
+     `halo` = si lleva el trazo ancho y tenue debajo; en el lienzo solo
+     lo llevan los dos de delante, y los de detrás van finos y sueltos —
+     ese contraste de pesos es lo que da profundidad.
      ========================================================== */
-  const CINTAS = [
-    { k1: 0.9, k2: 2.1, vel: 0.055, base: 0.10, amp: 0.30, det: 0.22, alfa: 0.15, ancho: 2.6, fase: 0, sep: 0.055 },
-    { k1: 1.5, k2: 3.2, vel: -0.080, base: 0.07, amp: 0.24, det: 0.55, alfa: 0.22, ancho: 1.9, fase: 1.9, sep: 0.028 },
-    { k1: 2.3, k2: 4.6, vel: 0.115, base: 0.045, amp: 0.17, det: 0.95, alfa: 0.34, ancho: 1.3, fase: 3.7, sep: 0.008 },
+  /* `lado` y `abre` son la BOCA (ver pintar): a la altura del verso los
+     hilos se reparten, unos por arriba (-1) y otros por abajo (+1), y lo
+     rodean como un ojo; `abre` separa un poco los del mismo lado para que
+     no se monten. Alternan para que con 3 o 4 hilos también haya de los dos. */
+  const HILOS = [
+    { f: 0.0, a: 1.00, dy: 0.000, w: 2.2, al: 1.00, halo: 1, lado: -1, abre: 1.00 },   // el principal
+    { f: 1.7, a: 0.88, dy: 0.017, w: 1.6, al: 0.80, halo: 1, lado: 1, abre: 1.00 },
+    { f: 3.1, a: 1.08, dy: -0.014, w: 1.4, al: 0.58, halo: 0, lado: -1, abre: 1.14 },
+    { f: 4.4, a: 0.74, dy: 0.008, w: 1.0, al: 0.40, halo: 0, lado: 1, abre: 1.14 },
+    { f: 5.6, a: 1.16, dy: -0.006, w: 0.9, al: 0.28, halo: 0, lado: -1, abre: 1.28 },
   ];
 
-  // en un aparato flojo, dos cintas en vez de tres
-  const cintas = () => (bajo() ? CINTAS.slice(1) : CINTAS);
+  // en un aparato flojo tres hilos; en el móvil, cuatro
+  const hilos = () => (bajo() ? HILOS.slice(0, 3) : movil() ? HILOS.slice(0, 4) : HILOS);
+
+  const TAU = Math.PI * 2;
+  const suave = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 
   let reloj = 0;                // segundos de animación acumulados
-  const ys = [];                // desplazamientos reutilizados (sin basura)
+  const ys = [];                // alturas del hilo que se traza (sin basura)
+  const ola = [];               // la ola grande + el espectro, común a todos
+  const cerca = [];             // 0..1: cuánto está cada x a la altura del verso
 
-  /* Los puntos van cada ~9 px de lienzo: por debajo de eso el ojo ya no
-     distingue la curva y solo se paga. En el móvil, cada 16. */
-  const paso = () => (movil() ? 16 : 9) * dpr;
+  /* Los puntos van cada ~8 px de lienzo: por debajo de eso el ojo ya no
+     distingue la curva y solo se paga. En el móvil, cada 14. */
+  const paso = () => (movil() ? 14 : 8) * dpr;
 
-  const trazar = (n, dir, mitad) => {
+  const trazar = (n) => {
     ctx.beginPath();
     const px = W / (n - 1);
-    ctx.moveTo(0, mitad + ys[0] * dir);
+    ctx.moveTo(0, ys[0]);
     for (let i = 1; i < n - 1; i++) {
       const x = i * px;
-      const y = mitad + ys[i] * dir;
-      const xs = x + px * 0.5;
-      const yn = mitad + ys[i + 1] * dir;
       // punto de control en el propio punto, extremo en el medio del tramo:
       // curva suave con un solo punto de control por tramo
-      ctx.quadraticCurveTo(x, y, xs, (y + yn) * 0.5);
+      ctx.quadraticCurveTo(x, ys[i], x + px * 0.5, (ys[i] + ys[i + 1]) * 0.5);
     }
-    ctx.lineTo(W, mitad + ys[n - 1] * dir);
+    ctx.lineTo(W, ys[n - 1]);
   };
 
-  const cerca = [];             // cuánto manda el verso en cada punto (0..1)
+  /* ==========================================================
+     LA MÁSCARA DE LUZ
+     Cuánta luz lleva la ola en cada x, de 0 a 1, y de qué tono. Se apaga
+     en los bordes del panel (la ola nace y muere, no se corta contra el
+     marco) y se templa un poco a la altura del verso: ahí los hilos ya no
+     pasan por DETRÁS de las letras —lo rodean por arriba y por abajo, ver
+     la boca en pintar()—, así que basta con bajarles un 30 % para que
+     dibujen el contorno sin pelear con la letra. A los lados, el tono
+     claro del acento.
+
+     (La v117 los apagaba al 7 % detrás del verso y los dejaba pasar por
+     encima: la ola parecía cortarse en la letra. El usuario echó de menos
+     cómo la v116 «recorría la letra de la canción», abriéndose alrededor
+     del verso que suena, y eso es lo que se recuperó.) Va metido en el
+     propio gradiente del trazo: cero pasadas de más.
+
+     El gradiente se rehace solo cuando cambia algo que se vea (el verso
+     se mueve, cambia el color, cambia el tamaño): con el verso quieto,
+     que es casi siempre, se reutiliza el mismo objeto.
+     ========================================================== */
+  const MUESTRAS = 40;
+  let mascaraFirma = '';
+
+  const luzEn = (x, on) => {
+    const u = x / W;
+    let m = u < 0.07 ? suave(u / 0.07) : u > 0.93 ? suave((1 - u) / 0.07) : 1;
+    // lejos: 0 pegado al centro de la escena, 1 en los flancos (tono claro)
+    let lejos = Math.sin(Math.PI * u);
+    if (on > 0.02 && ancla.semi > 0) {
+      const d = Math.abs(x - ancla.cx) - ancla.semi;
+      const hombro = Math.max(90 * dpr, ancla.semi * 0.4);
+      const tapa = d <= 0 ? 1 : 1 - suave(d / hombro);
+      m *= 1 - tapa * on * 0.3;
+      const flanco = suave((d - hombro * 0.3) / (W * 0.22));
+      lejos += (flanco - lejos) * on;
+    }
+    return [m, lejos];
+  };
+
+  const mascara = (on) => {
+    const firma = Math.round(ancla.cx) + '|' + Math.round(ancla.semi) + '|' +
+      on.toFixed(2) + '|' + W + '|' + colFirma;
+    if (degradado && firma === mascaraFirma) return degradado;
+    mascaraFirma = firma;
+    const g = ctx.createLinearGradient(0, 0, W, 0);
+    for (let s = 0; s <= MUESTRAS; s++) {
+      const t = s / MUESTRAS;
+      const [m, lejos] = luzEn(t * W, on);
+      g.addColorStop(t, rgba(mezcla(colA, colB, lejos), m.toFixed(3)));
+    }
+    degradado = g;
+    return g;
+  };
+
+  /* ==========================================================
+     LA MÚSICA · la FORMA baila, la LUZ va despacio
+     Dos velocidades a propósito:
+     · la FORMA (altura de la ola, espectro, carriles, velocidad) sigue a
+       la música casi al momento y SALTA con el bombo. Es lo que hacía la
+       onda de la v116 y el usuario echó de menos: «reaccionaba a la
+       música cuando se sync, que sea movido». Con ◈ sync o música local
+       el ritmo es de verdad (fuente 'audio') y el salto va entero; cuando
+       el detector va a ciegas ('estimado', Spotify sin sync) solo un
+       tercio, que un metrónomo inventado bailando a tope se ve mecánico;
+     · la LUZ (brillo, tono) cambia de carácter en segundos y NO late con
+       el golpe: el fondo que parpadea con el bombo lo rechazó tres veces.
+     Moverse no es parpadear: los hilos saltan, pero no se encienden.
+     ========================================================== */
+  let nivelL = 0.12;            // lentos: la luz
+  let energiaL = 0.3;
+  let nivelR = 0.12;            // rápidos: la forma
+  let energiaR = 0.3;
+
+  // El destello: una gota de luz que recorre el hilo principal cada ~12 s.
+  let chispa = -0.3;
 
   const pintar = (m, dt, ahora) => {
     ctx.clearRect(0, 0, W, H);
 
     const on = seguirVerso(ahora, dt);
+    const seg = dt / 1000;
 
-    const energia = m ? m.energia : 0.3;
-    const nivel = m ? m.nivel : 0.12;
-    const golpe = m ? m.boom * m.boomFuerza : 0;
-    const brillo = m ? m.brillo * m.brilloFuerza : 0;
+    nivelL += ((m ? m.nivel : 0.12) - nivelL) * K(0.03, dt);
+    energiaL += ((m ? m.energia : 0.3) - energiaL) * K(0.018, dt);
+    nivelR += ((m ? m.nivel : 0.12) - nivelR) * K(0.25, dt);
+    energiaR += ((m ? m.energia : 0.3) - energiaR) * K(0.12, dt);
+    // el golpe del bombo: entero con ritmo de verdad, un tercio si es estimado
+    const pesoGolpe = !m ? 0 : m.fuente === 'audio' ? 1 : m.fuente === 'estimado' ? 0.35 : 0;
+    const golpe = m ? clamp(m.boom * m.boomFuerza, 0, 1) * pesoGolpe : 0;
 
-    /* El eje de la onda es la ALTURA DEL VERSO que se canta. Sin verso se
-       queda en el centro del panel, que es donde estaba antes. */
+    /* El eje de la ola es la ALTURA DEL VERSO que se canta. Sin verso se
+       queda en el centro del panel. */
     const mitad = H * 0.5 + (ancla.cy - H * 0.5) * on;
     const n = Math.max(12, Math.ceil(W / paso()) + 1);
-    if (ys.length !== n) { ys.length = n; cerca.length = n; }
+    if (ys.length !== n) { ys.length = n; ola.length = n; cerca.length = n; }
 
-    /* Cuánto se aparta la onda a la altura del texto: medio verso más un
-       puñado de píxeles de aire. Ese aire fijo importa en la vista lista,
-       donde los versos van pegados —39 px de alto y 38 de separación, sin
-       hueco entre ellos—: con él la boca se abre lo bastante para que el
-       verso anterior y el siguiente queden DENTRO, en limpio, en vez de
-       llevarse la cinta por encima. El tope de 0,33·H es por el modo edit,
-       donde el verso ocupa media pantalla y sin tope las cintas se irían
-       fuera del panel. */
+    /* LA BOCA · lo que hacía la onda de la v116 y el usuario echó de menos
+       («me gustaba que recorría la letra de la canción»): a la altura del
+       verso que suena los hilos se APARTAN —los de `lado` -1 por arriba,
+       los de +1 por abajo— y lo rodean como un ojo; a los lados vuelven a
+       juntarse y a trenzarse. Al cambiar de verso la boca viaja con él.
+
+       Cuánto se apartan: medio verso más 40 px de aire. Ese aire importa en
+       la vista lista, donde los versos van pegados (39 px de alto, sin
+       hueco): así el anterior y el siguiente quedan DENTRO de la boca, en
+       limpio, en vez de llevarse un hilo por encima. Tope de 0,33·H por el
+       modo edit, donde el verso ocupa media pantalla. `cerca` dice cuánto
+       está cada x a la altura del verso: 1 encima de las letras, 0 lejos,
+       con un hombro suave entre medias. */
     const apertura = Math.min(ancla.alto * 0.55 + 40 * dpr, H * 0.33);
-
-    /* LA ONDA ES DEL TAMAÑO DE SU VERSO. En el modo edit el verso es
-       enorme y la onda ruge; en la vista lista mide 40 px y la misma onda
-       a todo trapo se comía los versos de arriba y de abajo —probado, se
-       veía un borrón— y encima tapaba media pantalla. Así que cuando está
-       anclada, la altura se mide contra el verso y no contra el panel. */
-    const techoAncla = Math.min(1, (apertura + Math.max(H * 0.06, ancla.alto * 1.4)) / (H * 0.46));
-    const escala = 1 - on * (1 - techoAncla);
-
-    /* Cuánto se abre la onda. El suelo de 0,42 existe para que en una
-       balada —o en silencio, o sonando por Spotify Connect sin el ◈, que
-       es cuando el detector va a ciegas— siga habiendo onda que mirar:
-       una línea recta no es un fondo, es una raya. */
-    const fuerza = (0.42 + nivel * 0.85 + energia * 0.35 + golpe * 0.55) * escala;
     const px = W / (n - 1);
-    // los hombros: cómo de rápido se cierra el hueco al alejarse del verso
     const hombro = Math.max(60 * dpr, ancla.semi * 0.55);
     for (let i = 0; i < n; i++) {
       if (on < 0.02) { cerca[i] = 0; continue; }
       const d = Math.abs(i * px - ancla.cx) - ancla.semi;
-      if (d <= 0) { cerca[i] = on; continue; }
-      if (d >= hombro) { cerca[i] = 0; continue; }
-      const u = 1 - d / hombro;
-      cerca[i] = u * u * (3 - 2 * u) * on;      // smoothstep
+      cerca[i] = d <= 0 ? on : d >= hombro ? 0 : suave(1 - d / hombro) * on;
     }
 
-    const g = gradiente();
+    /* Altura de la ola: ±4,5 % del panel en calma, ±11-15 % con un tema
+       movido y un salto de hasta la mitad más en cada bombo, con tope en
+       el 20 %. Encima del verso se calma al 20 % (ver la boca), así que el
+       baile es a los lados. En el modo edit el verso ocupa media pantalla
+       y la ola vive a sus lados, donde hay sitio para que crezca. */
+    let A = H * (0.045 + nivelR * 0.09 + energiaR * 0.04) * (1 + golpe * 0.5);
+    A *= 1 + on * clamp(ancla.alto / H - 0.12, 0, 0.35) * 1.4;
+    A = Math.min(A, H * 0.2);
+
+    // la media del espectro, para que el detalle ondule arriba Y abajo
+    let media = 0;
+    for (let i = 0; i < N; i++) media += esp[i];
+    media /= N;
+
+    const T = reloj;
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      // la ola nunca se aplana del todo en los bordes: solo se apaga
+      const env = 0.45 + 0.55 * Math.sin(Math.PI * t);
+      ola[i] = env * (
+        Math.sin(t * TAU * 1.15 + T * 0.31) * 0.55 +
+        Math.sin(t * TAU * 0.55 - T * 0.17 + 1.3) * 0.45 +
+        (muestra(t) - media) * 1.6          // el espectro dibuja la ola (antes 0,9)
+      );
+    }
+
+    const g = mascara(on);
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.strokeStyle = g;
 
-    const lista = cintas();
-    for (let c = 0; c < lista.length; c++) {
+    const brillo = clamp(0.55 + nivelL * 0.35 + energiaL * 0.1, 0, 0.95);
+    const carril = H * (0.8 + energiaR * 0.6);
+    const conHalo = !bajo();
+    const lista = hilos();
+
+    for (let c = lista.length - 1; c >= 0; c--) {      // de atrás adelante
       const L = lista[c];
-      const f = reloj * L.vel + L.fase;
-
-      /* Cada cinta corre a su propia altura. Sin esta separación las tres
-         se juntan en UNA raya en cuanto la música se calma —era lo que
-         pasaba con la app en pausa— y lo que se ve no es una onda sino un
-         subrayado. Al subir la energía se separan más, así el conjunto se
-         abre con el tema. La franja es simétrica porque el reflejo invierte
-         la separación igual que invierte la onda. */
-      const sep = L.sep * H * (0.55 + energia * 0.75) * escala;
-
+      const y0 = mitad + L.dy * carril;
       for (let i = 0; i < n; i++) {
         const t = i / (n - 1);
-        /* Sobre en forma de campana: la onda nace y muere en los bordes
-           del panel. Sin esto las cintas se cortan en seco contra el marco
-           y se ve el truco. */
-        const env = Math.pow(Math.sin(Math.PI * t), 0.75);
-        const onda =
-          Math.sin(t * L.k1 * Math.PI * 2 + f * 6.283) * 0.62 +
-          Math.sin(t * L.k2 * Math.PI * 2 - f * 4.1) * 0.38;
-        const detalle = muestra(t) * L.det;
-        /* Dos cosas a la altura del verso: la cinta se APARTA (y su
-           reflejo se aparta al otro lado, así que el verso queda dentro de
-           una boca abierta) y además se CALMA, porque una onda agitada
-           justo detrás de las letras es exactamente el fondo que el
-           usuario no quería. Ruge a los lados, que es donde hay sitio.
-
-           Y el tope de ±0,46·H no es cosmético: sin él, un drop en un tema
-           movido manda la cinta MÁS ALLÁ del borde del panel y lo que se ve
-           es una recta pegada al marco, justo cuando tocaba ver el golpe. */
+        const propio =
+          Math.sin(t * TAU * 2.2 + T * 0.62 + L.f) * 0.5 +
+          Math.sin(t * TAU * 3.6 - T * 0.44 + L.f * 1.7) * 0.22;
+        /* Encima del verso: el hilo se aparta a su lado de la boca y además
+           se CALMA (una ola agitada pegada a las letras es el fondo que el
+           usuario no quería); ruge a los lados, que es donde hay sitio. */
+        const ce = cerca[i];
         ys[i] = clamp(
-          cerca[i] * apertura +
-            (sep * env + env * H * (onda * L.base * (0.7 + energia * 0.9) + detalle * L.amp) * fuerza)
-              * (1 - 0.62 * cerca[i]),
-          -H * 0.46, H * 0.46
-        );
+          y0 + L.lado * ce * apertura * L.abre +
+            A * (ola[i] * L.a + propio * 0.55 * (0.45 + 0.55 * Math.sin(Math.PI * t))) * (1 - 0.8 * ce),
+          2 * dpr, H - 2 * dpr);
       }
+      trazar(n);
 
-      /* RESPLANDOR BARATO · el mismo trazo dos veces, ancho y tenue
-         primero, fino y brillante encima. `shadowBlur` haría lo mismo más
-         bonito, pero Skia rehace el desenfoque en CADA trazo y esto son
-         3 cintas × 2 lados × 60 veces por segundo. Con 'lighter' las dos
-         pasadas se suman y el resultado es el halo de siempre.
-
-         El camino se arma UNA vez por lado y se traza dos: el camino sigue
-         vivo hasta el próximo beginPath(), así que rehacerlo era pagar 120
-         curvas de balde. */
-      const alfa = L.alfa * (0.75 + nivel * 0.5 + golpe * 0.6);
-      const glow = !movil();
-
-      for (let dir = 1; dir >= -1; dir -= 2) {
-        trazar(n, dir, mitad);
-        if (glow) {
-          ctx.globalAlpha = clamp(alfa * 0.30, 0, 1);
-          ctx.lineWidth = L.ancho * dpr * 4.5;
-          ctx.stroke();
-        }
-        // el reflejo de abajo, más apagado: da profundidad sin duplicar ruido
-        ctx.globalAlpha = clamp(alfa * (dir > 0 ? 1 : 0.62), 0, 1);
-        ctx.lineWidth = L.ancho * dpr;
+      /* RESPLANDOR BARATO · el mismo camino dos veces: ancho y tenue
+         debajo, fino encima. `shadowBlur` haría lo mismo, pero Skia rehace
+         el desenfoque en CADA trazo y esto corre 60 veces por segundo. Con
+         'lighter' las dos pasadas se suman en el halo del lienzo (9 px a
+         0,18 bajo un hilo de 2,2). */
+      if (L.halo && conHalo) {
+        ctx.globalAlpha = brillo * L.al * 0.2;
+        ctx.lineWidth = L.w * dpr * 4.2;
         ctx.stroke();
       }
+      ctx.globalAlpha = brillo * L.al;
+      ctx.lineWidth = L.w * dpr;
+      ctx.stroke();
 
-      /* La cinta de delante lleva CUERPO: el hueco entre ella y su reflejo
-         relleno con un velo que se apaga hacia fuera. Es lo que convierte
-         dos líneas en una onda de sonido. */
-      if (c === lista.length - 1) {
-        trazar(n, 1, mitad);
-        for (let i = n - 1; i >= 0; i--) {
-          ctx.lineTo((i * W) / (n - 1), mitad - ys[i]);
+      /* EL DESTELLO · una gota de luz que corre por el hilo principal,
+         despacio, y descansa antes de volver. Es un trazo más sobre el
+         camino que ya está armado. Hereda la máscara: tras el verso se
+         apaga igual que el hilo, así nunca brilla encima de las letras. */
+      if (c === 0 && conHalo && chispa > -0.1 && chispa < 1.1) {
+        const gx = chispa * W;
+        const ancho = W * 0.09;
+        const pico = luzEn(clamp(gx, 0, W), on)[0] * (0.55 + energiaL * 0.3);
+        if (pico > 0.02) {
+          const d = ctx.createLinearGradient(gx - ancho, 0, gx + ancho, 0);
+          d.addColorStop(0, rgba(colC, 0));
+          d.addColorStop(0.5, rgba(colC, pico.toFixed(3)));
+          d.addColorStop(1, rgba(colC, 0));
+          ctx.strokeStyle = d;
+          ctx.globalAlpha = 0.35;
+          ctx.lineWidth = L.w * dpr * 4;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.lineWidth = L.w * dpr * 1.2;
+          ctx.stroke();
+          ctx.strokeStyle = g;
         }
-        ctx.closePath();
-        /* El velo se queda por debajo de 0,25 a propósito: por encima deja
-           de ser fondo y empieza a competir con la letra, que es justo lo
-           que el usuario no quería del fondo anterior. */
-        ctx.globalAlpha = clamp(0.07 + nivel * 0.12 + golpe * 0.12, 0, 0.25);
-        ctx.fillStyle = g;
-        ctx.fill();
       }
     }
 
-    /* Línea del horizonte: el eje de la onda —o sea, el renglón del verso—,
-       encendido por los platillos. Es el detalle que más «NCS» hace la
-       escena y cuesta un trazo. */
-    ctx.globalAlpha = clamp(0.06 + brillo * 0.22 + nivel * 0.05, 0, 1);
-    ctx.lineWidth = Math.max(1, dpr);
-    ctx.beginPath();
-    ctx.moveTo(0, mitad);
-    ctx.lineTo(W, mitad);
-    ctx.stroke();
-
-    /* AURA DEL VERSO · un charco de luz alrededor de las letras, que late
-       con el bombo. Se pinta ANTES del hueco y más grande que él, así que
-       lo que queda es un halo: el verso encendido por su propia onda. Es
-       lo que ata la letra a la escena en vez de dejarla flotando encima. */
-    if (on > 0.02 && ancla.semi > 0) {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = clamp((0.09 + golpe * 0.14 + nivel * 0.07) * on, 0, 0.3);
-      ctx.save();
-      ctx.translate(ancla.cx, ancla.cy);
-      ctx.scale(ancla.semi * 1.18 + 70 * dpr, ancla.alto * 0.9 + 30 * dpr);
-      const a = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      a.addColorStop(0, rgba(colA, 0.85));
-      a.addColorStop(0.45, rgba(colB, 0.42));
-      a.addColorStop(1, rgba(colB, 0));
-      ctx.fillStyle = a;
-      ctx.beginPath();
-      ctx.arc(0, 0, 1, 0, 6.2832);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    /* EL HUECO DEL VERSO · se borra lo pintado en una elipse blanda sobre
-       las letras. Apartar las cintas no basta: el velo de la cinta de
-       delante rellena el hueco ENTRE ella y su reflejo —o sea, justo donde
-       está el texto— y el horizonte lo tacharía de lado a lado. Con
-       `destination-out` la letra se queda en un bolsillo limpio y la onda
-       parece abrirse a su paso. Solo toca a este lienzo. */
-    if (on > 0.02 && ancla.semi > 0) {
-      const rx = ancla.semi * 1.1 + 24 * dpr;
-      const ry = ancla.alto * 0.62 + 16 * dpr;
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.globalAlpha = 1;
-      ctx.save();
-      ctx.translate(ancla.cx, ancla.cy);
-      ctx.scale(rx, ry);                 // el círculo unidad se vuelve elipse
-      const h = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-      h.addColorStop(0, 'rgba(0,0,0,' + on.toFixed(3) + ')');
-      h.addColorStop(0.62, 'rgba(0,0,0,' + (on * 0.93).toFixed(3) + ')');
-      h.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = h;
-      ctx.beginPath();
-      ctx.arc(0, 0, 1, 0, 6.2832);
-      ctx.fill();
-      ctx.restore();
-    }
+    // ~9 s de viaje y ~4 de descanso; un tema movido la acelera un poco
+    chispa += seg * (0.11 + energiaL * 0.05);
+    if (chispa > 1.45) chispa = -0.3;
 
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    reloj += dt / 1000;
+    // la ola corre más deprisa cuanto más movido es el tema (se integra: sin saltos)
+    reloj += seg * (0.8 + energiaR * 0.9 + nivelR * 0.4);
   };
 
   /* ==========================================================
@@ -596,7 +639,7 @@
     ultimo = ahora;
 
     revisarColor(ahora);
-    leerEspectro(window.MMPerf ? window.MMPerf.k(0.22, dt) : 0.22);
+    leerEspectro(K(0.22, dt));      // como la v116: la ola sigue al espectro, no lo arrastra
 
     const M = window.BeatModule;
     pintar(M && M.get ? M.get() : null, dt, ahora);

@@ -379,7 +379,10 @@
       nota: 'la del propio reproductor: terminal verde de los ochenta',
       css: "'VT323', 'Share Tech Mono', monospace",
       google: null,
-      alto: 1.9, peso: 400, activo: 700, track: '0.02em', mayus: false, ajuste: 1,
+      /* activo 400: VT323 no tiene negrita y la inventada emborronaba los
+         píxeles. El peso del verso activo lo da el «doble golpe» del CSS
+         (busca data-lyrics-font="retro"). */
+      alto: 1.9, peso: 400, activo: 400, track: '0.02em', mayus: false, ajuste: 1,
     },
     {
       id: 'mono', nombre: 'Share Tech Mono', grupo: 'consola',

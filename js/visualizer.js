@@ -1,5 +1,6 @@
 /* ==========================================================
-   Visualizador de audio — espectro reflejado, profesional.
+   Visualizador de audio — espectro de segmentos, como el display VFD
+   de una cadena de música (antes: barras lisas con reflejo).
    · FFT real (Web Audio) cuando el audio suena por el <audio>
      local (canciones importadas y previews de Spotify).
    · Animación suave de respaldo (idle) cuando no hay señal
@@ -74,7 +75,7 @@
      resolución depende del nivel — y olvidar las tiras cacheadas, porque
      cambia el número de barras y con él su altura. */
   if (window.MMPerf && window.MMPerf.alCambiar) {
-    window.MMPerf.alCambiar(() => { cacheTiras = null; sizeCanvas(); });
+    window.MMPerf.alCambiar(() => { cacheVfd = null; sizeCanvas(); });
   }
 
   // ---- Color helpers (siguen el acento del tema) ----
@@ -122,63 +123,74 @@
   };
   const rgba = ({ r, g, b }, a = 1) => `rgba(${r},${g},${b},${a})`;
 
-  /* ---------- Cacheo de lo caro del pintado ----------
+  /* ---------- El espectro como un display de equipo (VFD) ----------
+     Antes eran 64 barras lisas con reflejo: el visualizador «de cualquier
+     web». Ahora es la pantalla de fósforo de una cadena de los 80-90:
+     columnas de segmentos con los APAGADOS a la vista (el fósforo sin
+     encender se ve), el color por tramos sacados de la paleta —como los 16
+     tonos que el viscolor.txt de Winamp le daba al espectro— y el pico como
+     un segmento que cae despacio. Nada parpadea: sube y baja con el mismo
+     suavizado de siempre.
 
-     Medido antes de esto (Chrome, CPU x6 para imitar un móvil): el bucle del
-     visualizador se comía 100 ms de cada segundo, más que todos los demás
-     bucles juntos. No era la aritmética: eran 64 barras creando DOS
-     degradados nuevos cada una y rellenándolos con `shadowBlur`, que es lo
-     más lento que hay en canvas 2D porque desenfoca en la CPU. Eso son 7.680
-     degradados y 7.680 desenfoques por segundo — y seguía corriendo con la
-     música parada.
-
-     Ahora: el degradado se pinta UNA vez en una tira de 1 píxel de ancho y
-     cada barra es un `drawImage` de esa tira estirada (idéntico a la vista,
-     porque los topes del degradado eran relativos a la altura de la barra).
-     El resplandor se lo pone el CSS al canvas entero con un `drop-shadow`:
-     una sola pasada de la GPU en vez de 128 desenfoques de CPU por frame. */
-  let cacheTiras = null;
-  const tirasDe = (maxBar, playing) => {
+     Lo caro se hace UNA vez (y se rehace solo si cambian el color, el
+     tamaño o el número de columnas): la rejilla apagada va en un lienzo
+     aparte, y las posiciones y los tonos, en tablas. Cada frame es un
+     drawImage de la rejilla + un relleno por FILA (todas las columnas
+     encendidas a esa altura en un solo path) + los picos. Sin degradados ni
+     shadowBlur: el resplandor sigue siendo el drop-shadow del CSS, una
+     pasada de la GPU (ver #visualizer). La historia de por qué: este bucle
+     llegó a comerse 100 ms de cada segundo con 128 desenfoques de CPU. */
+  let cacheVfd = null;
+  const mezclar = (a, b, t) => ({
+    r: Math.round(a.r + (b.r - a.r) * t),
+    g: Math.round(a.g + (b.g - a.g) * t),
+    b: Math.round(a.b + (b.b - a.b) * t),
+  });
+  const rejilla = (nc, playing) => {
     const { accent, claro } = colores();
-    // La firma dice cuándo hay que rehacerlas: color, altura o estado
-    const firma = `${accent.r},${accent.g},${accent.b}|${claro.r}|${Math.round(maxBar)}|${playing ? 1 : 0}`;
-    if (cacheTiras && cacheTiras.firma === firma) return cacheTiras;
+    const firma = `${accent.r},${accent.g},${accent.b}|${W}x${H}@${dpr}|${nc}|${playing ? 1 : 0}`;
+    if (cacheVfd && cacheVfd.firma === firma) return cacheVfd;
 
-    const alto = Math.max(2, Math.ceil(maxBar));
-    const hacer = (pintar) => {
-      const c = document.createElement('canvas');
-      c.width = 1; c.height = alto;
-      pintar(c.getContext('2d'));
-      return c;
-    };
-    const barra = hacer((c) => {
-      const g = c.createLinearGradient(0, 0, 0, alto);
-      g.addColorStop(0,    rgba(claro, playing ? 1 : 0.7));
-      g.addColorStop(0.55, rgba(accent, 0.95));
-      g.addColorStop(1,    rgba(accent, 0.55));
-      c.fillStyle = g; c.fillRect(0, 0, 1, alto);
-    });
-    const reflejo = hacer((c) => {
-      const g = c.createLinearGradient(0, 0, 0, alto);
-      g.addColorStop(0, rgba(accent, 0.30));
-      g.addColorStop(1, rgba(accent, 0));
-      c.fillStyle = g; c.fillRect(0, 0, 1, alto);
-    });
-    cacheTiras = { firma, barra, reflejo };
-    return cacheTiras;
-  };
-
-  /* Las cadenas 'rgba(…)' también se hacían de nuevo en cada barra: unas 380
-     por frame, todas iguales entre sí. Se memorizan por color y opacidad. */
-  const memoTono = new Map();
-  const tono = (c, a) => {
-    const k = `${c.r},${c.g},${c.b},${a}`;
-    let v = memoTono.get(k);
-    if (v === undefined) {
-      if (memoTono.size > 64) memoTono.clear();   // el acento cambia con la canción
-      memoTono.set(k, v = `rgba(${k})`);
+    // un segmento cada ~9 px de alto: 8 filas como poco, 20 como mucho
+    const filas = Math.max(8, Math.min(20, Math.round(H / 9)));
+    // bordes pegados a píxeles de verdad: un segmento a medio píxel se ve borroso
+    const snap = (v) => Math.round(v * dpr) / dpr;
+    const padX = 2, padY = 3, gy = 2;
+    const gx = nc > 24 ? 3 : 4;
+    const cw = (W - padX * 2 - gx * (nc - 1)) / nc;
+    const paso = (H - padY * 2 + gy) / filas;
+    const cols = [], rows = [];
+    for (let c = 0; c < nc; c++) {
+      const x0 = snap(padX + c * (cw + gx)), x1 = snap(padX + c * (cw + gx) + cw);
+      cols.push([x0, Math.max(1 / dpr, x1 - x0)]);
     }
-    return v;
+    for (let r = 0; r < filas; r++) {
+      const base = H - padY - r * paso;
+      const y0 = snap(base - (paso - gy)), y1 = snap(base);
+      rows.push([y0, Math.max(1 / dpr, y1 - y0)]);
+    }
+
+    /* Tonos por tramo, de abajo arriba: el acento apagado → el acento → su
+       versión clara. Sin señal (la onda de respaldo) va un poco más tenue. */
+    const oscuro = mezclar(accent, { r: 0, g: 0, b: 0 }, 0.35);
+    const alfa = playing ? 1 : 0.75;
+    const tonos = rows.map((_, r) => {
+      const f = filas > 1 ? r / (filas - 1) : 1;
+      return rgba(f < 0.6 ? mezclar(oscuro, accent, f / 0.6) : mezclar(accent, claro, (f - 0.6) / 0.4), alfa);
+    });
+
+    // la rejilla apagada, a la resolución real del lienzo
+    const fondo = document.createElement('canvas');
+    fondo.width = canvas.width; fondo.height = canvas.height;
+    const fx = fondo.getContext('2d');
+    fx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fx.fillStyle = rgba(accent, 0.08);
+    fx.beginPath();
+    for (const [x, w] of cols) for (const [y, h] of rows) fx.rect(x, y, w, h);
+    fx.fill();
+
+    cacheVfd = { firma, filas, cols, rows, tonos, fondo, pico: rgba(claro, 0.95), lit: new Int16Array(nc) };
+    return cacheVfd;
   };
 
   /* 64 barras eran 64 en todas partes. En un teléfono no se distinguen y
@@ -352,19 +364,6 @@
     return out;
   };
 
-  // ---- Barra con tope redondeado ----
-  const roundedTopBar = (x, y, w, h, r) => {
-    r = Math.min(r, w / 2, h);
-    ctx.beginPath();
-    ctx.moveTo(x, y + h);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h);
-    ctx.closePath();
-  };
-
   // ---- Modo SYNC: captura el audio del sistema (para Spotify) ----
   // El audio de Spotify Connect no pasa por el navegador, así que no se
   // puede analizar directo. Con getDisplayMedia el usuario comparte el
@@ -379,13 +378,14 @@
     if (porMic()) {
       /* Que se sepa QUÉ hace antes de pulsarlo. Pedir el micrófono sin
          avisar, en una app de música, es de las cosas que más mosquean. */
-      syncBtn.textContent = '◈ oír';
+      // el ◈ lo pinta el CSS (.viz-sync::before), en la rejilla de los iconos pixel
+      syncBtn.textContent = 'oír';
       syncBtn.dataset.modo = 'mic';
       syncBtn.title = 'Escuchar por el micrófono para que el espectro siga la música. ' +
         'Solo tiene sentido si suena en OTRO aparato: si suena en este teléfono, ' +
         'el sistema baja el volumen como en una llamada.';
     } else {
-      syncBtn.textContent = '◈ sync';
+      syncBtn.textContent = 'sync';
       delete syncBtn.dataset.modo;
       syncBtn.title = 'Sincronizar el espectro con el audio del sistema — ideal para Spotify. ' +
         'Comparte tu pantalla marcando "compartir audio del sistema".';
@@ -605,75 +605,85 @@
     haySenal = playing;
     if (!vals) vals = idleSpectrum();
 
-    /* Fuera de pantalla (modo cine, ventana encogida) se hacen las cuentas
-       pero NO se pinta: smooth[] tiene que seguir vivo porque de ahí come
-       getBands(), que es lo que mueve la onda del modo cine. Lo que se ahorra
-       es justo lo caro: degradados, shadowBlur y relleno por barra. */
-    if (!visible) {
-      for (let i = 0, n = barrasVisibles(); i < n; i++) {
-        const target = vals[i];
-        const s = smooth[i];
-        smooth[i] = s + (target - s) * (target > s ? kSube : kBaja);
-        const v = smooth[i];
-        if (v > peaks[i]) { peaks[i] = v; peakVel[i] = 0; }
-        else { peakVel[i] += 0.0009 * fr; peaks[i] = Math.max(v, peaks[i] - peakVel[i] * fr); }
-      }
-      updateMiniEq(playing);
-      return;
-    }
-
-    ctx.clearRect(0, 0, W, H);
-
-    const { accent, claro } = colores();
-
-    const center = H / 2;
-    const gap = 2;
+    /* Las cuentas se hacen SIEMPRE, se vea o no: smooth[] tiene que seguir
+       vivo porque de ahí comen getBands() —la onda del modo cine— y el
+       mini-EQ de la barra de estado. Ataque rápido, caída lenta; el pico
+       cae con su propia inercia. */
     const nb = barrasVisibles();
-    const barW = (W - gap * (nb - 1)) / nb;
-    const maxBar = H * 0.46;
-    const radius = Math.min(barW / 2, 3);
-    const tiras = tirasDe(maxBar, playing);
-
-    // Línea central tenue
-    ctx.strokeStyle = tono(accent, 0.10);
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, center); ctx.lineTo(W, center); ctx.stroke();
-
-    ctx.fillStyle = tono(claro, 0.95);      // el tope del pico: un solo color
-
     for (let i = 0; i < nb; i++) {
       const target = vals[i];
       const s = smooth[i];
-      // ataque rápido, caída lenta
       smooth[i] = s + (target - s) * (target > s ? kSube : kBaja);
       const v = smooth[i];
-      const bh = Math.max(1.5, v * maxBar);
-      const x = i * (barW + gap);
-
-      // pico que cae
       if (v > peaks[i]) { peaks[i] = v; peakVel[i] = 0; }
       else { peakVel[i] += 0.0009 * fr; peaks[i] = Math.max(v, peaks[i] - peakVel[i] * fr); }
+    }
+    updateMiniEq(playing);
 
-      /* Barra y reflejo: la MISMA tira ya pintada, estirada a lo alto que
-         toque. Antes cada barra creaba sus dos degradados y los rellenaba
-         con shadowBlur: 64 barras × 2 degradados × 2 desenfoques, 60 veces
-         por segundo. El degradado ahora se pinta una vez (ver tirasDe) y el
-         resplandor lo pone el CSS sobre el canvas entero, de una pasada. */
-      ctx.save();
-      roundedTopBar(x, center - bh, barW, bh, radius);
-      ctx.clip();
-      ctx.drawImage(tiras.barra, x, center - bh, barW, bh);
-      ctx.restore();
-      ctx.drawImage(tiras.reflejo, x, center, barW, bh * 0.7);
+    // Fuera de pantalla (modo cine, ventana encogida) no se pinta nada
+    if (!visible) return;
 
-      // tope del pico: punta clara
-      const py = center - Math.max(1.5, peaks[i] * maxBar) - 2;
-      ctx.fillRect(x, py, barW, 2);
+    /* Una columna por cada DOS bandas (32 con las 64 del ordenador): en un
+       display de segmentos, 64 columnas finísimas se leen como ruido. */
+    const nc = Math.max(1, Math.ceil(nb / 2));
+    const R = rejilla(nc, playing);
+    const { filas, cols, rows, tonos, lit } = R;
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(R.fondo, 0, 0, W, H);        // los segmentos apagados
+
+    for (let c = 0; c < nc; c++) {
+      const v = Math.max(smooth[2 * c], smooth[2 * c + 1] || 0);
+      lit[c] = Math.min(filas, Math.round(v * filas));
+    }
+    /* Los encendidos, fila a fila: todas las columnas que llegan a esa
+       altura van en un solo path con el tono de la fila. Si en una fila no
+       hay ninguna, en las de encima tampoco. */
+    for (let r = 0; r < filas; r++) {
+      let hay = false;
+      ctx.beginPath();
+      const y = rows[r][0], h = rows[r][1];
+      for (let c = 0; c < nc; c++) {
+        if (lit[c] > r) { ctx.rect(cols[c][0], y, cols[c][1], h); hay = true; }
+      }
+      if (!hay) break;
+      ctx.fillStyle = tonos[r];
+      ctx.fill();
     }
 
-    updateMiniEq(playing);
+    // el pico: un segmento claro que cae despacio por encima de la columna
+    ctx.beginPath();
+    let hayPico = false;
+    for (let c = 0; c < nc; c++) {
+      const n = Math.round(Math.max(peaks[2 * c], peaks[2 * c + 1] || 0) * filas);
+      if (n < 1) continue;
+      const r = Math.min(filas - 1, n - 1);
+      ctx.rect(cols[c][0], rows[r][0], cols[c][1], rows[r][1]);
+      hayPico = true;
+    }
+    if (hayPico) { ctx.fillStyle = R.pico; ctx.fill(); }
   };
   draw();
+
+  /* ---------- El tiempo, con sus «8» apagados detrás ----------
+     A juego con el espectro: el tiempo va en 7 segmentos (DSEG7, ver .time
+     en el CSS) y, como en un display de verdad, detrás de cada cifra se ven
+     sus segmentos apagados. El CSS los pinta con un ::before que lee
+     data-g; aquí se escribe ese data-g —el mismo texto con cada cifra y cada
+     «-» hecho un «8»— cada vez que alguien cambia el tiempo (app.js, el
+     reloj de spotify.js, el modo «lo que queda»…). Escribir un atributo no
+     despierta al observador, así que no hay bucle. */
+  const fantasma = (el) => {
+    if (!el) return;
+    const poner = () => {
+      const g = el.textContent.replace(/[0-9-]/g, '8');
+      if (el.dataset.g !== g) el.dataset.g = g;
+    };
+    poner();
+    new MutationObserver(poner).observe(el, { childList: true, characterData: true, subtree: true });
+  };
+  fantasma(document.getElementById('timeCurrent'));
+  fantasma(document.getElementById('timeTotal'));
 
   // API pública mínima
   window.VisualizerModule = {

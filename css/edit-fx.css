@@ -367,7 +367,7 @@
   content: attr(data-txt);
   position: absolute;
   inset: 0;
-  color: var(--magenta);
+  color: var(--accent-2);
   opacity: 0.7;
   text-shadow: none;
   animation-duration: 0.55s;

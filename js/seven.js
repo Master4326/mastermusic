@@ -131,9 +131,11 @@
     root.style.removeProperty('--accent');
     root.style.removeProperty('--accent-glow');
     root.style.removeProperty('--accent-dim');
-    // Read the resolved accent from the [data-theme] cascade and derive borders
+    /* El acento del tema se lee en el BODY, que es donde lo pone
+       `body[data-theme="…"]`. Se leía en <html>, que no tiene tema, y los
+       bordes de los temas verde, rosa, naranja… salían del cian de fábrica. */
     setTimeout(() => {
-      const computed = getComputedStyle(root).getPropertyValue('--accent').trim() || '#5ce1e6';
+      const computed = getComputedStyle(body).getPropertyValue('--accent').trim() || '#5ce1e6';
       applyBordersFromAccent(computed);
     }, 0);
   };
@@ -162,6 +164,47 @@
     root.style.setProperty('--border-light', rgbToHex(mid));
     root.style.setProperty('--border-pixel', rgbToHex(mix(mid, { r: 0, g: 0, b: 0 }, 0.25)));
     root.style.setProperty('--border-dark',  rgbToHex(mix(mid, { r: 0, g: 0, b: 0 }, 0.7)));
+    root.style.setProperty('--accent-2', segundoTono(rgb));
+    /* La barra del navegador (Chrome en Android, la app instalada) también
+       sigue a la canción: un tono oscuro del acento, para que los iconos
+       del sistema se sigan leyendo encima. Era #0a0e2e fijo. */
+    if (metaTema) metaTema.setAttribute('content', rgbToHex(mix(rgb, { r: 10, g: 14, b: 46 }, 0.74)));
+  };
+
+  /* ---------- Segundo tono de la paleta (--accent-2) ----------
+     El acento girado 20° y un poco más claro. Hace el papel que tenía
+     --magenta, un rosa FIJO (#ff5cc8), en los rótulos de ajustes, los
+     corchetes «[ … ]», la marca del reposo y una mancha del aura del cine:
+     con una carátula ámbar aquello salía rosa. Mismo criterio que la onda
+     de fondo.js: familia cercana y más luz, no un color que pelee. */
+  const metaTema = document.querySelector('meta[name="theme-color"]');
+  const aHsl = ({ r, g, b }) => {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2;
+    if (!d) return { h: 0, s: 0, l };
+    const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    const h = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) / 6
+      : mx === g ? ((b - r) / d + 2) / 6
+      : ((r - g) / d + 4) / 6;
+    return { h, s, l };
+  };
+  const deHsl = ({ h, s, l }) => {
+    h = ((h % 1) + 1) % 1;
+    if (!s) return { r: l * 255, g: l * 255, b: l * 255 };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const canal = (t) => {
+      t = ((t % 1) + 1) % 1;
+      if (t < 1 / 6) return 255 * (p + (q - p) * 6 * t);
+      if (t < 1 / 2) return 255 * q;
+      if (t < 2 / 3) return 255 * (p + (q - p) * (2 / 3 - t) * 6);
+      return 255 * p;
+    };
+    return { r: canal(h + 1 / 3), g: canal(h), b: canal(h - 1 / 3) };
+  };
+  const segundoTono = (rgb) => {
+    const c = aHsl(rgb);
+    return rgbToHex(deHsl({ h: c.h + 20 / 360, s: c.s, l: Math.min(0.86, c.l + 0.1) }));
   };
 
   const applyText = (hex) => {
@@ -808,8 +851,14 @@
     coverFirma = firma;
     pintarChip();
 
+    /* La portada entra descodificada y con su disolución de píxeles
+       (js/caratula.js); sin ese módulo, de golpe como antes. */
+    const ponerPortada = (url) => {
+      if (window.MMCaratula) window.MMCaratula.poner(coverArt, url);
+      else coverArt.style.backgroundImage = url ? `url('${url}')` : '';
+    };
     if (!t) {
-      coverArt.style.backgroundImage = '';
+      ponerPortada('');
       coverArt.classList.remove('has-image');
       coverArt.innerHTML = '<span class="cover-placeholder">♪</span>';
       npAlbumEl.textContent = '';
@@ -817,11 +866,11 @@
       return;
     }
     if (t.cover) {
-      coverArt.style.backgroundImage = `url('${t.cover}')`;
+      ponerPortada(t.cover);
       coverArt.classList.add('has-image');
       coverArt.innerHTML = '';
     } else {
-      coverArt.style.backgroundImage = '';
+      ponerPortada('');
       coverArt.classList.remove('has-image');
       coverArt.innerHTML = '<span class="cover-placeholder">♪</span>';
     }

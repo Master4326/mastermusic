@@ -88,46 +88,96 @@
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
   // -------- Client ID modal --------
+  /* La ventana que pide el Client ID. Era lo primero que ve quien conecta
+     la app y venía con ropa de otra: el gris #181818 de Spotify, esquinas
+     de 12 px, botones-píldora verdes y la VT323 heredada a 13 px, diminuta.
+     Ahora es una ventana de la casa (clases .cid-* en el CSS): barra con los
+     puntos del acento, panel biselado, pasos numerados, la Redirect URI en
+     un campo con «copiar» y todo con los colores de la paleta. Los campos
+     van transparentes con borde, sin fondo oscuro. Esc cierra, Intro acepta
+     y el foco vuelve a donde estaba. */
   const askClientId = () => new Promise((resolve) => {
     const existing = localStorage.getItem(STORAGE.CID) || '';
+    const antes = document.activeElement;
     const modal = document.createElement('div');
+    modal.className = 'cid-fondo';
     modal.innerHTML = `
-      <div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(8px)">
-        <div style="background:#181818;border-radius:12px;padding:32px;max-width:520px;width:90%;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,0.6)">
-          <h2 style="margin-bottom:8px;font-size:22px">Conectar con Spotify</h2>
-          <p style="color:#b3b3b3;font-size:13px;margin-bottom:16px;line-height:1.5">
-            Necesitas un <b>Client ID</b> gratuito de Spotify. Pasos:
-          </p>
-          <ol style="color:#b3b3b3;font-size:13px;margin:0 0 16px 18px;line-height:1.7">
-            <li>Abre <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:#1db954">developer.spotify.com/dashboard</a></li>
-            <li>Login con tu cuenta normal de Spotify</li>
-            <li>"Create app" → nombre libre (ej. "Mi Reproductor")</li>
-            <li><b>Redirect URI:</b><br><code style="background:#000;padding:4px 8px;border-radius:4px;font-size:12px;word-break:break-all">${REDIRECT_URI}</code></li>
-            <li>Marca <b>"Web API"</b> y guarda</li>
-            <li>Copia el <b>Client ID</b> y pégalo aquí abajo</li>
+      <div class="cid-ventana" role="dialog" aria-modal="true" aria-labelledby="cidTitulo">
+        <div class="cid-barra">
+          <span class="cid-puntos" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="cid-titulo" id="cidTitulo">conectar con spotify</span>
+          <button type="button" class="cid-x" id="cidX" aria-label="Cerrar">✕</button>
+        </div>
+        <div class="cid-cuerpo">
+          <p>Hace falta un <b>Client ID</b> gratuito de Spotify. Solo una vez:</p>
+          <ol class="cid-pasos">
+            <li>abre <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> e inicia sesión con tu cuenta de siempre</li>
+            <li>«Create app», con el nombre que quieras</li>
+            <li>en <b>Redirect URI</b> pega esta:
+              <span class="cid-campo">
+                <input id="cidUri" class="cid-uri" readonly aria-label="Redirect URI" spellcheck="false">
+                <button type="button" class="cid-copiar" id="cidCopiar">copiar</button>
+              </span>
+            </li>
+            <li>marca <b>Web API</b> y guarda</li>
+            <li>copia el <b>Client ID</b> y pégalo aquí:</li>
           </ol>
-          <input id="cidInput" placeholder="Pega tu Client ID aquí" value="${existing}"
-            style="width:100%;padding:12px;border-radius:6px;background:#000;border:1px solid #333;color:#fff;font-size:14px;margin-bottom:12px;outline:none" />
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button id="cidCancel" style="padding:10px 18px;background:transparent;border:1px solid #555;border-radius:999px;color:#fff;cursor:pointer;font-weight:600">Cancelar</button>
-            <button id="cidOk" style="padding:10px 18px;background:#1db954;border:none;border-radius:999px;color:#000;cursor:pointer;font-weight:700">Continuar</button>
+          <input id="cidInput" class="cid-entrada" placeholder="client id…" aria-label="Client ID"
+                 autocomplete="off" spellcheck="false">
+          <div class="cid-botones">
+            <button type="button" class="cid-cancelar" id="cidCancel">cancelar</button>
+            <button type="button" class="cid-ok" id="cidOk">continuar ▸</button>
           </div>
-          <p style="color:#666;font-size:11px;margin-top:14px">
-            Necesitas Spotify Premium para controlar la reproducción. Tu Client ID se guarda solo en tu navegador.
-          </p>
+          <p class="cid-fino">Hace falta Spotify Premium para mandar la música. El Client ID se queda solo en este navegador.</p>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
     const input = modal.querySelector('#cidInput');
+    const uri = modal.querySelector('#cidUri');
+    // por propiedad, no dentro del HTML: un valor con comillas ya no rompe nada
+    input.value = existing;
+    uri.value = REDIRECT_URI;
     input.focus();
-    const close = (val) => { document.body.removeChild(modal); resolve(val); };
-    modal.querySelector('#cidOk').onclick = () => {
+
+    const teclas = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();       // que el Esc no cierre también el cine ni otra cosa
+      close(null);
+    };
+    const close = (val) => {
+      document.removeEventListener('keydown', teclas, true);
+      modal.remove();
+      if (antes && antes.isConnected && antes.focus) { try { antes.focus(); } catch (_) {} }
+      resolve(val);
+    };
+    const aceptar = () => {
       const v = input.value.trim();
       if (v) { localStorage.setItem(STORAGE.CID, v); close(v); }
+      else input.focus();
     };
+    document.addEventListener('keydown', teclas, true);
+    modal.querySelector('#cidOk').onclick = aceptar;
     modal.querySelector('#cidCancel').onclick = () => close(null);
-    input.onkeydown = (e) => { if (e.key === 'Enter') modal.querySelector('#cidOk').click(); };
+    modal.querySelector('#cidX').onclick = () => close(null);
+    input.onkeydown = (e) => { if (e.key === 'Enter') aceptar(); };
+
+    const copiar = modal.querySelector('#cidCopiar');
+    let reloj = 0;
+    const avisar = (txt) => {
+      copiar.textContent = txt;
+      clearTimeout(reloj);
+      reloj = setTimeout(() => { copiar.textContent = 'copiar'; }, 1800);
+    };
+    const seleccionar = () => { uri.focus(); uri.select(); avisar('seleccionada'); };
+    copiar.onclick = () => {
+      try {
+        const p = navigator.clipboard && navigator.clipboard.writeText(REDIRECT_URI);
+        if (p && p.then) p.then(() => avisar('copiada ✓'), seleccionar);
+        else seleccionar();
+      } catch (_) { seleccionar(); }
+    };
   });
 
   // -------- Auth flow --------
@@ -789,7 +839,12 @@
     const pct = progDur ? Math.min(100, (sec / progDur) * 100) : 0;
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressThumb').style.left = pct + '%';
-    document.getElementById('timeCurrent').textContent = formatTime(sec);
+    /* Este reloj corre a 60 fps pero el texto cambia una vez por segundo:
+       reescribirlo en cada frame rehacía el nodo de texto 60 veces por
+       segundo (y despertaba 60 veces al que dibuja los «8» apagados). */
+    const tc = document.getElementById('timeCurrent');
+    const txt = formatTime(sec);
+    if (tc.textContent !== txt) tc.textContent = txt;
     const PC = window.PlayerCore;
     if (PC && PC.pintarRestante) PC.pintarRestante(sec, progDur);
     if (PC && PC.ariaBarra) PC.ariaBarra(sec, progDur);
@@ -869,7 +924,9 @@
        #coverArt, la del panel izquierdo. */
     const coverArt = document.getElementById('coverArt');
     if (coverArt && track.cover) {
-      coverArt.style.backgroundImage = `url('${track.cover}')`;
+      // entra descodificada y con su disolución de píxeles (js/caratula.js)
+      if (window.MMCaratula) window.MMCaratula.poner(coverArt, track.cover);
+      else coverArt.style.backgroundImage = `url('${track.cover}')`;
       coverArt.style.backgroundSize = 'cover';
       coverArt.style.backgroundPosition = 'center';
       coverArt.innerHTML = '';
@@ -1232,7 +1289,12 @@
     const b = like();
     if (!b) return;
     b.hidden = !visible || likeMuerto;
-    b.textContent = likeOn ? '♥' : '♡';
+    // icono pixel: corazón hueco ↔ lleno cambiando la clase (sin él, el glifo de antes)
+    const ico = b.querySelector('.ico');
+    if (ico) {
+      ico.classList.toggle('ico-corazon-lleno', likeOn);
+      ico.classList.toggle('ico-corazon', !likeOn);
+    } else b.textContent = likeOn ? '♥' : '♡';
     b.classList.toggle('like-on', likeOn);
     b.title = likeOn ? 'Quitar de Tus me gusta' : 'Guardar en Tus me gusta';
     // el lector de pantalla oía siempre «Guardar…», también con la canción ya guardada
@@ -1538,7 +1600,8 @@
     document.getElementById('npArtist').textContent = t.artist;
     const npCoverEl = document.getElementById('coverArt');
     if (npCoverEl && t.cover) {
-      npCoverEl.style.backgroundImage = `url('${t.cover}')`;
+      if (window.MMCaratula) window.MMCaratula.poner(npCoverEl, t.cover);
+      else npCoverEl.style.backgroundImage = `url('${t.cover}')`;
       npCoverEl.style.backgroundSize = 'cover';
       npCoverEl.innerHTML = '';
     }

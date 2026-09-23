@@ -289,7 +289,8 @@
     artista.forEach((l) => { ctx.fillText(l, metaX, ty + 4); });
 
     // ---------- Pie ----------
-    ctx.font = `17px ${MARCA}`;
+    // 16 px, no 17: Press Start 2P es de 8 × 8 y solo sale limpia a múltiplos de 8
+    ctx.font = `16px ${MARCA}`;
     ctx.fillStyle = mudo;
     ctx.textAlign = 'left';
     ctx.fillText('MASTER MUSIC', P, H - P + 4);

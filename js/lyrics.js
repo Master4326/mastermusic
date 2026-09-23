@@ -2314,7 +2314,12 @@
        los dos por delante; se toca cada span. Sin spans, como antes. */
     const modeIco = modeBtn.querySelector('.sb-ico');
     const modeTxt = modeBtn.querySelector('.sb-txt');
-    if (modeIco) modeIco.textContent = editMode ? '≡' : '✦';
+    /* El icono es un icono pixel (<i class="ico ico-edit">, ver
+       assets/iconos-pixel.js): se cambia de dibujo cambiando la clase. */
+    if (modeIco && modeIco.classList.contains('ico')) {
+      modeIco.classList.toggle('ico-lista', editMode);
+      modeIco.classList.toggle('ico-edit', !editMode);
+    } else if (modeIco) modeIco.textContent = editMode ? '≡' : '✦';
     else modeBtn.textContent = editMode ? '≡' : '✦';
     if (modeTxt) modeTxt.textContent = editMode ? 'lista' : 'edit';
     modeBtn.title = editMode ? 'Volver a vista lista' : 'Modo edit (letra animada)';
@@ -2536,6 +2541,22 @@
     return r;
   };
 
+  /* Profundidad por distancia, como Apple Music: la línea que viene casi
+     nítida y cada una más lejos, un poco más apagada y desenfocada (antes
+     todas las que venían iban a 0,6 px y todas las pasadas a 1,5 px). Solo
+     se marcan las ±3 vecinas del verso activo con data-d; las demás cogen
+     el valor «lejos» del CSS. Son siete atributos por cambio de verso. */
+  let conDistancia = [];
+  const marcarDistancias = (idx) => {
+    for (const n of conDistancia) delete n.dataset.d;
+    conDistancia = [];
+    if (idx < 0) return;
+    for (let d = -3; d <= 3; d++) {
+      const n = d ? lineNodes[idx + d] : null;
+      if (n) { n.dataset.d = String(d); conDistancia.push(n); }
+    }
+  };
+
   /* Cambio de línea INCREMENTAL. Antes esto recorría la lista entera
      quitando y poniendo clases en cada verso, o sea que cada línea nueva
      invalidaba el estilo de toda la letra. Ahora, en la reproducción normal,
@@ -2558,6 +2579,7 @@
       }
     }
 
+    marcarDistancias(idx);
     const active = idx >= 0 ? lineNodes[idx] : null;
     if (!active) return;
     active.classList.remove('past');

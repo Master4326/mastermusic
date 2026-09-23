@@ -15,6 +15,7 @@
   --accent: #5ce1e6;
   --accent-glow: #5ce1e6;
   --accent-dim: #3a8b8e;
+  --accent-2: #8fd3ff;
   --text: #e8ecff;
   --text-dim: #8b94d8;
   --text-muted: #5a648f;
@@ -58,7 +59,14 @@ html, body {
   user-select: none;
   -webkit-font-smoothing: none;
   font-smooth: never;
-  image-rendering: pixelated;
+  /* Aquí iba `image-rendering: pixelated`, heredado por TODA imagen de la
+     app. Pero en la app no hay pixel art en imagen: lo que había eran fotos
+     (carátulas de 640 px enseñadas a 418, miniaturas de listas y cola) y
+     lienzos grandes reducidos (la vista previa de la tarjeta ❝, 1080 px a
+     unos 460). Reducir con «vecino más cercano» se salta filas enteras:
+     líneas rotas, rótulos dentados y moiré. El aire retro lo dan las
+     scanlines de encima, no romper la foto. */
+  image-rendering: auto;
 }
 
 body {
@@ -76,6 +84,27 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 input { font-family: inherit; outline: none; }
 ul { list-style: none; }
 a { color: var(--accent); text-decoration: none; }
+
+/* ==========================================================
+   GRANO FIJO CONTRA LOS ESCALONES DEL DEGRADADO
+   Los fondos son degradados oscuros larguísimos (azul noche → negro) y una
+   pantalla de 8 bits no tiene tonos para tanto: se ven escalones
+   («banding»). Un ruido gris muy suave los rompe — es el truco del cine y
+   de los juegos. NO se mueve ni parpadea: es una textura quieta de 160 px
+   hecha con feTurbulence (sin peticiones), gris medio-oscuro al 4,5 %, así
+   que sube los negros un par de tonos y reparte ±2 tonos de ruido.
+   Va por debajo del viñeteado y las scanlines, y fuera en «rendimiento
+   bajo»: en un aparato justo, una capa más a pantalla completa sí cuenta.
+   ========================================================== */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 8999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1 0 0 0 -0.25 1 0 0 0 -0.25 1 0 0 0 -0.25 0 0 0 0 0.045'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+body.perf-bajo::after { display: none; }
 
 /* ==========================================================
    CRT scanlines + vignette overlay
@@ -122,7 +151,9 @@ a { color: var(--accent); text-decoration: none; }
   border: 2px solid var(--border-light);
   box-shadow:
     inset 0 0 0 1px var(--border-dark),
-    0 0 30px rgba(92, 225, 230, 0.15),
+    /* el halo sale del acento de la canción: era el cian de fábrica escrito
+       a mano y con una carátula ámbar la ventana seguía brillando en cian */
+    0 0 30px color-mix(in oklab, var(--accent-glow) 15%, transparent),
     0 8px 40px rgba(0, 0, 0, 0.7);
   display: grid;
   grid-template-rows: auto 1fr auto auto;
@@ -234,10 +265,15 @@ body:has(.window.maximized) { padding: 0; }
 /* El ⚙ de arriba solo existe en el teléfono (ver `body.disp-movil`); en el
    ordenador el engranaje sigue en la barra de pestañas. */
 .tb-cfg { display: none; }
+/* Press Start 2P está dibujada en una rejilla de 8 × 8 (medido: el 99,9 %
+   de sus puntos cae en múltiplos de 1/8 de em). Solo sale nítida a 8, 16,
+   24… px; a 9 px cada «píxel» mide 1,125 y el navegador lo emborrona. El
+   espaciado va en píxeles enteros por lo mismo. Vale para toda la app: si
+   se usa esta fuente, a 8/16/24. */
 .title-text {
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
-  letter-spacing: 0.1em;
+  font-size: 8px;
+  letter-spacing: 1px;
   color: var(--accent);
   text-shadow: 0 0 4px var(--accent-glow);
 }
@@ -310,7 +346,7 @@ body:has(.window.maximized) { padding: 0; }
   box-shadow:
     inset 1px 1px 0 var(--border-hi),
     inset -1px -1px 0 var(--border-dark),
-    0 0 12px rgba(92, 225, 230, 0.2);
+    0 0 12px color-mix(in oklab, var(--accent-glow) 20%, transparent);
   padding: 6px;
   position: relative;
 }
@@ -338,8 +374,18 @@ body:has(.window.maximized) { padding: 0; }
   align-items: center;
   justify-content: center;
   position: relative;
-  image-rendering: pixelated;
+  image-rendering: auto;          /* foto: reducción suave (ver html, body) */
   filter: contrast(1.1) saturate(1.1);
+}
+/* La portada VIEJA durante el cambio de canción: js/caratula.js la pinta
+   aquí encima y la va borrando a bloques (disolución de Bayer). Queda por
+   debajo de las scanlines (::after), que van después en el árbol. */
+.cover-disuelve {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 .cover-art.has-image::after {
   content: '';
@@ -373,13 +419,6 @@ body:has(.window.maximized) { padding: 0; }
   padding: 8px 10px;
   font-size: 18px;
   line-height: 1.2;
-}
-.ti-label {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
-  color: var(--magenta);
-  letter-spacing: 0.1em;
-  margin-bottom: 4px;
 }
 /* Fila del título: mini-EQ + título. El min-width: 0 es obligatorio en los
    dos niveles — sin él, un hijo flex se niega a encoger y el ellipsis y la
@@ -418,11 +457,15 @@ body.playing .ti-eq { display: inline-flex; }
 }
 body.reduce-motion .ti-eq i { animation: none; transform: scaleY(0.55); }
 
+/* VT323 no tiene negrita: con `bold` el navegador se inventaba una que
+   engordaba los píxeles a medias. La negrita de las pantallas de entonces
+   es el doble golpe: el mismo texto otra vez, corrido 1 px. */
 .ti-title {
   color: var(--accent);
   font-size: 22px;
-  font-weight: bold;
-  text-shadow: 0 0 4px var(--accent-glow);
+  font-weight: normal;
+  font-synthesis: none;
+  text-shadow: 1px 0 0 currentColor, 0 0 4px var(--accent-glow);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -769,6 +812,46 @@ body.perf-tactil .tab-bar.se-esconde::after {
 }
 .lyrics-body .lyric-line:hover {
   color: var(--text);
+  opacity: 0.85;
+  filter: none;
+}
+
+/* ----- Versos que se parten en mitades parecidas -----
+   Sin esto, un verso largo partía donde caía y dejaba una palabra sola en
+   el segundo renglón. `balance` reparte el texto en renglones de largo
+   parecido sin cambiar cuántos hay (el centrado de lyrics.js no nota nada).
+   Funciona en todos los navegadores desde 2024; donde no, parte como antes. */
+.lyrics-body .lyric-line,
+.lyrics-body .lyric-trad,
+.lyrics-edit .ed-trad {
+  text-wrap: balance;
+}
+
+/* ----- Profundidad por distancia (como Apple Music) -----
+   Antes todas las líneas que venían iban a 0,6 px de desenfoque y todas
+   las pasadas a 1,5 px. Ahora la siguiente se lee casi nítida y cada una
+   más lejos se apaga y se desenfoca un poco más. lyrics.js pone data-d en
+   las ±3 vecinas del verso activo; las demás cogen el valor «lejos».
+   Solo con letra sincronizada (.sync): una letra sin tiempos no tiene
+   verso activo y se quedaría toda al fondo. Ninguna regla toca la activa. */
+.lyrics-body.sync .lyric-line:not(.active) {
+  opacity: 0.3;
+  filter: blur(1.6px);
+  transform: scale(0.9);
+}
+.lyrics-body.sync .lyric-line.past:not(.active) {
+  opacity: 0.16;
+  filter: blur(2px);
+  transform: scale(0.88);
+}
+.lyrics-body.sync .lyric-line[data-d="1"]:not(.active)  { opacity: 0.74; filter: blur(0.3px); transform: scale(0.96); }
+.lyrics-body.sync .lyric-line[data-d="2"]:not(.active)  { opacity: 0.5;  filter: blur(0.9px); transform: scale(0.93); }
+.lyrics-body.sync .lyric-line[data-d="-1"]:not(.active) { opacity: 0.5;  filter: blur(0.8px); transform: scale(0.93); }
+.lyrics-body.sync .lyric-line[data-d="-2"]:not(.active) { opacity: 0.3;  filter: blur(1.4px); transform: scale(0.9); }
+.lyrics-body.sync .lyric-line[data-d="-3"]:not(.active) { opacity: 0.2;  filter: blur(1.8px); }
+/* pasar el ratón por encima sigue enfocando cualquier verso (antes no podía
+   con los que venían: su desenfoque ganaba al del :hover) */
+.lyrics-body.sync .lyric-line:not(.active):hover {
   opacity: 0.85;
   filter: none;
 }
@@ -1158,6 +1241,50 @@ body.perf-tactil .tab-bar.se-esconde::after {
     0 0 2px var(--accent),
     0 0 22px var(--accent-glow),
     0 2px 0 rgba(0, 0, 0, 0.75);
+}
+
+/* ---------- VT323, LA DE SIEMPRE: negrita de doble golpe ----------
+   VT323 no trae negrita. Con el 700 del verso activo el navegador se la
+   inventaba (engorda el trazo medio píxel y redondea los cuadros). Ahora
+   el catálogo le pide 400 y el peso lo da el truco de las pantallas de
+   entonces: el mismo texto otra vez, corrido a la derecha (0,05 em, 1 px a
+   22 px). Se repite en las palabras que llevan sombra propia —la destacada
+   y las del karaoke— porque su text-shadow pisa el de la línea. */
+:root[data-lyrics-font="retro"] .lyrics-body .lyric-line.active {
+  font-synthesis: none;
+  text-shadow:
+    0.05em 0 0 currentColor,
+    0 0 6px var(--accent-glow),
+    0 0 14px var(--accent-glow),
+    0 0 28px var(--accent-glow),
+    2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+:root[data-lyrics-font="retro"] .lyrics-body .lyric-line.active .w-big {
+  text-shadow:
+    0.05em 0 0 currentColor,
+    0 0 8px var(--accent-glow),
+    0 0 20px var(--accent-glow),
+    0 0 40px var(--accent-glow),
+    2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+:root[data-lyrics-font="retro"] .lyrics-body.sync .lyric-line.active .w.sung {
+  text-shadow:
+    0.05em 0 0 currentColor,
+    0 0 6px var(--accent-glow),
+    0 0 16px var(--accent-glow),
+    2px 2px 0 rgba(0, 0, 0, 0.55);
+}
+:root[data-lyrics-font="retro"] .lyrics-body.sync .lyric-line.active .w.cantando {
+  text-shadow:
+    0.05em 0 0 currentColor,
+    0 0 8px var(--accent-glow),
+    0 0 22px var(--accent-glow),
+    0 0 44px var(--accent-glow),
+    2px 2px 0 rgba(0, 0, 0, 0.55);
+}
+:root[data-lyrics-font="retro"] .fp-now {
+  font-synthesis: none;
+  text-shadow: 0.05em 0 0 currentColor, 0 0 6px var(--accent-glow), 0 0 14px var(--accent-glow);
 }
 
 /* palabra destacada: más grande y en cursiva, como pal-grande del regalo */
@@ -1621,7 +1748,9 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   box-shadow: inset -1px -1px 0 var(--border-hi), inset 1px 1px 0 var(--border-dark);
   transform: translate(1px, 1px);
 }
-.retro-btn .bracket { color: var(--magenta); }
+/* Los corchetes «[ … ]» iban en --magenta, un rosa fijo: ahora en el segundo
+   tono de la paleta (--accent-2, lo saca seven.js del acento). */
+.retro-btn .bracket { color: var(--accent-2); }
 .retro-btn.small { padding: 4px 8px; font-size: 13px; }
 
 .offset-control {
@@ -1749,11 +1878,6 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   color: inherit;
 }
 .track-row.no-click:hover .tr-title { color: inherit; }
-.tr-num {
-  text-align: right;
-  color: var(--magenta);
-  font-size: 14px;
-}
 .tr-info {
   min-width: 0;
   display: flex;
@@ -1795,14 +1919,17 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   position: sticky;
   top: 0;
   z-index: 3;
-  color: var(--magenta);
+  color: var(--accent-2);
   margin: 0 -20px 10px;
   padding: 6px 20px 7px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border-dark);
+  /* Press Start 2P está dibujada en 8 × 8: solo sale nítida a 8, 16, 24 px.
+     A 9 px cada «píxel» medía 1,125 y se emborronaba. El espaciado, en
+     píxeles enteros por lo mismo. */
   font-family: 'Press Start 2P', monospace;
-  font-size: 9px;
-  letter-spacing: 0.1em;
+  font-size: 8px;
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 /* Aterrizar en una sección con el teclado no debe dibujar un cerco
@@ -1835,7 +1962,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   background: conic-gradient(#ff5c5c, #ffe45c, #22ff77, #5ce1e6, #b58cff, #ff77c8, #ff5c5c);
   color: #fff;
   font-family: 'Press Start 2P', monospace;
-  font-size: 11px;
+  font-size: 8px;
   text-shadow: 0 0 4px #000, 1px 1px 0 #000;
   display: flex;
   align-items: center;
@@ -1860,7 +1987,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 .custom-label {
   color: #fff;
   font-family: 'Press Start 2P', monospace;
-  font-size: 14px;
+  font-size: 16px;
   text-shadow: 0 0 4px #000, 1px 1px 0 #000;
   pointer-events: none;
 }
@@ -1950,14 +2077,40 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   align-items: center;
   gap: 10px;
 }
+/* ----- El tiempo en 7 segmentos, a juego con el espectro VFD -----
+   DSEG7 (keshikan, SIL Open Font License 1.1; la licencia va al lado, en
+   css/fuentes/DSEG-LICENSE.txt), la variante «Mini» en cursiva: solo trae
+   números y signos, 5 KB. Detrás de cada cifra se ven sus segmentos
+   APAGADOS, como en un display de verdad: es un ::before con el mismo
+   texto hecho todo «8» (lo escribe js/visualizer.js en data-g cada vez que
+   cambia el tiempo). En DSEG el «-» ocupa lo mismo que una cifra, así que
+   el «-1:12» del tiempo restante también cuadra con su «88:88». */
+@font-face {
+  font-family: 'DSEG7';
+  src: url('fuentes/DSEG7ClassicMini-Italic.woff2') format('woff2');
+  font-display: swap;
+}
 .time {
-  font-family: 'VT323', monospace;
-  font-size: 16px;
+  font-family: 'DSEG7', 'VT323', monospace;
+  font-size: 12px;              /* sus cifras llenan el em entero: 12 px de DSEG ≈ 16 de VT323 */
   color: var(--accent);
   min-width: 42px;
   text-align: center;
   text-shadow: 0 0 4px var(--accent-glow);
   font-variant-numeric: tabular-nums;
+  position: relative;
+  z-index: 0;                   /* los «8» apagados, detrás de las cifras */
+}
+.time[data-g]::before {
+  content: attr(data-g);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  padding: inherit;
+  text-align: inherit;
+  color: color-mix(in oklab, var(--accent) 13%, transparent);
+  text-shadow: none;
+  pointer-events: none;
 }
 .progress-bar {
   flex: 1;
@@ -2978,7 +3131,7 @@ body.playing .cinema-disc { animation-play-state: running; }
 .au-blob.b4 {
   bottom: 8%; left: 14%;
   width: calc(48% * var(--fondo-escala, 1));
-  background: radial-gradient(circle, var(--magenta) 0%, transparent 68%);
+  background: radial-gradient(circle, var(--accent-2) 0%, transparent 68%);
   animation: au-4 23s ease-in-out infinite alternate;
   opacity: 0.55;
 }
@@ -3473,13 +3626,13 @@ body.perf-bajo .cinema-vineta { display: none; }
 .drop-card {
   background: var(--bg-panel);
   border: 4px solid var(--accent);
-  box-shadow: 0 0 30px var(--accent-glow), inset 0 0 20px rgba(92, 225, 230, 0.2);
+  box-shadow: 0 0 30px var(--accent-glow), inset 0 0 20px color-mix(in oklab, var(--accent-glow) 20%, transparent);
   padding: 40px 60px;
   text-align: center;
 }
 .drop-card h2 {
   font-family: 'Press Start 2P', monospace;
-  font-size: 18px;
+  font-size: 16px;
   color: var(--accent);
   text-shadow: 0 0 8px var(--accent-glow);
   margin-bottom: 12px;
@@ -3578,7 +3731,7 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
 .retro-input, .prompt, .retro-btn { font-size: clamp(14px, 1.5cqw, 24px); }
 
 /* --- Barra de reproducción: tiempos, controles y progreso --- */
-.time { font-size: clamp(14px, 1.5cqw, 26px); min-width: clamp(42px, 4cqw, 72px); }
+.time { font-size: clamp(11px, 1.15cqw, 20px); min-width: clamp(42px, 4cqw, 72px); }
 .ctrl-btn {
   width: clamp(32px, 3.6cqw, 62px);
   height: clamp(26px, 3cqw, 50px);
@@ -3688,7 +3841,7 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
   .cover-frame { width: 96px; }
   .ctrl-btn { width: 36px; height: 32px; }
   .play-btn { width: 46px; height: 36px; }
-  .title-text { font-size: 12px; }
+  .title-text { font-size: 8px; }
 }
 
 /* (Aquí vivía la regla que retiraba el ◧ en teléfonos de 360 px con la
@@ -4750,6 +4903,9 @@ body.reduce-motion .fuentes-caja { animation: none; }
   initial-value: #5ce1e6;
 }
 @property --accent-dim  { syntax: '<color>'; inherits: true; initial-value: #3a8b8e; }
+/* Segundo tono de la paleta: el acento girado 20° y más claro (seven.js).
+   Hace el papel que tenía el rosa FIJO --magenta en rótulos y adornos. */
+@property --accent-2    { syntax: '<color>'; inherits: true; initial-value: #8fd3ff; }
 @property --dyn-1       { syntax: '<color>'; inherits: true; initial-value: #1a1f4a; }
 @property --dyn-2       { syntax: '<color>'; inherits: true; initial-value: #0a0e2e; }
 @property --bg-window   { syntax: '<color>'; inherits: true; initial-value: #1a1f4a; }
@@ -4763,6 +4919,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
 :root {
   transition:
     --accent .45s ease, --accent-glow .45s ease, --accent-dim .45s ease,
+    --accent-2 .45s ease,
     --dyn-1 .7s ease, --dyn-2 .7s ease,
     --bg-window .7s ease, --bg-panel .7s ease,
     --bg-panel-2 .7s ease, --bg-frame .7s ease,
@@ -4904,7 +5061,7 @@ body.reduce-motion .skel-line { animation: none; }
   opacity: 0.42;
   pointer-events: none;
 }
-.li-mark::before { color: var(--magenta); animation: li-chroma-a 3.6s ease-in-out infinite; }
+.li-mark::before { color: var(--accent-2); animation: li-chroma-a 3.6s ease-in-out infinite; }
 .li-mark::after  { color: var(--accent);  animation: li-chroma-b 3.6s ease-in-out infinite; }
 @keyframes li-chroma-a {
   0%, 100% { transform: translate(0, 0); }
@@ -5347,12 +5504,15 @@ body.perf-bajo .amb-blob.b2 { display: none; }
    debajo del texto (z-index 2). El JS solo escribe transform y
    opacity. Opacidades bajas a propósito: la letra manda.
    ========================================================== */
-/* 1 · carátula difuminada que respira */
+/* 1 · carátula difuminada que respira
+   El desenfoque bajó de 42 a 28 px (22-sep-2026): con 42 la foto era una
+   mancha de color y el usuario pidió «bájale un toque» para que se
+   reconozca la canción detrás de la letra. */
 .la-cover {
   position: absolute;
   inset: -12%;
   background: center/cover no-repeat;
-  filter: blur(calc(42px * var(--fondo-escala, 1))) saturate(1.5);
+  filter: blur(calc(28px * var(--fondo-escala, 1))) saturate(1.5);
   opacity: 0;
   will-change: transform, opacity;
   transition: opacity .8s ease-out;
@@ -5370,7 +5530,7 @@ body.pantalla-grande .la-cover {
    grande por frame es carísimo): se queda fija, con menos radio y un poco
    de escala puesta desde aquí para que siga cubriendo el panel. */
 body.perf-movil .la-cover {
-  filter: blur(20px) saturate(1.4);
+  filter: blur(14px) saturate(1.4);
   transform: scale(1.1);
   will-change: opacity;
 }
@@ -5596,7 +5756,7 @@ body.reduce-motion .lyrics-ambient.golpetazo { animation: none; }
 body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
 
 @media (max-width: 760px) {
-  .la-cover { filter: blur(26px) saturate(1.4); }
+  .la-cover { filter: blur(18px) saturate(1.4); }
   .la-eq i { filter: blur(5px); }
   .la-suelo { display: none; }      /* la perspectiva sale cara en móvil */
   /* el drop-shadow por estrella se nota en un móvil: el glow lo pone
@@ -5948,7 +6108,7 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
    ---------------------------------------------------------- */
 .sp-result.sp-now {
   border-color: var(--accent-dim);
-  background: rgba(92, 225, 230, 0.07);
+  background: color-mix(in oklab, var(--accent) 8%, transparent);
 }
 .sp-result.sp-now .sp-name { color: var(--accent); text-shadow: 0 0 5px var(--accent-glow); }
 .sp-result.sp-now .sp-idx { color: var(--accent); }
@@ -6166,7 +6326,7 @@ body.reduce-motion .paleta-caja { animation: none; }
 .paleta-fila-r.sel {
   border-color: var(--accent);
   background: var(--bg-panel-2);
-  box-shadow: inset 0 0 14px rgba(92, 225, 230, .12);
+  box-shadow: inset 0 0 14px color-mix(in oklab, var(--accent-glow) 12%, transparent);
 }
 .paleta-ico {
   width: 38px; height: 38px;
@@ -6405,7 +6565,7 @@ body.letra-ancha .title-bar { height: clamp(36px, 4cqh, 48px); }
   display: flex; align-items: center; justify-content: center;
   font-size: clamp(11px, 1.2cqh, 18px);
   color: var(--accent);
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 .npc-meta {
   display: flex;
@@ -6489,8 +6649,7 @@ body.letra-ancha .title-bar { height: clamp(36px, 4cqh, 48px); }
   height: 100%;
   display: none;                 /* lo enciende el ajuste «ambiente» */
   pointer-events: none;
-  /* html lleva `image-rendering: pixelated` para el pixel-art; en una
-     curva difusa eso son escalones. */
+  /* una curva difusa escalada con `pixelated` son escalones */
   image-rendering: auto;
 }
 body.fondo-ondas .la-ncs { display: block; }
@@ -7157,7 +7316,7 @@ body.disp-movil .title-bar {
 }
 body.disp-movil .title-left,
 body.disp-movil .title-end { flex: 0 0 auto; }
-body.disp-movil .title-text { font-size: 9px; }
+body.disp-movil .title-text { font-size: 8px; }
 /* _ ▢ ✕ fuera: la app ya ocupa la pantalla entera */
 body.disp-movil .title-right { display: none; }
 body.disp-movil .paleta-btn {
@@ -7604,3 +7763,316 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
 /* El anillo del teclado, por dentro: en el teléfono la fila recorta lo que
    se sale (para poder plegarse) y el anillo de fuera quedaba cortado. */
 .ctl-vista > :focus-visible { outline-offset: -2px; }
+
+/* ==========================================================
+   «CONECTAR CON SPOTIFY» · la ventana que pide el Client ID
+   (la monta js/spotify.js → askClientId). Antes llevaba el gris, las
+   esquinas y las píldoras verdes de Spotify escritas a mano y la VT323 a
+   13 px: parecía de otro programa. Ahora es una ventana de la casa, con
+   la paleta viva y los campos transparentes con borde.
+   ========================================================== */
+.cid-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.8);
+}
+.cid-ventana {
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  background: var(--bg-panel);
+  border: 2px solid var(--border-light);
+  box-shadow:
+    inset 1px 1px 0 var(--border-pixel),
+    inset -1px -1px 0 var(--border-dark),
+    0 0 24px color-mix(in oklab, var(--accent-glow) 16%, transparent),
+    0 12px 36px rgba(0, 0, 0, 0.6);
+  font-family: 'VT323', monospace;
+  color: var(--text);
+  user-select: text;
+}
+.cid-barra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 10px;
+  background: linear-gradient(180deg, var(--bg-frame) 0%, var(--bg-window) 100%);
+  border-bottom: 2px solid var(--border-dark);
+}
+.cid-puntos {
+  display: grid;
+  grid-template-columns: repeat(3, 4px);
+  grid-auto-rows: 4px;
+  gap: 1px;
+  flex: 0 0 auto;
+}
+.cid-puntos i:nth-child(odd) { background: var(--accent); box-shadow: 0 0 2px var(--accent-glow); }
+.cid-titulo {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;               /* su rejilla: 8 / 16 / 24 */
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-shadow: 0 0 4px var(--accent-glow);
+}
+.cid-x {
+  margin-left: auto;
+  width: 24px; height: 22px;
+  background: var(--bg-frame);
+  border: 1px solid var(--border-light);
+  box-shadow: inset 1px 1px 0 var(--border-light), inset -1px -1px 0 var(--border-dark);
+  color: var(--text);
+  font-size: 12px;
+}
+.cid-x:active { box-shadow: inset -1px -1px 0 var(--border-light), inset 1px 1px 0 var(--border-dark); }
+.cid-cuerpo {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  font-size: 20px;
+  line-height: 1.2;
+}
+.cid-cuerpo p { margin: 0; }
+.cid-cuerpo b { color: var(--accent); font-weight: normal; }
+.cid-cuerpo a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; word-break: break-all; }
+.cid-pasos {
+  margin: 0;
+  padding-left: 26px;
+  display: grid;
+  gap: 6px;
+  list-style: decimal;
+}
+.cid-pasos li::marker {
+  color: var(--accent-2);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+}
+.cid-campo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  padding: 3px 3px 3px 8px;
+  border: 2px solid var(--border-pixel);
+}
+.cid-uri {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 14px;
+  text-overflow: ellipsis;
+}
+.cid-copiar,
+.cid-cancelar,
+.cid-ok {
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 12px;
+}
+.cid-copiar {
+  flex: 0 0 auto;
+  font-size: 18px;
+  padding: 2px 8px;
+  color: var(--accent);
+  background: var(--bg-frame);
+  border: 1px solid var(--border-light);
+  box-shadow: inset 1px 1px 0 var(--border-light), inset -1px -1px 0 var(--border-dark);
+}
+.cid-entrada {
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: 2px solid var(--border-light);
+  color: var(--text);
+  font-family: 'VT323', monospace;
+  font-size: 22px;
+}
+.cid-entrada::placeholder { color: var(--text-dim); opacity: 0.8; }
+.cid-entrada:focus { border-color: var(--accent); box-shadow: 0 0 8px color-mix(in oklab, var(--accent-glow) 35%, transparent); }
+.cid-botones { display: flex; justify-content: flex-end; gap: 10px; }
+.cid-cancelar { color: var(--text-dim); border: 2px solid transparent; }
+.cid-cancelar:hover { color: var(--text); border-color: var(--border-pixel); }
+.cid-ok {
+  color: var(--bg-deep);
+  background: var(--accent);
+  border: 2px solid color-mix(in oklab, var(--accent) 60%, #fff);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--accent-glow) 40%, transparent);
+}
+.cid-ok:active { transform: translate(1px, 1px); }
+.cid-fino { color: var(--text-dim); font-size: 17px; }
+
+/* ==========================================================
+   APP INSTALADA EN EL PC · la barra de la app ES la de la ventana
+   Con "display_override": ["window-controls-overlay"] en el manifest, la
+   app instalada desde Chrome o Edge ya no lleva la barra de Windows encima
+   de la suya (dos barras y dos juegos de _ ▢ ✕): su propia barra de título
+   ocupa esa franja y Windows pone ahí sus botones de verdad. Los _ ▢ ✕ de
+   la app —que en una ventana instalada no pueden minimizar ni cerrar
+   nada— se esconden SOLO en este modo. Si se pliega la franja con la
+   flechita del navegador, vuelve la barra de siempre (el media query deja
+   de casar) y con ella todo lo de antes.
+   ========================================================== */
+@media (display-mode: window-controls-overlay) {
+  body { padding: 0; }
+  .window {
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-width: 100vw;
+    max-height: 100vh;
+    border: 0;
+    resize: none;
+  }
+  .window::after { display: none; }
+  .title-bar {
+    height: env(titlebar-area-height, 36px);
+    padding-left: calc(env(titlebar-area-x, 0px) + 8px);
+    /* el hueco de los botones de Windows, a la derecha, queda libre */
+    padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 6px);
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+  .title-bar button,
+  .title-bar a,
+  .title-bar input {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+  .title-right { display: none; }
+}
+
+/* ICONOS-PIXEL:INICIO — lo genera assets/iconos-pixel.js; no tocar a mano:
+   se cambia el dibujo allí y se vuelve a correr `node assets/iconos-pixel.js`. */
+:root {
+  --ico-ajustes: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 0h2v1h-2zM1 1h2v1h-2zM5 1h2v1h-2zM9 1h2v1h-2zM1 2h10v1h-10zM2 3h3v1h-3zM7 3h3v1h-3zM2 4h2v1h-2zM8 4h2v1h-2zM0 5h4v1h-4zM8 5h4v1h-4zM0 6h4v1h-4zM8 6h4v1h-4zM2 7h2v1h-2zM8 7h2v1h-2zM2 8h3v1h-3zM7 8h3v1h-3zM1 9h10v1h-10zM1 10h2v1h-2zM5 10h2v1h-2zM9 10h2v1h-2zM5 11h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-aleatorio: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M9 2h1v1h-1zM0 3h2v1h-2zM7 3h4v1h-4zM2 4h1v1h-1zM6 4h1v1h-1zM9 4h1v1h-1zM3 5h1v1h-1zM5 5h1v1h-1zM4 6h1v1h-1zM3 7h1v1h-1zM5 7h1v1h-1zM2 8h1v1h-1zM6 8h1v1h-1zM9 8h1v1h-1zM0 9h2v1h-2zM7 9h4v1h-4zM9 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-ancha: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h10v1h-10zM1 2h5v1h-5zM10 2h1v1h-1zM1 3h5v1h-5zM10 3h1v1h-1zM1 4h5v1h-5zM10 4h1v1h-1zM1 5h5v1h-5zM10 5h1v1h-1zM1 6h5v1h-5zM10 6h1v1h-1zM1 7h5v1h-5zM10 7h1v1h-1zM1 8h5v1h-5zM10 8h1v1h-1zM1 9h5v1h-5zM10 9h1v1h-1zM1 10h10v1h-10z'/%3E%3C/svg%3E");
+  --ico-anterior: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 1h2v1h-2zM10 1h1v1h-1zM2 2h2v1h-2zM9 2h2v1h-2zM2 3h2v1h-2zM8 3h3v1h-3zM2 4h2v1h-2zM7 4h4v1h-4zM2 5h2v1h-2zM6 5h5v1h-5zM2 6h2v1h-2zM6 6h5v1h-5zM2 7h2v1h-2zM7 7h4v1h-4zM2 8h2v1h-2zM8 8h3v1h-3zM2 9h2v1h-2zM9 9h2v1h-2zM2 10h2v1h-2zM10 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-buscar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h4v1h-4zM2 2h1v1h-1zM7 2h1v1h-1zM1 3h1v1h-1zM8 3h1v1h-1zM1 4h1v1h-1zM8 4h1v1h-1zM1 5h1v1h-1zM8 5h1v1h-1zM1 6h1v1h-1zM8 6h1v1h-1zM2 7h1v1h-1zM7 7h1v1h-1zM3 8h4v1h-4zM8 8h1v1h-1zM8 9h2v1h-2zM9 10h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-cerrar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 2h2v1h-2zM8 2h2v1h-2zM2 3h3v1h-3zM7 3h3v1h-3zM3 4h6v1h-6zM4 5h4v1h-4zM4 6h4v1h-4zM3 7h6v1h-6zM2 8h3v1h-3zM7 8h3v1h-3zM2 9h2v1h-2zM8 9h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-cine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h3v1h-3zM8 1h3v1h-3zM1 2h1v1h-1zM10 2h1v1h-1zM1 3h1v1h-1zM10 3h1v1h-1zM1 8h1v1h-1zM10 8h1v1h-1zM1 9h1v1h-1zM10 9h1v1h-1zM1 10h3v1h-3zM8 10h3v1h-3z'/%3E%3C/svg%3E");
+  --ico-cita: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M3 3h2v1h-2zM9 3h2v1h-2zM2 4h2v1h-2zM8 4h2v1h-2zM1 5h3v1h-3zM7 5h3v1h-3zM1 6h3v1h-3zM7 6h3v1h-3zM1 7h3v1h-3zM7 7h3v1h-3z'/%3E%3C/svg%3E");
+  --ico-cola: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 2h10v1h-10zM1 5h10v1h-10zM7 6h1v1h-1zM7 7h2v1h-2zM1 8h5v1h-5zM7 8h3v1h-3zM7 9h2v1h-2zM7 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-corazon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 2h3v1h-3zM7 2h3v1h-3zM1 3h1v1h-1zM5 3h2v1h-2zM10 3h1v1h-1zM1 4h1v1h-1zM10 4h1v1h-1zM1 5h1v1h-1zM10 5h1v1h-1zM2 6h1v1h-1zM9 6h1v1h-1zM3 7h1v1h-1zM8 7h1v1h-1zM4 8h1v1h-1zM7 8h1v1h-1zM5 9h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-corazon-lleno: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 2h3v1h-3zM7 2h3v1h-3zM1 3h10v1h-10zM1 4h10v1h-10zM1 5h10v1h-10zM2 6h8v1h-8zM3 7h6v1h-6zM4 8h4v1h-4zM5 9h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-disp: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 1h8v1h-8zM2 2h1v1h-1zM9 2h1v1h-1zM2 3h1v1h-1zM5 3h2v1h-2zM9 3h1v1h-1zM2 4h1v1h-1zM9 4h1v1h-1zM2 5h1v1h-1zM4 5h4v1h-4zM9 5h1v1h-1zM2 6h1v1h-1zM4 6h1v1h-1zM7 6h1v1h-1zM9 6h1v1h-1zM2 7h1v1h-1zM4 7h1v1h-1zM7 7h1v1h-1zM9 7h1v1h-1zM2 8h1v1h-1zM4 8h4v1h-4zM9 8h1v1h-1zM2 9h1v1h-1zM9 9h1v1h-1zM2 10h8v1h-8z'/%3E%3C/svg%3E");
+  --ico-edit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h2v1h-2zM5 2h2v1h-2zM4 3h4v1h-4zM3 4h6v1h-6zM1 5h10v1h-10zM1 6h10v1h-10zM3 7h6v1h-6zM4 8h4v1h-4zM5 9h2v1h-2zM5 10h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-historial: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 3h2v1h-2zM5 4h2v1h-2zM5 5h2v1h-2zM9 5h2v1h-2zM5 6h2v1h-2zM9 6h2v1h-2zM1 7h2v1h-2zM5 7h2v1h-2zM9 7h2v1h-2zM1 8h2v1h-2zM5 8h2v1h-2zM9 8h2v1h-2zM1 9h2v1h-2zM5 9h2v1h-2zM9 9h2v1h-2zM1 10h2v1h-2zM5 10h2v1h-2zM9 10h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-lab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h6v1h-6zM4 2h1v1h-1zM7 2h1v1h-1zM4 3h1v1h-1zM7 3h1v1h-1zM4 4h1v1h-1zM7 4h1v1h-1zM3 5h1v1h-1zM8 5h1v1h-1zM2 6h1v1h-1zM9 6h1v1h-1zM1 7h10v1h-10zM1 8h10v1h-10zM1 9h10v1h-10z'/%3E%3C/svg%3E");
+  --ico-letra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M6 1h2v1h-2zM6 2h3v1h-3zM6 3h1v1h-1zM8 3h2v1h-2zM6 4h1v1h-1zM9 4h1v1h-1zM6 5h1v1h-1zM9 5h1v1h-1zM6 6h1v1h-1zM6 7h1v1h-1zM3 8h4v1h-4zM2 9h5v1h-5zM3 10h3v1h-3z'/%3E%3C/svg%3E");
+  --ico-lista: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 3h10v1h-10zM1 6h10v1h-10zM1 9h10v1h-10z'/%3E%3C/svg%3E");
+  --ico-listas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h4v1h-4zM7 1h4v1h-4zM1 2h1v1h-1zM4 2h1v1h-1zM7 2h1v1h-1zM10 2h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM7 3h1v1h-1zM10 3h1v1h-1zM1 4h4v1h-4zM7 4h4v1h-4zM1 7h4v1h-4zM7 7h4v1h-4zM1 8h1v1h-1zM4 8h1v1h-1zM7 8h1v1h-1zM10 8h1v1h-1zM1 9h1v1h-1zM4 9h1v1h-1zM7 9h1v1h-1zM10 9h1v1h-1zM1 10h4v1h-4zM7 10h4v1h-4z'/%3E%3C/svg%3E");
+  --ico-max: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 2h8v1h-8zM2 3h8v1h-8zM2 4h1v1h-1zM9 4h1v1h-1zM2 5h1v1h-1zM9 5h1v1h-1zM2 6h1v1h-1zM9 6h1v1h-1zM2 7h1v1h-1zM9 7h1v1h-1zM2 8h1v1h-1zM9 8h1v1h-1zM2 9h8v1h-8z'/%3E%3C/svg%3E");
+  --ico-min: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 8h8v1h-8zM2 9h8v1h-8z'/%3E%3C/svg%3E");
+  --ico-pausa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 1h3v1h-3zM7 1h3v1h-3zM2 2h3v1h-3zM7 2h3v1h-3zM2 3h3v1h-3zM7 3h3v1h-3zM2 4h3v1h-3zM7 4h3v1h-3zM2 5h3v1h-3zM7 5h3v1h-3zM2 6h3v1h-3zM7 6h3v1h-3zM2 7h3v1h-3zM7 7h3v1h-3zM2 8h3v1h-3zM7 8h3v1h-3zM2 9h3v1h-3zM7 9h3v1h-3zM2 10h3v1h-3zM7 10h3v1h-3z'/%3E%3C/svg%3E");
+  --ico-play: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h1v1h-1zM3 2h2v1h-2zM3 3h4v1h-4zM3 4h5v1h-5zM3 5h7v1h-7zM3 6h7v1h-7zM3 7h5v1h-5zM3 8h4v1h-4zM3 9h2v1h-2zM3 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-repetir: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M8 1h1v1h-1zM1 2h9v1h-9zM1 3h1v1h-1zM8 3h1v1h-1zM1 4h1v1h-1zM1 5h1v1h-1zM10 6h1v1h-1zM10 7h1v1h-1zM3 8h1v1h-1zM10 8h1v1h-1zM2 9h9v1h-9zM3 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-siguiente: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h1v1h-1zM8 1h2v1h-2zM1 2h2v1h-2zM8 2h2v1h-2zM1 3h3v1h-3zM8 3h2v1h-2zM1 4h4v1h-4zM8 4h2v1h-2zM1 5h5v1h-5zM8 5h2v1h-2zM1 6h5v1h-5zM8 6h2v1h-2zM1 7h4v1h-4zM8 7h2v1h-2zM1 8h3v1h-3zM8 8h2v1h-2zM1 9h2v1h-2zM8 9h2v1h-2zM1 10h1v1h-1zM8 10h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-sync: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h1v1h-1zM5 2h1v1h-1zM3 3h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM3 4h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM1 5h1v1h-1zM3 5h1v1h-1zM5 5h1v1h-1zM7 5h1v1h-1zM9 5h1v1h-1zM1 6h1v1h-1zM3 6h1v1h-1zM5 6h1v1h-1zM7 6h1v1h-1zM9 6h1v1h-1zM3 7h1v1h-1zM5 7h1v1h-1zM7 7h1v1h-1zM3 8h1v1h-1zM5 8h1v1h-1zM7 8h1v1h-1zM5 9h1v1h-1zM5 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-vinilo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M4 1h4v1h-4zM2 2h2v1h-2zM8 2h2v1h-2zM1 3h1v1h-1zM10 3h1v1h-1zM1 4h1v1h-1zM10 4h1v1h-1zM0 5h1v1h-1zM5 5h2v1h-2zM11 5h1v1h-1zM0 6h1v1h-1zM5 6h2v1h-2zM11 6h1v1h-1zM1 7h1v1h-1zM10 7h1v1h-1zM1 8h1v1h-1zM10 8h1v1h-1zM2 9h2v1h-2zM8 9h2v1h-2zM4 10h4v1h-4z'/%3E%3C/svg%3E");
+  --ico-vol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h1v1h-1zM4 2h2v1h-2zM9 2h1v1h-1zM3 3h3v1h-3zM10 3h1v1h-1zM1 4h5v1h-5zM7 4h1v1h-1zM10 4h1v1h-1zM1 5h5v1h-5zM8 5h1v1h-1zM10 5h1v1h-1zM1 6h5v1h-5zM8 6h1v1h-1zM10 6h1v1h-1zM1 7h5v1h-5zM7 7h1v1h-1zM10 7h1v1h-1zM3 8h3v1h-3zM10 8h1v1h-1zM4 9h2v1h-2zM9 9h1v1h-1zM5 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-vol-bajo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h1v1h-1zM4 2h2v1h-2zM3 3h3v1h-3zM1 4h5v1h-5zM7 4h1v1h-1zM1 5h5v1h-5zM8 5h1v1h-1zM1 6h5v1h-5zM8 6h1v1h-1zM1 7h5v1h-5zM7 7h1v1h-1zM3 8h3v1h-3zM4 9h2v1h-2zM5 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-vol-mudo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h1v1h-1zM4 2h2v1h-2zM3 3h3v1h-3zM1 4h5v1h-5zM7 4h1v1h-1zM10 4h1v1h-1zM1 5h5v1h-5zM8 5h2v1h-2zM1 6h5v1h-5zM8 6h2v1h-2zM1 7h5v1h-5zM7 7h1v1h-1zM10 7h1v1h-1zM3 8h3v1h-3zM4 9h2v1h-2zM5 10h1v1h-1z'/%3E%3C/svg%3E");
+}
+.ico {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: var(--ico-tam, 24px);
+  height: var(--ico-tam, 24px);
+  background-color: currentColor;
+  -webkit-mask: var(--m) center / 100% 100% no-repeat;
+  mask: var(--m) center / 100% 100% no-repeat;
+}
+.ico-ajustes { --m: var(--ico-ajustes); }
+.ico-aleatorio { --m: var(--ico-aleatorio); }
+.ico-ancha { --m: var(--ico-ancha); }
+.ico-anterior { --m: var(--ico-anterior); }
+.ico-buscar { --m: var(--ico-buscar); }
+.ico-cerrar { --m: var(--ico-cerrar); }
+.ico-cine { --m: var(--ico-cine); }
+.ico-cita { --m: var(--ico-cita); }
+.ico-cola { --m: var(--ico-cola); }
+.ico-corazon { --m: var(--ico-corazon); }
+.ico-corazon-lleno { --m: var(--ico-corazon-lleno); }
+.ico-disp { --m: var(--ico-disp); }
+.ico-edit { --m: var(--ico-edit); }
+.ico-historial { --m: var(--ico-historial); }
+.ico-lab { --m: var(--ico-lab); }
+.ico-letra { --m: var(--ico-letra); }
+.ico-lista { --m: var(--ico-lista); }
+.ico-listas { --m: var(--ico-listas); }
+.ico-max { --m: var(--ico-max); }
+.ico-min { --m: var(--ico-min); }
+.ico-pausa { --m: var(--ico-pausa); }
+.ico-play { --m: var(--ico-play); }
+.ico-repetir { --m: var(--ico-repetir); }
+.ico-siguiente { --m: var(--ico-siguiente); }
+.ico-sync { --m: var(--ico-sync); }
+.ico-vinilo { --m: var(--ico-vinilo); }
+.ico-vol { --m: var(--ico-vol); }
+.ico-vol-bajo { --m: var(--ico-vol-bajo); }
+.ico-vol-mudo { --m: var(--ico-vol-mudo); }
+/* ICONOS-PIXEL:FIN */
+
+/* ==========================================================
+   ICONOS PIXEL · dónde van y a qué tamaño
+   (los dibujos y la clase .ico los genera assets/iconos-pixel.js, justo
+   encima). Solo múltiplos de su rejilla de 12: 24 px en los botones y las
+   pestañas, 12 px al lado del texto. A 20 px cada píxel mediría 1,67 y
+   saldrían desiguales, que es justo lo que se quería quitar.
+   ========================================================== */
+.ctrl-btn .ico,
+.tab .ico,
+.tb-cfg .ico,
+.cin-btn .ico { --ico-tam: 24px; }
+.tb-btn .ico,
+.pb-ico.ico,
+.vinyl-toggle .ico,
+.dev-ico.ico { --ico-tam: 12px; }
+.sb-ico.ico { display: block; --ico-tam: 24px; }
+
+/* el mismo brillo que llevaban los <svg> */
+.ctrl-btn:hover .ico,
+.ctrl-btn.active .ico { filter: drop-shadow(0 0 3px var(--accent-glow)); }
+.play-btn .ico,
+.play-btn:hover .ico { filter: none; }
+.tab.icon-tab.active .ico { filter: drop-shadow(0 0 4px var(--accent-glow)); }
+.tab-gear .ico { transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.tab-gear:hover .ico,
+.tab-gear.active .ico { transform: rotate(90deg); }
+body.disp-movil .tb-cfg .ico { transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+body.disp-movil .tb-cfg.active .ico {
+  transform: rotate(90deg);
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+.pb-ico.ico { filter: drop-shadow(0 0 3px var(--accent-glow)); }
+.ctl-vista .side-btn.on .sb-ico.ico,
+.ctl-vista .side-btn[aria-pressed="true"] .sb-ico.ico { filter: drop-shadow(0 0 3px var(--accent-glow)); }
+
+/* El volumen tiene tres dibujos según el nivel (antes eran trozos de un
+   mismo <svg> que se escondían con .low y .muted, que siguen mandando). */
+.vol-btn.low .ico-vol { --m: var(--ico-vol-bajo); }
+.vol-btn.muted .ico-vol { --m: var(--ico-vol-mudo); }
+
+/* ◈ sync del espectro: el icono lo pone el CSS, porque visualizer.js
+   reescribe el texto del botón («sync» / «oír») y se lo llevaría. */
+.viz-sync::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  background-color: currentColor;
+  -webkit-mask: var(--ico-sync) center / 100% 100% no-repeat;
+  mask: var(--ico-sync) center / 100% 100% no-repeat;
+}

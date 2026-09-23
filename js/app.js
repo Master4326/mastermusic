@@ -646,12 +646,16 @@
   const pintarRestante = (sec, dur) => {
     if (!el.timeTotal) return;
     const d = isFinite(dur) && dur > 0 ? dur : duration();
-    el.timeTotal.textContent = (verRestante && d)
+    /* Lo llama el reloj de spotify.js en cada frame: se escribe solo lo que
+       cambia (el texto, una vez por segundo como mucho). */
+    const txt = (verRestante && d)
       ? '-' + formatTime(Math.max(0, d - (sec || 0)))
       : formatTime(d);
-    el.timeTotal.title = verRestante
+    if (el.timeTotal.textContent !== txt) el.timeTotal.textContent = txt;
+    const tit = verRestante
       ? 'Lo que queda de la canción — pulsa para ver lo que dura'
       : 'Lo que dura la canción — pulsa para ver lo que queda';
+    if (el.timeTotal.title !== tit) el.timeTotal.title = tit;
   };
 
   if (el.timeTotal) {

@@ -61,7 +61,7 @@
       <button type="button" class="paleta-btn" id="paletaBtn"
               aria-label="Buscar en todo: tu música, tus listas, Spotify y los mandos"
               title="Buscar">
-        <span class="pb-ico" aria-hidden="true">⌕</span>
+        <i class="pb-ico ico ico-buscar" aria-hidden="true"></i>
         <span class="pb-txt">buscar</span>
       </button>
       <div class="title-end">
@@ -85,9 +85,7 @@
              abre config, y dentro de config te devuelve a donde estabas. En
              el ordenador no se ve: allí el ⚙ sigue en la barra de pestañas. -->
         <button type="button" class="tb-cfg" id="tbCfg" aria-label="Configuración" title="Configuración (S)">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.6-.22l-2.39.96a7.06 7.06 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.63.94l-2.39-.96a.49.49 0 0 0-.6.22L2.69 8.86a.49.49 0 0 0 .12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.21.37.3.6.22l2.39-.96c.5.37 1.04.7 1.63.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.63-.94l2.39.96c.23.08.48 0 .6-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/>
-          </svg>
+          <i class="ico ico-ajustes" aria-hidden="true"></i>
         </button>
         <!-- Los tres de la esquina se repartían por el `title` («if (b.title
              === 'Maximizar')»), o sea que cambiar el texto del globito los
@@ -96,11 +94,11 @@
              que maximizar o «devolver el tamaño» no hacía nada que se viera. -->
         <div class="title-right">
           <button class="tb-btn" data-win="min" aria-label="Devolver el tamaño de ventana normal"
-                  title="Devolver el tamaño de ventana normal">_</button>
+                  title="Devolver el tamaño de ventana normal"><i class="ico ico-min" aria-hidden="true"></i></button>
           <button class="tb-btn" data-win="max" aria-label="Maximizar: la app ocupa toda la pantalla"
-                  title="Maximizar: la app ocupa toda la pantalla (o doble clic en esta barra)">▢</button>
+                  title="Maximizar: la app ocupa toda la pantalla (o doble clic en esta barra)"><i class="ico ico-max" aria-hidden="true"></i></button>
           <button class="tb-btn tb-close" data-win="close" aria-label="Cerrar: para la música"
-                  title="Cerrar: para la música">✕</button>
+                  title="Cerrar: para la música"><i class="ico ico-cerrar" aria-hidden="true"></i></button>
         </div>
       </div>
     </div>
@@ -114,7 +112,7 @@
         <div class="cover-frame">
           <button class="vinyl-toggle" id="vinylToggle" aria-pressed="false"
                   aria-label="Modo vinilo: la carátula gira como un disco"
-                  title="Modo vinilo (carátula giratoria)">◉</button>
+                  title="Modo vinilo (carátula giratoria)"><i class="ico ico-vinilo" aria-hidden="true"></i></button>
           <div class="cover-inner" id="coverInner">
             <div class="cover-art" id="coverArt">
               <span class="cover-placeholder">♪</span>
@@ -136,7 +134,7 @@
         <div class="visualizer-frame">
           <canvas id="visualizer"></canvas>
           <button class="viz-sync" id="vizSyncBtn"
-            title="Sincronizar el espectro con el audio del sistema — ideal para Spotify. Comparte tu pantalla marcando 'compartir audio del sistema'.">◈ sync</button>
+            title="Sincronizar el espectro con el audio del sistema — ideal para Spotify. Comparte tu pantalla marcando 'compartir audio del sistema'.">sync</button>
         </div>
 
       </section>
@@ -149,47 +147,29 @@
              esconde en ventanas muy estrechas, donde no cabe. -->
         <div class="tab-bar" role="tablist" aria-label="Secciones">
           <button class="tab icon-tab active" data-tab="lyrics" title="Letra sincronizada (L)">
-            <span class="tab-ico" aria-hidden="true">♪</span><span class="tab-txt">letra</span>
+            <i class="ico ico-letra" aria-hidden="true"></i><span class="tab-txt">letra</span>
           </button>
           <button class="tab icon-tab" data-tab="search" title="Buscar en Spotify (F)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-              <circle cx="10.5" cy="10.5" r="5.5"/>
-              <line x1="15" y1="15" x2="20.5" y2="20.5"/>
-            </svg><span class="tab-txt">buscar</span>
+            <i class="ico ico-buscar" aria-hidden="true"></i><span class="tab-txt">buscar</span>
           </button>
           <button class="tab icon-tab" data-tab="library" title="Tu música y tu biblioteca de Spotify: playlists, álbumes, artistas (B)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-              <rect x="3" y="4" width="3.4" height="16"/>
-              <rect x="9" y="4" width="3.4" height="16"/>
-              <path d="M16.2 5.6l3.3-.9 3.4 12.6-3.3.9z" transform="translate(-2 0)"/>
-            </svg><span class="tab-txt">listas</span>
+            <i class="ico ico-listas" aria-hidden="true"></i><span class="tab-txt">listas</span>
           </button>
           <button class="tab icon-tab" data-tab="queue" title="Cola — lo que suena después (Q)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-              <line x1="4" y1="6" x2="20" y2="6"/>
-              <line x1="4" y1="12" x2="20" y2="12"/>
-              <line x1="4" y1="18" x2="11" y2="18"/>
-              <path d="M15.5 15.2v6.2l5.2-3.1z" fill="currentColor" stroke="none"/>
-            </svg><span class="tab-txt">cola</span>
+            <i class="ico ico-cola" aria-hidden="true"></i><span class="tab-txt">cola</span>
           </button>
           <!-- HISTORIAL · la pestaña existía en el teclado (H y 6) y en el
                service worker, pero no en el HTML: js/stats.js se cargaba —
                tampoco, faltaba su <script>— y salía por la puerta en la
                primera línea porque no encontraba #statsBody. -->
           <button class="tab icon-tab" data-tab="stats" title="Tu historial y tus más escuchadas (H)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-              <line x1="5" y1="20" x2="5" y2="13"/>
-              <line x1="12" y1="20" x2="12" y2="6"/>
-              <line x1="19" y1="20" x2="19" y2="10"/>
-            </svg><span class="tab-txt">historial</span>
+            <i class="ico ico-historial" aria-hidden="true"></i><span class="tab-txt">historial</span>
           </button>
           <span class="tab-right">
             <!-- Con su nombre, como las demás: era la única pestaña que
                  seguía siendo un icono pelado. -->
             <button class="tab icon-tab tab-gear" data-tab="settings" aria-label="Ajustes (configuración)" title="Ajustes (S)">
-              <svg viewBox="0 0 24 24">
-                <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.6-.22l-2.39.96a7.06 7.06 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.63.94l-2.39-.96a.49.49 0 0 0-.6.22L2.69 8.86a.49.49 0 0 0 .12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.21.37.3.6.22l2.39-.96c.5.37 1.04.7 1.63.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.63-.94l2.39.96c.23.08.48 0 .6-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/>
-              </svg><span class="tab-txt">ajustes</span>
+              <i class="ico ico-ajustes" aria-hidden="true"></i><span class="tab-txt">ajustes</span>
             </button>
           </span>
         </div>
@@ -785,12 +765,12 @@
                de la letra se queda limpio. -->
           <button class="ctrl-btn vol-btn side-btn" id="anchoBtn" aria-pressed="false"
                   aria-label="Letra ancha: esconde la carátula y deja todo el ancho para la letra"
-                  title="Letra ancha: esconde la carátula y deja todo el ancho para la letra (W)"><span class="sb-ico" aria-hidden="true">◧</span><span class="sb-txt" aria-hidden="true">ancha</span></button>
+                  title="Letra ancha: esconde la carátula y deja todo el ancho para la letra (W)"><i class="sb-ico ico ico-ancha" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">ancha</span></button>
           <!-- El icono y el nombre van en spans: js/lyrics.js cambia los dos
                (✦ edit ↔ ≡ lista) sin barrer el botón entero. -->
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" aria-pressed="false"
                   aria-label="Modo edit: la letra a pantalla completa, animada"
-                  title="Modo edit (letra animada)"><span class="sb-ico" aria-hidden="true">✦</span><span class="sb-txt" aria-hidden="true">edit</span></button>
+                  title="Modo edit (letra animada)"><i class="sb-ico ico ico-edit" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">edit</span></button>
           <!-- ❝ COMPARTIR LA LETRA · elige los versos y sale una imagen con
                la carátula, el título y esos versos. Va aquí, con ✦ ◧ ⛶,
                porque el panel de la letra se queda limpio: el panel de
@@ -798,61 +778,39 @@
                galería de tipografías. -->
           <button class="ctrl-btn vol-btn side-btn" id="compartirBtn"
                   aria-label="Compartir la letra como imagen"
-                  title="Compartir la letra como imagen: carátula, título y los versos que elijas"><span class="sb-ico" aria-hidden="true">❝</span><span class="sb-txt" aria-hidden="true">compartir</span></button>
+                  title="Compartir la letra como imagen: carátula, título y los versos que elijas"><i class="sb-ico ico ico-cita" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">compartir</span></button>
           <!-- ⚗ Lab de efectos · nace con `hidden` y lo destapa js/lyrics.js
                SOLO en local (127.0.0.1 / file:). En la página publicada no
                aparece: es herramienta de taller, no de quien viene a oír
                música. Lleva su nombre igual, porque en local sí se lee. -->
           <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn"
                   aria-label="Laboratorio de efectos: probar las animaciones sin música"
-                  title="Laboratorio de efectos: probar todas las animaciones sin música" hidden><span class="sb-ico" aria-hidden="true">⚗</span><span class="sb-txt" aria-hidden="true">lab</span></button>
+                  title="Laboratorio de efectos: probar todas las animaciones sin música" hidden><i class="sb-ico ico ico-lab" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">lab</span></button>
           <button class="ctrl-btn vol-btn side-btn" id="cinemaBtn"
                   aria-label="Modo cine: letra a pantalla completa con la carátula girando"
-                  title="Modo cine: letra animada + carátula girando (Esc para salir)"><span class="sb-ico" aria-hidden="true">⛶</span><span class="sb-txt" aria-hidden="true">cine</span></button>
+                  title="Modo cine: letra animada + carátula girando (Esc para salir)"><i class="sb-ico ico ico-cine" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">cine</span></button>
         </div>
 
         <div class="ctl-musica">
         <button class="ctrl-btn" id="shuffleBtn" aria-pressed="false" aria-label="Aleatorio" title="Aleatorio">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="16 3 21 3 21 8"/>
-            <line x1="4" y1="20" x2="21" y2="3"/>
-            <polyline points="21 16 21 21 16 21"/>
-            <line x1="15" y1="15" x2="21" y2="21"/>
-            <line x1="4" y1="4" x2="9" y2="9"/>
-          </svg>
+          <i class="ico ico-aleatorio" aria-hidden="true"></i>
         </button>
         <button class="ctrl-btn" id="prevBtn" aria-label="Canción anterior" title="Anterior (shift + ←)">
-          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <polygon points="19 20 9 12 19 4 19 20"/>
-            <rect x="4" y="4" width="2.6" height="16"/>
-          </svg>
+          <i class="ico ico-anterior" aria-hidden="true"></i>
         </button>
         <button class="ctrl-btn play-btn" id="playBtn" aria-label="Reproducir" title="Reproducir / pausa (espacio)">
           <span id="playIcon">
-            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-              <polygon points="7 4 20 12 7 20 7 4"/>
-            </svg>
+            <i class="ico ico-play" aria-hidden="true"></i>
           </span>
           <span id="pauseIcon" hidden>
-            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-              <rect x="6" y="4" width="4" height="16"/>
-              <rect x="14" y="4" width="4" height="16"/>
-            </svg>
+            <i class="ico ico-pausa" aria-hidden="true"></i>
           </span>
         </button>
         <button class="ctrl-btn" id="nextBtn" aria-label="Canción siguiente" title="Siguiente (shift + →)">
-          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <polygon points="5 4 15 12 5 20 5 4"/>
-            <rect x="17.4" y="4" width="2.6" height="16"/>
-          </svg>
+          <i class="ico ico-siguiente" aria-hidden="true"></i>
         </button>
         <button class="ctrl-btn" id="repeatBtn" aria-pressed="false" aria-label="Repetir" title="Repetir">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="17 1 21 5 17 9"/>
-            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-            <polyline points="7 23 3 19 7 15"/>
-            <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-          </svg>
+          <i class="ico ico-repetir" aria-hidden="true"></i>
           <span class="rep-badge">1</span>
         </button>
         </div>
@@ -864,7 +822,7 @@
                Le faltaba el botón. Lo enseña y lo esconde él según si la
                canción es de Spotify y si la cuenta tiene permiso. -->
           <button class="ctrl-btn like-btn" id="likeBtn" aria-pressed="false"
-                  aria-label="Guardar en Tus me gusta" title="Guardar en Tus me gusta" hidden>♡</button>
+                  aria-label="Guardar en Tus me gusta" title="Guardar en Tus me gusta" hidden><i class="ico ico-corazon" aria-hidden="true"></i></button>
           <!-- DÓNDE SUENA · bajó de la barra de estado, donde nadie lo buscaba,
                a su sitio de siempre en cualquier reproductor: al lado del
                volumen. Sale solo con Spotify; el menú lo monta spotify.js
@@ -872,7 +830,7 @@
           <button class="dev-chip" id="devChip" hidden
             aria-haspopup="true" aria-expanded="false"
             title="Elegir en qué dispositivo suena">
-            <span class="dev-ico" aria-hidden="true">◎</span><span id="devName"></span>
+            <i class="dev-ico ico ico-disp" aria-hidden="true"></i><span id="devName"></span>
           </button>
           <!-- VOLUMEN: icono discreto, la barra se despliega al pasar el mouse -->
           <div class="volume-ctl" id="volumeCtl">
@@ -884,15 +842,7 @@
               </div>
             </div>
             <button class="ctrl-btn vol-btn" id="volBtn" aria-label="Silenciar" title="Silenciar (M)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"/>
-                <path class="vol-wave1" d="M15 9.7a3.4 3.4 0 0 1 0 4.6"/>
-                <path class="vol-wave2" d="M17.6 7.2a7 7 0 0 1 0 9.6"/>
-                <g class="vol-x">
-                  <line x1="15.5" y1="9.5" x2="20.5" y2="14.5"/>
-                  <line x1="20.5" y1="9.5" x2="15.5" y2="14.5"/>
-                </g>
-              </svg>
+              <i class="ico ico-vol" aria-hidden="true"></i>
             </button>
           </div>
         </div>
@@ -979,14 +929,14 @@
     <div class="cinema-ctl" id="cinemaCtl">
       <span class="cin-time" id="cinTimeCur">0:00</span>
       <button class="cin-btn" id="cinPrev" title="Anterior">
-        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><rect x="4" y="4" width="2.6" height="16"/></svg>
+        <i class="ico ico-anterior" aria-hidden="true"></i>
       </button>
       <button class="cin-btn cin-play" id="cinPlay" title="Reproducir / pausa (espacio)">
-        <svg viewBox="0 0 24 24" fill="currentColor" id="cinPlayIcon"><polygon points="7 4 20 12 7 20 7 4"/></svg>
-        <svg viewBox="0 0 24 24" fill="currentColor" id="cinPauseIcon" hidden><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        <i class="ico ico-play" id="cinPlayIcon" aria-hidden="true"></i>
+        <i class="ico ico-pausa" id="cinPauseIcon" aria-hidden="true" hidden></i>
       </button>
       <button class="cin-btn" id="cinNext" title="Siguiente">
-        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><rect x="17.4" y="4" width="2.6" height="16"/></svg>
+        <i class="ico ico-siguiente" aria-hidden="true"></i>
       </button>
       <span class="cin-time" id="cinTimeTot">0:00</span>
     </div>
@@ -1030,6 +980,8 @@
        le pide nada a nadie al arrancar (los demás lo encuentran todo por
        su id, esté donde esté). -->
   <script defer src="js/movil.js"></script>
+  <!-- La carátula entra descodificada y con disolución de píxeles al cambiar de canción -->
+  <script defer src="js/caratula.js"></script>
   <script defer src="js/vendor/jsmediatags.min.js"></script>
   <script defer src="js/db.js"></script>
   <script defer src="js/lyrics.js"></script>
