@@ -7921,7 +7921,10 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
    flechita del navegador, vuelve la barra de siempre (el media query deja
    de casar) y con ella todo lo de antes.
    ========================================================== */
-@media (display-mode: window-controls-overlay) {
+/* INSTALADA, con o sin la barra propia: la ventana de verdad es la del
+   sistema, así que la app la llena entera y sus _ ▢ ✕ —que repetían los de
+   Windows justo encima y no pueden minimizar ni cerrar nada— se van. */
+@media (display-mode: standalone), (display-mode: window-controls-overlay) {
   body { padding: 0; }
   .window {
     width: 100vw !important;
@@ -7933,6 +7936,10 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
     resize: none;
   }
   .window::after { display: none; }
+  .title-right { display: none; }
+}
+/* …y con la barra propia puesta, la de la app ocupa su franja. */
+@media (display-mode: window-controls-overlay) {
   .title-bar {
     height: env(titlebar-area-height, 36px);
     padding-left: calc(env(titlebar-area-x, 0px) + 8px);
@@ -7947,7 +7954,6 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
     -webkit-app-region: no-drag;
     app-region: no-drag;
   }
-  .title-right { display: none; }
 }
 
 /* ICONOS-PIXEL:INICIO — lo genera assets/iconos-pixel.js; no tocar a mano:
