@@ -208,19 +208,32 @@ body:has(.window.maximized) { padding: 0; }
 /* ==========================================================
    TITLE BAR
    ========================================================== */
+/* De 28 a 36 px: ahora lleva en el centro el buscador «en todo», que es un
+   campo y no un botón de 20 px. Los dos lados miden lo mismo (flex 1 1 0)
+   para que el buscador quede centrado de verdad, lleve lo que lleve cada
+   lado (el chip de la letra ancha aparece y desaparece a la derecha). */
 .title-bar {
-  height: 28px;
+  height: 36px;
   background: linear-gradient(180deg, var(--bg-frame) 0%, var(--bg-window) 100%);
   border-bottom: 2px solid var(--border-dark);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 6px;
+  gap: 12px;
+  padding: 0 6px 0 8px;
   font-size: 14px;
 }
 .title-left {
   display: flex; align-items: center; gap: 8px;
+  flex: 1 1 0; min-width: 0;
 }
+.title-end {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  flex: 1 1 0; min-width: 0;
+}
+/* El ⚙ de arriba solo existe en el teléfono (ver `body.disp-movil`); en el
+   ordenador el engranaje sigue en la barra de pestañas. */
+.tb-cfg { display: none; }
 .title-text {
   font-family: 'Press Start 2P', monospace;
   font-size: 9px;
@@ -228,9 +241,9 @@ body:has(.window.maximized) { padding: 0; }
   color: var(--accent);
   text-shadow: 0 0 4px var(--accent-glow);
 }
-.title-right { display: flex; gap: 2px; }
+.title-right { display: flex; gap: 3px; flex: 0 0 auto; }
 .tb-btn {
-  width: 22px; height: 20px;
+  width: 24px; height: 22px;
   background: var(--bg-frame);
   border: 1px solid var(--border-light);
   box-shadow: inset 1px 1px 0 var(--border-light), inset -1px -1px 0 var(--border-dark);
@@ -2076,11 +2089,43 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 .time-total:hover { border-color: var(--accent-dim); }
 .time-total:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* ==========================================================
+   LA FILA DE MANDOS · tres zonas en una rejilla
+
+     vista (izq.)  ·  música (centro)  ·  dónde y cuánto (dcha.)
+
+   Las dos de los lados miden lo mismo (1fr), así que la música queda en el
+   centro exacto aunque a un lado haya cuatro botones y al otro tres. Antes
+   el volumen y ◧ ✦ ❝ ⛶ flotaban en `position: absolute` encima de la fila:
+   en cuanto la ventana estrechaba se montaban sobre «siguiente».
+   ========================================================== */
 .controls-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.ctl-vista,
+.ctl-musica,
+.ctl-sonido {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  min-width: 0;
+}
+.ctl-musica { justify-content: center; gap: 8px; }
+.ctl-sonido { justify-self: end; gap: clamp(6px, 0.8cqw, 14px); }
+/* La vista va TRANSPARENTE, sin bandeja: botones fantasma sobre la propia
+   barra, como fueron siempre ✦ y ⛶. Se probó una bandeja hundida (fondo
+   más oscuro con borde) y el usuario la rechazó el 22-sep-2026: «que sean
+   transparentes, no más oscuras». El grupo ya se distingue por estar a la
+   izquierda, separado de la música, y por los nombres. */
+.ctl-vista {
+  justify-self: start;
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 .ctrl-btn {
   position: relative;
@@ -2121,20 +2166,36 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 }
 .ctrl-btn.repeat-one .rep-badge { display: block; }
 
+/* EL BOTÓN QUE MÁS SE PULSA, RELLENO. Era un botón más de la fila con el
+   icono en acento; ahora es el único con el acento de fondo, así que se
+   encuentra sin buscarlo — con el ratón y, sobre todo, con el pulgar. */
 .play-btn {
   width: 42px; height: 30px;
   font-size: 14px;
-  color: var(--accent);
-  text-shadow: 0 0 4px var(--accent-glow);
+  color: var(--bg-deep);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.45),
+    inset -2px -2px 0 var(--accent-dim),
+    0 0 10px var(--accent-glow);
+  text-shadow: none;
 }
 .play-btn span { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .play-btn span[hidden] { display: none; }
 .play-btn svg {
   width: 52%; height: 52%;
-  filter: drop-shadow(0 0 3px var(--accent-glow));
+  filter: none;
 }
-.play-btn:hover { background: var(--accent); color: #000; text-shadow: none; }
+.play-btn:hover { background: var(--accent); color: var(--bg-deep); text-shadow: none; filter: brightness(1.12); }
 .play-btn:hover svg { filter: none; }
+/* Pulsado: el hundido de siempre, pero sin que el icono se pinte del mismo
+   color que el fondo (la regla general de .ctrl-btn:active lo pone en acento). */
+.play-btn:active,
+.play-btn.active {
+  color: var(--bg-deep);
+  box-shadow: inset 2px 2px 0 var(--accent-dim), inset -1px -1px 0 rgba(255, 255, 255, 0.35);
+}
 .separator { color: var(--border-pixel); font-size: 18px; padding: 0 4px; }
 
 /* ==========================================================
@@ -2143,11 +2204,10 @@ body.barra-agarrada .prog-tip { opacity: 1; }
    ========================================================== */
 .controls-row { position: relative; }
 
+/* Ya no flota: vive en la zona de la derecha como uno más. Se queda
+   `position: relative` porque en táctil su barra sale flotando encima. */
 .volume-ctl {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: relative;
   display: flex;
   align-items: center;
 }
@@ -2553,15 +2613,52 @@ body.playing .status-bar .filler {
 /* ==========================================================
    MODO CINE — letra gigante sobre la carátula (opcional)
    ========================================================== */
-/* Botones ✦ (edit) y ⛶ (cine) junto al volumen: mismos fantasmas */
+/* Botones de VISTA (◧ ✦ ❝ ⛶) en su bandeja: el icono y, debajo, su nombre.
+   Eran glifos sueltos que solo se entendían posando el ratón encima, y con
+   el dedo ni eso. Fantasmas, como antes: no compiten con la música. */
 .side-btn {
   font-size: 15px;
   color: var(--text-dim);
+}
+.ctl-vista .side-btn {
+  width: auto;
+  min-width: clamp(56px, 5.4cqw, 84px);
+  height: clamp(40px, 3.4cqw, 54px);
+  padding: 0 6px;
+  flex-direction: column;
+  gap: 4px;
+  border: 2px solid transparent;
+}
+.ctl-vista .side-btn:hover {
+  color: var(--text);
+  border-color: var(--border-pixel);
+}
+.sb-ico {
+  display: block;
+  font-size: clamp(17px, 1.5cqw, 24px);
+  line-height: 1;
+}
+.sb-txt {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'VT323', monospace;
+  font-size: clamp(13px, 1.1cqw, 17px);
+  letter-spacing: 1px;
+  line-height: 1;
 }
 .side-btn.on,
 body.cinema-open #cinemaBtn {
   color: var(--accent);
   text-shadow: 0 0 5px var(--accent-glow);
+}
+/* Encendido (letra ancha o modo edit puestos): el acento y un borde, sin
+   fondo — transparente como los demás */
+.ctl-vista .side-btn.on {
+  background: transparent;
+  border-color: var(--accent-dim);
 }
 /* con el cine abierto, los botones de modo edit y del lab no deben interferir */
 body.cinema-open #lyricsModeBtn,
@@ -3492,7 +3589,8 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
   height: clamp(30px, 3.4cqw, 58px);
   font-size: clamp(14px, 1.6cqw, 28px);
 }
-.controls-row { gap: clamp(8px, 1cqw, 20px); }
+.controls-row { gap: clamp(10px, 1.4cqw, 28px); }
+.ctl-musica { gap: clamp(8px, 1cqw, 20px); }
 .progress-bg { height: clamp(12px, 1.4cqh, 20px); }
 .progress-row { gap: clamp(10px, 1.2cqw, 22px); }
 
@@ -3590,26 +3688,14 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
   .cover-frame { width: 96px; }
   .ctrl-btn { width: 36px; height: 32px; }
   .play-btn { width: 46px; height: 36px; }
-  .side-btn { width: 28px; }
   .title-text { font-size: 12px; }
 }
 
-/* ----------------------------------------------------------
-   TELÉFONO PEQUEÑO (360 px) CON LA LETRA ANCHA · el ◧ se retira
-
-   Con la letra ancha la fila de la derecha se llena: ◈ ◧ ✦ ❝ ⛶. En
-   360 px no caben los cinco ni encogiéndolos, y el que se salía de la
-   pantalla era el ⛶ del cine — un botón que existe y no se puede
-   tocar, que es el fallo que más veces ha dado esta barra.
-
-   Se retira el ◧ y no otro porque es el ÚNICO que tiene otra puerta:
-   con la letra ancha puesta, la carátula se muda al chip de la barra
-   de título, y ese chip ya devuelve la vista normal al pulsarlo (y la
-   tecla W sigue igual). Los otros cuatro no tienen sustituto.
-   ---------------------------------------------------------- */
-@media (max-width: 400px) {
-  body.letra-ancha #anchoBtn { display: none; }
-}
+/* (Aquí vivía la regla que retiraba el ◧ en teléfonos de 360 px con la
+   letra ancha: ◈ ◧ ✦ ❝ ⛶ no cabían en la misma fila que la música y el
+   ⛶ se salía de la pantalla. Desde que la vista tiene su propia fila en
+   el teléfono —ver `body.disp-movil`— caben todos y ya no hace falta
+   esconder ninguno.) */
 
 /* ==========================================================
    Vinyl mode — carátula giratoria (botón opcional)
@@ -5631,62 +5717,13 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   .li-ways { flex-direction: column; align-items: center; }
   .li-way { width: min(300px, 88%); }
 
-  /* El volumen dejaba de caber: iba en posición absoluta a la derecha y con
-     ❤ ✦ ⛶ ⋯ se montaba encima del botón de siguiente. En vertical entra en
-     la fila como uno más y, si no cabe, la fila reparte en dos renglones. */
-  .volume-ctl {
-    position: static;
-    transform: none;
-    margin-left: 2px;
-  }
-  /* ---------- La fila de botones, para el dedo ----------
-     Estaba con `flex-wrap: wrap`: en cuanto los 7 botones no cabían, los
-     últimos saltaban a un segundo renglón que la ventana recortaba — se
-     PERDÍAN. Y median 32×26 px, menos de la mitad del objetivo de toque
-     recomendado, de ahí el «no dejan dar».
-     Ahora: un solo renglón que siempre cabe, botones de 42 px (46 el de
-     play, que es el que más se usa) y el reparto lo hace el hueco, no el
-     azar del wrap. */
-  .controls-row {
-    flex-wrap: nowrap;
-    gap: clamp(2px, 1.4vw, 10px);
-    padding: 0 2px;
-  }
-  /* El alto (42px) es intocable: es lo que decide si el pulgar acierta.
-     El ancho puede encoger — con Spotify Connect aparece un botón más
-     (el volumen del aparato remoto) y en un teléfono de 320px salen 8;
-     con un mínimo de 40px la fila se desbordaba y volvíamos al problema
-     de siempre. Calculado: a 320px salen 32px de ancho, justo el mínimo. */
-  .controls-row .ctrl-btn {
-    width: auto;
-    flex: 1 1 0;
-    min-width: 32px;
-    max-width: 58px;
-    height: 42px;
-  }
-  /* El grupo de la derecha (◧ ✦ ❝ ⛶, y el ◈ cuando la letra va ancha)
-     TIENE que poder encoger. Con `flex: 0 0 auto` no cedía un píxel: al
-     añadir el ❝ de compartir, en un teléfono de 390 px con la letra
-     ancha el último botón —el ⛶ del cine— se salía de la pantalla y
-     quedaba literalmente intocable. La fila es `nowrap` a propósito (un
-     segundo renglón lo recorta la ventana y los botones se PIERDEN), así
-     que el hueco que falta lo tiene que repartir el propio flex. */
-  .controls-row .volume-ctl { flex: 0 1 auto; min-width: 0; }
-  /* 28 px de ancho por 42 de alto: el alto es lo que decide si el pulgar
-     acierta, y es el mismo que el resto de la fila. Con 30 no cabían los
-     cinco en un teléfono de 360 y el ⛶ se salía por siete píxeles. */
-  .volume-ctl .side-btn { flex: 0 1 auto; min-width: 28px; }
-  /* Y el ◈ deja de pedir sitio para su palabra cuando comparte fila */
-  body.letra-ancha .viz-sync.en-mandos { padding: 0 5px; font-size: 13px; }
-  .controls-row .play-btn {
-    flex: 1.35 1 0;
-    max-width: 76px;
-    height: 46px;
-  }
+  /* (La fila de botones del teléfono ya no se aprieta aquí: desde el
+     rediseño de sep-2026 va en DOS filas —la música y, debajo, la vista—
+     y sus medidas viven en el bloque `body.disp-movil`, al final del
+     archivo. Aquí había diez botones en un solo renglón, de 28 a 44 px de
+     ancho, con todo el cálculo de cuántos cabían a 320 px.) */
   .ctrl-btn svg { width: 46%; height: 46%; }
   .play-btn svg { width: 50%; height: 50%; }
-  /* el ✦ y el ⛶ son glifos, no SVG: que no se queden enanos */
-  .side-btn { font-size: 19px; }
 
   /* Objetivos de toque: por debajo de ~38px el pulgar falla */
   .tab {
@@ -5695,7 +5732,6 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
     display: inline-flex;
     align-items: center;
   }
-  .side-btn { min-width: 36px; height: 34px; }
   .lib-chip, .sp-rec { min-height: 32px; }
 
   /* Muesca y barra de gestos: sin esto el reloj de la barra de estado cae
@@ -5813,50 +5849,35 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   .status-bar { position: relative; z-index: 3; }
 
   /* --- 3) la fila de botones, para el dedo --- */
-  /* El volumen iba en `position: absolute` y se montaba sobre ♥ ✦ ⛶.
-     Aquí entra en la fila como uno más. */
-  .volume-ctl {
-    position: static;
-    transform: none;
-    margin-left: 2px;
-    flex: 0 0 auto;
-  }
+  /* Las tres zonas en un solo renglón (vista · música · dónde y cuánto):
+     tumbado sobra ancho y falta alto, justo al revés que en vertical. */
+  .controls-row { gap: 8px; }
   /* En el móvil el volumen se controla con los botones físicos. La barra y
      la bocina se van (en horizontal sobra menos sitio aún que en vertical:
-     `@media (hover: none)` las dejaba fijas en 90 px), pero ✦ y ⛶ se quedan
-     — son los dos botones por los que se abre la letra y el cine. */
+     `@media (hover: none)` las dejaba fijas en 90 px). */
   .volume-ctl .vol-pct,
   .volume-ctl .volume-bar,
   .volume-ctl #volBtn { display: none; }
   /* …salvo con Spotify Connect: ahí el volumen que suena es el del aparato
      remoto y los botones físicos del teléfono no lo tocan. */
   body.spotify-conectado .volume-ctl #volBtn { display: flex; }
-  /* `wrap` mandaba los últimos botones a un segundo renglón que la ventana
-     recortaba: se PERDÍAN. Un solo renglón que siempre cabe. */
-  .controls-row {
-    flex-wrap: nowrap;
-    gap: clamp(2px, 1.2vw, 10px);
-    padding: 0 2px;
-  }
   /* Alto 38 px: menos que los 42 de vertical porque aquí la pantalla es
      baja, pero por encima del mínimo con el que el pulgar acierta. */
-  .controls-row .ctrl-btn {
-    width: auto;
-    flex: 1 1 0;
-    min-width: 32px;
-    max-width: 54px;
-    height: 38px;
-  }
-  .controls-row .play-btn {
-    flex: 1.35 1 0;
-    max-width: 70px;
-    height: 40px;
-  }
+  .ctl-musica .ctrl-btn { width: 46px; height: 38px; }
+  .ctl-musica .play-btn { width: 60px; height: 40px; }
+  .ctl-sonido .ctrl-btn { width: 40px; height: 38px; }
+  /* La vista, solo con su icono: el nombre no cabe en una pantalla baja */
+  .ctl-vista .side-btn { min-width: 42px; height: 38px; padding: 0 4px; }
+  .ctl-vista .sb-txt { display: none; }
   .ctrl-btn svg { width: 46%; height: 46%; }
   .play-btn svg { width: 50%; height: 50%; }
-  /* el ✦ y el ⛶ son glifos, no SVG: que no se queden enanos */
-  .side-btn { font-size: 18px; min-width: 34px; height: 32px; }
   .tab { min-height: 32px; padding: 5px 10px; display: inline-flex; align-items: center; }
+
+  /* --- 4) la barra de título, más baja y sin _ ▢ ✕ ---
+     En un teléfono la app ya ocupa la pantalla: maximizar o «devolver el
+     tamaño» no cambiaba nada que se viera. Se queda el buscador. */
+  .title-bar { height: 32px; }
+  .title-right { display: none; }
 }
 
 /* Botones del pie de las estadísticas */
@@ -5977,29 +5998,61 @@ body.perf-tactil .sp-del { opacity: 1; }
 .q-desde:hover { color: var(--accent); border-color: var(--accent-dim); }
 
 /* ----------------------------------------------------------
-   Botón de buscar de la barra de estado
-   Es el ÚNICO acceso al buscador que existe sin teclado.
+   «Buscar», en el centro de la barra de título
+   Es el ÚNICO acceso al buscador que existe sin teclado, y era un botón de
+   15 px en la barra de estado, entre el mensaje y el reloj. Ahora tiene
+   pinta de lo que es —un campo de búsqueda— y vive en la barra que no se
+   esconde nunca. Es un botón que ABRE el buscador, no un campo de verdad:
+   escribir aquí y en la paleta serían dos buscadores distintos.
+   Dice «buscar» y nada más (sin frase larga ni «ctrl K»: el usuario lo
+   quiso así el 22-sep-2026), así que el campo es más estrecho.
    ---------------------------------------------------------- */
 .paleta-btn {
-  display: inline-flex;
+  flex: 0 1 380px;
+  min-width: 0;
+  height: 26px;
+  display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 1px 10px;
+  gap: 10px;
+  padding: 0 5px 0 10px;
   font-family: 'VT323', monospace;
-  font-size: 15px;
-  letter-spacing: 1px;
+  font-size: 19px;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  text-align: left;
   color: var(--text-dim);
-  background: var(--bg-panel-2);
-  border: 1px solid var(--border-pixel);
+  /* Transparente, solo el marco: con fondo negro se veía como un agujero
+     en la barra, y el usuario lo pidió así (22-sep-2026, igual que la
+     fila de vista). */
+  background: transparent;
+  border: 2px solid var(--border-pixel);
+  box-shadow: none;
   cursor: pointer;
-  line-height: 1.5;
-  flex-shrink: 0;
+  transition: border-color .15s ease, box-shadow .15s ease, color .15s ease;
 }
-.paleta-btn:hover {
-  color: var(--bg-deep);
-  background: var(--accent);
+.paleta-btn:hover,
+.paleta-btn:focus-visible {
+  color: var(--text);
   border-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+.pb-ico {
+  flex: 0 0 auto;
+  font-size: 1.1em;
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+.pb-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Ventana muy estrecha: solo la lupa, con su nombre para el lector de pantalla */
+@container win (max-width: 460px) {
+  .pb-txt { display: none; }
+  .paleta-btn { flex: 0 0 auto; width: 40px; padding: 0; justify-content: center; }
 }
 
 /* ==========================================================
@@ -6285,20 +6338,14 @@ body.perf-tactil .pie-dedo { display: inline; }
   .tab.active .tab-txt { display: none; }
 }
 
-/* Teléfono en horizontal · la barra de estado se queda, pero solo con el
-   botón: el ⌕ es el único que abre el buscador sin teclado, y el texto de
-   estado y el reloj son justo lo prescindible cuando la pantalla es baja.
+/* Teléfono en horizontal · sin barra de estado. Antes se quedaba solo por
+   el ⌕, que era el único botón que abría el buscador sin teclado (el texto
+   de estado y el reloj ya se escondían: con la pantalla tan baja son lo
+   prescindible). Desde que el ⌕ vive en la barra de título, esa fila no
+   llevaba nada y se le devuelve el sitio a la letra.
    Mismos umbrales que el bloque grande de más arriba. */
 @media (orientation: landscape) and (max-height: 560px) and (max-width: 1100px) {
-  .status-bar {
-    display: flex;
-    padding-top: 0;
-    padding-bottom: 0;
-    min-height: 0;
-  }
-  .status-bar .status-left,
-  .status-bar #clock { display: none; }
-  .paleta-btn { font-size: 13px; padding: 0 8px; }
+  .status-bar { display: none; }
 }
 
 /* ==========================================================
@@ -6322,7 +6369,7 @@ body.letra-ancha .main-grid { grid-template-columns: 1fr; }
 
 /* La barra de título crece un poco para que el chip se lea en una
    ventana grande; en una pequeña se queda en los 28 px de siempre. */
-body.letra-ancha .title-bar { height: clamp(28px, 3.4cqh, 46px); }
+body.letra-ancha .title-bar { height: clamp(36px, 4cqh, 48px); }
 
 /* --- El chip «ahora suena» --- */
 .np-chip {
@@ -6330,8 +6377,10 @@ body.letra-ancha .title-bar { height: clamp(28px, 3.4cqh, 46px); }
   align-items: center;
   gap: clamp(6px, 0.7cqw, 12px);
   min-width: 0;
-  max-width: min(58cqw, 520px);
-  margin: 0 8px 0 auto;          /* pegado a los botones de la ventana */
+  /* Comparte la barra con el buscador del centro: la mitad derecha es suya
+     y de los botones de la ventana. */
+  max-width: min(30cqw, 440px);
+  margin: 0;
   padding: 2px 8px 2px 2px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--border-pixel);
@@ -6406,10 +6455,16 @@ body.letra-ancha .title-bar { height: clamp(28px, 3.4cqh, 46px); }
   align-self: center;
   opacity: 0.75;
   padding: 0 clamp(6px, 0.7cqw, 12px);
-  height: clamp(26px, 3cqw, 50px);
+  /* la misma altura que los botones de la fila de vista, donde entra, y
+     transparente como ellos: el fondo oscuro solo tiene sentido encima de
+     las barras del espectro, que es donde vive el resto del tiempo */
+  height: clamp(40px, 3.4cqw, 54px);
+  background: transparent;
   font-size: clamp(13px, 1.4cqw, 22px);
   display: flex;
   align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 .viz-sync.en-mandos:hover { opacity: 1; }
 
@@ -7000,3 +7055,552 @@ body.reduce-motion .comp-caja { animation: none; }
   .comp-lienzo { max-height: 62vh; }
   .comp-versos { min-height: 80px; max-height: 110px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   REDISEÑO DE LA FILA DE MANDOS Y DEL TELÉFONO (22-sep-2026)
+
+   Lo que se movió, y por qué:
+   · ESCRITORIO — «buscar en todo» sube al centro de la barra de título
+     (era un botoncito en la barra de estado); la fila de abajo se parte
+     en tres zonas que ya no se pisan: VISTA (◧ ✦ ❝ ⛶, con su nombre) ·
+     MÚSICA (el ▶ relleno) · DÓNDE Y CUÁNTO (♡ · ◎ · volumen).
+   · TELÉFONO EN VERTICAL (`body.disp-movil`, lo pone js/movil.js) — las
+     pestañas bajan al pie, donde llega el pulgar; arriba quedan «buscar
+     en todo» y ⚙; la carátula, el título y el ♡ van en una franja con el
+     espectro de fondo; la música en su fila con botones grandes y la
+     vista en otra, con nombre; ◎ trae el volumen dentro de su menú.
+   El panel de la letra no gana ni un botón: la regla de siempre.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ---------- Zona derecha de la fila: ♡ · ◎ · volumen ---------- */
+.ctl-sonido .like-btn {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
+  font-size: clamp(18px, 1.8cqw, 28px);
+}
+.ctl-sonido .like-btn:hover {
+  background: transparent;
+  border-color: var(--border-pixel);
+  color: var(--accent);
+}
+.ctl-sonido .like-btn.like-on,
+.left-panel > .like-btn.like-on {
+  color: var(--accent);
+  text-shadow: 0 0 6px var(--accent-glow);
+}
+.ctl-sonido .dev-chip {
+  max-width: clamp(96px, 16cqw, 260px);
+  min-height: clamp(30px, 2.6cqw, 40px);
+  padding: 0 10px;
+  font-size: clamp(14px, 1.3cqw, 20px);
+}
+
+/* ---------- Ventanas estrechas (de escritorio, o un teléfono tumbado) ----------
+   Por debajo de ~1100 px de ventana la vista se queda en sus iconos: el
+   nombre ayuda, pero no a costa de empujar la música fuera del centro. */
+@container win (max-width: 1100px) {
+  .ctl-vista .sb-txt { display: none; }
+  .ctl-vista .side-btn { min-width: clamp(38px, 4cqw, 48px); }
+}
+/* Y por debajo de ~600 px las tres zonas no caben en un renglón: la música
+   sube al suyo, arriba y en el centro, y vista y sonido comparten el de
+   abajo. (El teléfono en vertical tiene su propia disposición, más abajo.) */
+@container win (max-width: 600px) {
+  .controls-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 6px; }
+  .ctl-musica { grid-column: 1 / -1; grid-row: 1; }
+  .ctl-vista { grid-row: 2; }
+  .ctl-sonido { grid-row: 2; }
+}
+
+/* ---------- El volumen dentro del menú de «dónde suena» ----------
+   Solo en el teléfono: allí la fila ya no lleva bocina, y el volumen que
+   hace falta tocar desde la app es el del aparato donde suena. En el
+   ordenador la bocina está al lado del chip y esto sobraría. */
+.dev-vol { display: none; }
+.dev-vol-ico { flex: 0 0 auto; width: 22px; height: 22px; color: var(--text-dim); }
+.dev-vol-rango { flex: 1 1 auto; min-width: 0; height: 30px; accent-color: var(--accent); cursor: pointer; }
+.dev-vol-pct {
+  flex: 0 0 auto;
+  min-width: 4ch;
+  text-align: right;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  color: var(--accent);
+  text-shadow: 0 0 4px var(--accent-glow);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- El ▶ de cada lista, a la vista con el dedo ----------
+   Aparecía al pasar el ratón por encima: con el dedo no aparecía nunca. */
+body.perf-tactil .lib-card-play {
+  opacity: 1;
+  transform: none;
+  width: 38px;
+  height: 38px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   EL TELÉFONO EN VERTICAL · body.disp-movil
+   La misma condición que el bloque «MÓVIL VERTICAL» de más arriba
+   (vertical y ≤ 760 px), pero puesta como clase por js/movil.js, que es
+   quien muda los nodos: así el aspecto y la mudanza no pueden
+   desacompasarse.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* --- Arriba: el logo, «buscar» y ⚙ --- */
+body.disp-movil .title-bar {
+  height: 46px;
+  gap: 8px;
+  padding: 0 5px 0 10px;
+}
+body.disp-movil .title-left,
+body.disp-movil .title-end { flex: 0 0 auto; }
+body.disp-movil .title-text { font-size: 9px; }
+/* _ ▢ ✕ fuera: la app ya ocupa la pantalla entera */
+body.disp-movil .title-right { display: none; }
+body.disp-movil .paleta-btn {
+  flex: 1 1 auto;
+  width: auto;
+  height: 34px;
+  padding: 0 9px;
+  gap: 6px;
+  font-size: 17px;
+  justify-content: flex-start;
+}
+/* la ventana del teléfono mide menos de 460 px y la regla de ventanas muy
+   estrechas deja el buscador en su lupa: aquí sí cabe la palabra */
+body.disp-movil .paleta-btn .pb-txt { display: inline; }
+body.disp-movil .tb-cfg {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  background: var(--bg-frame);
+  border: 2px solid var(--border-light);
+  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  color: var(--text-dim);
+  -webkit-tap-highlight-color: transparent;
+}
+body.disp-movil .tb-cfg svg {
+  display: block;
+  width: 21px;
+  height: 21px;
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+body.disp-movil .tb-cfg.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+body.disp-movil .tb-cfg.active svg {
+  transform: rotate(90deg);
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+}
+/* Con la letra ancha, el chip de la carátula necesita el sitio: el
+   buscador se queda en su lupa (que sigue diciendo lo que es al lector). */
+body.disp-movil.letra-ancha .title-end { flex: 1 1 auto; min-width: 0; }
+body.disp-movil.letra-ancha .np-chip { flex: 1 1 auto; max-width: none; }
+body.disp-movil.letra-ancha .paleta-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  padding: 0;
+  justify-content: center;
+}
+body.disp-movil.letra-ancha .paleta-btn .pb-txt { display: none; }
+/* En un teléfono de 360 px o menos el nombre de la app no deja sitio al
+   buscador: se queda el icono de píxeles. */
+@media (max-width: 379px) {
+  body.disp-movil .title-text { display: none; }
+}
+
+/* --- La franja de «ahora suena» --- */
+body.disp-movil .main-grid { gap: 8px; padding: 8px; }
+body.disp-movil .left-panel {
+  position: relative;
+  flex: 0 0 auto;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 10px;
+  height: 78px;
+  padding: 0 3px 0 7px;
+  background: var(--bg-panel);
+  border: 2px solid var(--border-light);
+  box-shadow: inset 1px 1px 0 var(--border-pixel), inset -1px -1px 0 var(--border-dark);
+  overflow: hidden;
+}
+body.disp-movil .cover-frame {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: 60px;
+  height: 60px;
+  padding: 3px;
+}
+/* El ◉ vinilo se va a config ⚙ → apariencia: sobre 60 px se comía la
+   carátula y no se acertaba con el dedo. */
+body.disp-movil .vinyl-toggle { display: none; }
+body.disp-movil .track-info {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+body.disp-movil .ti-title  { font-size: 23px; line-height: 1; }
+body.disp-movil .ti-artist { font-size: 18px; line-height: 1; }
+body.disp-movil .ti-album  { font-size: 15px; line-height: 1; margin-top: 0; }
+/* El espectro deja de ocupar una fila: pasa a ser el fondo tenue de la
+   franja. Es el mismo lienzo (visualizer.js lo redimensiona solo); lo que
+   cambia es que ya no roba 60 px de alto a la letra. */
+body.disp-movil .visualizer-frame {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  z-index: 0;
+  flex: none;
+  height: 64%;
+  min-height: 0;
+  max-height: none;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  opacity: 0.22;
+  pointer-events: none;
+}
+/* ♡, al lado del título (lo muda js/movil.js) */
+body.disp-movil .left-panel > .like-btn {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 52px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
+  font-size: 27px;
+}
+/* Los avisos de la barra de estado salen en el renglón del disco durante
+   sus 4 s (seven.js marca `.aviso`); el resto del tiempo, el disco. */
+body.disp-movil .track-info #statusText {
+  display: block;
+  font-size: 15px;
+  line-height: 1;
+}
+/* Fuera de sus 4 s no se VE (el título y el artista ya están escritos
+   justo encima), pero sigue ahí para el lector de pantalla: es un
+   `role="status"`, y con `display: none` dejaría de anunciar nada. */
+body.disp-movil .track-info #statusText:not(.aviso) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+body.disp-movil .track-info:has(#statusText.aviso) .ti-album { display: none; }
+/* Sin barra de estado: sus avisos van a la franja, el ⌕ subió a la barra
+   de título, ◎ a la fila de vista, y la hora ya la da el teléfono. */
+body.disp-movil .status-bar { display: none; }
+body.disp-movil .window::after { display: none; }
+/* …salvo con la LETRA ANCHA, que esconde la franja entera: los avisos
+   vuelven a su barra (js/movil.js los devuelve), fina y sin reloj. */
+body.disp-movil.letra-ancha .status-bar {
+  display: flex;
+  padding: 2px 10px;
+  font-size: 13px;
+}
+body.disp-movil.letra-ancha .status-bar .filler,
+body.disp-movil.letra-ancha .status-bar #clock { display: none; }
+/* y el ♡, que vivía en la franja, pasa a la fila de vista con su nombre */
+body.disp-movil .ctl-vista .like-btn {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 2px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+}
+body.disp-movil .ctl-vista .like-btn::after {
+  content: 'me gusta';
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'VT323', monospace;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+@media (min-width: 400px) {
+  body.disp-movil .ctl-vista .like-btn::after { font-size: 14px; }
+}
+body.disp-movil .ctl-vista .like-btn.like-on { color: var(--accent); }
+
+/* --- La letra: un punto más grande y con más ancho ---
+   En el teléfono la fórmula de escritorio se quedaba en su mínimo (19 px
+   antes de igualar la tipografía, ~15 px con la de fábrica). S/M/L/XL
+   siguen mandando igual, solo que desde un punto de partida legible. */
+body.disp-movil .lyrics-body {
+  font-size: calc(22px * var(--lyrics-scale) * var(--lyrics-font-scale, 1));
+}
+body.disp-movil #tab-lyrics.active { padding: 10px 12px; }
+
+/* --- La fila de mandos, en dos pisos: música arriba, vista debajo --- */
+body.disp-movil .playback-bar { padding: 4px 10px 8px; gap: 6px; }
+body.disp-movil .controls-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+body.disp-movil .ctl-musica {
+  order: 1;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+body.disp-movil .ctl-vista { order: 2; }
+/* ♡ y ◎ se mudaron; el volumen vive en el menú de ◎ */
+body.disp-movil .ctl-sonido { display: none; }
+body.disp-movil .ctl-musica .ctrl-btn {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 40px;
+  max-width: 60px;
+  height: 48px;
+}
+body.disp-movil .ctl-musica .play-btn {
+  flex: 1.5 1 0;
+  max-width: 88px;
+  height: 56px;
+}
+body.disp-movil .ctl-vista > * {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 44px;
+}
+body.disp-movil .ctl-vista .side-btn { min-width: 0; padding: 0; }
+body.disp-movil .ctl-vista .sb-ico { font-size: 18px; }
+/* `display: block` a propósito: la ventana del teléfono mide menos de
+   1100 px y la regla de ventanas estrechas (más arriba) quita los nombres.
+   Aquí, con su fila propia, caben — y con el dedo son lo que más falta hace.
+   Medido: en 360 px a cada botón le tocan ~59 px por dentro, y «compartir»
+   (el más largo) solo entra a 13 px y sin espaciado; desde 400 px, a 14. */
+body.disp-movil .ctl-vista .sb-txt { display: block; font-size: 13px; letter-spacing: 0; }
+@media (min-width: 400px) {
+  body.disp-movil .ctl-vista .sb-txt { font-size: 14px; }
+}
+/* Con la letra ancha la fila lleva además el ♡ (y el ◈ si el micrófono está
+   permitido): los nombres ya no caben enteros y es justo el modo de «dame
+   sitio para la letra». Se queda en iconos, y más baja. */
+body.disp-movil.letra-ancha .ctl-vista > * { height: 40px; }
+body.disp-movil.letra-ancha .ctl-vista .sb-txt,
+body.disp-movil.letra-ancha .ctl-vista .dev-chip::after,
+body.disp-movil.letra-ancha .ctl-vista .like-btn::after { display: none; }
+/* ◎ en la bandeja: icono arriba y una palabra debajo («aquí», o el nombre
+   del aparato). El nombre largo sigue en #devName y en su aria-label. */
+body.disp-movil .ctl-vista .dev-chip {
+  max-width: none;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  border: 2px solid var(--accent-dim);
+  color: var(--accent);
+  text-shadow: 0 0 4px var(--accent-glow);
+}
+body.disp-movil .ctl-vista .dev-chip .dev-ico { font-size: 18px; line-height: 1; }
+@media (min-width: 400px) {
+  body.disp-movil .ctl-vista .dev-chip { font-size: 14px; }
+}
+body.disp-movil .ctl-vista .dev-chip #devName { display: none; }
+body.disp-movil .ctl-vista .dev-chip::after {
+  content: attr(data-corto);
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.disp-movil .ctl-vista .viz-sync.en-mandos {
+  height: 44px;
+  padding: 0 2px;
+  font-size: 14px;
+}
+/* Teléfonos muy estrechos: los nombres no caben, se quedan los iconos */
+@media (max-width: 339px) {
+  body.disp-movil .ctl-vista .sb-txt,
+  body.disp-movil .ctl-vista .dev-chip::after,
+  body.disp-movil .ctl-vista .like-btn::after { display: none; }
+}
+
+/* --- Las pestañas, al pie (las muda js/movil.js) ---
+   Cada una con su icono y su nombre: al pie hay sitio para las cinco, y es
+   el sitio de cualquier app de teléfono. La de dentro, marcada arriba con
+   la raya del acento. ⚙ no va aquí: subió a la barra de título. */
+body.disp-movil .window > .tab-bar {
+  position: relative;
+  z-index: 3;
+  height: 60px;
+  max-height: 60px;
+  padding: 0;
+  gap: 0;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  background: var(--bg-window);
+  border-bottom: 0;
+  border-top: 2px solid var(--border-dark);
+  font-size: 15px;
+}
+body.disp-movil .window > .tab-bar .tab {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 0;
+  padding: 0 2px;
+  border-bottom: 0;
+}
+body.disp-movil .window > .tab-bar .tab svg {
+  width: 22px;
+  height: 22px;
+}
+body.disp-movil .window > .tab-bar .tab-ico {
+  font-size: 22px;
+  line-height: 22px;
+  height: 22px;
+}
+body.disp-movil .window > .tab-bar .tab-txt {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+body.disp-movil .window > .tab-bar .tab.active { background: var(--bg-panel); }
+body.disp-movil .window > .tab-bar .tab.active::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 0;
+  height: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+body.disp-movil .window > .tab-bar .tab-right { display: none; }
+/* Se sigue recogiendo sola en la letra, como arriba: del todo con ratón, y
+   dejando su tirador de 22 px con el dedo (las reglas de siempre pierden
+   aquí por especificidad, así que se repiten para el pie). */
+body.disp-movil .window > .tab-bar.se-esconde {
+  max-height: 0;
+  opacity: 0;
+  border-top-width: 0;
+}
+body.disp-movil.perf-tactil .window > .tab-bar.se-esconde {
+  max-height: 22px;
+  opacity: 1;
+  border-top-width: 2px;
+}
+@media (max-width: 359px) {
+  body.disp-movil .window > .tab-bar .tab-txt { font-size: 13px; letter-spacing: 0; }
+}
+
+/* --- Listas: los chips en una sola fila que se desliza ---
+   Se partían en dos o tres renglones y empujaban la lista hacia abajo. El
+   ⟳ se queda pegado a la derecha, siempre a mano. */
+body.disp-movil .lib-nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+body.disp-movil .lib-nav::-webkit-scrollbar { display: none; }
+body.disp-movil .lib-chip { flex: 0 0 auto; min-height: 36px; }
+body.disp-movil .lib-refresh {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  background: var(--bg-panel);
+  box-shadow: -12px 0 10px var(--bg-panel);
+}
+
+/* --- El menú de «dónde suena»: más ancho y con el volumen --- */
+body.disp-movil .dev-menu { min-width: min(300px, calc(100vw - 16px)); }
+body.disp-movil .dev-item { min-height: 44px; }
+body.disp-movil .dev-vol {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 10px 8px 8px;
+  border-top: 1px dashed var(--border-dark);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LA FILA DE VISTA SE ESCONDE SOLA, COMO LA BARRA DE PESTAÑAS
+   22-sep-2026: «que sea como ajustes, que si después de un tiempo no le
+   das se quite, para que esté más limpio».
+
+   Mismo reloj y mismo gesto que la barra de pestañas (js/seven.js): se va
+   cuando ella lleva `.se-esconde` —solo en la letra, tras 2,5 s con ratón
+   o 4 s con el dedo— y vuelve con ella: al mover el ratón o con el
+   tirador. No tiene temporizador propio, así que no puede desacompasarse.
+   En el ordenador se DESVANECE sin dejar de ocupar su sitio: la música
+   no se mueve del centro ni un píxel. En el teléfono además se PLIEGA, y
+   la letra gana esa fila.
+   ══════════════════════════════════════════════════════════════════ */
+.ctl-vista {
+  transition: opacity 0.3s ease-out, visibility 0.3s;
+}
+.window:has(.tab-bar.se-esconde) .ctl-vista {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+body.disp-movil .ctl-vista {
+  max-height: 64px;
+  overflow: hidden;
+  transition: max-height 0.35s ease-out, margin-top 0.35s ease-out,
+              opacity 0.3s ease-out, visibility 0.35s;
+}
+body.disp-movil .window:has(.tab-bar.se-esconde) .ctl-vista {
+  max-height: 0;
+  margin-top: -6px;          /* se come también el hueco que la separa de la música */
+}
+body.reduce-motion .controls-row .ctl-vista { transition: none; }
+/* El anillo del teclado, por dentro: en el teléfono la fila recorta lo que
+   se sale (para poder plegarse) y el anillo de fuera quedaba cortado. */
+.ctl-vista > :focus-visible { outline-offset: -2px; }

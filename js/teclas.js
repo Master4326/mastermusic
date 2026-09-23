@@ -91,12 +91,14 @@
      es 0 y el foco se queda donde estaba, que es justo lo que necesita
      quien navega con el tabulador.
 
-     Solo la fila de mandos y las pestañas: son las que compiten con el
-     espacio. El ✖ del volumen se queda fuera porque su barra se despliega
-     con `:focus-within`, y soltarle el foco la cerraría de golpe. */
+     Solo la fila de mandos y las pestañas (y el ⚙ de la barra de título
+     del teléfono, que es el engranaje de las pestañas): son las que
+     compiten con el espacio. El ✖ del volumen se queda fuera porque su
+     barra se despliega con `:focus-within`, y soltarle el foco la cerraría
+     de golpe. */
   document.addEventListener('click', (e) => {
     if (e.detail === 0) return;
-    const b = e.target.closest && e.target.closest('.tab, .ctrl-btn');
+    const b = e.target.closest && e.target.closest('.tab, .ctrl-btn, .tb-cfg');
     if (!b || b.id === 'volBtn') return;
     if (document.activeElement === b) b.blur();
   });

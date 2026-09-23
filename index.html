@@ -50,29 +50,58 @@
         </div>
         <span class="title-text">MASTER MUSIC</span>
       </div>
-      <!-- AHORA SUENA · el chip que sustituye a la columna izquierda cuando
-           está puesta la LETRA ANCHA (botón ◧ o tecla W). Vive en la barra de
-           título a propósito: es la única barra que no se esconde nunca, así
-           que la carátula y el nombre siguen a la vista mientras la letra se
-           queda con el ancho entero. Pulsarlo devuelve la vista normal. -->
-      <button class="np-chip" id="npChip" hidden
-              title="Volver a la vista normal — la carátula regresa a su columna (W)">
-        <span class="npc-cover" id="npChipCover" aria-hidden="true">♪</span>
-        <span class="npc-meta">
-          <span class="npc-title" id="npChipTitle">Sin canción</span>
-          <span class="npc-artist" id="npChipArtist"></span>
-        </span>
+      <!-- BUSCAR EN TODO · subió aquí desde la barra de estado, donde era un
+           botoncito de 15 px al lado del reloj. Esta es la única barra que no
+           se esconde nunca (la de pestañas se recoge sola y el cine tapa la
+           de abajo), así que la puerta a todo lo demás queda siempre a la
+           vista y en el centro, que es donde se busca un buscador.
+           Dice «buscar» y nada más: llevaba una frase larga y el «ctrl K», y
+           el usuario lo quiso limpio (22-sep-2026). El atajo sigue en config
+           ⚙ → atajos de teclado. Lo cablea js/buscador.js por su id. -->
+      <button type="button" class="paleta-btn" id="paletaBtn"
+              aria-label="Buscar en todo: tu música, tus listas, Spotify y los mandos"
+              title="Buscar">
+        <span class="pb-ico" aria-hidden="true">⌕</span>
+        <span class="pb-txt">buscar</span>
       </button>
-      <!-- Los tres de la esquina se repartían por el `title` («if (b.title
-           === 'Maximizar')»), o sea que cambiar el texto del globito los
-           dejaba mudos. Ahora cada uno lleva escrito lo que es. -->
-      <div class="title-right">
-        <button class="tb-btn" data-win="min" aria-label="Devolver el tamaño de ventana normal"
-                title="Devolver el tamaño de ventana normal">_</button>
-        <button class="tb-btn" data-win="max" aria-label="Maximizar: la app ocupa toda la pantalla"
-                title="Maximizar: la app ocupa toda la pantalla (o doble clic en esta barra)">▢</button>
-        <button class="tb-btn tb-close" data-win="close" aria-label="Cerrar: para la música"
-                title="Cerrar: para la música">✕</button>
+      <div class="title-end">
+        <!-- AHORA SUENA · el chip que sustituye a la columna izquierda cuando
+             está puesta la LETRA ANCHA (botón ◧ o tecla W). Vive en la barra de
+             título a propósito: es la única barra que no se esconde nunca, así
+             que la carátula y el nombre siguen a la vista mientras la letra se
+             queda con el ancho entero. Pulsarlo devuelve la vista normal. -->
+        <button class="np-chip" id="npChip" hidden
+                title="Volver a la vista normal — la carátula regresa a su columna (W)">
+          <span class="npc-cover" id="npChipCover" aria-hidden="true">♪</span>
+          <span class="npc-meta">
+            <span class="npc-title" id="npChipTitle">Sin canción</span>
+            <span class="npc-artist" id="npChipArtist"></span>
+          </span>
+        </button>
+        <!-- ⚙ DEL TELÉFONO · en el móvil las pestañas bajan al pie de la
+             pantalla y el engranaje sube aquí, arriba a la derecha, que es
+             donde se busca en cualquier app. No es un segundo ajuste: pulsa
+             el engranaje de siempre (js/movil.js), así que hace lo mismo —
+             abre config, y dentro de config te devuelve a donde estabas. En
+             el ordenador no se ve: allí el ⚙ sigue en la barra de pestañas. -->
+        <button type="button" class="tb-cfg" id="tbCfg" aria-label="Configuración" title="Configuración (S)">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.6-.22l-2.39.96a7.06 7.06 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.63.94l-2.39-.96a.49.49 0 0 0-.6.22L2.69 8.86a.49.49 0 0 0 .12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.21.37.3.6.22l2.39-.96c.5.37 1.04.7 1.63.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.63-.94l2.39.96c.23.08.48 0 .6-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/>
+          </svg>
+        </button>
+        <!-- Los tres de la esquina se repartían por el `title` («if (b.title
+             === 'Maximizar')»), o sea que cambiar el texto del globito los
+             dejaba mudos. Ahora cada uno lleva escrito lo que es.
+             En el teléfono no salen: la app ya ocupa la pantalla entera, así
+             que maximizar o «devolver el tamaño» no hacía nada que se viera. -->
+        <div class="title-right">
+          <button class="tb-btn" data-win="min" aria-label="Devolver el tamaño de ventana normal"
+                  title="Devolver el tamaño de ventana normal">_</button>
+          <button class="tb-btn" data-win="max" aria-label="Maximizar: la app ocupa toda la pantalla"
+                  title="Maximizar: la app ocupa toda la pantalla (o doble clic en esta barra)">▢</button>
+          <button class="tb-btn tb-close" data-win="close" aria-label="Cerrar: para la música"
+                  title="Cerrar: para la música">✕</button>
+        </div>
       </div>
     </div>
 
@@ -155,10 +184,12 @@
             </svg><span class="tab-txt">historial</span>
           </button>
           <span class="tab-right">
-            <button class="tab icon-tab tab-gear" data-tab="settings" aria-label="Configuración" title="Configuración (S)">
+            <!-- Con su nombre, como las demás: era la única pestaña que
+                 seguía siendo un icono pelado. -->
+            <button class="tab icon-tab tab-gear" data-tab="settings" aria-label="Ajustes (configuración)" title="Ajustes (S)">
               <svg viewBox="0 0 24 24">
                 <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.62l-1.92-3.32a.49.49 0 0 0-.6-.22l-2.39.96a7.06 7.06 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.63.94l-2.39-.96a.49.49 0 0 0-.6.22L2.69 8.86a.49.49 0 0 0 .12.62l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.62l1.92 3.32c.12.21.37.3.6.22l2.39-.96c.5.37 1.04.7 1.63.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.63-.94l2.39.96c.23.08.48 0 .6-.22l1.92-3.32a.49.49 0 0 0-.12-.62l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/>
-              </svg>
+              </svg><span class="tab-txt">ajustes</span>
             </button>
           </span>
         </div>
@@ -214,8 +245,8 @@
                    y es lo que nadie encuentra solo si no se le dice. -->
               <button type="button" class="li-way" id="idleBuscar">
                 <span class="li-ico" aria-hidden="true">⌕</span>
-                <b>ctrl + K</b>
-                <em>busca en todo</em>
+                <b>buscar</b>
+                <em>tu música, tus listas y spotify</em>
               </button>
               <button type="button" class="li-way" id="idleImportar">
                 <span class="li-ico" aria-hidden="true">♫</span>
@@ -265,7 +296,7 @@
             <div class="sp-search-head">♫ buscar en spotify</div>
             <div class="search-row">
               <span class="prompt">♫</span>
-              <input type="text" id="spotifySearchInput" placeholder="canción, artista o álbum..." class="retro-input"
+              <input type="text" id="spotifySearchInput" placeholder="buscar…" class="retro-input"
                 autocomplete="off" spellcheck="false" />
               <button class="sp-limpiar" id="spotifyClear" title="Borrar (Esc)" hidden>✕</button>
             </div>
@@ -454,6 +485,19 @@
                 <button class="seg-btn" data-val="liso">liso</button>
               </div>
               <button class="set-ver" type="button" data-ver="lyrics">ver ▸</button>
+            </div>
+            <!-- VINILO · la carátula gira como un disco. En el ordenador sigue
+                 teniendo su ◉ encima de la carátula; en el teléfono la carátula
+                 mide 60 px y un botón encima se la comía entera, así que allí
+                 este es su sitio. Mismo `mm_vinyl` y mismo formato que el ◉
+                 (js/seven.js): los dos mandan sobre lo mismo y se enteran. -->
+            <div class="set-row" data-buscar="vinilo disco girar gira caratula tocadiscos rueda">
+              <span class="set-label">vinilo</span>
+              <div class="seg" data-set="vinilo"
+                   title="La carátula gira como un disco mientras suena. En el ordenador también está el botón ◉, encima de la carátula.">
+                <button class="seg-btn" data-val="true">gira</button>
+                <button class="seg-btn" data-val="false">quieta</button>
+              </div>
             </div>
             <div class="set-row" data-buscar="crt scanlines pantalla tubo retro curva brillo">
               <span class="set-label">pantalla crt</span>
@@ -712,7 +756,62 @@
                 title="Lo que dura la canción — pulsa para ver lo que queda">0:00</button>
       </div>
 
+      <!-- ==========================================================
+           LA FILA DE MANDOS, EN TRES ZONAS QUE NO SE PISAN
+
+             VISTA            ·   MÚSICA               ·   DÓNDE Y CUÁNTO
+             ◧ ✦ ❝ ⛶             ⤮ ⏮ ▶ ⏭ ↻              ♡ ◎ volumen
+
+           Antes era una sola fila: el transporte en el centro y, flotando
+           encima por la derecha (position: absolute), un racimo de glifos
+           sin nombre —volumen, ◧ ✦ ❝ ⛶— que en cuanto la ventana estrechaba
+           se montaba sobre «siguiente». Y «dónde suena» vivía perdido en la
+           barra de estado, al lado del reloj.
+
+           Ahora cada cosa está con las de su clase: lo que cambia cómo ves
+           la letra, lo que mueve la música y dónde y a cuánto suena. Los
+           botones de VISTA llevan su nombre debajo (en ventanas estrechas
+           se quedan en el icono). En el teléfono la fila se parte en dos:
+           arriba la música con botones grandes y debajo la vista; el ♡ sube
+           a la franja de la carátula y ◎ entra en la fila de vista, con el
+           volumen dentro de su menú (lo muda js/movil.js).
+           ========================================================== -->
       <div class="controls-row">
+        <div class="ctl-vista" role="group" aria-label="Cómo ver la letra">
+          <!-- LETRA ANCHA · esconde la columna de la carátula y deja el panel
+               entero para la letra. La carátula y el nombre no se pierden: se
+               mudan al chip de la barra de título. Va aquí, con ✦ y ⛶, porque
+               es lo mismo que ellos —una forma de ver— y porque así el panel
+               de la letra se queda limpio. -->
+          <button class="ctrl-btn vol-btn side-btn" id="anchoBtn" aria-pressed="false"
+                  aria-label="Letra ancha: esconde la carátula y deja todo el ancho para la letra"
+                  title="Letra ancha: esconde la carátula y deja todo el ancho para la letra (W)"><span class="sb-ico" aria-hidden="true">◧</span><span class="sb-txt" aria-hidden="true">ancha</span></button>
+          <!-- El icono y el nombre van en spans: js/lyrics.js cambia los dos
+               (✦ edit ↔ ≡ lista) sin barrer el botón entero. -->
+          <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" aria-pressed="false"
+                  aria-label="Modo edit: la letra a pantalla completa, animada"
+                  title="Modo edit (letra animada)"><span class="sb-ico" aria-hidden="true">✦</span><span class="sb-txt" aria-hidden="true">edit</span></button>
+          <!-- ❝ COMPARTIR LA LETRA · elige los versos y sale una imagen con
+               la carátula, el título y esos versos. Va aquí, con ✦ ◧ ⛶,
+               porque el panel de la letra se queda limpio: el panel de
+               compartir lo cuelga js/compartir.js del <body>, como la
+               galería de tipografías. -->
+          <button class="ctrl-btn vol-btn side-btn" id="compartirBtn"
+                  aria-label="Compartir la letra como imagen"
+                  title="Compartir la letra como imagen: carátula, título y los versos que elijas"><span class="sb-ico" aria-hidden="true">❝</span><span class="sb-txt" aria-hidden="true">compartir</span></button>
+          <!-- ⚗ Lab de efectos · nace con `hidden` y lo destapa js/lyrics.js
+               SOLO en local (127.0.0.1 / file:). En la página publicada no
+               aparece: es herramienta de taller, no de quien viene a oír
+               música. Lleva su nombre igual, porque en local sí se lee. -->
+          <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn"
+                  aria-label="Laboratorio de efectos: probar las animaciones sin música"
+                  title="Laboratorio de efectos: probar todas las animaciones sin música" hidden><span class="sb-ico" aria-hidden="true">⚗</span><span class="sb-txt" aria-hidden="true">lab</span></button>
+          <button class="ctrl-btn vol-btn side-btn" id="cinemaBtn"
+                  aria-label="Modo cine: letra a pantalla completa con la carátula girando"
+                  title="Modo cine: letra animada + carátula girando (Esc para salir)"><span class="sb-ico" aria-hidden="true">⛶</span><span class="sb-txt" aria-hidden="true">cine</span></button>
+        </div>
+
+        <div class="ctl-musica">
         <button class="ctrl-btn" id="shuffleBtn" aria-pressed="false" aria-label="Aleatorio" title="Aleatorio">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="16 3 21 3 21 8"/>
@@ -756,88 +855,61 @@
           </svg>
           <span class="rep-badge">1</span>
         </button>
+        </div>
 
-        <!-- ♥ GUARDAR EN SPOTIFY · spotify.js tiene el corazón entero escrito
-             (pintarLike / refrescarLike / alternarLike, contra el endpoint
-             nuevo /me/library) y hasta la regla .ctrl-btn.like-on en el CSS.
-             Le faltaba el botón. Lo enseña y lo esconde él según si la
-             canción es de Spotify y si la cuenta tiene permiso. -->
-        <button class="ctrl-btn like-btn" id="likeBtn" aria-pressed="false"
-                aria-label="Guardar en Tus me gusta" title="Guardar en Tus me gusta" hidden>♡</button>
-
-        <!-- VOLUMEN: icono discreto, la barra se despliega al pasar el mouse -->
-        <div class="volume-ctl" id="volumeCtl">
-          <span class="vol-pct" id="volPct">70</span>
-          <div class="volume-bar" id="volumeBar" title="Volumen">
-            <div class="volume-bg">
-              <div class="volume-fill" id="volumeFill"></div>
-              <div class="volume-thumb" id="volumeThumb"></div>
-            </div>
-          </div>
-          <button class="ctrl-btn vol-btn" id="volBtn" aria-label="Silenciar" title="Silenciar (M)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"/>
-              <path class="vol-wave1" d="M15 9.7a3.4 3.4 0 0 1 0 4.6"/>
-              <path class="vol-wave2" d="M17.6 7.2a7 7 0 0 1 0 9.6"/>
-              <g class="vol-x">
-                <line x1="15.5" y1="9.5" x2="20.5" y2="14.5"/>
-                <line x1="20.5" y1="9.5" x2="15.5" y2="14.5"/>
-              </g>
-            </svg>
+        <div class="ctl-sonido">
+          <!-- ♥ GUARDAR EN SPOTIFY · spotify.js tiene el corazón entero escrito
+               (pintarLike / refrescarLike / alternarLike, contra el endpoint
+               nuevo /me/library) y hasta la regla .ctrl-btn.like-on en el CSS.
+               Le faltaba el botón. Lo enseña y lo esconde él según si la
+               canción es de Spotify y si la cuenta tiene permiso. -->
+          <button class="ctrl-btn like-btn" id="likeBtn" aria-pressed="false"
+                  aria-label="Guardar en Tus me gusta" title="Guardar en Tus me gusta" hidden>♡</button>
+          <!-- DÓNDE SUENA · bajó de la barra de estado, donde nadie lo buscaba,
+               a su sitio de siempre en cualquier reproductor: al lado del
+               volumen. Sale solo con Spotify; el menú lo monta spotify.js
+               colgado del <body> (ver el comentario de allí). -->
+          <button class="dev-chip" id="devChip" hidden
+            aria-haspopup="true" aria-expanded="false"
+            title="Elegir en qué dispositivo suena">
+            <span class="dev-ico" aria-hidden="true">◎</span><span id="devName"></span>
           </button>
-          <!-- LETRA ANCHA · esconde la columna de la carátula y deja el panel
-               entero para la letra. La carátula y el nombre no se pierden: se
-               mudan al chip de la barra de título. Va aquí, con ✦ y ⛶, porque
-               es lo mismo que ellos —una forma de ver— y porque así el panel
-               de la letra se queda limpio. -->
-          <button class="ctrl-btn vol-btn side-btn" id="anchoBtn" aria-pressed="false"
-                  aria-label="Letra ancha: esconde la carátula y deja todo el ancho para la letra"
-                  title="Letra ancha: esconde la carátula y deja todo el ancho para la letra (W)">◧</button>
-          <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" aria-pressed="false"
-                  aria-label="Modo edit: la letra a pantalla completa, animada"
-                  title="Modo edit (letra animada)">✦</button>
-          <!-- ❝ COMPARTIR LA LETRA · elige los versos y sale una imagen con
-               la carátula, el título y esos versos. Va aquí, con ✦ ◧ ⛶,
-               porque el panel de la letra se queda limpio: el panel de
-               compartir lo cuelga js/compartir.js del <body>, como la
-               galería de tipografías. -->
-          <button class="ctrl-btn vol-btn side-btn" id="compartirBtn"
-                  aria-label="Compartir la letra como imagen"
-                  title="Compartir la letra como imagen: carátula, título y los versos que elijas">❝</button>
-          <!-- ⚗ Lab de efectos · nace con `hidden` y lo destapa js/lyrics.js
-               SOLO en local (127.0.0.1 / file:). En la página publicada no
-               aparece: es herramienta de taller, no de quien viene a oír
-               música. Lleva su nombre igual, porque en local sí se lee. -->
-          <button class="ctrl-btn vol-btn side-btn" id="fxLabBtn"
-                  aria-label="Laboratorio de efectos: probar las animaciones sin música"
-                  title="Laboratorio de efectos: probar todas las animaciones sin música" hidden>⚗</button>
-          <button class="ctrl-btn vol-btn side-btn" id="cinemaBtn"
-                  aria-label="Modo cine: letra a pantalla completa con la carátula girando"
-                  title="Modo cine: letra animada + carátula girando (Esc para salir)">⛶</button>
+          <!-- VOLUMEN: icono discreto, la barra se despliega al pasar el mouse -->
+          <div class="volume-ctl" id="volumeCtl">
+            <span class="vol-pct" id="volPct">70</span>
+            <div class="volume-bar" id="volumeBar" title="Volumen">
+              <div class="volume-bg">
+                <div class="volume-fill" id="volumeFill"></div>
+                <div class="volume-thumb" id="volumeThumb"></div>
+              </div>
+            </div>
+            <button class="ctrl-btn vol-btn" id="volBtn" aria-label="Silenciar" title="Silenciar (M)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"/>
+                <path class="vol-wave1" d="M15 9.7a3.4 3.4 0 0 1 0 4.6"/>
+                <path class="vol-wave2" d="M17.6 7.2a7 7 0 0 1 0 9.6"/>
+                <g class="vol-x">
+                  <line x1="15.5" y1="9.5" x2="20.5" y2="14.5"/>
+                  <line x1="20.5" y1="9.5" x2="15.5" y2="14.5"/>
+                </g>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- STATUS BAR -->
+    <!-- STATUS BAR · qué suena, los avisos y el reloj. El ⌕ de buscar subió
+         a la barra de título y «dónde suena» bajó a la fila de mandos: aquí
+         queda lo que se LEE, no lo que se pulsa. En el teléfono no hay barra
+         de estado: los avisos salen en la franja de la carátula (js/movil.js)
+         y la hora ya la da el propio teléfono. -->
     <div class="status-bar">
       <span class="status-left">
         <span class="mini-eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
         <span id="statusText" role="status" aria-live="polite">▣ listo</span>
       </span>
       <span class="filler" aria-hidden="true"></span>
-      <!-- BUSCAR EN TODO · el atajo Ctrl+K no existe para quien usa el dedo, y
-           la barra de estado es lo único que se ve SIEMPRE (la de pestañas se
-           esconde sola en la letra y el cine la tapa entera). -->
-      <button class="paleta-btn" id="paletaBtn" title="Buscar en todo: tu música, tus listas, Spotify y los mandos (Ctrl+K)">
-        <span aria-hidden="true">⌕</span> buscar
-      </button>
-      <!-- Dónde suena. Sale solo con Spotify Connect; el menú lo monta
-           spotify.js colgado del <body> (ver el comentario de allí). -->
-      <button class="dev-chip" id="devChip" hidden
-        aria-haspopup="true" aria-expanded="false"
-        title="Elegir en qué dispositivo suena">
-        <span class="dev-ico" aria-hidden="true">◎</span><span id="devName"></span>
-      </button>
       <span id="clock">--:--</span>
     </div>
   </div>
@@ -951,6 +1023,13 @@
        robársela al navegador (Ctrl+B, Ctrl+H…) ni al botón que tiene el
        foco. Va lo primero porque los dos cargan después. -->
   <script defer src="js/teclas.js"></script>
+  <!-- EL TELÉFONO EN VERTICAL · muda de sitio lo que tiene que estar al
+       alcance del pulgar (pestañas al pie, ♡ a la franja de la carátula,
+       ◎ a la fila de vista, los avisos a la franja). Va de los PRIMEROS a
+       propósito: cuanto antes corra, menos se ve la mudanza al abrir; y no
+       le pide nada a nadie al arrancar (los demás lo encuentran todo por
+       su id, esté donde esté). -->
+  <script defer src="js/movil.js"></script>
   <script defer src="js/vendor/jsmediatags.min.js"></script>
   <script defer src="js/db.js"></script>
   <script defer src="js/lyrics.js"></script>

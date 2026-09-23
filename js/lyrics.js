@@ -215,8 +215,10 @@
     const tipEl = document.getElementById('lyricsIdleTip');
     const TIPS = [
       // El primero de la lista es el que más falta hace saber: un solo cuadro
-      // para tu música, tus listas, tu historial, Spotify y los mandos.
-      'ctrl + K busca en todo: tu música, tus listas, tu historial y spotify',
+      // para tu música, tus listas, tu historial, Spotify y los mandos. Sin
+      // «ctrl + K»: el usuario quitó el atajo de la vista (22-sep-2026); se
+      // señala el botón, que sirve igual con ratón que con el dedo.
+      '⌕ buscar, arriba, busca en todo: tu música, tus listas, tu historial y spotify',
       'en el buscador, shift + enter encola la canción en vez de ponerla',
       'la cola (Q) dice de qué lista sale lo que suena — y se pulsa para abrirla',
       'pulsa ✦ para el modo edit — la letra a pantalla completa, animada',
@@ -2307,7 +2309,14 @@
   /* ── alternar lista ↔ edit ── */
   const applyMode = () => {
     repartirHidden();   // la regla de quién ocupa el panel vive en un solo sitio
-    modeBtn.textContent = editMode ? '≡' : '✦';
+    /* El botón lleva icono y nombre en dos spans (la fila de vista enseña
+       «✦ edit» / «≡ lista»). Escribir textContent en el botón se llevaba
+       los dos por delante; se toca cada span. Sin spans, como antes. */
+    const modeIco = modeBtn.querySelector('.sb-ico');
+    const modeTxt = modeBtn.querySelector('.sb-txt');
+    if (modeIco) modeIco.textContent = editMode ? '≡' : '✦';
+    else modeBtn.textContent = editMode ? '≡' : '✦';
+    if (modeTxt) modeTxt.textContent = editMode ? 'lista' : 'edit';
     modeBtn.title = editMode ? 'Volver a vista lista' : 'Modo edit (letra animada)';
     modeBtn.classList.toggle('on', editMode);
     modeBtn.setAttribute('aria-pressed', editMode ? 'true' : 'false');

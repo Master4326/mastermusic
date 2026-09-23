@@ -40,6 +40,11 @@
        enterarse). La lee traductor.js directamente de localStorage, igual
        que el micrófono y «sigue sonando». */
     trad:   { key: 'mm_trad', def: 'off' },
+    /* VINILO · la carátula gira como un disco. Es la misma clave y el mismo
+       formato ('true'/'false') que el botón ◉ de encima de la carátula
+       (js/seven.js): los dos mandan sobre lo mismo. En el teléfono este es
+       su único sitio, porque allí la carátula mide 60 px y el ◉ se la comía. */
+    vinilo: { key: 'mm_vinyl', def: 'false' },
     // La intensidad del modo edit NO es un ajuste: lyrics.js la deduce sola
     // del ritmo de cada línea y de los graves (ver intensidadAuto).
   };
@@ -100,6 +105,16 @@
       if (window.VisualizerModule && window.VisualizerModule.refrescarSync) {
         window.VisualizerModule.refrescarSync();
       }
+    } else if (id === 'vinilo') {
+      /* La clase del <body> es lo que hace girar la carátula; el ◉ de
+         encima de ella se marca igual, para que los dos digan lo mismo. */
+      const on = v === 'true';
+      body.classList.toggle('vinyl-mode', on);
+      const boton = document.getElementById('vinylToggle');
+      if (boton) {
+        boton.classList.toggle('active', on);
+        boton.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
     }
   };
 
@@ -134,6 +149,9 @@
   if (mqMotion.addEventListener) mqMotion.addEventListener('change', onMq);
   else if (mqMotion.addListener) mqMotion.addListener(onMq);
 
+  // El ◉ de la carátula cambió el vinilo por su cuenta: marcar el que toca
+  document.addEventListener('mm:vinilo', () => pintarSeg('vinilo'));
+
   // ---------- Elegir ----------
   // Cómo se llama cada ajuste cuando hay que decirlo en una frase
   const ETIQUETA = {
@@ -145,6 +163,7 @@
     radio:    'sigue sonando',
     ambiente: 'ambiente',
     trad:     'traducción',
+    vinilo:   'vinilo',
   };
 
   const elegir = (id, val, conFoco) => {

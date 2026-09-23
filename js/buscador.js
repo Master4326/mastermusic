@@ -117,7 +117,7 @@
         <div class="paleta-fila">
           <span class="paleta-prompt" aria-hidden="true">⌕</span>
           <input class="paleta-input" type="text" autocomplete="off" spellcheck="false"
-                 aria-label="Buscar" placeholder="canción, artista, lista o un mando…" />
+                 aria-label="Buscar" placeholder="buscar…" />
           <button class="paleta-x" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>
         </div>
         <ul class="paleta-lista" role="listbox"></ul>

@@ -640,6 +640,29 @@
   const vizSyncCasa = vizSyncBtn ? vizSyncBtn.parentNode : null;
   const ANCHO_KEY = 'mm_letra_ancha';
 
+  /* El ◈ del espectro se muda a la fila de vista cuando su marco deja de
+     verse como tal: con la letra ancha (la columna entera se esconde) y en
+     el teléfono (el espectro pasa a ser el fondo tenue de la franja de la
+     carátula, y un botón dentro de un fondo no se puede pulsar). Es EL
+     botón de quien oye por Spotify Connect —sin él el detector va a
+     ciegas—, así que no puede irse con su marco. Lo coloca SOLO este
+     módulo: js/movil.js avisa con `mm:disposicion` y no lo toca. */
+  const colocarSync = () => {
+    if (!vizSyncBtn || !vizSyncCasa || !anchoBtn) return;
+    const fuera = body.classList.contains('letra-ancha') || body.classList.contains('disp-movil');
+    vizSyncBtn.classList.toggle('en-mandos', fuera);
+    if (fuera) {
+      if (vizSyncBtn.nextSibling !== anchoBtn) anchoBtn.parentNode.insertBefore(vizSyncBtn, anchoBtn);
+    } else if (vizSyncBtn.parentNode !== vizSyncCasa) {
+      vizSyncCasa.appendChild(vizSyncBtn);
+    }
+  };
+  document.addEventListener('mm:disposicion', () => {
+    colocarSync();
+    montarMarquesinas();
+    if (window.FondoModule && window.FondoModule.medir) window.FondoModule.medir();
+  });
+
   const pintarChip = () => {
     if (!npChip) return;
     const pc = window.PlayerCore;
@@ -660,14 +683,10 @@
       anchoBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
     if (npChip) npChip.hidden = !on;
-    /* El ◈ del espectro se muda con la columna escondida: es EL botón de
-       quien oye por Spotify Connect (sin él el detector va a ciegas) y
-       dejarlo dentro del marco del visualizador lo haría desaparecer. */
-    if (vizSyncBtn && vizSyncCasa && anchoBtn) {
-      vizSyncBtn.classList.toggle('en-mandos', on);
-      if (on) anchoBtn.parentNode.insertBefore(vizSyncBtn, anchoBtn);
-      else vizSyncCasa.appendChild(vizSyncBtn);
-    }
+    colocarSync();
+    /* En el teléfono la letra ancha esconde la franja de la carátula, que es
+       donde viven el ♡ y los avisos: js/movil.js los recoloca al enterarse. */
+    document.dispatchEvent(new CustomEvent('mm:ancho', { detail: { on } }));
     pintarChip();
     /* Al volver a la vista normal el título se mide otra vez: mientras
        estuvo escondido medía 0 y la marquesina no podía saber si cabía. */
@@ -703,16 +722,27 @@
   const tabBar = document.querySelector('.tab-bar');
   let tabsTimer = null;
 
+  /* LA FILA DE VISTA (◧ ancha · ✦ edit/lista · ❝ · ⛶) se va y vuelve CON
+     ESTA BARRA: pedido del usuario el 22-sep-2026, «que sea como ajustes,
+     que si después de un tiempo no le das se quite, para que esté más
+     limpio». No lleva temporizador propio: el CSS la esconde mientras la
+     barra de pestañas tenga `.se-esconde`, así que las dos obedecen al
+     mismo reloj y al mismo gesto para volver (mover el ratón, o el tirador
+     con el dedo), y no pueden desacompasarse. */
+  const filaVista = document.querySelector('.ctl-vista');
 
   const tactil = () => !!(window.MMPerf && window.MMPerf.tactil());
 
   const ocultarTabs = () => {
     if (!tabBar || cualTab() !== 'lyrics') return;
     /* Con ratón: si el cursor está justo encima (a punto de pulsar el
-       engranaje), esconderla sería una trampa — se re-arma y ya. En táctil
-       no existe el hover, y además la barra deja un tirador visible, así
-       que no hace falta esta cortesía. */
-    if (!tactil() && tabBar.matches(':hover')) { armarTabs(); return; }
+       engranaje, o «cine» en la fila de vista), esconderla sería una
+       trampa — se re-arma y ya. Igual si el foco del teclado está en la
+       fila de vista. En táctil no existe el hover, y además la barra deja
+       un tirador visible, así que no hace falta esta cortesía. */
+    const ocupada = tabBar.matches(':hover')
+      || (filaVista && (filaVista.matches(':hover') || filaVista.matches(':focus-within')));
+    if (!tactil() && ocupada) { armarTabs(); return; }
     tabBar.classList.add('se-esconde');
   };
 
@@ -727,6 +757,16 @@
     armarTabs();
   };
 
+  /* Cambiar de pestaña con la barra recogida —el ⚙ de arriba en el
+     teléfono, un atajo de teclado, un «ver ▸» de config— la dejaba
+     recogida FUERA de la letra, donde es la navegación: en el móvil, las
+     pestañas de abajo seguían plegadas dentro de config. Fuera de la letra
+     se despliega siempre; al volver a la letra, el reloj empieza de cero. */
+  document.addEventListener('mm:tab', (e) => {
+    if (e.detail && e.detail.tab === 'lyrics') armarTabs();
+    else despertarTabs();
+  });
+
   if (tactil()) {
     /* Solo el TIRADOR la despierta. Si la despertara cualquier toque, leer
        la letra la haría saltar cada vez que rozas la pantalla; y como el
@@ -737,6 +777,18 @@
       tabBar.addEventListener('pointerdown', () => {
         if (tabBar.classList.contains('se-esconde')) despertarTabs();
         else armarTabs();
+      }, { passive: true });
+    }
+    /* Mientras se usan los mandos, lo de alrededor no se va: tocar la
+       barra de reproducción (la música o la fila de vista) vuelve a contar
+       los 4 s. Si ya estaba recogido NO lo despierta: en el teléfono la
+       fila de vista y las pestañas se pliegan, y desplegarlas justo al
+       pulsar pausa movería los botones debajo del dedo — para eso está el
+       tirador. */
+    const barraMandos = document.querySelector('.playback-bar');
+    if (barraMandos && tabBar) {
+      barraMandos.addEventListener('pointerdown', () => {
+        if (!tabBar.classList.contains('se-esconde')) armarTabs();
       }, { passive: true });
     }
     armarTabs();
@@ -777,7 +829,7 @@
     /* Montar el span dispara otra vez el MutationObserver, pero ese pase
        muere en el corte por firma de arriba: no hay bucle. */
     montarMarquesinas();
-    updateStatus(`♪ ${t.name} — ${t.artist || 'desconocido'}`);
+    updateStatus(`♪ ${t.name} — ${t.artist || 'desconocido'}`, true);
   };
 
   // Watch the title element — every time it changes, refresh cover & album
@@ -798,6 +850,11 @@
       const on = !body.classList.contains('vinyl-mode');
       applyVinyl(on);
       localStorage.setItem('mm_vinyl', on ? 'true' : 'false');
+      /* El mismo ajuste vive también en config ⚙ → apariencia → vinilo
+         (en el teléfono es su único sitio): que se entere y marque el
+         botón que toca. Él escribe la misma clave, así que no hay nada
+         que traducir. */
+      document.dispatchEvent(new CustomEvent('mm:vinilo', { detail: { on } }));
       if (window.SevenStatus) window.SevenStatus(on ? '▣ modo vinilo activado' : '▣ modo vinilo desactivado');
     });
   }
@@ -840,8 +897,15 @@
     if (statusText.textContent !== txt) statusText.textContent = txt;
   };
 
-  const updateStatus = (msg) => {
+  /* `esCancion`: el aviso de «♪ ahora suena tal» al cambiar de canción.
+     En el teléfono no hay barra de estado: los avisos salen 4 s en la
+     franja de la carátula, en el renglón del disco (lo decide el CSS con
+     la clase `.aviso`). Allí el título y el artista YA están escritos justo
+     encima, así que ese aviso concreto no se marca: repetirlo debajo sería
+     ruido. En el escritorio se ve igual que siempre. */
+  const updateStatus = (msg, esCancion) => {
     statusText.textContent = msg;
+    statusText.classList.toggle('aviso', !esCancion);
     // Reinicia el flicker retro de entrada
     statusText.classList.remove('flash');
     void statusText.offsetWidth;
@@ -849,6 +913,7 @@
     clearTimeout(statusTimeout);
     statusTimeout = setTimeout(() => {
       statusTimeout = null;
+      statusText.classList.remove('aviso');
       statusText.textContent = textoReposo();
     }, 4000);
   };
@@ -898,12 +963,12 @@
 
   /* El consejo de un estado vacío tiene que servir en el aparato que lo
      lee. «pulsa ctrl+K» en un teléfono es un consejo imposible: no hay
-     teclas. Va un BOTÓN, que sirve en los dos sitios, y el atajo se
-     queda al lado solo donde existe un teclado que lo tenga. */
+     teclas. Va un BOTÓN, que sirve en los dos sitios. (El «ctrl+K» que se
+     quedaba al lado con teclado también se fue: el usuario quitó el atajo
+     de la vista el 22-sep-2026; vive en config ⚙ → atajos de teclado.) */
   const botonBuscar = (txt) =>
     `<button type="button" class="retro-btn small q-vacio-buscar">`
-    + `<span class="bracket">[</span> ${txt} <span class="bracket">]</span></button>`
-    + (window.MMPerf && window.MMPerf.tactil() ? '' : ' <kbd>ctrl+K</kbd>');
+    + `<span class="bracket">[</span> ${txt} <span class="bracket">]</span></button>`;
 
   /* Las pistas que hay pintadas ahora mismo, en el mismo orden que las filas.
      La fila guarda solo su número (`data-idx`) y el objeto entero vive aquí:

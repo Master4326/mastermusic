@@ -1235,6 +1235,9 @@
     b.textContent = likeOn ? '♥' : '♡';
     b.classList.toggle('like-on', likeOn);
     b.title = likeOn ? 'Quitar de Tus me gusta' : 'Guardar en Tus me gusta';
+    // el lector de pantalla oía siempre «Guardar…», también con la canción ya guardada
+    b.setAttribute('aria-label', b.title);
+    b.setAttribute('aria-pressed', likeOn ? 'true' : 'false');
   };
 
   // Al cambiar de canción: preguntar si ya está guardada
@@ -1376,10 +1379,12 @@
       list.innerHTML = consulta
         ? `<li class="sp-empty">▒ nada para «${escapeHtml(consulta)}» ▒<br>
              <span class="sp-empty-tip">prueba con el nombre del artista, o con menos palabras</span></li>`
+        /* Sin la línea de ayuda («canción, artista o las dos cosas · F abre
+           esto…»): el usuario quiso el buscador limpio, solo «buscar»
+           (22-sep-2026). Los chips de debajo ya dicen qué se puede buscar. */
         : `<li class="sp-empty sp-empty-inicio">
              <span class="sp-empty-ico">♫</span>
              <b>busca lo que quieras oír</b>
-             <span class="sp-empty-tip">canción, artista o las dos cosas<span class="pie-teclado"> · <kbd>F</kbd> abre esto desde cualquier sitio</span></span>
            </li>`;
       return;
     }
@@ -2304,6 +2309,8 @@
      de <body> no hay ancestro que pueda tener transform, y de paso no lo
      recorta el `overflow` de la barra. */
   let devMenu = null;
+  let devLista = null;     // la parte del menú que se repinta: los aparatos
+  let devVol = null;       // y la que no: el volumen (solo se ve en el teléfono)
   let devAbierto = false;
 
   const chip = () => document.getElementById('devChip');
@@ -2312,16 +2319,26 @@
     const c = chip();
     if (!c) return;
     const nom = document.getElementById('devName');
+    /* `corto` es el mismo dato en una palabra, para la fila de vista del
+       teléfono: allí cada botón mide ~65 px y «sonando aquí» no cabía. Lo
+       pinta el CSS (`attr(data-corto)`); el nombre largo sigue en #devName
+       y en el nombre accesible del botón. */
+    let largo, corto;
     if (lastDevice && lastDevice.name) {
       // Sonando aquí no hace falta el nombre del aparato: el aparato es esto.
-      if (nom) nom.textContent = sdkActivo ? 'sonando aquí' : lastDevice.name;
+      largo = sdkActivo ? 'sonando aquí' : lastDevice.name;
+      corto = sdkActivo ? 'aquí' : lastDevice.name;
       c.hidden = false;
       c.classList.toggle('dev-restringido', !!lastDevice.is_restricted);
     } else {
       c.hidden = !isLoggedIn();     // conectado pero sin aparato: se puede elegir uno
-      if (nom) nom.textContent = sdkDeviceId ? 'sonará aquí' : 'elegir dispositivo';
+      largo = sdkDeviceId ? 'sonará aquí' : 'elegir dispositivo';
+      corto = sdkDeviceId ? 'aquí' : 'elegir';
       c.classList.remove('dev-restringido');
     }
+    if (nom) nom.textContent = largo;
+    c.dataset.corto = corto;
+    c.setAttribute('aria-label', 'Dónde suena: ' + largo + '. Pulsa para elegir otro aparato');
     c.classList.toggle('dev-aqui', sdkActivo);
   };
 
@@ -2337,7 +2354,7 @@
     if (!c || !devMenu) return;
     const r = c.getBoundingClientRect();
     const ancho = devMenu.offsetWidth || 220;
-    // La barra de estado vive abajo del todo: el menú abre hacia ARRIBA
+    // El chip vive en la fila de mandos, abajo del todo: el menú abre hacia ARRIBA
     devMenu.style.left = Math.round(
       Math.max(8, Math.min(window.innerWidth - ancho - 8, r.right - ancho))) + 'px';
     devMenu.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
@@ -2350,7 +2367,7 @@
 
   const pintarMenuDev = (lista) => {
     if (!lista.length) {
-      devMenu.innerHTML = `<div class="dev-vacio">
+      devLista.innerHTML = `<div class="dev-vacio">
         ▒ ningún dispositivo a la vista ▒
         <span>${sdkVetado
           ? 'este navegador no puede reproducir aquí: abre Spotify en el móvil o el PC'
@@ -2361,7 +2378,7 @@
     /* Esta pestaña primero: es el destino por defecto y el que evita tener
        que abrir Spotify, así que no debe quedar perdido entre los demás. */
     lista = lista.slice().sort((a, b) => (somos(b.id) ? 1 : 0) - (somos(a.id) ? 1 : 0));
-    devMenu.innerHTML = lista.map((d) => `
+    devLista.innerHTML = lista.map((d) => `
       <button class="dev-item${d.is_active ? ' activo' : ''}${somos(d.id) ? ' es-aqui' : ''}" role="menuitem"
         data-id="${escapeHtml(d.id || '')}" ${d.is_restricted ? 'disabled' : ''}
         title="${d.is_restricted ? 'Spotify no permite controlar este dispositivo desde fuera' : ''}">
@@ -2371,6 +2388,24 @@
       </button>`).join('');
   };
 
+  /* EL VOLUMEN, DENTRO DEL MENÚ DE «DÓNDE SUENA».
+     En el teléfono la fila de mandos ya no lleva la bocina: el volumen que
+     de verdad hace falta tocar desde la app es el del APARATO donde suena
+     (la tele, el altavoz, el otro móvil: sus botones físicos no están en tu
+     mano), y ese vive justo con la lista de aparatos, que es donde lo pone
+     cualquier reproductor. Es el mismo volumen de siempre —PlayerCore, que
+     ya se lo manda a Spotify con su pausa de 250 ms—, no uno nuevo.
+     En el ordenador el CSS no lo enseña: allí la bocina está al lado. */
+  const pintarVolMenu = () => {
+    if (!devVol) return;
+    const pc = window.PlayerCore;
+    const v = pc && pc.state ? Math.round((pc.state.volume || 0) * 100) : 70;
+    const r = devVol.querySelector('.dev-vol-rango');
+    const p = devVol.querySelector('.dev-vol-pct');
+    if (r && document.activeElement !== r) r.value = String(v);
+    if (p) p.textContent = v + '%';
+  };
+
   const abrirMenuDev = async () => {
     if (!devMenu) {
       devMenu = document.createElement('div');
@@ -2378,8 +2413,32 @@
       devMenu.id = 'devMenu';
       devMenu.setAttribute('role', 'menu');
       devMenu.hidden = true;
+      devMenu.innerHTML = `<div class="dev-lista"></div>
+        <div class="dev-vol">
+          <svg class="dev-vol-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"/>
+            <path d="M15 9.7a3.4 3.4 0 0 1 0 4.6"/><path d="M17.6 7.2a7 7 0 0 1 0 9.6"/>
+          </svg>
+          <input type="range" class="dev-vol-rango" min="0" max="100" step="1" value="70"
+                 aria-label="Volumen de donde suena">
+          <span class="dev-vol-pct">70%</span>
+        </div>`;
+      devLista = devMenu.querySelector('.dev-lista');
+      devVol = devMenu.querySelector('.dev-vol');
       document.body.appendChild(devMenu);
+      const rango = devVol.querySelector('.dev-vol-rango');
+      rango.addEventListener('input', () => {
+        const pc = window.PlayerCore;
+        if (pc && pc.setVolume) pc.setVolume(Number(rango.value) / 100);
+        const p = devVol.querySelector('.dev-vol-pct');
+        if (p) p.textContent = rango.value + '%';
+      });
       devMenu.addEventListener('click', async (e) => {
+        /* Arrastrar el volumen acaba en un «click» que sube hasta el
+           document, y allí está el oyente que cierra el menú: sin esto, el
+           menú se cerraba al soltar el dedo de la barra. */
+        if (e.target.closest('.dev-vol')) { e.stopPropagation(); return; }
         const it = e.target.closest('.dev-item');
         if (!it || !it.dataset.id) return;
         cerrarMenuDev();
@@ -2403,12 +2462,13 @@
     devMenu.hidden = false;
     const c = chip();
     if (c) c.setAttribute('aria-expanded', 'true');
-    devMenu.innerHTML = '<div class="dev-vacio">▒ buscando dispositivos… ▒</div>';
+    devLista.innerHTML = '<div class="dev-vacio">▒ buscando dispositivos… ▒</div>';
+    pintarVolMenu();
     colocarMenuDev();
     try {
       pintarMenuDev(await spDevices());
     } catch (e) {
-      devMenu.innerHTML = `<div class="dev-vacio">▒ no se pudo consultar ▒
+      devLista.innerHTML = `<div class="dev-vacio">▒ no se pudo consultar ▒
         <span>${escapeHtml(detalleSpotify(e))}</span></div>`;
     }
     colocarMenuDev();   // el alto cambió al pintar la lista
