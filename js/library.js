@@ -259,11 +259,17 @@
     return (t.uri && cur.uri === t.uri) || (t.id && cur.id === t.id);
   };
 
+  /* La que suena lleva, en el sitio del número, tres barritas que se mueven
+     con la música: las mismas bandas que el mini-EQ de la barra de estado
+     (las mueve visualizer.js; sin audio que medir, una animación de
+     respaldo, y en pausa quietas). Antes era un ▶ quieto, suene o no. */
+  const EQ_FILA = '<span class="sp-eq" role="img" aria-label="sonando"><i></i><i></i><i></i></span>';
+
   const rowTrack = (t, i) => `
     <li class="sp-result${t.unplayable ? ' sp-unplayable' : ''}${sonando(t) ? ' sp-now' : ''}" data-idx="${i}"
         tabindex="0"
         ${t.unplayable ? 'title="Spotify no da una URI para esta pista (archivo local o retirada del catálogo)"' : ''}>
-      <span class="sp-idx">${sonando(t) ? '▶' : String(i + 1).padStart(2, '0')}</span>
+      <span class="sp-idx">${sonando(t) ? EQ_FILA : String(i + 1).padStart(2, '0')}</span>
       <div class="sp-thumb" ${t.cover ? `style="background-image:url('${t.cover}')"` : ''}>${t.cover ? '' : '♪'}</div>
       <div class="sp-meta">
         <div class="sp-name">${escapeHtml(t.name)}</div>
@@ -1193,7 +1199,7 @@
   });
 
   /* ---------- Mover la marca de «esto es lo que suena» ----------
-     Al cambiar de canción hay que mover el ▶ de la lista. Repintar entera
+     Al cambiar de canción hay que mover las barritas de la lista. Repintar entera
      valdría... y tiraría el scroll: estás a mitad de una playlist de 400,
      entra la siguiente canción y la lista salta al principio sola. Aquí se
      tocan SOLO las dos filas que cambian. */
@@ -1208,7 +1214,10 @@
       if (on === li.classList.contains('sp-now')) return;   // esta no cambia
       li.classList.toggle('sp-now', on);
       const idx = li.querySelector('.sp-idx');
-      if (idx) idx.textContent = on ? '▶' : String(parseInt(li.dataset.idx, 10) + 1).padStart(2, '0');
+      if (idx) {
+        if (on) idx.innerHTML = EQ_FILA;
+        else idx.textContent = String(parseInt(li.dataset.idx, 10) + 1).padStart(2, '0');
+      }
     });
   };
 

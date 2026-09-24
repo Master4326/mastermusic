@@ -3,6 +3,11 @@
    ========================================================== */
 
 :root {
+  /* La app es oscura y hay que decírselo al navegador: sin esto pintaba EN
+     CLARO todo lo que dibuja él —las barras de desplazamiento que no llevan
+     la pixel, los deslizadores, los campos—, grises de Windows en medio del
+     azul noche. */
+  color-scheme: dark;
   --bg-deep: #0a0e2e;
   --bg-window: #1a1f4a;
   --bg-panel: #161a3e;
@@ -18,10 +23,30 @@
   --accent-2: #8fd3ff;
   --text: #e8ecff;
   --text-dim: #8b94d8;
-  --text-muted: #5a648f;
+  /* Lo secundario (número y duración de cada canción, álbum, secciones,
+     ayudas, «buscar…», vacíos). Era #5a648f: 2,9 : 1 sobre el panel, y para
+     leer texto normal hacen falta 4,5. Con #7c86c2 da 4,8 sobre el panel y
+     4,5 sobre la ventana, y sigue un escalón por debajo de --text-dim. La
+     versión que sale de la carátula la sube colors.js con la misma vara. */
+  --text-muted: #7c86c2;
   --magenta: #ff5cc8;
   --yellow: #ffe45c;
   --green: #5cff8a;
+  /* LOS TIEMPOS DE LA CASA. Había 16 duraciones y 8 curvas distintas en las
+     transiciones, escritas a mano; las que se repiten tienen ya nombre, para
+     que todo lo que se mueve sea de la misma familia. Mismos valores de
+     siempre: con esto no cambia nada de lo que se ve. */
+  --t-rapida: 0.15s;
+  --t-media: 0.3s;
+  --t-lenta: 0.6s;
+  --muelle: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Lo que seleccionas en un campo (buscar, filtrar, la Redirect URI) se
+   pintaba del azul del sistema: ahora, del acento. */
+::selection {
+  background: var(--accent);
+  color: var(--bg-deep);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -81,7 +106,7 @@ body {
 }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
-input { font-family: inherit; outline: none; }
+input { font-family: inherit; outline: none; caret-color: var(--accent); }
 ul { list-style: none; }
 a { color: var(--accent); text-decoration: none; }
 
@@ -229,12 +254,6 @@ body.perf-bajo::after { display: none; }
 }
 body:has(.window.maximized) { padding: 0; }
 .window.maximized::after { display: none; }
-
-/* Pixel-art double border effect for inner panels */
-.pixel-border {
-  border: 2px solid var(--border-light);
-  box-shadow: inset 0 0 0 1px var(--border-dark);
-}
 
 /* ==========================================================
    TITLE BAR
@@ -589,7 +608,7 @@ body.perf-bajo #visualizer { filter: none; }
   max-height: 90px;
   overflow: hidden;
   position: relative;            /* para el tirador táctil (::after) */
-  transition: max-height 0.35s ease-out, opacity 0.3s ease-out,
+  transition: max-height 0.35s ease-out, opacity var(--t-media) ease-out,
               padding 0.35s ease-out, border-bottom-width 0.35s ease-out;
 }
 .tab-bar.se-esconde {
@@ -643,7 +662,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
   padding: 4px 12px;
   color: var(--text-dim);
   border-bottom: 2px solid transparent;
-  transition: color 0.15s;
+  transition: color var(--t-rapida);
 }
 .tab:hover { color: var(--text); }
 .tab.active {
@@ -660,12 +679,6 @@ body.perf-tactil .tab-bar.se-esconde::after {
   padding-left: clamp(8px, 0.9cqw, 16px);
   padding-right: clamp(8px, 0.9cqw, 16px);
 }
-.tab.icon-tab svg {
-  width: 1.15em;
-  height: 1.15em;
-  display: block;
-}
-.tab.icon-tab.active svg { filter: drop-shadow(0 0 4px var(--accent-glow)); }
 
 /* Zona derecha: engranaje + indicador online */
 .tab-right {
@@ -674,10 +687,8 @@ body.perf-tactil .tab-bar.se-esconde::after {
   align-items: center;
   gap: 10px;
 }
-/* El engranaje es un botón, no una pestaña: sin subrayado y gira al hover */
+/* El engranaje es un botón, no una pestaña: sin subrayado */
 .tab-gear { border-bottom: none !important; }
-.tab-gear svg { transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
-.tab-gear:hover svg, .tab-gear.active svg { transform: rotate(90deg); }
 /* (El "● online" que vivía aquí se quitó a pedido del usuario — además
    siempre decía online, hasta sin conexión.) */
 
@@ -720,14 +731,18 @@ body.perf-tactil .tab-bar.se-esconde::after {
   position: relative;                /* make this the offsetParent so line.offsetTop
                                         is measured relative to the scroll container,
                                         which the auto-center math depends on */
+  /* Cuánto crece el verso activo: en reposo y en el pico de su «pop». De
+     aquí sale también el ancho máximo de TODOS los versos (ver abajo). */
+  --esc-activo: 1.12;
+  --esc-pico: 1.16;
 }
 .lyrics-body .lyric-line {
   padding: 4px 0 4px 24px;
   position: relative;
   transition:
-    color 0.3s ease-out,
-    text-shadow 0.3s ease-out,
-    transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color var(--t-media) ease-out,
+    text-shadow var(--t-media) ease-out,
+    transform var(--t-lenta) var(--muelle),
     opacity 0.4s ease-out,
     filter 0.5s ease-out;
   cursor: pointer;
@@ -735,9 +750,21 @@ body.perf-tactil .tab-bar.se-esconde::after {
   transform-origin: left center;
   transform: scale(0.95);
   opacity: 0.55;
-  will-change: transform, opacity, color;
-  /* Hard limit width so even scaled active line cannot overflow horizontally */
-  max-width: 100%;
+  /* Aquí iba `will-change: transform, opacity, color` en TODOS los versos:
+     una canción de 60 versos pedía 60 capas de composición, y `color` ni
+     siquiera se puede preparar. Ahora solo el activo y sus ±3 vecinos (los
+     que se mueven), en la regla de «Profundidad por distancia». */
+  /* EL VERSO ACTIVO NO PUEDE SALIRSE POR LA DERECHA. Crece desde la
+     izquierda (transform-origin: left) hasta --esc-activo, y en el «pop»
+     hasta --esc-pico. Con `max-width: 100%` un verso de una fila que casi
+     llenaba el ancho acababa un 12 % más ancho que el panel —un 22 % en el
+     pico de antes—, y overflow-x se comía su final: el verso «seguía
+     derecho» y no se podía leer (medido: hasta 85 px fuera ya quieto, 196
+     durante el pop). Ahora cada verso se compone con el ancho que le cabe
+     YA crecido: (ancho + los 12 px de padding derecho del panel) / pico.
+     En todos los versos y no solo en el activo, para que al encenderse no
+     se recomponga en otra forma. */
+  max-width: calc((100% + 12px) / var(--esc-pico, 1.16));
   word-wrap: break-word;
 }
 .lyrics-body .lyric-line.past {
@@ -756,11 +783,11 @@ body.perf-tactil .tab-bar.se-esconde::after {
     0 0 14px var(--accent-glow),
     0 0 28px var(--accent-glow),
     2px 2px 0 rgba(0, 0, 0, 0.6);    /* faux bold stroke without changing layout */
-  transform: scale(1.12);            /* moderate, fits in container even when long */
+  transform: scale(var(--esc-activo, 1.12));   /* cabe siempre: ver max-width arriba */
   opacity: 1;
   font-weight: var(--lyrics-weight-on, 700);
   letter-spacing: var(--lyrics-tracking, 0.02em);
-  animation: lyric-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: lyric-pop 0.55s var(--muelle);
   z-index: 3;
   /* La línea activa entra enfocada DE GOLPE: sin `filter` en la transición.
      Mientras se interpolaba blur(0.6px) → none, la línea tenía filtro medio
@@ -768,9 +795,9 @@ body.perf-tactil .tab-bar.se-esconde::after {
      de la palabra destacada salía cortado por arriba y por abajo. Los 0,6 px
      de desenfoque que se pierden no se ven; el recorte sí se veía. */
   transition:
-    color 0.3s ease-out,
-    text-shadow 0.3s ease-out,
-    transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color var(--t-media) ease-out,
+    text-shadow var(--t-media) ease-out,
+    transform var(--t-lenta) var(--muelle),
     opacity 0.4s ease-out;
 }
 /* The pop animation — quick squish-then-overshoot like a music video edit */
@@ -780,17 +807,24 @@ body.perf-tactil .tab-bar.se-esconde::after {
     opacity: 0.4;
     text-shadow: 0 0 0px transparent;
     filter: blur(2px);
+    /* la SUBIDA sin rebote: con la curva de muelle de la regla, este tramo
+       se pasaba de su propio pico (~1.19) y el verso largo volvía a asomar
+       por la derecha. El muelle sigue en la bajada y en el asiento. */
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
+  /* El pico era 1.22: en un verso largo se salía casi una cuarta parte por
+     la derecha mientras duraba. 1.16 sigue siendo un golpe claro y es el
+     tope con el que se calcula el ancho de los versos. */
   35% {
-    transform: scale(1.22) translateY(-2px);
+    transform: scale(var(--esc-pico, 1.16)) translateY(-2px);
     opacity: 1;
     filter: none;
   }
   60% {
-    transform: scale(1.06);
+    transform: scale(1.08);
   }
   100% {
-    transform: scale(1.12) translateY(0);
+    transform: scale(var(--esc-activo, 1.12)) translateY(0);
     opacity: 1;
   }
 }
@@ -849,6 +883,10 @@ body.perf-tactil .tab-bar.se-esconde::after {
 .lyrics-body.sync .lyric-line[data-d="-1"]:not(.active) { opacity: 0.5;  filter: blur(0.8px); transform: scale(0.93); }
 .lyrics-body.sync .lyric-line[data-d="-2"]:not(.active) { opacity: 0.3;  filter: blur(1.4px); transform: scale(0.9); }
 .lyrics-body.sync .lyric-line[data-d="-3"]:not(.active) { opacity: 0.2;  filter: blur(1.8px); }
+/* Capa de composición solo donde algo se mueve: el verso activo y sus
+   vecinos (MDN: will-change es el último recurso, y en pocos elementos). */
+.lyrics-body .lyric-line.active,
+.lyrics-body .lyric-line[data-d] { will-change: transform, opacity; }
 /* pasar el ratón por encima sigue enfocando cualquier verso (antes no podía
    con los que venían: su desenfoque ganaba al del :hover) */
 .lyrics-body.sync .lyric-line:not(.active):hover {
@@ -879,16 +917,18 @@ body.perf-tactil .tab-bar.se-esconde::after {
   letter-spacing: 0.01em;
   color: var(--text-muted);
   opacity: 0.5;
-  max-width: 100%;
+  /* la del verso activo crece a 1.06 y se corre 3 px: se compone con el
+     ancho que le cabrá así (misma cuenta que .lyric-line) */
+  max-width: calc((100% + 9px) / 1.06);
   word-wrap: break-word;
   /* el clic para saltar al segundo es del verso: el subtítulo lo deja pasar */
   pointer-events: none;
   transform: scale(0.98);
   transform-origin: left center;
   transition:
-    color 0.3s ease-out,
+    color var(--t-media) ease-out,
     opacity 0.4s ease-out,
-    transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform var(--t-lenta) var(--muelle),
     filter 0.5s ease-out;
 }
 .lyrics-body .lyric-line.past + .lyric-trad {
@@ -924,6 +964,11 @@ body.perf-tactil .tab-bar.se-esconde::after {
    Lo vigila check-glow.js. */
 .lyrics-body .lyric-line .w {
   display: inline-block;
+  /* Una palabra más larga que el verso entero («Aaaaaaaaaah…», «oh,oh,oh…»)
+     no se partía: un inline-block no se corta por dentro con break-word,
+     solo con `anywhere`, y se salía cientos de píxeles por la derecha. Esto
+     no toca a las palabras normales: solo parte la que no cabe ni sola. */
+  overflow-wrap: anywhere;
   /* Base VISIBLE: si una animación se cancela a mitad, la palabra aparece
      en vez de quedarse invisible. El estado oculto inicial lo pone el
      fill-mode "both" (aplica el keyframe from durante el delay). */
@@ -940,11 +985,17 @@ body.perf-tactil .tab-bar.se-esconde::after {
   transform: none;
   filter: none;
 }
+/* En los efectos letra a letra cada letra es un inline-block, y entre dos
+   inline-blocks pegados el navegador PUEDE partir el renglón: las palabras
+   se cortaban por la mitad al cambiar de fila («cr | uzando»). lyrics.js
+   mete cada palabra en su .wl, también inline-block: salta de fila entera
+   y solo se parte por dentro si no cabe ni sola en el verso. */
+.lyrics-body .lyric-line .wl { display: inline-block; }
 .lyric-line.fx-rise .w  { animation-name: w-rise; }
 .lyric-line.fx-slide .w { animation-name: w-slide; }
 .lyric-line.fx-wave .w  {
   animation-name: w-wave;
-  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation-timing-function: var(--muelle);
 }
 .lyric-line.fx-type .w  {
   animation-name: w-type;
@@ -969,14 +1020,17 @@ body.perf-tactil .tab-bar.se-esconde::after {
   to   { opacity: 1; }
 }
 
-/* Los efectos 3D necesitan profundidad en la línea contenedora */
+/* Los efectos 3D necesitan profundidad en la línea contenedora. La
+   perspectiva solo alcanza a los HIJOS: en los de letra a letra las letras
+   viven dentro de su .wl, así que ahí la lleva cada palabra. */
 .lyric-line.fx-flip,
-.lyric-line.fx-spin { perspective: 500px; }
+.lyric-line.fx-spin,
+.lyric-line.fx-spin .wl { perspective: 500px; }
 
 /* volteo 3D: cada palabra se levanta como una tarjeta */
 .lyric-line.fx-flip .w {
   animation-name: w-flip;
-  animation-duration: 0.6s;
+  animation-duration: var(--t-lenta);
   transform-origin: 50% 100%;
 }
 @keyframes w-flip {
@@ -988,8 +1042,8 @@ body.perf-tactil .tab-bar.se-esconde::after {
 /* caída con rebote: las letras llueven desde arriba, cada una girada */
 .lyric-line.fx-fall .w {
   animation-name: w-fall;
-  animation-duration: 0.6s;
-  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation-duration: var(--t-lenta);
+  animation-timing-function: var(--muelle);
 }
 @keyframes w-fall {
   0%   { opacity: 0; transform: translateY(-1.1em) rotate(calc(var(--sx, 1) * 16deg)) scale(1.2); filter: blur(2px); }
@@ -1088,7 +1142,8 @@ body.perf-tactil .tab-bar.se-esconde::after {
    ═════════════════════════════════════════════ */
 
 /* espejo: cada letra llega del revés y se voltea a su sitio */
-.lyric-line.fx-espejo { perspective: 600px; }
+.lyric-line.fx-espejo,
+.lyric-line.fx-espejo .wl { perspective: 600px; }
 .lyric-line.fx-espejo .w {
   animation-name: w-espejo;
   animation-duration: 0.5s;
@@ -1267,20 +1322,18 @@ body.perf-tactil .tab-bar.se-esconde::after {
     0 0 40px var(--accent-glow),
     2px 2px 0 rgba(0, 0, 0, 0.6);
 }
-:root[data-lyrics-font="retro"] .lyrics-body.sync .lyric-line.active .w.sung {
+:root[data-lyrics-font="retro"] .lyrics-body.sync .lyric-line.active .w.sung,
+:root[data-lyrics-font="retro"] .lyrics-body.sync .lyric-line.active .w.cantando {
   text-shadow:
     0.05em 0 0 currentColor,
     0 0 6px var(--accent-glow),
     0 0 16px var(--accent-glow),
     2px 2px 0 rgba(0, 0, 0, 0.55);
 }
-:root[data-lyrics-font="retro"] .lyrics-body.sync .lyric-line.active .w.cantando {
-  text-shadow:
-    0.05em 0 0 currentColor,
-    0 0 8px var(--accent-glow),
-    0 0 22px var(--accent-glow),
-    0 0 44px var(--accent-glow),
-    2px 2px 0 rgba(0, 0, 0, 0.55);
+/* la copia que se llena también necesita su segundo golpe, o la parte
+   rellena se vería más fina que la que falta */
+:root[data-lyrics-font="retro"] .lyrics-body.sync .lyric-line.active .w.cantando::after {
+  text-shadow: 0.05em 0 0 currentColor;
 }
 :root[data-lyrics-font="retro"] .fp-now {
   font-synthesis: none;
@@ -1307,28 +1360,49 @@ body.perf-tactil .tab-bar.se-esconde::after {
   color: var(--text-dim);
   transition: color 0.18s linear, text-shadow 0.18s linear;
 }
-/* ya cantada: acento pleno, es la parte "rellenada" de la barra de karaoke */
+/* ya cantada: acento pleno, es la parte "rellenada" de la barra de karaoke.
+   Sin transición: la palabra llega aquí con su copia del barrido ya llena
+   (ver abajo), y un fundido de 0,18 s desde el tono apagado se vería como
+   un bajón justo al terminarla. */
 .lyrics-body.sync .lyric-line.active .w.sung {
   color: var(--accent);
+  transition: none;
   text-shadow:
     0 0 6px var(--accent-glow),
     0 0 16px var(--accent-glow),
     2px 2px 0 rgba(0, 0, 0, 0.55);
 }
-/* la palabra que suena AHORA: blanca y encendida, marca el punto exacto */
+/* LA PALABRA QUE SUENA AHORA SE LLENA DE IZQUIERDA A DERECHA (v120).
+   Antes se encendía entera y en blanco de golpe, en su primera sílaba, y
+   se quedaba quieta hasta la siguiente. Ahora va como en Apple Music Sing:
+   debajo, la palabra en el tono de lo que falta por cantar, con el brillo
+   de las ya cantadas; encima, una copia de sí misma en el acento (el texto
+   lo deja lyrics.js en data-t) que se destapa con clip-path hasta --p,
+   que lyrics.js mueve en cada fotograma con el mismo reparto por sílabas.
+   Lleva también .sung (lyrics.js la pone al empezar), así que esta regla
+   tiene que ir DESPUÉS. El recorte va de −12 % a 112 % para no dejar sin
+   pintar el vuelo de la cursiva de la palabra destacada. */
 .lyrics-body.sync .lyric-line.active .w.cantando {
-  color: var(--text);
-  text-shadow:
-    0 0 8px var(--accent-glow),
-    0 0 22px var(--accent-glow),
-    0 0 44px var(--accent-glow),
-    2px 2px 0 rgba(0, 0, 0, 0.55);
+  position: relative;
+  color: var(--text-dim);
+}
+.lyrics-body.sync .lyric-line.active .w.cantando::after {
+  content: attr(data-t);
+  position: absolute;
+  /* la copia ocupa la caja exacta de la palabra y se compone igual que
+     ella: si una palabra larguísima se parte en dos renglones (ver
+     overflow-wrap en .w), la copia se parte por el mismo sitio */
+  inset: 0;
+  color: var(--accent);
+  text-shadow: none;           /* el brillo ya lo pone la palabra de debajo */
+  clip-path: inset(-40% calc(112% - 1.24 * var(--p, 0%)) -40% -12%);
+  pointer-events: none;
 }
 /* A propósito NO se anima ni transform ni animation en la palabra activa:
    esos dos canales ya los usa el revelado de entrada (fx-rise, fx-swing…) y
    pisarlos cortaba la animación de la primera palabra de cada verso. El
-   karaoke se queda en color + glow, que es exactamente lo que hace Apple
-   Music, se compone gratis y sigue funcionando con «menos movimiento». */
+   karaoke se queda en color, brillo y un clip-path en su copia, que se
+   compone gratis y sigue funcionando con «menos movimiento». */
 
 /* ----- HUECO INSTRUMENTAL: intro, solo o puente -----
    Tres puntos que se encienden con el avance (--gp, 0→1 desde lyrics.js).
@@ -1396,13 +1470,6 @@ body.reduce-motion .lyric-gap i { transition: none; }
    Títulos ≤3 palabras salen GIGANTES en Bodoni; frases en Poppins
    palabra a palabra. La línea anterior colapsa con blur. */
 #tab-lyrics { position: relative; }
-.lyrics-mode-btn {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  z-index: 10;
-}
-.lyrics-mode-btn.on { background: var(--border-pixel); color: var(--text); }
 
 /* ── Ambiente del panel de letras: esquinas + notas flotantes ──
    El texto de la letra vive por encima (z-index 2); las notas y las
@@ -1473,10 +1540,10 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
   flex: 1;
   min-height: 0;             /* llena el panel igual que .lyrics-body */
   overflow: hidden;
-  /* La misma fuente que la letra normal, la que el usuario haya elegido.
-     Los efectos que SÍ dependen de una fuente concreta para verse bien
-     (ed-apila y ed-trozos, que imitan los edits de TikTok con la Nunito
-     gorda) la declaran ellos en edit-fx.css y mandan sobre esto. */
+  /* La misma fuente que la letra normal, la que el usuario haya elegido,
+     para TODOS los efectos. ed-apila y ed-trozos traían una Nunito propia
+     (la de los edits de TikTok) y eran los únicos que salían con otra
+     letra: ahora heredan esta como los demás. */
   font-family: var(--lyrics-font, 'VT323', monospace);
   font-weight: var(--lyrics-weight, normal);
   text-transform: var(--lyrics-caps, none);
@@ -1532,8 +1599,8 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   white-space: pre;
 }
 .edl-teclea { animation-name: edl-teclea; animation-duration: 0.1s; animation-timing-function: steps(1, end); }
-.edl-cae    { animation-name: edl-cae; animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
-.edl-onda   { animation-name: edl-onda; animation-duration: 0.55s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+.edl-cae    { animation-name: edl-cae; animation-duration: 0.5s; animation-timing-function: var(--muelle); }
+.edl-onda   { animation-name: edl-onda; animation-duration: 0.55s; animation-timing-function: var(--muelle); }
 .edl-neon   { animation-name: edl-neon; animation-duration: 0.7s; animation-timing-function: linear; }
 
 
@@ -1559,8 +1626,8 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   animation-delay: var(--d, 0ms);
   white-space: pre;
 }
-.edl-explota  { animation-name: edl-explota; animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
-.edl-descifra { animation-name: edl-descifra; animation-duration: 0.3s; animation-timing-function: linear; }
+.edl-explota  { animation-name: edl-explota; animation-duration: var(--t-lenta); animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+.edl-descifra { animation-name: edl-descifra; animation-duration: var(--t-media); animation-timing-function: linear; }
 
 
 /* ═══ MODO EDIT · fx replicados de los edits de referencia del usuario ═══
@@ -1691,7 +1758,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   animation-delay: var(--d, 0ms);
   white-space: pre;
   animation-name: edl-esquina;
-  animation-duration: 0.6s;
+  animation-duration: var(--t-lenta);
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -1753,17 +1820,6 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 .retro-btn .bracket { color: var(--accent-2); }
 .retro-btn.small { padding: 4px 8px; font-size: 13px; }
 
-.offset-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.offset-display {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
 #offsetValue {
   font-family: 'VT323', monospace;
   font-size: 18px;
@@ -1869,40 +1925,6 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   border: 1px solid var(--accent);
   color: var(--accent);
   text-shadow: 0 0 4px var(--accent-glow);
-}
-/* Filas de la cola de Spotify: informativas, no se puede saltar a ellas */
-.track-row.no-click { cursor: default; }
-.track-row.no-click:hover {
-  background: transparent;
-  border-color: transparent;
-  color: inherit;
-}
-.track-row.no-click:hover .tr-title { color: inherit; }
-.tr-info {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.tr-title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text);
-}
-.tr-artist {
-  font-size: 13px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.track-row:hover .tr-title,
-.track-row.playing .tr-title { color: var(--accent); }
-.tr-duration {
-  text-align: right;
-  color: var(--text-dim);
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ----- Settings tab -----
@@ -2045,14 +2067,6 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   line-height: 14px;
 }
 .radio-row:hover { color: var(--accent); }
-.setting-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  font-size: 16px;
-  border-bottom: 1px dotted var(--border-pixel);
-}
-.setting-row .key { color: var(--accent); }
 .about-text {
   font-size: 14px;
   color: var(--text-dim);
@@ -2206,7 +2220,7 @@ body.playing .progress-fill::before {
   left: 0%;
   transform: translate(-50%, -50%);
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity var(--t-rapida);
   pointer-events: none;
 }
 .progress-bar:hover .progress-thumb,
@@ -2291,19 +2305,13 @@ body.barra-agarrada .prog-tip { opacity: 1; }
   display: flex; align-items: center; justify-content: center;
   transition: all 0.1s;
 }
-.ctrl-btn svg {
-  width: 54%; height: 54%;
-  display: block;
-}
 .ctrl-btn:hover { background: var(--border-pixel); color: var(--accent); }
-.ctrl-btn:hover svg { filter: drop-shadow(0 0 3px var(--accent-glow)); }
 .ctrl-btn:active,
 .ctrl-btn.active {
   box-shadow: inset -1px -1px 0 var(--border-hi), inset 1px 1px 0 var(--border-dark);
   color: var(--accent);
   text-shadow: 0 0 4px var(--accent-glow);
 }
-.ctrl-btn.active svg { filter: drop-shadow(0 0 3px var(--accent-glow)); }
 
 /* Badge "1" del modo repetir-una (VT323, esquina inferior) */
 .rep-badge {
@@ -2336,12 +2344,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 }
 .play-btn span { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .play-btn span[hidden] { display: none; }
-.play-btn svg {
-  width: 52%; height: 52%;
-  filter: none;
-}
 .play-btn:hover { background: var(--accent); color: var(--bg-deep); text-shadow: none; filter: brightness(1.12); }
-.play-btn:hover svg { filter: none; }
 /* Pulsado: el hundido de siempre, pero sin que el icono se pinte del mismo
    color que el fondo (la regla general de .ctrl-btn:active lo pone en acento). */
 .play-btn:active,
@@ -2349,7 +2352,6 @@ body.barra-agarrada .prog-tip { opacity: 1; }
   color: var(--bg-deep);
   box-shadow: inset 2px 2px 0 var(--accent-dim), inset -1px -1px 0 rgba(255, 255, 255, 0.35);
 }
-.separator { color: var(--border-pixel); font-size: 18px; padding: 0 4px; }
 
 /* ==========================================================
    VOLUMEN — icono discreto anclado a la derecha; la barra se
@@ -2377,13 +2379,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
   color: var(--accent);
   text-shadow: none;
 }
-.vol-btn svg { width: 62%; height: 62%; }
-.vol-btn .vol-x { display: none; }
-.vol-btn.muted .vol-wave1,
-.vol-btn.muted .vol-wave2 { display: none; }
-.vol-btn.muted .vol-x { display: block; }
 .vol-btn.muted { color: var(--text-muted); }
-.vol-btn.low .vol-wave2 { display: none; }
 
 /* Barra: colapsada por defecto, se abre suave al hover / arrastre */
 .volume-bar {
@@ -2437,7 +2433,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
   left: 70%;
   transform: translate(-50%, -50%);
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity var(--t-rapida);
 }
 .volume-bar:hover .volume-thumb,
 .volume-ctl.dragging .volume-thumb { opacity: 1; }
@@ -2530,7 +2526,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 .mini-eq.live i { animation: none !important; }
 body.playing .mini-eq i { animation: eq-dance 0.9s steps(3, jump-none) infinite; }
 body.playing .mini-eq i:nth-child(1) { animation-duration: 0.8s; }
-body.playing .mini-eq i:nth-child(2) { animation-duration: 0.6s; animation-delay: 0.12s; }
+body.playing .mini-eq i:nth-child(2) { animation-duration: var(--t-lenta); animation-delay: 0.12s; }
 body.playing .mini-eq i:nth-child(3) { animation-duration: 1.0s; animation-delay: 0.05s; }
 body.playing .mini-eq i:nth-child(4) { animation-duration: 0.7s; animation-delay: 0.2s; }
 body.playing .mini-eq i:nth-child(5) { animation-duration: 0.85s; animation-delay: 0.3s; }
@@ -2674,7 +2670,7 @@ body.playing .status-bar .filler {
   padding: 1px 7px;
   cursor: pointer;
   min-height: 22px;
-  transition: color .15s ease, border-color .15s ease;
+  transition: color var(--t-rapida) ease, border-color var(--t-rapida) ease;
 }
 .dev-chip:hover,
 .dev-chip[aria-expanded="true"] {
@@ -2884,7 +2880,7 @@ body.cinema-open #fxLabBtn { pointer-events: none; opacity: 0.3; }
   font-size: 15px;
   cursor: pointer;
   opacity: 0.6;
-  transition: all 0.15s;
+  transition: all var(--t-rapida);
 }
 .cinema-close:hover {
   opacity: 1;
@@ -3487,7 +3483,7 @@ body.playing .cin-brillo { animation-play-state: running; }
   display: grid;
   place-items: center;
   color: var(--text-dim);
-  transition: color 0.15s, transform 0.15s;
+  transition: color var(--t-rapida), transform var(--t-rapida);
 }
 .cin-btn svg { width: 18px; height: 18px; }
 /* Un <svg> con el atributo `hidden` NO se esconde solo: medido, el ⏸ del
@@ -3644,24 +3640,38 @@ body.perf-bajo .cinema-vineta { display: none; }
 }
 
 /* ==========================================================
-   Scrollbars (pixelated)
+   BARRAS DE DESPLAZAMIENTO PIXEL, EN TODAS PARTES
+   Solo las llevaban .tab-content y .lyrics-body. Las demás cajas que
+   ruedan —ajustes (.cfg-cuerpo, lo que más se rueda), buscar en todo, las
+   tipografías, la tarjeta ❝, el menú de aparatos, «Conectar con Spotify» y
+   la columna del móvil tumbado— salían con la barra gris de Windows. Una
+   sola regla sin selector y la familia entera se acaba, también para las
+   cajas que vengan.
+
+   ⚠️ Nada de `scrollbar-color` ni `scrollbar-width` (salvo `none`, que es
+   esconderla): desde Chrome 121, un elemento que lleva cualquiera de las
+   dos IGNORA estas barras con forma, y `scrollbar-color` además se hereda.
+   Firefox no entiende ::-webkit-scrollbar y se queda con la de colores.
    ========================================================== */
-.tab-content::-webkit-scrollbar,
-.lyrics-body::-webkit-scrollbar { width: 12px; }
-.tab-content::-webkit-scrollbar-track,
-.lyrics-body::-webkit-scrollbar-track {
+::-webkit-scrollbar { width: 12px; height: 10px; }
+::-webkit-scrollbar-track {
   background: var(--bg-panel-2);
   border-left: 1px solid var(--border-dark);
 }
-.tab-content::-webkit-scrollbar-thumb,
-.lyrics-body::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
   background: var(--bg-frame);
   border: 1px solid var(--border-light);
   box-shadow: inset 1px 1px 0 var(--border-hi);
 }
-.tab-content::-webkit-scrollbar-thumb:hover,
-.lyrics-body::-webkit-scrollbar-thumb:hover {
-  background: var(--border-pixel);
+::-webkit-scrollbar-thumb:hover { background: var(--border-pixel); }
+::-webkit-scrollbar-corner { background: var(--bg-panel-2); }
+/* la esquina para agrandar la ventana (.window lleva resize: both): una
+   escalera de puntos de la rejilla de 12, en vez del agarre del sistema */
+::-webkit-resizer {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges' fill='%235a6ad9'%3E%3Cpath d='M10 2h1v1h-1zM8 4h1v1h-1zM10 4h1v1h-1zM6 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM4 8h1v1h-1zM6 8h1v1h-1zM8 8h1v1h-1zM10 8h1v1h-1z'/%3E%3C/svg%3E") right 1px bottom 1px / 12px 12px no-repeat;
+}
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-color: var(--border-light) var(--bg-panel-2); }
 }
 
 /* ==========================================================
@@ -3727,7 +3737,6 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
 
 /* --- Biblioteca / listas / inputs --- */
 .track-list { font-size: clamp(14px, 1.5cqw, 24px); }
-.tr-artist, .tr-num, .tr-duration { font-size: clamp(12px, 1.25cqw, 20px); }
 .retro-input, .prompt, .retro-btn { font-size: clamp(14px, 1.5cqw, 24px); }
 
 /* --- Barra de reproducción: tiempos, controles y progreso --- */
@@ -3867,7 +3876,7 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
   color: var(--text-dim);
   cursor: pointer;
   opacity: 0.5;
-  transition: opacity .15s, color .15s, box-shadow .15s, border-color .15s;
+  transition: opacity var(--t-rapida), color var(--t-rapida), box-shadow var(--t-rapida), border-color var(--t-rapida);
 }
 .viz-sync:hover { opacity: 1; color: var(--accent); }
 /* Sonando sin señal en el navegador (Spotify Connect): el detector está a
@@ -3908,7 +3917,7 @@ body.reduce-motion .viz-sync.sugerido { animation: none; }
   align-items: center;
   justify-content: center;
   opacity: 0.55;
-  transition: opacity .15s, color .15s, box-shadow .15s;
+  transition: opacity var(--t-rapida), color var(--t-rapida), box-shadow var(--t-rapida);
 }
 .vinyl-toggle:hover { opacity: 1; }
 .vinyl-toggle.active {
@@ -4097,7 +4106,7 @@ body.vinyl-mode .cover-inner::after {
   cursor: pointer;
   font-size: 13px;
   opacity: 0;
-  transition: opacity .15s ease, color .15s ease, background .15s ease;
+  transition: opacity var(--t-rapida) ease, color var(--t-rapida) ease, background var(--t-rapida) ease;
 }
 .sp-result:hover .sp-queue,
 .sp-result:focus-within .sp-queue { opacity: 1; }
@@ -4233,7 +4242,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   cursor: pointer;
   opacity: 0;
   transform: translateY(6px);
-  transition: opacity .15s, transform .15s;
+  transition: opacity var(--t-rapida), transform var(--t-rapida);
 }
 .lib-card:hover .lib-card-play { opacity: 1; transform: translateY(0); }
 .lib-card-play:hover { background: var(--accent); color: var(--bg-deep); box-shadow: 0 0 10px var(--accent-glow); }
@@ -4295,6 +4304,34 @@ body.perf-tactil .sp-queue { opacity: 1; }
   font-size: 15px;
   color: var(--text-muted);
 }
+/* ----- La que suena: tres barritas en el sitio del número -----
+   Era un ▶ quieto, sonara o no. Ahora, tres barras VFD del mismo corte que
+   el mini-EQ de la barra de estado: con audio que medir las mueve
+   visualizer.js (clase .live, pasos de 3/6/9/12 px); sin él, la animación de
+   respaldo mientras suena; en pausa, bajitas y quietas. Pequeñas a
+   propósito: en una lista, lo que se mueve distrae enseguida. */
+.sp-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 2px;
+  width: 100%;
+  height: 12px;
+  vertical-align: middle;
+}
+.sp-eq i {
+  width: 3px;
+  height: 12px;                 /* alto fijo y se encoge con transform: ni layout ni repintado */
+  transform: scaleY(0.25);
+  transform-origin: bottom;
+  background: var(--accent);
+  box-shadow: 0 0 3px var(--accent-glow);
+}
+.sp-eq.live i { animation: none !important; }
+body.playing .sp-eq i { animation: eq-dance 0.8s steps(3, jump-none) infinite; }
+body.playing .sp-eq i:nth-child(2) { animation-duration: var(--t-lenta); animation-delay: 0.12s; }
+body.playing .sp-eq i:nth-child(3) { animation-duration: 1s; animation-delay: 0.05s; }
+body.reduce-motion .sp-eq i { animation: none !important; transform: scaleY(0.5) !important; }
 .q-section {
   list-style: none;
   font-family: 'VT323', monospace;
@@ -4339,10 +4376,10 @@ body.perf-tactil .sp-queue { opacity: 1; }
 /* Las filas de «a continuación» SÍ se pulsan: al posarse encima, el número
    de orden se cambia por un ▶. Sin esta pista visual la cola parecía —y era—
    una lista de solo lectura; el número por sí solo no invita a pulsar. */
-#queueList .sp-result[data-idx]:hover .sp-idx,
-#queueList .sp-result[data-idx]:focus-visible .sp-idx { font-size: 0; }
-#queueList .sp-result[data-idx]:hover .sp-idx::after,
-#queueList .sp-result[data-idx]:focus-visible .sp-idx::after {
+#queueList .sp-result[data-idx]:not(.sp-now):hover .sp-idx,
+#queueList .sp-result[data-idx]:not(.sp-now):focus-visible .sp-idx { font-size: 0; }
+#queueList .sp-result[data-idx]:not(.sp-now):hover .sp-idx::after,
+#queueList .sp-result[data-idx]:not(.sp-now):focus-visible .sp-idx::after {
   content: '▶';
   font-size: 15px;
   color: var(--accent);
@@ -4432,7 +4469,10 @@ body.reduce-motion .la-note { display: none; }
 body.reduce-motion .mini-eq i { animation: none !important; height: 6px !important; }
 body.reduce-motion #clock .c,
 body.reduce-motion .progress-thumb { animation: none !important; }
-body.reduce-motion .cover-inner.vinyl,
+/* El vinilo gira en `body.vinyl-mode .cover-inner`. Aquí ponía
+   `.cover-inner.vinyl`, una clase que no lleva nadie: con «menos movimiento»
+   —que promete parar el vinilo— el disco seguía dando vueltas. */
+body.reduce-motion.vinyl-mode .cover-inner,
 body.reduce-motion .cinema-disc { animation: none !important; }
 body.reduce-motion .cinema-bg { animation: none !important; }
 body.reduce-motion .lyrics-ambient .la-corner { animation: none !important; }
@@ -4491,13 +4531,6 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
   border-color: var(--accent);
   box-shadow: 0 0 8px var(--accent-glow);
 }
-.set-hint {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 6px;
-  line-height: 1.5;
-}
 
 /* ==========================================================
    AJUSTES: tipografía de la letra (js/fonts.js)
@@ -4527,7 +4560,7 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--t-rapida), box-shadow var(--t-rapida);
 }
 .font-abrir:hover, .font-abrir:focus-visible {
   border-color: var(--accent);
@@ -4591,9 +4624,11 @@ body.reduce-motion .fuentes-caja { animation: none; }
   overflow-x: auto;
   background: var(--bg-panel-2);
   border-bottom: 2px solid var(--border-dark);
-  /* una sola fila que se arrastra: envolverlas volvería a ser una pared */
-  scrollbar-width: thin;
+  /* una sola fila que se arrastra: envolverlas volvería a ser una pared.
+     Aquí iba `scrollbar-width: thin`, y con él Chrome ignora la barra pixel
+     (ver «BARRAS DE DESPLAZAMIENTO PIXEL»): la fina se pide por su alto. */
 }
+.fuentes-grupos::-webkit-scrollbar { height: 8px; }
 .fg-chip {
   flex: 0 0 auto;
   font-family: 'VT323', monospace;
@@ -4645,7 +4680,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--t-rapida), box-shadow var(--t-rapida);
 }
 /* ⚠️ La tarjeta NO lleva `overflow: hidden`, y no es un descuido.
 
@@ -4854,7 +4889,72 @@ body.reduce-motion .fuentes-caja { animation: none; }
    desbordaba de su celda de la rejilla y en un móvil el [ver ▸] salía
    ENCIMA del botón «0». */
 .offset-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
-.offset-ctl input[type="range"] { flex: 1 1 90px; min-width: 70px; accent-color: var(--accent); }
+.offset-ctl input[type="range"] { flex: 1 1 90px; min-width: 70px; }
+
+/* ----- LOS DESLIZADORES, CON EL RIEL DE LA BARRA DE PROGRESO -----
+   Eran los del sistema: bolita redonda y riel gris (en claro, además, hasta
+   que la raíz dijo color-scheme). Ahora, el riel de celdas de la barra de
+   progreso con lo recorrido en el acento y un tirador cuadrado biselado.
+   Lo recorrido lo dice --v (0-100 %), que escriben seven.js (sincronía) y
+   spotify.js (volumen del aparato): WebKit no tiene pseudo-elemento para la
+   parte llena (Firefox sí: ::-moz-range-progress). */
+.offset-ctl input[type="range"],
+.dev-vol-rango {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 22px;                /* el del volumen se queda en 30 (más abajo): es para el dedo */
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.offset-ctl input[type="range"]:focus-visible,
+.dev-vol-rango:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.offset-ctl input[type="range"]::-webkit-slider-runnable-track,
+.dev-vol-rango::-webkit-slider-runnable-track {
+  height: 8px;
+  border: 2px solid var(--border-dark);
+  background-color: var(--bg-panel-2);
+  background-image:
+    repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 8px),
+    repeating-linear-gradient(90deg, var(--bg-frame) 0 6px, transparent 6px 8px);
+  background-size: var(--v, 50%) 100%, 100% 100%;
+  background-repeat: no-repeat;
+  box-shadow: 0 1px 0 var(--border-pixel);
+}
+.offset-ctl input[type="range"]::-webkit-slider-thumb,
+.dev-vol-rango::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 10px;
+  height: 18px;
+  margin-top: -5px;            /* (8 del riel − 18 del tirador) / 2 */
+  background: var(--text);
+  border: 2px solid var(--border-dark);
+  box-shadow: inset -2px -2px 0 var(--accent-dim);
+}
+.offset-ctl input[type="range"]::-moz-range-track,
+.dev-vol-rango::-moz-range-track {
+  height: 8px;
+  border: 2px solid var(--border-dark);
+  background-color: var(--bg-panel-2);
+  background-image: repeating-linear-gradient(90deg, var(--bg-frame) 0 6px, transparent 6px 8px);
+}
+.offset-ctl input[type="range"]::-moz-range-progress,
+.dev-vol-rango::-moz-range-progress {
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 8px);
+}
+.offset-ctl input[type="range"]::-moz-range-thumb,
+.dev-vol-rango::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 10px;
+  height: 18px;
+  border-radius: 0;
+  background: var(--text);
+  border: 2px solid var(--border-dark);
+  box-shadow: inset -2px -2px 0 var(--accent-dim);
+}
 .offset-val {
   font-family: 'VT323', monospace;
   font-size: 18px;
@@ -4914,7 +5014,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
 @property --bg-frame    { syntax: '<color>'; inherits: true; initial-value: #2a2f5e; }
 @property --text        { syntax: '<color>'; inherits: true; initial-value: #e8ecff; }
 @property --text-dim    { syntax: '<color>'; inherits: true; initial-value: #8b94d8; }
-@property --text-muted  { syntax: '<color>'; inherits: true; initial-value: #5a648f; }
+@property --text-muted  { syntax: '<color>'; inherits: true; initial-value: #7c86c2; }
 
 :root {
   transition:
@@ -4975,24 +5075,84 @@ body.reduce-motion .tab-content.active { animation: none; }
   gap: 10px;
   padding: 6px 8px;
 }
+/* ESPERAS EN CELDAS VFD (v120). Antes era el brillo que barre de lado a
+   lado de cualquier web —un degradado de 90° cada 1,3 s—, y tan oscuro
+   (panel → borde oscuro) que casi ni se veía. Ahora: las celdas apagadas
+   del espectro y un tramo encendido de tres celdas que avanza a saltos de
+   una celda (8 px, con transform: nada de layout), fila tras fila. La
+   portada es una rejilla de celdas: la máscara abre los huecos de 2 px de
+   verdad, así que valen sobre cualquier fondo. */
 .skel-box, .skel-line {
-  background: linear-gradient(90deg, var(--bg-panel-2) 25%, var(--border-dark) 50%, var(--bg-panel-2) 75%);
-  background-size: 300% 100%;
-  animation: skelSweep 1.3s linear infinite;
+  position: relative;
+  overflow: hidden;
+  background: repeating-linear-gradient(90deg,
+    color-mix(in oklab, var(--accent) 13%, transparent) 0 6px, transparent 6px 8px);
 }
+.skel-box {
+  -webkit-mask: repeating-linear-gradient(0deg, transparent 0 2px, #000 2px 8px);
+  mask: repeating-linear-gradient(0deg, transparent 0 2px, #000 2px 8px);
+}
+.skel-box::after, .skel-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 24px;
+  background: repeating-linear-gradient(90deg,
+    color-mix(in oklab, var(--accent) 60%, transparent) 0 6px, transparent 6px 8px);
+  animation: skelVfd 2.4s steps(64, end) infinite;
+}
+.skel:nth-child(3n+2) :is(.skel-box, .skel-line)::after { animation-delay: 0.3s; }
+.skel:nth-child(3n) :is(.skel-box, .skel-line)::after { animation-delay: 0.6s; }
 .skel-box { width: 38px; height: 38px; flex-shrink: 0; }
 .skel-lines { flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .skel-line { height: 10px; }
 .skel-line.short { width: 45%; }
-@keyframes skelSweep {
-  from { background-position: 100% 0; }
-  to   { background-position: -100% 0; }
+/* de −3 celdas a 61: 64 saltos de 8 px justos, así el tramo cae siempre
+   encima de las celdas apagadas */
+@keyframes skelVfd {
+  from { transform: translateX(-24px); }
+  to   { transform: translateX(488px); }
 }
-body.reduce-motion .skel-box,
-body.reduce-motion .skel-line { animation: none; }
+body.reduce-motion .skel-box::after,
+body.reduce-motion .skel-line::after { animation: none; display: none; }
 /* Rejilla de portadas: esqueleto cuadrado */
 .as-grid .skel { display: block; padding: 8px; }
 .as-grid .skel-box { width: 100%; height: auto; aspect-ratio: 1/1; margin-bottom: 8px; }
+
+/* ----- LOS VACÍOS, CON EL DIBUJO DE SU PESTAÑA (v120) -----
+   Cuando no hay nada —sin resultados, cola vacía, lista sin canciones, un
+   ajuste que no existe— la frase de siempre iba sola en medio del hueco.
+   Encima lleva ahora el icono de esa pestaña a 48 px (×4 de su rejilla de
+   12: nítido) en el acento apagado. Solo dibujo: ni textos nuevos ni
+   botones. El «busca lo que quieras oír» del principio lleva el suyo en
+   el HTML (.sp-empty-ico) y aquí se deja fuera. */
+#spotifyResults .sp-empty:not(.sp-empty-inicio)::before,
+#libList .sp-empty::before,
+#queueList .sp-empty::before,
+#statsBody .sp-empty::before,
+.paleta-vacio::before,
+.fuentes-vacio::before,
+.comp-vacio::before,
+.cfg-vacio::before {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 10px;
+  background-color: var(--accent-dim);
+  -webkit-mask: var(--vacio-ico) center / 100% 100% no-repeat;
+  mask: var(--vacio-ico) center / 100% 100% no-repeat;
+}
+#spotifyResults .sp-empty,
+.paleta-vacio { --vacio-ico: var(--ico-buscar); }
+#libList .sp-empty { --vacio-ico: var(--ico-listas); }
+#queueList .sp-empty { --vacio-ico: var(--ico-cola); }
+#statsBody .sp-empty { --vacio-ico: var(--ico-historial); }
+.fuentes-vacio { --vacio-ico: var(--ico-letra); }
+.comp-vacio { --vacio-ico: var(--ico-cita); }
+.cfg-vacio { --vacio-ico: var(--ico-ajustes); }
 
 /* ══════════ ESTADO EN REPOSO ══════════
    Lo que se ve cuando todavía no suena nada. Vive fuera de #lyricsBody
@@ -5396,8 +5556,8 @@ body.reduce-motion .lyrics-ncs:not(.live) .ncs-rad i { animation: none; }
   white-space: pre;
 }
 .edl-difumina { animation-name: edl-difumina; animation-duration: 0.55s; animation-timing-function: ease-out; }
-.edl-gira     { animation-name: edl-gira; animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
-.edl-alterna  { animation-name: edl-alterna; animation-duration: 0.55s; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+.edl-gira     { animation-name: edl-gira; animation-duration: var(--t-lenta); animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
+.edl-alterna  { animation-name: edl-alterna; animation-duration: 0.55s; animation-timing-function: var(--muelle); }
 .edl-empuja   { animation-name: edl-empuja; animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
 /* las letras impares entran por el otro lado: da ritmo alterno */
 .edl-alterna:nth-child(even) { animation-name: edl-alterna-inv; }
@@ -5828,11 +5988,11 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   padding: 34px 16px;
   line-height: 1.5;
 }
+/* el dibujo de la pestaña a 48 px (×4), como el resto de vacíos; era un ♫
+   de la fuente de símbolos del sistema */
 .sp-empty-ico {
-  font-size: 34px;
-  color: var(--accent);
-  text-shadow: 0 0 16px var(--accent-glow);
-  opacity: 0.75;
+  --ico-tam: 48px;
+  color: var(--accent-dim);
 }
 .sp-empty-inicio b {
   font-family: 'VT323', monospace;
@@ -5882,8 +6042,6 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
      y sus medidas viven en el bloque `body.disp-movil`, al final del
      archivo. Aquí había diez botones en un solo renglón, de 28 a 44 px de
      ancho, con todo el cálculo de cuántos cabían a 320 px.) */
-  .ctrl-btn svg { width: 46%; height: 46%; }
-  .play-btn svg { width: 50%; height: 50%; }
 
   /* Objetivos de toque: por debajo de ~38px el pulgar falla */
   .tab {
@@ -6029,8 +6187,6 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   /* La vista, solo con su icono: el nombre no cabe en una pantalla baja */
   .ctl-vista .side-btn { min-width: 42px; height: 38px; padding: 0 4px; }
   .ctl-vista .sb-txt { display: none; }
-  .ctrl-btn svg { width: 46%; height: 46%; }
-  .play-btn svg { width: 50%; height: 50%; }
   .tab { min-height: 32px; padding: 5px 10px; display: inline-flex; align-items: center; }
 
   /* --- 4) la barra de título, más baja y sin _ ▢ ✕ ---
@@ -6188,7 +6344,7 @@ body.perf-tactil .sp-del { opacity: 1; }
   border: 2px solid var(--border-pixel);
   box-shadow: none;
   cursor: pointer;
-  transition: border-color .15s ease, box-shadow .15s ease, color .15s ease;
+  transition: border-color var(--t-rapida) ease, box-shadow var(--t-rapida) ease, color var(--t-rapida) ease;
 }
 .paleta-btn:hover,
 .paleta-btn:focus-visible {
@@ -6381,6 +6537,10 @@ body.reduce-motion .paleta-caja { animation: none; }
 /* Con el dedo, 26 px pegados a una fila que PONE la canción es una
    trampa: fallar el ＋ no es «no pasa nada», es que suena otra cosa. */
 body.perf-tactil .paleta-mas { width: 40px; height: 40px; font-size: 17px; }
+/* el ＋ y el ▶ son ya los dibujos pixel: a 12 px (×1), y a 24 con el dedo */
+.paleta-mas { display: inline-grid; place-items: center; padding: 0; }
+.paleta-mas .ico { --ico-tam: 12px; }
+body.perf-tactil .paleta-mas .ico { --ico-tam: 24px; }
 
 /* El pie de la paleta habla del aparato que lo está leyendo */
 .pie-dedo { display: none; }
@@ -6547,7 +6707,7 @@ body.letra-ancha .title-bar { height: clamp(36px, 4cqh, 48px); }
   color: var(--text);
   text-align: left;
   overflow: hidden;
-  transition: border-color .15s, background .15s;
+  transition: border-color var(--t-rapida), background var(--t-rapida);
 }
 /* El botón lleva `hidden` cuando la vista es la normal, y `display: flex`
    de autor le gana al `hidden` del navegador: es exactamente el fallo que
@@ -6792,7 +6952,7 @@ body.reduce-motion .la-ncs { display: none; }
 }
 .cfg-volver:hover { background: var(--border-pixel); color: var(--text); }
 .cfg-volver:active { transform: translate(1px, 1px); }
-.cv-flecha { transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.cv-flecha { transition: transform 0.18s var(--muelle); }
 .cfg-volver:hover .cv-flecha { transform: translateX(-3px); }
 body.reduce-motion .cv-flecha { transition: none; }
 
@@ -6806,7 +6966,7 @@ body.reduce-motion .cv-flecha { transition: none; }
   padding: 2px 8px;
   background: var(--bg-deep);
   border: 2px solid var(--border-dark);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--t-rapida), box-shadow var(--t-rapida);
 }
 .cfg-buscar:focus-within {
   border-color: var(--accent);
@@ -6891,7 +7051,7 @@ body.reduce-motion .cv-flecha { transition: none; }
   border: 2px solid var(--border-dark);
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--t-rapida), border-color var(--t-rapida);
 }
 .cfg-chip:hover { color: var(--text); border-color: var(--border-pixel); }
 .cfg-chip.on {
@@ -7278,8 +7438,8 @@ body.reduce-motion .comp-caja { animation: none; }
    hace falta tocar desde la app es el del aparato donde suena. En el
    ordenador la bocina está al lado del chip y esto sobraría. */
 .dev-vol { display: none; }
-.dev-vol-ico { flex: 0 0 auto; width: 22px; height: 22px; color: var(--text-dim); }
-.dev-vol-rango { flex: 1 1 auto; min-width: 0; height: 30px; accent-color: var(--accent); cursor: pointer; }
+.dev-vol-ico { flex: 0 0 auto; --ico-tam: 24px; color: var(--text-dim); }   /* la bocina pixel, a su rejilla (×2) */
+.dev-vol-rango { flex: 1 1 auto; min-width: 0; height: 30px; }   /* el resto, con el de la sincronía */
 .dev-vol-pct {
   flex: 0 0 auto;
   min-width: 4ch;
@@ -7345,19 +7505,9 @@ body.disp-movil .tb-cfg {
   color: var(--text-dim);
   -webkit-tap-highlight-color: transparent;
 }
-body.disp-movil .tb-cfg svg {
-  display: block;
-  width: 21px;
-  height: 21px;
-  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
 body.disp-movil .tb-cfg.active {
   color: var(--accent);
   border-color: var(--accent);
-}
-body.disp-movil .tb-cfg.active svg {
-  transform: rotate(90deg);
-  filter: drop-shadow(0 0 4px var(--accent-glow));
 }
 /* Con la letra ancha, el chip de la carátula necesita el sitio: el
    buscador se queda en su lupa (que sigue diciendo lo que es al lector). */
@@ -7646,10 +7796,6 @@ body.disp-movil .window > .tab-bar .tab {
   padding: 0 2px;
   border-bottom: 0;
 }
-body.disp-movil .window > .tab-bar .tab svg {
-  width: 22px;
-  height: 22px;
-}
 body.disp-movil .window > .tab-bar .tab-ico {
   font-size: 22px;
   line-height: 22px;
@@ -7742,7 +7888,7 @@ body.disp-movil .dev-vol {
    la letra gana esa fila.
    ══════════════════════════════════════════════════════════════════ */
 .ctl-vista {
-  transition: opacity 0.3s ease-out, visibility 0.3s;
+  transition: opacity var(--t-media) ease-out, visibility var(--t-media);
 }
 .window:has(.tab-bar.se-esconde) .ctl-vista {
   opacity: 0;
@@ -7753,7 +7899,7 @@ body.disp-movil .ctl-vista {
   max-height: 64px;
   overflow: hidden;
   transition: max-height 0.35s ease-out, margin-top 0.35s ease-out,
-              opacity 0.3s ease-out, visibility 0.35s;
+              opacity var(--t-media) ease-out, visibility 0.35s;
 }
 body.disp-movil .window:has(.tab-bar.se-esconde) .ctl-vista {
   max-height: 0;
@@ -7964,6 +8110,7 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   --ico-ancha: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h10v1h-10zM1 2h5v1h-5zM10 2h1v1h-1zM1 3h5v1h-5zM10 3h1v1h-1zM1 4h5v1h-5zM10 4h1v1h-1zM1 5h5v1h-5zM10 5h1v1h-1zM1 6h5v1h-5zM10 6h1v1h-1zM1 7h5v1h-5zM10 7h1v1h-1zM1 8h5v1h-5zM10 8h1v1h-1zM1 9h5v1h-5zM10 9h1v1h-1zM1 10h10v1h-10z'/%3E%3C/svg%3E");
   --ico-anterior: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 1h2v1h-2zM10 1h1v1h-1zM2 2h2v1h-2zM9 2h2v1h-2zM2 3h2v1h-2zM8 3h3v1h-3zM2 4h2v1h-2zM7 4h4v1h-4zM2 5h2v1h-2zM6 5h5v1h-5zM2 6h2v1h-2zM6 6h5v1h-5zM2 7h2v1h-2zM7 7h4v1h-4zM2 8h2v1h-2zM8 8h3v1h-3zM2 9h2v1h-2zM9 9h2v1h-2zM2 10h2v1h-2zM10 10h1v1h-1z'/%3E%3C/svg%3E");
   --ico-buscar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h4v1h-4zM2 2h1v1h-1zM7 2h1v1h-1zM1 3h1v1h-1zM8 3h1v1h-1zM1 4h1v1h-1zM8 4h1v1h-1zM1 5h1v1h-1zM8 5h1v1h-1zM1 6h1v1h-1zM8 6h1v1h-1zM2 7h1v1h-1zM7 7h1v1h-1zM3 8h4v1h-4zM8 8h1v1h-1zM8 9h2v1h-2zM9 10h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-casete: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M0 2h12v1h-12zM0 3h1v1h-1zM11 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM7 4h3v1h-3zM11 4h1v1h-1zM0 5h1v1h-1zM2 5h1v1h-1zM4 5h4v1h-4zM9 5h1v1h-1zM11 5h1v1h-1zM0 6h1v1h-1zM2 6h3v1h-3zM7 6h3v1h-3zM11 6h1v1h-1zM0 7h1v1h-1zM11 7h1v1h-1zM0 8h1v1h-1zM3 8h6v1h-6zM11 8h1v1h-1zM0 9h12v1h-12z'/%3E%3C/svg%3E");
   --ico-cerrar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 2h2v1h-2zM8 2h2v1h-2zM2 3h3v1h-3zM7 3h3v1h-3zM3 4h6v1h-6zM4 5h4v1h-4zM4 6h4v1h-4zM3 7h6v1h-6zM2 8h3v1h-3zM7 8h3v1h-3zM2 9h2v1h-2zM8 9h2v1h-2z'/%3E%3C/svg%3E");
   --ico-cine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h3v1h-3zM8 1h3v1h-3zM1 2h1v1h-1zM10 2h1v1h-1zM1 3h1v1h-1zM10 3h1v1h-1zM1 8h1v1h-1zM10 8h1v1h-1zM1 9h1v1h-1zM10 9h1v1h-1zM1 10h3v1h-3zM8 10h3v1h-3z'/%3E%3C/svg%3E");
   --ico-cita: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M3 3h2v1h-2zM9 3h2v1h-2zM2 4h2v1h-2zM8 4h2v1h-2zM1 5h3v1h-3zM7 5h3v1h-3zM1 6h3v1h-3zM7 6h3v1h-3zM1 7h3v1h-3zM7 7h3v1h-3z'/%3E%3C/svg%3E");
@@ -7972,18 +8119,24 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   --ico-corazon-lleno: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 2h3v1h-3zM7 2h3v1h-3zM1 3h10v1h-10zM1 4h10v1h-10zM1 5h10v1h-10zM2 6h8v1h-8zM3 7h6v1h-6zM4 8h4v1h-4zM5 9h2v1h-2z'/%3E%3C/svg%3E");
   --ico-disp: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 1h8v1h-8zM2 2h1v1h-1zM9 2h1v1h-1zM2 3h1v1h-1zM5 3h2v1h-2zM9 3h1v1h-1zM2 4h1v1h-1zM9 4h1v1h-1zM2 5h1v1h-1zM4 5h4v1h-4zM9 5h1v1h-1zM2 6h1v1h-1zM4 6h1v1h-1zM7 6h1v1h-1zM9 6h1v1h-1zM2 7h1v1h-1zM4 7h1v1h-1zM7 7h1v1h-1zM9 7h1v1h-1zM2 8h1v1h-1zM4 8h4v1h-4zM9 8h1v1h-1zM2 9h1v1h-1zM9 9h1v1h-1zM2 10h8v1h-8z'/%3E%3C/svg%3E");
   --ico-edit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h2v1h-2zM5 2h2v1h-2zM4 3h4v1h-4zM3 4h6v1h-6zM1 5h10v1h-10zM1 6h10v1h-10zM3 7h6v1h-6zM4 8h4v1h-4zM5 9h2v1h-2zM5 10h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-enchufe: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h1v1h-1zM8 1h1v1h-1zM3 2h1v1h-1zM8 2h1v1h-1zM2 3h8v1h-8zM2 4h1v1h-1zM9 4h1v1h-1zM2 5h1v1h-1zM9 5h1v1h-1zM3 6h1v1h-1zM8 6h1v1h-1zM4 7h4v1h-4zM5 8h2v1h-2zM5 9h2v1h-2zM5 10h2v1h-2z'/%3E%3C/svg%3E");
+  --ico-enlace: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h2v1h-2zM4 2h4v1h-4zM3 3h6v1h-6zM5 4h2v1h-2zM5 5h2v1h-2zM1 6h1v1h-1zM5 6h2v1h-2zM10 6h1v1h-1zM1 7h1v1h-1zM5 7h2v1h-2zM10 7h1v1h-1zM1 8h1v1h-1zM10 8h1v1h-1zM1 9h1v1h-1zM10 9h1v1h-1zM1 10h10v1h-10z'/%3E%3C/svg%3E");
   --ico-historial: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 3h2v1h-2zM5 4h2v1h-2zM5 5h2v1h-2zM9 5h2v1h-2zM5 6h2v1h-2zM9 6h2v1h-2zM1 7h2v1h-2zM5 7h2v1h-2zM9 7h2v1h-2zM1 8h2v1h-2zM5 8h2v1h-2zM9 8h2v1h-2zM1 9h2v1h-2zM5 9h2v1h-2zM9 9h2v1h-2zM1 10h2v1h-2zM5 10h2v1h-2zM9 10h2v1h-2z'/%3E%3C/svg%3E");
   --ico-lab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h6v1h-6zM4 2h1v1h-1zM7 2h1v1h-1zM4 3h1v1h-1zM7 3h1v1h-1zM4 4h1v1h-1zM7 4h1v1h-1zM3 5h1v1h-1zM8 5h1v1h-1zM2 6h1v1h-1zM9 6h1v1h-1zM1 7h10v1h-10zM1 8h10v1h-10zM1 9h10v1h-10z'/%3E%3C/svg%3E");
   --ico-letra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M6 1h2v1h-2zM6 2h3v1h-3zM6 3h1v1h-1zM8 3h2v1h-2zM6 4h1v1h-1zM9 4h1v1h-1zM6 5h1v1h-1zM9 5h1v1h-1zM6 6h1v1h-1zM6 7h1v1h-1zM3 8h4v1h-4zM2 9h5v1h-5zM3 10h3v1h-3z'/%3E%3C/svg%3E");
   --ico-lista: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 3h10v1h-10zM1 6h10v1h-10zM1 9h10v1h-10z'/%3E%3C/svg%3E");
   --ico-listas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h4v1h-4zM7 1h4v1h-4zM1 2h1v1h-1zM4 2h1v1h-1zM7 2h1v1h-1zM10 2h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM7 3h1v1h-1zM10 3h1v1h-1zM1 4h4v1h-4zM7 4h4v1h-4zM1 7h4v1h-4zM7 7h4v1h-4zM1 8h1v1h-1zM4 8h1v1h-1zM7 8h1v1h-1zM10 8h1v1h-1zM1 9h1v1h-1zM4 9h1v1h-1zM7 9h1v1h-1zM10 9h1v1h-1zM1 10h4v1h-4zM7 10h4v1h-4z'/%3E%3C/svg%3E");
+  --ico-mas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 2h2v1h-2zM5 3h2v1h-2zM5 4h2v1h-2zM2 5h8v1h-8zM2 6h8v1h-8zM5 7h2v1h-2zM5 8h2v1h-2zM5 9h2v1h-2z'/%3E%3C/svg%3E");
   --ico-max: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 2h8v1h-8zM2 3h8v1h-8zM2 4h1v1h-1zM9 4h1v1h-1zM2 5h1v1h-1zM9 5h1v1h-1zM2 6h1v1h-1zM9 6h1v1h-1zM2 7h1v1h-1zM9 7h1v1h-1zM2 8h1v1h-1zM9 8h1v1h-1zM2 9h8v1h-8z'/%3E%3C/svg%3E");
   --ico-min: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 8h8v1h-8zM2 9h8v1h-8z'/%3E%3C/svg%3E");
   --ico-pausa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 1h3v1h-3zM7 1h3v1h-3zM2 2h3v1h-3zM7 2h3v1h-3zM2 3h3v1h-3zM7 3h3v1h-3zM2 4h3v1h-3zM7 4h3v1h-3zM2 5h3v1h-3zM7 5h3v1h-3zM2 6h3v1h-3zM7 6h3v1h-3zM2 7h3v1h-3zM7 7h3v1h-3zM2 8h3v1h-3zM7 8h3v1h-3zM2 9h3v1h-3zM7 9h3v1h-3zM2 10h3v1h-3zM7 10h3v1h-3z'/%3E%3C/svg%3E");
+  --ico-persona: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M4 1h4v1h-4zM3 2h1v1h-1zM8 2h1v1h-1zM3 3h1v1h-1zM8 3h1v1h-1zM3 4h1v1h-1zM8 4h1v1h-1zM4 5h4v1h-4zM3 7h6v1h-6zM2 8h1v1h-1zM9 8h1v1h-1zM1 9h1v1h-1zM10 9h1v1h-1zM1 10h10v1h-10z'/%3E%3C/svg%3E");
   --ico-play: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h1v1h-1zM3 2h2v1h-2zM3 3h4v1h-4zM3 4h5v1h-5zM3 5h7v1h-7zM3 6h7v1h-7zM3 7h5v1h-5zM3 8h4v1h-4zM3 9h2v1h-2zM3 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-reloj: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M4 1h4v1h-4zM2 2h2v1h-2zM8 2h2v1h-2zM1 3h1v1h-1zM10 3h1v1h-1zM1 4h1v1h-1zM5 4h1v1h-1zM10 4h1v1h-1zM0 5h1v1h-1zM5 5h1v1h-1zM11 5h1v1h-1zM0 6h1v1h-1zM5 6h4v1h-4zM11 6h1v1h-1zM1 7h1v1h-1zM10 7h1v1h-1zM1 8h1v1h-1zM10 8h1v1h-1zM2 9h2v1h-2zM8 9h2v1h-2zM4 10h4v1h-4z'/%3E%3C/svg%3E");
   --ico-repetir: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M8 1h1v1h-1zM1 2h9v1h-9zM1 3h1v1h-1zM8 3h1v1h-1zM1 4h1v1h-1zM1 5h1v1h-1zM10 6h1v1h-1zM10 7h1v1h-1zM3 8h1v1h-1zM10 8h1v1h-1zM2 9h9v1h-9zM3 10h1v1h-1z'/%3E%3C/svg%3E");
   --ico-siguiente: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M1 1h1v1h-1zM8 1h2v1h-2zM1 2h2v1h-2zM8 2h2v1h-2zM1 3h3v1h-3zM8 3h2v1h-2zM1 4h4v1h-4zM8 4h2v1h-2zM1 5h5v1h-5zM8 5h2v1h-2zM1 6h5v1h-5zM8 6h2v1h-2zM1 7h4v1h-4zM8 7h2v1h-2zM1 8h3v1h-3zM8 8h2v1h-2zM1 9h2v1h-2zM8 9h2v1h-2zM1 10h1v1h-1zM8 10h2v1h-2z'/%3E%3C/svg%3E");
   --ico-sync: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h1v1h-1zM5 2h1v1h-1zM3 3h1v1h-1zM5 3h1v1h-1zM7 3h1v1h-1zM3 4h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM1 5h1v1h-1zM3 5h1v1h-1zM5 5h1v1h-1zM7 5h1v1h-1zM9 5h1v1h-1zM1 6h1v1h-1zM3 6h1v1h-1zM5 6h1v1h-1zM7 6h1v1h-1zM9 6h1v1h-1zM3 7h1v1h-1zM5 7h1v1h-1zM7 7h1v1h-1zM3 8h1v1h-1zM5 8h1v1h-1zM7 8h1v1h-1zM5 9h1v1h-1zM5 10h1v1h-1z'/%3E%3C/svg%3E");
+  --ico-teclado: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M0 3h12v1h-12zM0 4h1v1h-1zM11 4h1v1h-1zM0 5h1v1h-1zM2 5h1v1h-1zM4 5h1v1h-1zM6 5h1v1h-1zM8 5h1v1h-1zM11 5h1v1h-1zM0 6h1v1h-1zM11 6h1v1h-1zM0 7h1v1h-1zM3 7h6v1h-6zM11 7h1v1h-1zM0 8h1v1h-1zM11 8h1v1h-1zM0 9h12v1h-12z'/%3E%3C/svg%3E");
   --ico-vinilo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M4 1h4v1h-4zM2 2h2v1h-2zM8 2h2v1h-2zM1 3h1v1h-1zM10 3h1v1h-1zM1 4h1v1h-1zM10 4h1v1h-1zM0 5h1v1h-1zM5 5h2v1h-2zM11 5h1v1h-1zM0 6h1v1h-1zM5 6h2v1h-2zM11 6h1v1h-1zM1 7h1v1h-1zM10 7h1v1h-1zM1 8h1v1h-1zM10 8h1v1h-1zM2 9h2v1h-2zM8 9h2v1h-2zM4 10h4v1h-4z'/%3E%3C/svg%3E");
   --ico-vol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h1v1h-1zM4 2h2v1h-2zM9 2h1v1h-1zM3 3h3v1h-3zM10 3h1v1h-1zM1 4h5v1h-5zM7 4h1v1h-1zM10 4h1v1h-1zM1 5h5v1h-5zM8 5h1v1h-1zM10 5h1v1h-1zM1 6h5v1h-5zM8 6h1v1h-1zM10 6h1v1h-1zM1 7h5v1h-5zM7 7h1v1h-1zM10 7h1v1h-1zM3 8h3v1h-3zM10 8h1v1h-1zM4 9h2v1h-2zM9 9h1v1h-1zM5 10h1v1h-1z'/%3E%3C/svg%3E");
   --ico-vol-bajo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 1h1v1h-1zM4 2h2v1h-2zM3 3h3v1h-3zM1 4h5v1h-5zM7 4h1v1h-1zM1 5h5v1h-5zM8 5h1v1h-1zM1 6h5v1h-5zM8 6h1v1h-1zM1 7h5v1h-5zM7 7h1v1h-1zM3 8h3v1h-3zM4 9h2v1h-2zM5 10h1v1h-1z'/%3E%3C/svg%3E");
@@ -8003,6 +8156,7 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
 .ico-ancha { --m: var(--ico-ancha); }
 .ico-anterior { --m: var(--ico-anterior); }
 .ico-buscar { --m: var(--ico-buscar); }
+.ico-casete { --m: var(--ico-casete); }
 .ico-cerrar { --m: var(--ico-cerrar); }
 .ico-cine { --m: var(--ico-cine); }
 .ico-cita { --m: var(--ico-cita); }
@@ -8011,18 +8165,24 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
 .ico-corazon-lleno { --m: var(--ico-corazon-lleno); }
 .ico-disp { --m: var(--ico-disp); }
 .ico-edit { --m: var(--ico-edit); }
+.ico-enchufe { --m: var(--ico-enchufe); }
+.ico-enlace { --m: var(--ico-enlace); }
 .ico-historial { --m: var(--ico-historial); }
 .ico-lab { --m: var(--ico-lab); }
 .ico-letra { --m: var(--ico-letra); }
 .ico-lista { --m: var(--ico-lista); }
 .ico-listas { --m: var(--ico-listas); }
+.ico-mas { --m: var(--ico-mas); }
 .ico-max { --m: var(--ico-max); }
 .ico-min { --m: var(--ico-min); }
 .ico-pausa { --m: var(--ico-pausa); }
+.ico-persona { --m: var(--ico-persona); }
 .ico-play { --m: var(--ico-play); }
+.ico-reloj { --m: var(--ico-reloj); }
 .ico-repetir { --m: var(--ico-repetir); }
 .ico-siguiente { --m: var(--ico-siguiente); }
 .ico-sync { --m: var(--ico-sync); }
+.ico-teclado { --m: var(--ico-teclado); }
 .ico-vinilo { --m: var(--ico-vinilo); }
 .ico-vol { --m: var(--ico-vol); }
 .ico-vol-bajo { --m: var(--ico-vol-bajo); }
@@ -8052,10 +8212,10 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
 .play-btn .ico,
 .play-btn:hover .ico { filter: none; }
 .tab.icon-tab.active .ico { filter: drop-shadow(0 0 4px var(--accent-glow)); }
-.tab-gear .ico { transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.tab-gear .ico { transition: transform 0.45s var(--muelle); }
 .tab-gear:hover .ico,
 .tab-gear.active .ico { transform: rotate(90deg); }
-body.disp-movil .tb-cfg .ico { transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+body.disp-movil .tb-cfg .ico { transition: transform 0.45s var(--muelle); }
 body.disp-movil .tb-cfg.active .ico {
   transform: rotate(90deg);
   filter: drop-shadow(0 0 4px var(--accent-glow));

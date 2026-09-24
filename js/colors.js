@@ -301,10 +301,21 @@
        pasara: por eso el nombre del disco salía AZUL sobre una carátula en
        blanco y negro. */
     const cText = Math.min(accent.C * 0.30, 0.040);
+    /* El tono apagado (--text-muted) se quedaba en L 0,55: unos 3,9 : 1 sobre
+       el panel, y lo usan el número y la duración de cada canción, el álbum,
+       las secciones, las ayudas y los vacíos. Misma red que el acento: sube
+       la L hasta leerse (4,5 : 1 contra el panel), con techo por debajo del
+       --text-dim (L 0,74) para que la escalera siga siendo escalera. */
+    let mutedL = 0.550;
+    let mutedRgb = lchToRgb(mutedL, cText, accent.h);
+    while (mutedL < 0.70 && contraste(mutedRgb, panelRgb) < CONTRAST_MIN) {
+      mutedL += 0.01;
+      mutedRgb = lchToRgb(mutedL, cText, accent.h);
+    }
     const texto = {
       text:   lchToRgb(0.945, Math.min(accent.C * 0.18, 0.022), accent.h),
       dim:    lchToRgb(0.740, cText, accent.h),
-      muted:  lchToRgb(0.550, cText, accent.h),
+      muted:  mutedRgb,
     };
 
     return {

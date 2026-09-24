@@ -1126,17 +1126,23 @@
       const paso = Math.min(70, Math.max(18, (durMs * 0.4) / Math.max(1, text.length)));
       let k = 0;
       words.forEach((w, j) => {
+        /* las letras de cada palabra, juntas en su .wl: sin él el renglón
+           se podía partir entre dos letras y la palabra salía cortada */
+        const pal = document.createElement('span');
+        pal.className = 'wl';
         [...w].forEach(ch => {
           const s = document.createElement('span');
           s.className = 'w';
           s.textContent = ch;
+          s.dataset.t = ch;          // el barrido del karaoke copia el texto (::after)
           s.style.setProperty('--d', Math.round(d) + 'ms');
           s.style.setProperty('--sx', (k % 2 === 0 ? -1 : 1));
           if (j === idxGrande) s.classList.add('w-big');
-          ln.appendChild(s);
+          pal.appendChild(s);
           d += paso;
           k++;
         });
+        ln.appendChild(pal);
         if (j < words.length - 1) { ln.appendChild(document.createTextNode(' ')); d += paso; }
       });
     } else {
@@ -1146,6 +1152,7 @@
         const s = document.createElement('span');
         s.className = 'w' + (j === idxGrande ? ' w-big' : '');
         s.textContent = w;
+        s.dataset.t = w;           // el barrido del karaoke copia el texto (::after)
         s.style.setProperty('--d', Math.round(d) + 'ms');
         s.style.setProperty('--sx', (j % 2 === 0 ? -1 : 1));
         ln.appendChild(s);
@@ -1475,7 +1482,11 @@
 
   const elegirFx = (listaOriginal, i, salt) => {
     const lista = filtrarIntensidad(listaOriginal, i);
-    if (demoFx && lista.includes(demoFx)) { edPrevFx = demoFx; return demoFx; }
+    /* En el ⚗ lab manda el efecto pedido aunque la intensidad automática de
+       la línea de prueba (6 s, tranquila) lo hubiera descartado: antes se
+       miraba en la lista YA filtrada y los efectos de golpe caían en otro
+       sin avisar (pedías ed-terremoto y salía un ed-lockup). */
+    if (demoFx && listaOriginal.includes(demoFx)) { edPrevFx = demoFx; return demoFx; }
     let k = semilla(i, salt, lista.length);
     if (lista[k] === edPrevFx) k = (k + 1 + semilla(i, salt + 50, lista.length - 1)) % lista.length;
     edPrevFx = lista[k];
@@ -1546,11 +1557,66 @@
      mide: si sobresale se baja el tamaño hasta que entre, y si cabe no se
      toca nada. Corre una vez por verso (no por frame) y como mucho 4 vueltas.
      Va en un rAF porque en el momento de crear el stack todavía está vacío. */
+  /* Lo que la CÁMARA de este verso (edcam-*) agranda y desplaza el stack.
+     Acercan hasta un 20 % y se corren hasta un 3 %: un título que ya
+     llenaba el ancho acababa, al final del movimiento, más ancho que el
+     panel —que recorta— y las letras de los extremos y su brillo salían
+     cortados a ras del borde. Se lee de los fotogramas de la animación de
+     verdad, así que una cámara nueva no hay que apuntarla en ninguna lista. */
+  const holguraCamara = (stack) => {
+    let z = 1, tx = 0;
+    try {
+      stack.getAnimations().forEach((a) => {
+        const kf = a.effect && a.effect.getKeyframes ? a.effect.getKeyframes() : [];
+        kf.forEach((k) => {
+          const t = String(k.transform || '');
+          for (const m of t.matchAll(/scale\(\s*([\d.]+)/g)) z = Math.max(z, parseFloat(m[1]) || 1);
+          for (const m of t.matchAll(/translateX?\(\s*(-?[\d.]+)%/g)) tx = Math.max(tx, Math.abs(parseFloat(m[1]) || 0) / 100);
+        });
+      });
+    } catch (e) { /* sin Web Animations: sin holgura extra */ }
+    return { z: Math.min(1.3, z), tx: Math.min(0.08, tx) };
+  };
+
+  // ancho del contenido en UNA sola fila, sin transformaciones (layout puro)
+  const anchoNatural = (el) => {
+    const antes = el.style.width;
+    el.style.width = 'max-content';
+    const w = el.offsetWidth;
+    el.style.width = antes;
+    return w;
+  };
+
   const ajustarAncho = (stack) => {
-    if (!stack || !stack.isConnected) return;
+    if (!stack || !stack.isConnected || stack.dataset.out) return;
     const max = stack.clientWidth;
     if (!max) return;
-    stack.querySelectorAll('.ed-titulo, .ed-frase').forEach((fila) => {
+    /* Títulos, filas de ed-apila y trozos van en UNA fila cada uno, y esa
+       fila tiene que caber con la cámara en su punto más abierto. Antes solo
+       se miraba scrollWidth, que no ve nada mientras el texto pueda partirse:
+       un título demasiado grande se partía en dos renglones (y los de letra a
+       letra, por la mitad de una palabra) en vez de encogerse. */
+    const cam = holguraCamara(stack);
+    const lim = (max * (1 - 2 * cam.tx)) / cam.z;
+    const encajar = (quien, filas) => {
+      for (let vuelta = 0; vuelta < 3 && filas.length; vuelta++) {
+        const ancho = Math.max(...filas.map(anchoNatural));
+        if (ancho <= lim + 1) return;
+        const px = parseFloat(getComputedStyle(quien).fontSize) || 20;
+        const nuevo = Math.max(12, (px * lim) / ancho);
+        if (nuevo >= px - 0.2) return;     // ya no se puede encoger más: se deja
+        quien.style.fontSize = nuevo.toFixed(1) + 'px';
+      }
+    };
+    stack.querySelectorAll('.ed-titulo, .ed-lockup-mini').forEach((f) => encajar(f, [f]));
+    // en estos dos el tamaño lo lleva el bloque: manda su fila más ancha
+    stack.querySelectorAll('.ed-apila').forEach((b) => encajar(b, [...b.querySelectorAll('.ed-apila-fila')]));
+    stack.querySelectorAll('.ed-trozos').forEach((b) => encajar(b, [...b.querySelectorAll('.ed-trozo')]));
+
+    /* Las frases sí se parten en renglones, y eso es lo suyo: aquí solo se
+       vigila la palabra que no cabe ni sola (se saldría del panel y, como
+       .lyrics-edit recorta, aparecería partida por la mitad). */
+    stack.querySelectorAll('.ed-frase').forEach((fila) => {
       let vueltas = 0;
       while (fila.scrollWidth > max + 1 && vueltas < 4) {
         const px = parseFloat(getComputedStyle(fila).fontSize) || 20;
@@ -2209,7 +2275,7 @@
       // eco gigante borroso detrás (solo en los modos tranquilos)
       if (fx === 'ed-acumula' || fx === 'ed-crece') {
         const eco = document.createElement('div');
-        eco.className = 'ed-eco';
+        eco.className = 'ed-eco-fondo';   // NO 'ed-eco': ese es el título de la estela
         eco.textContent = text;
         stack.appendChild(eco);
       }
@@ -2598,7 +2664,80 @@
     autoScrolling = true;
     clearTimeout(autoScrollTimer);
     autoScrollTimer = setTimeout(() => { autoScrolling = false; }, 700);
-    lyricsBody.scrollTo({ top: Math.max(0, targetTop), left: 0, behavior: 'smooth' });
+    subirEnCascada(Math.max(0, targetTop), idx);
+  };
+
+  /* ---- LA LETRA SUBE EN CASCADA (v120) ----
+     Antes: lyricsBody.scrollTo({ behavior: 'smooth' }), o sea el bloque
+     entero subiendo de una pieza con la curva que trajera el navegador.
+     Ahora el salto se hace de una vez y cada verso cercano recorre su
+     trocito con un muelle, un pelín después que el de encima: la letra se
+     mueve como una ola y el verso nuevo se asienta con un rebote mínimo.
+     Es lo que hace Apple Music (y AMLL, que lo copia para la web).
+
+     Va por la propiedad `translate`, que es independiente de la
+     `transform` de la profundidad (scale por data-d) y del «pop» del verso
+     activo: no se pisan. Se mueven TODOS los hijos del tramo —versos,
+     traducciones y huecos instrumentales—, cada uno con el retraso de su
+     verso, para que la traducción no se despegue de su línea a medio
+     camino. Si llega otro verso con un muelle a medias, el nuevo sale de
+     donde se VE cada línea en ese momento: nada pega saltos.
+
+     Sin cascada (el salto suave de siempre): con «menos movimiento», con la
+     letra escondida (modo edit) y en un salto más largo que el panel —un
+     clic a otro verso, arrastrar la barra—, donde un muelle solo marearía. */
+  const MUELLE_LETRA = 'linear(0, 0.021, 0.078, 0.161, 0.261, 0.37, 0.482, 0.591, 0.695, 0.789, 0.872, 0.942, 1, 1.046, 1.081, 1.105, 1.119, 1.126, 1.126, 1.12, 1.112, 1.1, 1.087, 1.072, 1.058, 1.045, 1.032, 1.021, 1.012, 1.003, 0.997, 0.992, 0.988, 0.986, 0.984, 0.984, 0.984, 0.985, 0.987, 0.988, 1)';
+  let curvaCascada = '';
+  const enCascada = new WeakMap();   // los muelles de esta función: cancelarlos no toca las transiciones del CSS
+  const desplazadoY = (el) => {
+    const t = getComputedStyle(el).translate;
+    if (!t || t === 'none') return 0;
+    const partes = t.split(' ');
+    return parseFloat(partes[1] || '0') || 0;
+  };
+  const subirEnCascada = (targetTop, idx) => {
+    const salto = targetTop - lyricsBody.scrollTop;
+    const calma = !!(window.MMSettings && window.MMSettings.reduceMotion());
+    if (calma || !lyricsBody.offsetParent || typeof lyricsBody.animate !== 'function'
+        || Math.abs(salto) > lyricsBody.clientHeight) {
+      lyricsBody.scrollTo({ top: targetTop, left: 0, behavior: lyricsBody.offsetParent ? 'smooth' : 'auto' });
+      return;
+    }
+    if (!curvaCascada) {
+      let ok = false;
+      try { ok = !!(window.CSS && CSS.supports('transition-timing-function', 'linear(0, 1)')); } catch (e) { /* navegador viejo */ }
+      curvaCascada = ok ? MUELLE_LETRA : 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+    }
+    // el tramo que se ve, con margen: de 6 versos arriba a 10 abajo
+    const primero = lineNodes[Math.max(0, idx - 6)];
+    const ultimo = lineNodes[Math.min(lineNodes.length - 1, idx + 10)];
+    if (!primero || !ultimo) { lyricsBody.scrollTop = targetTop; return; }
+    const tramo = [];
+    let verso = Math.max(0, idx - 6) - 1;
+    for (let el = primero; el; el = el.nextElementSibling) {
+      if (el.classList.contains('lyric-line')) {
+        if (verso >= idx + 10) break;          // el siguiente verso ya queda fuera
+        verso++;
+      }
+      tramo.push({ el, verso, visto: desplazadoY(el) });
+    }
+    lyricsBody.scrollTop = targetTop;
+    const subio = lyricsBody.scrollTop - (targetTop - salto);   // lo que de verdad se movió
+    for (const t of tramo) {
+      const viejo = enCascada.get(t.el);
+      if (viejo) viejo.cancel();
+      const desde = subio + t.visto;
+      if (Math.abs(desde) < 0.5) { enCascada.delete(t.el); continue; }
+      // los de arriba salen juntos; desde el verso anterior al activo, cada
+      // uno 26 ms después que el de encima (tope: 8 escalones)
+      const escalon = Math.max(0, Math.min(8, t.verso - (idx - 2)));
+      const a = t.el.animate(
+        [{ translate: '0 ' + desde.toFixed(1) + 'px' }, { translate: '0 0' }],
+        { duration: 820, delay: escalon * 26, easing: curvaCascada, fill: 'backwards' }
+      );
+      enCascada.set(t.el, a);
+      a.onfinish = () => { if (enCascada.get(t.el) === a) enCascada.delete(t.el); };
+    }
   };
 
   /* ---- Karaoke: la línea activa se va tiñendo palabra a palabra ----
@@ -2650,6 +2789,7 @@
     repartir(Array.prototype.slice.call(ln.querySelectorAll('.w')), idx);
 
   let kIdx = -1, kSpans = null, kNext = 0;
+  let kLleno = -1;   // último --p escrito en la palabra que suena (en décimas de %)
 
   /* Olvida el verso que se estaba tiñendo. Lo llaman limpiarLetra() y
      renderLines(), o sea cada vez que llega una letra nueva.
@@ -2660,18 +2800,19 @@
      ANTERIOR, que ya no están en el documento. Resultado: el verso salía
      activo pero sin teñirse nada, y no se recuperaba hasta que el índice daba
      la casualidad de cambiar a otro valor. */
-  const karaokeOlvidar = () => { kIdx = -1; kSpans = null; kNext = 0; };
+  const karaokeOlvidar = () => { kIdx = -1; kSpans = null; kNext = 0; kLleno = -1; };
 
   const karaokeReset = () => {
     if (kSpans) {
       for (let i = 0; i < kSpans.length; i++) kSpans[i].el.classList.remove('sung', 'cantando');
     }
     kNext = 0;
+    kLleno = -1;
   };
   const karaoke = (t, idx) => {
     if (idx < 0 || !lineNodes[idx]) { kIdx = -1; kSpans = null; return; }
     const ln = lineNodes[idx];
-    if (kIdx !== idx) { kIdx = idx; kSpans = null; kNext = 0; }
+    if (kIdx !== idx) { kIdx = idx; kSpans = null; kNext = 0; kLleno = -1; }
     if (!kSpans) {
       // _kw puede ser [] (línea sin palabras): también vale como caché, así
       // que se comprueba la referencia, no la longitud — si no, se volvería a
@@ -2694,9 +2835,31 @@
       kNext++;
       cambio = true;
     }
-    if (!cambio) return;
-    for (let i = 0; i < kSpans.length; i++) {
-      kSpans[i].el.classList.toggle('cantando', i === kNext - 1);
+    if (cambio) {
+      for (let i = 0; i < kSpans.length; i++) {
+        kSpans[i].el.classList.toggle('cantando', i === kNext - 1);
+      }
+      kLleno = -1;
+    }
+
+    /* EL BARRIDO: la palabra que suena se llena de izquierda a derecha
+       mientras dura, como en Apple Music Sing. Encima lleva una copia de sí
+       misma en el acento (::after con su data-t) destapada con clip-path
+       hasta --p (style.css, «KARAOKE»). Sus tiempos son los mismos del
+       reparto por sílabas: de su arranque al de la siguiente, o al final
+       de lo cantado si es la última. Aquí solo se escribe --p, y solo
+       cuando cambia una décima: nada de layout, y el `animation` del
+       revelado de entrada sigue siendo suyo. En pausa, t no avanza y la
+       palabra se queda a medio llenar, que es lo que se está oyendo. */
+    if (!kNext) return;
+    const k = kNext - 1;
+    const s0 = kSpans[k].s;
+    const s1 = k + 1 < kSpans.length ? kSpans[k + 1].s : 1;
+    const f = s1 > s0 ? (p - s0) / (s1 - s0) : 1;
+    const lleno = Math.round(Math.max(0, Math.min(1, f)) * 1000) / 10;
+    if (lleno !== kLleno) {
+      kLleno = lleno;
+      kSpans[k].el.style.setProperty('--p', lleno + '%');
     }
   };
 

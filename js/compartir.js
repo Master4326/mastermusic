@@ -220,7 +220,7 @@
     const acento = css('--accent', '#5ce1e6');
     const texto = css('--text', '#e8ecff');
     const tenue = css('--text-dim', '#8b94d8');
-    const mudo = css('--text-muted', '#5a648f');
+    const mudo = css('--text-muted', '#7c86c2');
     const f = fuenteLetra();
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);

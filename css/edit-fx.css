@@ -22,15 +22,21 @@
    · transform, animation y opacity de .ed-pal / .ed-titulo son de los efectos
      de entrada. El karaoke y cualquier capa posterior solo pueden tocar
      color y text-shadow.
-   · Un efecto que se asienta NUNCA puede quedarse con un `filter` puesto:
-     el último valor tiene que ser `filter: none`, jamás `blur(0)`. Un
-     elemento con filtro se pinta dentro de su región de filtro (su caja +
-     el ensanche del propio filtro), y con blur(0) el ensanche es CERO: el
-     text-shadow que asoma fuera se corta a ras y el resplandor sale como un
-     rectángulo. Y como todos los efectos llevan fill-mode both/forwards, ese
-     último valor se queda puesto para siempre. blur(0) y none se ven igual,
-     así que no se pierde nada. Solo las salidas (sal-*, ed-colapsa*) terminan
-     con un blur de verdad, que es su gracia. Lo vigila check-glow.js.
+   · Un efecto que se asienta termina con `filter: none`, nunca `blur(0)`
+     (costumbre de la casa; lo vigila check-modulos.js [6]). OJO, medido el
+     23-sep-2026: Chrome deja de todas formas `blur(0px)` al acabar una
+     animación blur(N) → none, y ese filtro sobrante ya NO recorta el
+     resplandor (quitarlo no cambia ni un píxel). Solo las salidas (sal-*,
+     ed-colapsa*) terminan con un blur de verdad, que es su gracia.
+   · Lo que SÍ corta el brillo a ras es un RECORTE que se queda puesto
+     (fill-mode both/forwards): clip-path, overflow o máscara. Por eso un
+     clip-path nunca acaba pegado a la caja —inset(0), polygon(0 0,100% 0…)—:
+     el text-shadow (30 px) y los acentos de las MAYÚSCULAS asoman por fuera
+     y salían cortados en un rectángulo. El último valor deja margen:
+     calc(-0.5em - 30px) en títulos; calc(-0.5em - 24px) arriba/abajo y
+     calc(-0.3em - 24px) a los lados en palabras. En las mitades partidas
+     (ed-rebana, ed-tijera) el corte de dentro se queda y los bordes de fuera
+     se abren. Las salidas (sal-*) sí pueden recortar: se están yendo.
    ========================================================== */
 
 .ed-stack {
@@ -210,9 +216,12 @@
   line-height: 1.06;
 }.ed-trozo {
   grid-area: 1 / 1;              /* todos en la misma celda: se relevan */
-  font-family: 'Nunito', 'VT323', sans-serif;
+  /* La tipografía es la de la letra, la que el usuario eligió (la hereda de
+     .lyrics-edit), con el mismo peso y las mismas mayúsculas que los títulos
+     gigantes. Traía la Nunito propia de los edits de TikTok y era el único
+     efecto (con ed-apila) que salía con otra letra. */
   font-weight: 900;
-  letter-spacing: -0.015em;
+  letter-spacing: 0.01em;
   text-transform: uppercase;
   color: var(--text);
   text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6);
@@ -288,8 +297,15 @@
   font-style: italic;
   color: var(--accent);
   text-shadow: 0 0 10px var(--accent-glow), 0 0 26px var(--accent-glow);
-}.ed-pal.ed-cursiva { font-style: italic; opacity: 0.95; }/* eco gigante borroso detrás de la frase */
-.ed-eco {
+}.ed-pal.ed-cursiva { font-style: italic; opacity: 0.95; }/* eco gigante borroso detrás de la frase (ed-acumula y ed-crece).
+   Se llamaba .ed-eco, IGUAL que el título ed-eco (la estela de copias), así
+   que cada renglón de ese título se llevaba también estas reglas: absoluto
+   al 50 %, a 3,2em, borroso y recortado. Todos los renglones caían en el
+   mismo punto, uno encima de otro, ilegibles y con el brillo cortado en un
+   rectángulo. Ahora tiene nombre propio, y los extremos se funden con una
+   máscara en vez de cortarse a ras (con overflow se veía el borde de la
+   franja como una caja translúcida detrás de la frase). */
+.ed-eco-fondo {
   position: absolute;
   left: 0;
   right: 0;
@@ -297,13 +313,15 @@
   translate: 0 -50%;
   font-weight: 900;
   font-size: 3.2em;
-  line-height: 1;
+  line-height: 1.3;
   opacity: 0.07;
   filter: blur(3px);
   white-space: nowrap;
-  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
   z-index: 1;
   text-transform: uppercase;
+  pointer-events: none;
 }/* flash de impacto para los efectos fuertes */
 .ed-flash {
   position: absolute;
@@ -346,10 +364,10 @@
   animation-delay: var(--d, 0ms);
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }.ed-titulo.ed-tijera::before {
-  clip-path: polygon(0 0, 100% 0, 100% 38%, 0 72%);
+  clip-path: polygon(calc(-0.5em - 30px) calc(-0.5em - 30px), calc(100% + 0.5em + 30px) calc(-0.5em - 30px), calc(100% + 0.5em + 30px) 38%, 100% 38%, 0 72%, calc(-0.5em - 30px) 72%);
   animation-name: ed-tijera-a;
 }.ed-titulo.ed-tijera::after {
-  clip-path: polygon(0 72%, 100% 38%, 100% 100%, 0 100%);
+  clip-path: polygon(calc(-0.5em - 30px) 72%, 0 72%, 100% 38%, calc(100% + 0.5em + 30px) 38%, calc(100% + 0.5em + 30px) calc(100% + 0.5em + 30px), calc(-0.5em - 30px) calc(100% + 0.5em + 30px));
   animation-name: ed-tijera-b;
 }@keyframes ed-tijera-base { from { opacity: 0; } to { opacity: 1; } }@keyframes ed-tijera-a {
   0%   { opacity: 0; transform: translate(-0.5em, -0.35em); filter: blur(5px); }
@@ -481,9 +499,9 @@
   50%      { transform: translateX(1.6%) rotate(0.5deg); }
 }/* ── títulos nuevos ── */
 .ed-titulo.ed-recorte { animation-name: ed-recorte; animation-duration: 0.6s; }.ed-titulo.ed-enfoca  { animation-name: ed-enfoca; animation-duration: 0.9s; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }.ed-titulo.ed-sello   { animation-name: ed-sello; animation-duration: 0.45s; animation-timing-function: cubic-bezier(0.55, 0, 0.68, 0.53); }.ed-titulo.ed-chroma  { animation-name: ed-chroma; animation-duration: 0.7s; }@keyframes ed-recorte {                 /* cortina: barrido que revela el texto */
-  0%   { opacity: 0; clip-path: inset(0 100% 0 0); transform: skewX(8deg) translateX(-0.15em); }
+  0%   { opacity: 0; clip-path: inset(calc(-0.5em - 30px) 100% calc(-0.5em - 30px) calc(-0.5em - 30px)); transform: skewX(8deg) translateX(-0.15em); }
   40%  { opacity: 1; }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); transform: skewX(0) translateX(0); }
+  100% { opacity: 1; clip-path: inset(calc(-0.5em - 30px)); transform: skewX(0) translateX(0); }
 }@keyframes ed-enfoca {                  /* desenfoque cinematográfico que enfoca */
   0%   { opacity: 0; filter: blur(18px); transform: scale(1.5, 1.25); }
   55%  { opacity: 1; }
@@ -655,7 +673,12 @@
   opacity: 0.55;
   color: var(--accent);
   letter-spacing: 0.2em;
-  margin: 0.5em 0;
+  /* El recorte (overflow y máscara) va a ras de la caja: con todo el aire
+     fuera, en margen, los acentos de las mayúsculas (Á, É, Ñ) y el brillo
+     asomaban por arriba y salían cortados. El aire va DENTRO, en padding,
+     y la separación con el título queda igual (0,35 + 0,15 = 0,5em). */
+  padding: 0.35em 0;
+  margin: 0.15em 0;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
   animation: ed-cinta-banda-in 0.4s ease-out both;
@@ -797,8 +820,8 @@
   80%  { transform: translateY(0.08em) rotate(0); }
   100% { opacity: 1; transform: translateY(0); }
 }@keyframes edp-corte {                  /* cortina: barrido que revela la palabra */
-  0%   { opacity: 1; clip-path: inset(0 100% 0 0); transform: translateX(-0.12em); }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); transform: translateX(0); }
+  0%   { opacity: 1; clip-path: inset(calc(-0.5em - 24px) 100% calc(-0.5em - 24px) calc(-0.3em - 24px)); transform: translateX(-0.12em); }
+  100% { opacity: 1; clip-path: inset(calc(-0.5em - 24px) calc(-0.3em - 24px)); transform: translateX(0); }
 }@keyframes edp-pendulo {                /* columpio colgado desde arriba */
   0%   { opacity: 0; transform: rotate(calc(var(--sx, 1) * 55deg)) translateY(-0.2em); }
   40%  { opacity: 1; transform: rotate(calc(var(--sx, 1) * -18deg)); }
@@ -970,15 +993,15 @@
   40%  { opacity: 1; color: transparent; transform: scale(1); }
   75%  { color: transparent; }
   100% { opacity: 1; color: var(--text); text-shadow: 0 0 10px var(--accent-glow); }
-}/* ed-subtitulo: píldora de caption estilo TikTok */
+}/* ed-subtitulo: la frase como el subtítulo de un vídeo — letra nítida con
+   un contorno oscuro pegado que la despega de cualquier fondo. Era una
+   píldora negra al 72 % con borde blanco: se veía como un cuadro
+   translúcido alrededor de la letra. Sin caja, como el resto del modo edit. */
 .ed-frase.ed-subtitulo {
-  display: table;
-  margin: 0 auto;
-  background: rgba(0, 0, 0, 0.72);
-  border: 2px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.35em;
-  padding: 0.28em 0.55em;
-  box-shadow: 0 0.15em 1em rgba(0, 0, 0, 0.5);
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 0.9),
+    0 2px 0 rgba(0, 0, 0, 0.55),
+    0 0 14px rgba(0, 0, 0, 0.55);
   animation: edp-subtitulo-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }@keyframes edp-subtitulo-in {
   from { opacity: 0; transform: scale(0.75); }
@@ -1081,10 +1104,10 @@ body.reduce-motion .ed-spark { display: none !important; }/* ── ed-mascara: 
   animation-delay: var(--d, 0ms);
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }.ed-titulo.ed-rebana::before {
-  clip-path: inset(0 0 50% 0);
+  clip-path: inset(calc(-0.5em - 30px) calc(-0.5em - 30px) 50% calc(-0.5em - 30px));
   animation-name: ed-rebana-alta;
 }.ed-titulo.ed-rebana::after {
-  clip-path: inset(50% 0 0 0);
+  clip-path: inset(50% calc(-0.5em - 30px) calc(-0.5em - 30px) calc(-0.5em - 30px));
   animation-name: ed-rebana-baja;
 }@keyframes ed-rebana-alta {
   0%   { opacity: 0; transform: translate(-0.5em, -0.28em); }
@@ -1151,9 +1174,9 @@ body.reduce-motion .ed-spark { display: none !important; }/* ── ed-mascara: 
   animation-duration: 0.75s;
   animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
 }@keyframes ed-cortina {
-  0%   { opacity: 0; clip-path: inset(0 50% 0 50%); transform: scaleY(1.1); }
+  0%   { opacity: 0; clip-path: inset(calc(-0.5em - 30px) 50% calc(-0.5em - 30px) 50%); transform: scaleY(1.1); }
   60%  { opacity: 1; }
-  100% { opacity: 1; clip-path: inset(0 -6% 0 -6%); transform: scaleY(1); }
+  100% { opacity: 1; clip-path: inset(calc(-0.5em - 30px) -6% calc(-0.5em - 30px) -6%); transform: scaleY(1); }
 }/* ── ed-eco: llega con estela de copias que se recogen ── */
 .ed-titulo.ed-eco {
   animation-name: ed-eco;
@@ -1291,8 +1314,8 @@ body.reduce-motion .ed-spark { display: none !important; }/* ── ed-mascara: 
   60% { opacity: 1; }
   100% { opacity: 1; transform: none; text-shadow: none; }
 }@keyframes edp-recorta {
-  0%   { opacity: 1; clip-path: inset(0 100% 0 0); transform: translateX(-0.12em); }
-  100% { opacity: 1; clip-path: inset(0 -8% 0 -8%); transform: none; }
+  0%   { opacity: 1; clip-path: inset(calc(-0.5em - 24px) 100% calc(-0.5em - 24px) calc(-0.3em - 24px)); transform: translateX(-0.12em); }
+  100% { opacity: 1; clip-path: inset(calc(-0.5em - 24px) calc(-0.3em - 24px)); transform: none; }
 }@keyframes edp-pulso {
   0%   { opacity: 0; transform: scale(0.7); }
   35%  { opacity: 1; transform: scale(1.16); }
@@ -1305,8 +1328,10 @@ body.reduce-motion .ed-spark { display: none !important; }/* ── ed-mascara: 
   55%  { opacity: 1; transform: translateX(calc(var(--sx, 1) * -0.1em)) scaleX(0.94); filter: none; }
   100% { opacity: 1; transform: none; }
 }@keyframes edp-persianas {
-  0%   { opacity: 0; clip-path: polygon(0 0,100% 0,100% 0,0 0, 0 33%,100% 33%,100% 33%,0 33%, 0 66%,100% 66%,100% 66%,0 66%); }
-  100% { opacity: 1; clip-path: polygon(0 0,100% 0,100% 33%,0 33%, 0 33%,100% 33%,100% 66%,0 66%, 0 66%,100% 66%,100% 100%,0 100%); }
+  0%   { opacity: 0; clip-path: polygon(calc(-0.3em - 24px) 0,calc(100% + 0.3em + 24px) 0,calc(100% + 0.3em + 24px) 0,calc(-0.3em - 24px) 0, calc(-0.3em - 24px) 33%,calc(100% + 0.3em + 24px) 33%,calc(100% + 0.3em + 24px) 33%,calc(-0.3em - 24px) 33%, calc(-0.3em - 24px) 66%,calc(100% + 0.3em + 24px) 66%,calc(100% + 0.3em + 24px) 66%,calc(-0.3em - 24px) 66%); }
+  /* al final las lamas se pisan un 1 %: juntas a ras dejaban una raya
+     fina cruzando cada palabra (el borde suavizado de las dos lamas) */
+  100% { opacity: 1; clip-path: polygon(calc(-0.3em - 24px) calc(-0.5em - 24px),calc(100% + 0.3em + 24px) calc(-0.5em - 24px),calc(100% + 0.3em + 24px) 34%,calc(-0.3em - 24px) 34%, calc(-0.3em - 24px) 32%,calc(100% + 0.3em + 24px) 32%,calc(100% + 0.3em + 24px) 67%,calc(-0.3em - 24px) 67%, calc(-0.3em - 24px) 65%,calc(100% + 0.3em + 24px) 65%,calc(100% + 0.3em + 24px) calc(100% + 0.5em + 24px),calc(-0.3em - 24px) calc(100% + 0.5em + 24px)); }
 }/* ── ed-marcador: rotulador que subraya al llegar la palabra ── */
 .ed-marcador .ed-pal {
   position: relative;
@@ -1334,11 +1359,11 @@ body.reduce-motion .ed-spark { display: none !important; }/* ── ed-mascara: 
    a su color. Clave del look: NADA se mueve y NO hay glow.
    ========================================================== */
 .ed-apila {
-  font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  /* con la tipografía de la letra (heredada), no con una Nunito propia */
   font-weight: 900;
   line-height: 1.14;
   text-align: center;
-  letter-spacing: -0.005em;
+  letter-spacing: 0.01em;
   text-shadow: none;          /* plano a propósito: el glow lo ensucia */
   padding: 0 4%;
 }.ed-apila-fila { display: block; }/* Alternancia fila sí, fila no. Los DOS colores salen de la paleta viva de

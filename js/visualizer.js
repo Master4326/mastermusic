@@ -532,6 +532,37 @@
   const eqIdx = [3, 10, 20, 33, 47];   // índices en smooth[] para cada barrita
   let eqLive = false;
   const eqPrev = [-1, -1, -1, -1, -1];   // último paso escrito, para no repetir
+
+  /* La fila que SUENA en las listas y en la cola (library.js y seven.js
+     ponen .sp-eq en el sitio del número) lleva tres de estas cinco:
+     graves, medios y agudos. Colección viva: las filas que se pintan
+     después entran solas, sin buscarlas en cada fotograma. Sin audio que
+     medir se quita .live y manda la animación de respaldo del CSS, igual
+     que en el mini-EQ; en pausa, quietas. */
+  const filasEq = document.getElementsByClassName('sp-eq');
+  const FILA_BANDAS = [0, 2, 4];
+  const pintarFilasEq = (playing) => {
+    for (let f = 0; f < filasEq.length; f++) {
+      const eq = filasEq[f];
+      const barras = eq.children;
+      if (eq._vivo !== playing) {
+        eq._vivo = playing;
+        eq.classList.toggle('live', playing);
+        if (!playing) {
+          for (let j = 0; j < barras.length; j++) { barras[j].style.transform = ''; barras[j]._paso = -1; }
+        }
+      }
+      if (!playing) continue;
+      for (let j = 0; j < barras.length && j < FILA_BANDAS.length; j++) {
+        const paso = eqPrev[FILA_BANDAS[j]];
+        if (barras[j]._paso !== paso) {
+          barras[j]._paso = paso;
+          barras[j].style.transform = 'scaleY(' + (0.25 + paso * 0.25).toFixed(2) + ')';
+        }
+      }
+    }
+  };
+
   const updateMiniEq = (playing) => {
     if (!eqBars.length) return;
     if (playing) {
@@ -552,6 +583,7 @@
       eqLive = false;
       for (let k = 0; k < eqBars.length; k++) { eqBars[k].style.transform = ''; eqPrev[k] = -1; }
     }
+    pintarFilasEq(playing);
   };
 
   // ¿está entrando audio de verdad AHORA? (no basta con que el grafo exista:

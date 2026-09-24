@@ -222,18 +222,18 @@
   };
 
   const MANDOS = () => [
-    { n: 'reproducir / pausa', alias: 'play pause parar', ico: '⏯',
+    { n: 'reproducir / pausa', alias: 'play pause parar', ico: 'play',
       hacer: () => PC() && PC().togglePlay() },
-    { n: 'canción siguiente', alias: 'next saltar', ico: '⏭', hacer: () => PC() && PC().next() },
-    { n: 'canción anterior', alias: 'prev atras volver', ico: '⏮', hacer: () => PC() && PC().prev() },
-    { n: 'aleatorio', alias: 'shuffle mezclar random', ico: '⤨',
+    { n: 'canción siguiente', alias: 'next saltar', ico: 'siguiente', hacer: () => PC() && PC().next() },
+    { n: 'canción anterior', alias: 'prev atras volver', ico: 'anterior', hacer: () => PC() && PC().prev() },
+    { n: 'aleatorio', alias: 'shuffle mezclar random', ico: 'aleatorio',
       hacer: () => {
         const st = PC() && PC().state;
         if (!st) return;
         PC().setShuffle(!st.shuffle);
         estado(st.shuffle ? '▣ aleatorio activado' : '▣ aleatorio desactivado');
       } },
-    { n: 'repetir', alias: 'repeat bucle loop', ico: '⟳',
+    { n: 'repetir', alias: 'repeat bucle loop', ico: 'repetir',
       hacer: () => {
         const st = PC() && PC().state;
         if (!st) return;
@@ -241,21 +241,21 @@
         PC().setRepeat(sig);
         estado('▣ repetir: ' + { off: 'no', all: 'toda la lista', one: 'esta canción' }[sig]);
       } },
-    { n: 'modo cine', alias: 'pantalla completa fullscreen letra grande', ico: '⛶',
+    { n: 'modo cine', alias: 'pantalla completa fullscreen letra grande', ico: 'cine',
       hacer: () => { const b = document.getElementById('cinemaBtn'); if (b) b.click(); } },
-    { n: 'modo edit (letra animada)', alias: 'efectos tiktok', ico: '✦',
+    { n: 'modo edit (letra animada)', alias: 'efectos tiktok', ico: 'edit',
       hacer: () => { const b = document.getElementById('lyricsModeBtn'); if (b) b.click(); } },
-    { n: 'letra ancha', alias: 'esconder caratula portada ancho completo w', ico: '◧',
+    { n: 'letra ancha', alias: 'esconder caratula portada ancho completo w', ico: 'ancha',
       hacer: () => { const b = document.getElementById('anchoBtn'); if (b) b.click(); } },
-    { n: 'silenciar', alias: 'mute volumen cero', ico: '🔇',
+    { n: 'silenciar', alias: 'mute volumen cero', ico: 'vol-mudo',
       hacer: () => {
         const st = PC() && PC().state;
         if (!st) return;
         PC().setVolume(st.volume > 0 ? 0 : 0.7);
       } },
-    { n: 'importar música', alias: 'añadir mp3 archivos abrir carpeta local', ico: '＋',
+    { n: 'importar música', alias: 'añadir mp3 archivos abrir carpeta local', ico: 'mas',
       hacer: () => { const i = document.getElementById('fileInput'); if (i) i.click(); } },
-    { n: 'vaciar la cola', alias: 'limpiar borrar a continuación', ico: '✕',
+    { n: 'vaciar la cola', alias: 'limpiar borrar a continuación', ico: 'cerrar',
       hacer: () => {
         if (PC() && PC().clearQueue) PC().clearQueue();
         if (window.SevenQueueRefresh) window.SevenQueueRefresh();
@@ -264,58 +264,58 @@
     /* Temporizador. Tres plazos y el de quitar, que solo aparece cuando hay
        algo que quitar — y de paso enseña lo que falta, que es la pregunta
        que se hace todo el mundo dos minutos después de ponerlo. */
-    { n: 'apagar en 15 minutos', alias: 'temporizador dormir sueño sleep timer', ico: '◷',
+    { n: 'apagar en 15 minutos', alias: 'temporizador dormir sueño sleep timer', ico: 'reloj',
       hacer: () => TEMP() && TEMP().poner(15) },
-    { n: 'apagar en 30 minutos', alias: 'temporizador dormir sueño sleep timer', ico: '◷',
+    { n: 'apagar en 30 minutos', alias: 'temporizador dormir sueño sleep timer', ico: 'reloj',
       hacer: () => TEMP() && TEMP().poner(30) },
-    { n: 'apagar en 1 hora', alias: 'temporizador dormir sueño sleep timer 60', ico: '◷',
+    { n: 'apagar en 1 hora', alias: 'temporizador dormir sueño sleep timer 60', ico: 'reloj',
       hacer: () => TEMP() && TEMP().poner(60) },
     ...(TEMP() && TEMP().puesto() ? [{
       n: 'quitar el temporizador (faltan ' + TEMP().texto() + ')',
-      alias: 'cancelar apagado dormir sleep timer', ico: '◷',
+      alias: 'cancelar apagado dormir sleep timer', ico: 'reloj',
       hacer: () => TEMP().quitar(),
     }] : []),
     /* Dos formas de compartir, y la de la imagen va primero porque es
        la que la gente quiere: el enlace pelado sirve para «escucha
        esto», la tarjeta sirve para enseñar el verso. */
-    { n: 'compartir la letra (imagen)', alias: 'tarjeta foto captura verso instagram estado story postal', ico: '❝',
+    { n: 'compartir la letra (imagen)', alias: 'tarjeta foto captura verso instagram estado story postal', ico: 'cita',
       hacer: () => (window.MMCompartir ? window.MMCompartir.abrir() : compartirActual()) },
     { n: 'compartir el enlace de la canción',
-      alias: 'enviar mandar link copiar url spotify lo que suena', ico: '⇥',
+      alias: 'enviar mandar link copiar url spotify lo que suena', ico: 'enlace',
       hacer: () => compartirActual() },
-    { n: 'ver mi música', alias: 'biblioteca local importada mp3', ico: '♪',
+    { n: 'ver mi música', alias: 'biblioteca local importada mp3', ico: 'casete',
       hacer: () => verColeccion('mine', 'tu música') },
-    { n: 'ver mis playlists', alias: 'listas spotify', ico: '≡',
+    { n: 'ver mis playlists', alias: 'listas spotify', ico: 'listas',
       hacer: () => verColeccion('playlists', 'tus playlists') },
-    { n: 'ver mis canciones guardadas', alias: 'me gusta favoritas liked', ico: '♥',
+    { n: 'ver mis canciones guardadas', alias: 'me gusta favoritas liked', ico: 'corazon-lleno',
       hacer: () => verColeccion('saved', 'tus guardadas') },
-    { n: 'ver mis álbumes', alias: 'discos', ico: '◙',
+    { n: 'ver mis álbumes', alias: 'discos', ico: 'vinilo',
       hacer: () => verColeccion('albums', 'tus álbumes') },
-    { n: 'ver mis artistas', alias: 'seguidos', ico: '◍',
+    { n: 'ver mis artistas', alias: 'seguidos', ico: 'persona',
       hacer: () => verColeccion('artists', 'tus artistas') },
-    { n: 'ver la cola', alias: 'a continuación qué suena después', ico: '≣',
+    { n: 'ver la cola', alias: 'a continuación qué suena después', ico: 'cola',
       hacer: () => irPestania('queue') },
-    { n: 'ver mi historial', alias: 'estadisticas mas escuchadas stats', ico: '▤',
+    { n: 'ver mi historial', alias: 'estadisticas mas escuchadas stats', ico: 'historial',
       hacer: () => irPestania('stats') },
-    { n: 'ver la letra', alias: 'lyrics', ico: '♫', hacer: () => irPestania('lyrics') },
+    { n: 'ver la letra', alias: 'lyrics', ico: 'letra', hacer: () => irPestania('lyrics') },
     /* AJUSTES · uno por sección. Con `MMAjustes.abrir` el buscador deja de
        soltarte al principio de una lista larga y te pone delante de lo que
        pediste. Van al final de los mandos a propósito: sin nada escrito
        solo salen los seis primeros, así que esto no llena la lista de
        arranque — aparece cuando lo buscas, que es cuando sirve. */
-    { n: 'ajustes', alias: 'configuracion opciones preferencias', ico: '⚙',
+    { n: 'ajustes', alias: 'configuracion opciones preferencias', ico: 'ajustes',
       hacer: () => irPestania('settings') },
-    { n: 'ajustes · colores', alias: 'acento fondo texto tema paleta configuracion', ico: '⚙',
+    { n: 'ajustes · colores', alias: 'acento fondo texto tema paleta configuracion', ico: 'ajustes',
       hacer: () => AJU() ? AJU().abrir('colores') : irPestania('settings') },
-    { n: 'ajustes · letras', alias: 'tamaño tipografia fuente traduccion sincronia configuracion', ico: '⚙',
+    { n: 'ajustes · letras', alias: 'tamaño tipografia fuente traduccion sincronia configuracion', ico: 'ajustes',
       hacer: () => AJU() ? AJU().abrir('letra') : irPestania('settings') },
-    { n: 'ajustes · apariencia', alias: 'ambiente crt movimiento microfono listas configuracion', ico: '⚙',
+    { n: 'ajustes · apariencia', alias: 'ambiente crt movimiento microfono listas configuracion', ico: 'ajustes',
       hacer: () => AJU() ? AJU().abrir('apariencia') : irPestania('settings') },
-    { n: 'ajustes · datos', alias: 'cache letras borrar biblioteca memoria configuracion', ico: '⚙',
+    { n: 'ajustes · datos', alias: 'cache letras borrar biblioteca memoria configuracion', ico: 'ajustes',
       hacer: () => AJU() ? AJU().abrir('datos') : irPestania('settings') },
-    { n: 'ajustes · atajos de teclado', alias: 'teclas shortcuts ayuda configuracion', ico: '⌨',
+    { n: 'ajustes · atajos de teclado', alias: 'teclas shortcuts ayuda configuracion', ico: 'teclado',
       hacer: () => AJU() ? AJU().abrir('teclas') : irPestania('settings') },
-    { n: conSpotify() ? 'desconectar spotify' : 'conectar spotify', alias: 'cuenta sesion login', ico: '◈',
+    { n: conSpotify() ? 'desconectar spotify' : 'conectar spotify', alias: 'cuenta sesion login', ico: 'enchufe',
       hacer: () => SP() && SP().connect() },
   ];
 
@@ -345,7 +345,7 @@
   });
 
   const deLocal = (t, pts) => ({
-    seccion: 'tu música', ico: '♪', cover: t.cover, titulo: t.name,
+    seccion: 'tu música', ico: 'letra', cover: t.cover, titulo: t.name,
     sub: t.artist || 'desconocido', extra: formatTime(t.duration), pts,
     pista: '▶ poner',
     accion: () => {
@@ -360,7 +360,7 @@
   });
 
   const deSpotify = (t, pts) => ({
-    seccion: 'spotify', ico: '♪', cover: t.cover, titulo: t.name,
+    seccion: 'spotify', ico: 'letra', cover: t.cover, titulo: t.name,
     sub: t.artist + (t.album ? ' · ' + t.album : ''), extra: formatTime(t.duration), pts,
     pista: '▶ poner',
     accion: () => SP() && SP().playTrack(t),
@@ -372,7 +372,7 @@
      encolar), con su propio botón y su propia etiqueta. Poner una playlist
      pasa así de «pestaña, chip, esperar, buscarla, pulsar» a dos teclas. */
   const deListaSpotify = (p, pts, tipo) => ({
-    seccion: 'tus listas', ico: tipo === 'artist' ? '◍' : tipo === 'album' ? '◙' : '≡',
+    seccion: 'tus listas', ico: tipo === 'artist' ? 'persona' : tipo === 'album' ? 'vinilo' : 'listas',
     cover: p.cover, redonda: tipo === 'artist', titulo: p.name,
     sub: p.owner || (p.total ? p.total + ' canciones' : tipo), pts,
     pista: 'abrir',
@@ -380,14 +380,14 @@
       irPestania('library');
       if (LIB() && LIB().abrir) LIB().abrir(tipo, p);
     },
-    masIco: '▶',
+    masIco: 'play',
     masTit: tipo === 'artist' ? 'Reproducir a este artista' : 'Reproducir la lista entera',
     cierraAlEncolar: true,
     encolar: () => { if (LIB() && LIB().playAll) LIB().playAll(p); },
   });
 
   const deCatalogo = (it, pts, tipo) => ({
-    seccion: 'spotify', ico: tipo === 'artist' ? '◍' : '◙',
+    seccion: 'spotify', ico: tipo === 'artist' ? 'persona' : 'vinilo',
     cover: it.cover, redonda: tipo === 'artist', titulo: it.name,
     sub: it.artist || (tipo === 'artist' ? 'artista' : 'álbum'), pts,
     pista: 'abrir',
@@ -450,7 +450,7 @@
   };
 
   const deEnlace = (m) => ({
-    seccion: 'enlace de spotify', ico: '⇥',
+    seccion: 'enlace de spotify', ico: 'enlace',
     titulo: m[1] === 'track' ? 'poner esta canción' : 'abrir este ' + COMO_SE_LLAMA[m[1]],
     sub: 'enlace pegado · ' + COMO_SE_LLAMA[m[1]],
     /* Fuera de concurso: quien pega un enlace no quiere que se lo comparen
@@ -461,7 +461,7 @@
   });
 
   const deHistorial = (h, pts) => ({
-    seccion: 'ya lo has oído', ico: '↺', cover: h.cover, titulo: h.name,
+    seccion: 'ya lo has oído', ico: 'historial', cover: h.cover, titulo: h.name,
     sub: (h.artist || '') + ' · ' + (h.veces === 1 ? '1 vez' : h.veces + ' veces'), pts,
     pista: h.uri ? '▶ poner' : 'sin enlace',
     accion: () => {
@@ -655,17 +655,25 @@
   };
 
   // ---------- Pintado ----------
+  /* Los iconos son los dibujos de 12 × 12 de la fila de mandos (clases
+     .ico-NOMBRE de style.css). Hasta la v119 eran símbolos de texto —⏯ ⤨ ◷
+     ⇥ ◙ ◍ ⌨…— que el sistema sacaba de las fuentes que tuviera, cada uno con
+     su grosor y su altura, y el de silenciar era un emoji a color. Si algún
+     día llega un símbolo suelto, se pinta como texto, como antes. */
+  const icoHTML = (ico) => (/^[a-z-]+$/.test(ico || '')
+    ? `<i class="ico ico-${ico}" aria-hidden="true"></i>`
+    : escapeHtml(ico || '·'));
   const filaHTML = (f, i) => `
     <li class="paleta-fila-r${i === elegida ? ' sel' : ''}" data-i="${i}" role="option"
         aria-selected="${i === elegida ? 'true' : 'false'}">
       <span class="paleta-ico${f.redonda ? ' redonda' : ''}"
-        ${f.cover ? `style="background-image:url('${escapeHtml(f.cover)}')"` : ''}>${f.cover ? '' : (f.ico || '·')}</span>
+        ${f.cover ? `style="background-image:url('${escapeHtml(f.cover)}')"` : ''}>${f.cover ? '' : icoHTML(f.ico)}</span>
       <span class="paleta-txt">
         <span class="paleta-tit">${escapeHtml(f.titulo)}</span>
         ${f.sub ? `<span class="paleta-sub">${escapeHtml(f.sub)}</span>` : ''}
       </span>
       ${f.extra ? `<span class="paleta-dur">${escapeHtml(f.extra)}</span>` : ''}
-      ${f.encolar ? `<button class="paleta-mas" title="${escapeHtml(f.masTit || 'A continuación (shift+enter)')}" tabindex="-1">${f.masIco || '＋'}</button>` : ''}
+      ${f.encolar ? `<button class="paleta-mas" title="${escapeHtml(f.masTit || 'A continuación (shift+enter)')}" tabindex="-1">${icoHTML(f.masIco || 'mas')}</button>` : ''}
       <span class="paleta-pista">${escapeHtml(f.pista || '')}</span>
     </li>`;
 
@@ -760,7 +768,7 @@
          no queda nada que buscar. */
       if (f.cierraAlEncolar) cerrar();
       f.encolar();
-      estado((f.masIco === '▶' ? '▶ ' : '＋ a continuación: ') + f.titulo);
+      estado((f.masIco === 'play' ? '▶ ' : '＋ a continuación: ') + f.titulo);
       return;
     }
     cerrar();

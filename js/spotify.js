@@ -1445,7 +1445,7 @@
            esto…»): el usuario quiso el buscador limpio, solo «buscar»
            (22-sep-2026). Los chips de debajo ya dicen qué se puede buscar. */
         : `<li class="sp-empty sp-empty-inicio">
-             <span class="sp-empty-ico">♫</span>
+             <i class="ico ico-buscar sp-empty-ico" aria-hidden="true"></i>
              <b>busca lo que quieras oír</b>
            </li>`;
       return;
@@ -2465,7 +2465,7 @@
     const v = pc && pc.state ? Math.round((pc.state.volume || 0) * 100) : 70;
     const r = devVol.querySelector('.dev-vol-rango');
     const p = devVol.querySelector('.dev-vol-pct');
-    if (r && document.activeElement !== r) r.value = String(v);
+    if (r && document.activeElement !== r) { r.value = String(v); r.style.setProperty('--v', v + '%'); }
     if (p) p.textContent = v + '%';
   };
 
@@ -2478,11 +2478,7 @@
       devMenu.hidden = true;
       devMenu.innerHTML = `<div class="dev-lista"></div>
         <div class="dev-vol">
-          <svg class="dev-vol-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"/>
-            <path d="M15 9.7a3.4 3.4 0 0 1 0 4.6"/><path d="M17.6 7.2a7 7 0 0 1 0 9.6"/>
-          </svg>
+          <i class="ico ico-vol dev-vol-ico" aria-hidden="true"></i>
           <input type="range" class="dev-vol-rango" min="0" max="100" step="1" value="70"
                  aria-label="Volumen de donde suena">
           <span class="dev-vol-pct">70%</span>
@@ -2492,6 +2488,8 @@
       document.body.appendChild(devMenu);
       const rango = devVol.querySelector('.dev-vol-rango');
       rango.addEventListener('input', () => {
+        // --v es lo recorrido: el riel de celdas lo pinta en el acento (style.css)
+        rango.style.setProperty('--v', rango.value + '%');
         const pc = window.PlayerCore;
         if (pc && pc.setVolume) pc.setVolume(Number(rango.value) / 100);
         const p = devVol.querySelector('.dev-vol-pct');

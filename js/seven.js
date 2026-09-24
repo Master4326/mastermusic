@@ -496,6 +496,8 @@
     const fmt = (v) => (v >= 0 ? '+' : '') + v.toFixed(2) + 's';
     const paint = (sec) => {
       offsetSlider.value = sec;
+      // --v es lo recorrido del riel (de −5 a +5 s): lo pinta el CSS en el acento
+      offsetSlider.style.setProperty('--v', ((sec + 5) * 10).toFixed(1) + '%');
       offsetValue.textContent = fmt(sec);
     };
     const apply = (v) => {
@@ -1036,7 +1038,7 @@
     <li class="sp-result ${idx >= 0 ? '' : 'sp-static'} ${now ? 'q-now sp-now' : ''}"
         ${idx >= 0 ? `data-idx="${idx}" tabindex="0" title="Sonar esta: ${escapeHtml(t.name)}"` : ''}
         ${idx >= 0 && t.id ? `data-track-id="${t.id}"` : ''}>
-      <span class="sp-idx">${now ? '▶' : String(i + 1).padStart(2, '0')}</span>
+      <span class="sp-idx">${now ? '<span class="sp-eq" role="img" aria-label="sonando"><i></i><i></i><i></i></span>' : String(i + 1).padStart(2, '0')}</span>
       <div class="sp-thumb" ${t.cover ? `style="background-image:url('${t.cover}')"` : ''}>${t.cover ? '' : '♪'}</div>
       <div class="sp-meta">
         <div class="sp-name">${escapeHtml(t.name)}</div>
