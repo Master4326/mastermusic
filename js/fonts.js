@@ -13,23 +13,36 @@
    pedido. Con 38 eso ya no se sostiene.
    Ahora en los ajustes hay UNA fila con la fuente puesta, y todas viven
    guardadas en su propia galería (se abre al pulsarla): buscador,
-   categorías —anime, juegos, series y cine…— y cada una con su muestra.
+   categorías —anime, juegos, góticas, bonitas…— y cada una con su muestra.
    Las hojas de Google se piden SOLO de lo que se ve, y agrupadas.
 
+   ── LA TANDA GRANDE (25-sep-2026) ──
+   De 41 a más de cien: juegos y animes MUY conocidos (Pokémon, Zelda,
+   Fortnite, Dragon Ball, Naruto, One Piece…), góticas, bonitas,
+   llamativas y normales. Cada una de las «famosas» se eligió poniendo
+   varias candidatas lado a lado con su remate puesto, y todas las del
+   catálogo tienen ¿ ¡ ñ y tildes (se comprobó glifa por glifa: Rock 3D
+   y Butcherman se quedaron fuera por no traerlas).
+
    AÑADIR UNA FUENTE = añadir un objeto a CATALOGO. Nada más:
-   la galería, la descarga desde Google y el ajuste de tamaño
-   salen de ahí solos.
+   la galería, la descarga desde Google, el ajuste de tamaño y el
+   remate (`trato`) salen de ahí solos.
 
    Campos:
      id      lo que se guarda en localStorage. NO lo cambies luego:
              quien tuviera esa fuente elegida perdería su ajuste.
      nombre  lo que se lee en la tarjeta (dibujado en su propia fuente)
      grupo   categoría de la galería (ver GRUPOS)
+     tambien (opcional) otras categorías donde TAMBIÉN sale: Pokémon es
+             juego y es anime; Castlevania es juego y es gótica
      nota    una línea de por qué está, para quien mire la galería
      css     valor de font-family. SIEMPRE con reserva local detrás,
              por si Google no contesta (sin red, servidor caído).
      google  familia y pesos tal cual los pide fonts.googleapis.com.
              null = ya viene en el <head> de index.html.
+             ⚠️ Un peso que la familia no tenga hace que Google conteste
+             400 y se caiga el LOTE entero (van de diez en diez): todas
+             las de esta lista se comprobaron una por una contra la API.
      alto    line-height
      peso    grosor de las líneas en reposo
      activo  grosor de la línea que está sonando
@@ -37,15 +50,33 @@
      mayus   true = se dibuja en MAYÚSCULAS (Bebas y Cinzel están
              hechas para eso: su minúscula no existe de verdad)
      ajuste  retoque fino sobre el tamaño que se calcula solo (1 = ninguno)
+     cursiva (opcional) true = toda la letra en cursiva, con la cursiva
+             DE VERDAD de la fuente (pídela en `google`: ital,wght@1,…)
+     trato   (opcional) el remate que hace que una fuente «parezca» lo que
+             evoca: el contorno azul de Pokémon, la estela de Sonic, el
+             aura morada de Jujutsu Kaisen. Se pinta en el verso que suena,
+             en su palabra destacada, en las ya cantadas del karaoke, en la
+             muestra de ajustes y en la tarjeta de la galería. El dibujo
+             está en style.css (busca data-lyrics-trato); aquí solo se
+             elige cuál y de qué color:
+               contorno  borde alrededor de cada letra + sombra dura abajo
+                         { borde, caida, grosor }
+               aura      resplandor de un color propio en vez del de la
+                         carátula                       { color, caida }
+               caida     sombra dura desplazada, sin borde { caida, grosor }
+               estela    rastro de velocidad hacia atrás (color de la app)
+               neon      brillo de tubo de neón         (color de la app)
+               trazo     contorno fino encima de la letra y su resplandor
+                         { borde, color }
 
    ⚠️ LICENCIAS. Esta página es pública, así que aquí SOLO entran fuentes
    que se puedan servir: las de Google Fonts (licencia abierta). Las
-   tipografías de Nintendo, Mojang, Microsoft/343, Netflix o de cualquier
-   anime NO se pueden redistribuir, y meter una copia sacada de por ahí no
-   es una opción. Lo que se hace es elegir la libre que MÁS SE PARECE y
-   rematar el parecido con CSS (la sombra dura de Minecraft, el contorno
-   de Mario). Donde una fuente evoca algo, la `nota` lo dice: es un aire,
-   no la original.
+   tipografías de Nintendo, Mojang, Microsoft/343, Epic, Netflix o de
+   cualquier anime NO se pueden redistribuir, y meter una copia sacada de
+   por ahí no es una opción. Lo que se hace es elegir la libre que MÁS SE
+   PARECE y rematar el parecido con CSS (la sombra dura de Minecraft, el
+   contorno de Mario, el azul de Pokémon). Donde una fuente evoca algo, la
+   `nota` lo dice: es un aire, no la original.
    ========================================================== */
 (() => {
   'use strict';
@@ -55,54 +86,101 @@
   const CLAVE_GRP = 'mm_lyrics_font_grupo'; // última categoría mirada
   const DEFECTO   = 'playfair';
 
-  /* El orden manda en la galería. `todas` va primero y siempre existe. */
+  /* El orden manda en la galería: el de los botones de categoría y el de
+     los rótulos de «todas». `todas` va primero y siempre existe.
+     (`modernas` pasó a llamarse `normales`: quien la tuviera guardada como
+     última categoría vuelve a «todas», que no hace daño.) */
   const GRUPOS = [
-    { id: 'todas',    nombre: 'todas' },
-    { id: 'anime',    nombre: 'anime' },
-    { id: 'juegos',   nombre: 'juegos' },
-    { id: 'cine',     nombre: 'series y cine' },
-    { id: 'clasicas', nombre: 'clásicas' },
-    { id: 'modernas', nombre: 'modernas' },
-    { id: 'mano',     nombre: 'a mano' },
-    { id: 'consola',  nombre: 'consola' },
+    { id: 'todas',      nombre: 'todas' },
+    { id: 'anime',      nombre: 'anime' },
+    { id: 'juegos',     nombre: 'juegos' },
+    { id: 'goticas',    nombre: 'góticas' },
+    { id: 'bonitas',    nombre: 'bonitas' },
+    { id: 'llamativas', nombre: 'llamativas' },
+    { id: 'cine',       nombre: 'series y cine' },
+    { id: 'normales',   nombre: 'normales' },
+    { id: 'clasicas',   nombre: 'clásicas' },
+    { id: 'mano',       nombre: 'a mano' },
+    { id: 'consola',    nombre: 'consola' },
   ];
 
   const CATALOGO = [
-    /* ══════════ CLÁSICAS ══════════ */
-    {
-      id: 'playfair', nombre: 'Playfair Display', grupo: 'clasicas',
-      nota: 'la de fábrica: serif con contraste, se lee grande sin cansar',
-      css: "'Playfair Display', Georgia, 'Times New Roman', serif",
-      google: 'Playfair+Display:ital,wght@0,500;0,700;1,600',
-      alto: 1.55, peso: 500, activo: 700, track: '0em', mayus: false, ajuste: 1,
-    },
-    {
-      id: 'cormorant', nombre: 'Cormorant Garamond', grupo: 'clasicas',
-      nota: 'fina y de libro antiguo; para baladas',
-      css: "'Cormorant Garamond', Garamond, Georgia, serif",
-      google: 'Cormorant+Garamond:ital,wght@0,500;0,700;1,600',
-      alto: 1.5, peso: 500, activo: 700, track: '0.01em', mayus: false, ajuste: 1,
-    },
-    {
-      id: 'lora', nombre: 'Lora', grupo: 'clasicas',
-      nota: 'serif tranquila, la más neutra de todas',
-      css: "'Lora', Georgia, serif",
-      google: 'Lora:ital,wght@0,400;0,700;1,500',
-      alto: 1.6, peso: 400, activo: 700, track: '0em', mayus: false, ajuste: 1,
-    },
-    {
-      id: 'cinzel', nombre: 'Cinzel', grupo: 'clasicas',
-      nota: 'capitales romanas; aire de épica y de crédito de película',
-      css: "'Cinzel', Georgia, serif",
-      google: 'Cinzel:wght@400;700',
-      alto: 1.55, peso: 400, activo: 700, track: '0.04em', mayus: true, ajuste: 1,
-    },
-
     /* ══════════ ANIME Y MANGA ══════════
        Las tipografías de los animes son de sus estudios y no se pueden
-       redistribuir. Estas son las japonesas libres de Google con el aire
-       de cada cosa: la redonda de los subtítulos, la mincho de los
-       títulos de episodio, la de rotulador de los carteles… */
+       redistribuir. Primero las de animes MUY conocidos —la libre que más
+       se parece a su logo, con el remate que lo termina de delatar— y
+       detrás las japonesas libres de Google con el aire de cada cosa: la
+       redonda de los subtítulos, la mincho de los títulos de episodio… */
+    {
+      id: 'dragonball', nombre: 'Dragon Ball', grupo: 'anime',
+      nota: 'maciza y con remates como el logo de Dragon Ball, con su contorno rojo',
+      css: "'Sigmar One', 'Titan One', Impact, sans-serif",
+      google: 'Sigmar+One',
+      alto: 1.5, peso: 400, activo: 400, track: '0.02em', mayus: true, ajuste: 1,
+      trato: { tipo: 'contorno', borde: '#c1272d', caida: '#000', grosor: '0.05em' },
+    },
+    {
+      id: 'naruto', nombre: 'Naruto', grupo: 'anime',
+      nota: 'letras latinas trazadas con pincel japonés, de pergamino ninja',
+      css: "'Shojumaru', 'Reggae One', Impact, sans-serif",
+      google: 'Shojumaru',
+      alto: 1.55, peso: 400, activo: 400, track: '0.02em', mayus: true, ajuste: 1,
+      trato: { tipo: 'contorno', borde: '#111', caida: '#000', grosor: '0.045em' },
+    },
+    {
+      id: 'onepiece', nombre: 'One Piece', grupo: 'anime',
+      nota: 'de cartel de «se busca» del oeste, como las recompensas de One Piece',
+      css: "'Rye', 'Sancreek', Georgia, serif",
+      google: 'Rye',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'caida', caida: '#3b2412', grosor: '0.05em' },
+    },
+    {
+      id: 'kimetsu', nombre: 'Kimetsu no Yaiba', grupo: 'anime',
+      nota: 'a pincel, con el trazo suelto de la caligrafía japonesa (Demon Slayer)',
+      css: "'Yuji Boku', 'Yuji Syuku', 'Shippori Mincho', serif",
+      google: 'Yuji+Boku',
+      alto: 1.65, peso: 400, activo: 400, track: '0.02em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'jujutsu', nombre: 'Jujutsu Kaisen', grupo: 'anime',
+      nota: 'gótica japonesa negrísima, con el brillo morado de la energía maldita',
+      css: "'Dela Gothic One', 'Reggae One', Impact, sans-serif",
+      google: 'Dela+Gothic+One',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'aura', color: 'rgba(140, 70, 255, 0.6)' },
+    },
+    {
+      id: 'titan', nombre: 'Attack on Titan', grupo: 'anime',
+      nota: 'capitales romanas en negrita, como el título de Shingeki no Kyojin',
+      css: "'Cinzel', 'Trajan Pro', Georgia, serif",
+      google: 'Cinzel:wght@700;900',
+      alto: 1.5, peso: 700, activo: 900, track: '0.03em', mayus: true, ajuste: 1,
+      trato: { tipo: 'caida', caida: 'rgba(0, 0, 0, 0.9)', grosor: '0.05em' },
+    },
+    {
+      id: 'mha', nombre: 'My Hero Academia', grupo: 'anime',
+      nota: 'rotulación de cómic americano, como el logo de My Hero Academia: ¡plus ultra!',
+      css: "'Bangers', 'Luckiest Guy', Impact, sans-serif",
+      google: 'Bangers',
+      alto: 1.4, peso: 400, activo: 400, track: '0.03em', mayus: true, ajuste: 1,
+      trato: { tipo: 'contorno', borde: '#000', caida: '#000', grosor: '0.05em' },
+    },
+    {
+      id: 'deathnote', nombre: 'Death Note', grupo: 'anime', tambien: ['goticas'],
+      nota: 'gótica negra como la tapa de la libreta, con un brillo pálido',
+      css: "'UnifrakturCook', 'UnifrakturMaguntia', Georgia, serif",
+      google: 'UnifrakturCook:wght@700',
+      alto: 1.6, peso: 700, activo: 700, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'aura', color: 'rgba(255, 255, 255, 0.28)', caida: 'rgba(0, 0, 0, 0.95)' },
+    },
+    {
+      id: 'ghibli', nombre: 'Ghibli', grupo: 'anime',
+      nota: 'de lápiz, amable y tranquila, como un cartel escrito en una peli de Ghibli',
+      css: "'Klee One', 'Zen Kurenaido', 'Segoe Print', cursive",
+      google: 'Klee+One:wght@400;600',
+      alto: 1.65, peso: 400, activo: 600, track: '0.01em', mayus: false, ajuste: 1,
+    },
     {
       id: 'zenmaru', nombre: 'Zen Maru Gothic', grupo: 'anime',
       nota: 'la redondita de los subtítulos y la interfaz: el aire anime por excelencia',
@@ -139,7 +217,7 @@
       alto: 1.7, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
     },
     {
-      id: 'hachimaru', nombre: 'Hachi Maru Pop', grupo: 'anime',
+      id: 'hachimaru', nombre: 'Hachi Maru Pop', grupo: 'anime', tambien: ['bonitas'],
       nota: 'kawaii de cuaderno: para lo dulce y lo tonto',
       css: "'Hachi Maru Pop', 'Zen Maru Gothic', cursive",
       google: 'Hachi+Maru+Pop',
@@ -196,6 +274,53 @@
       alto: 2.1, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 0.92,
     },
     {
+      /* ESTILO POKÉMON. El logo va en una letra gorda y saltarina con un
+         contorno AZUL grueso: eso es lo que se reconoce de lejos, más que la
+         forma exacta de cada letra. Luckiest Guy es la libre más parecida
+         (solo tiene mayúsculas, como el logo a la vista). El relleno se queda
+         con el color de la carátula, como en el resto de la app. */
+      id: 'pokemon', nombre: 'Pokémon', grupo: 'juegos', tambien: ['anime'],
+      nota: 'aire del logo de Pokémon: gorda y saltarina, con su contorno azul',
+      css: "'Luckiest Guy', 'Titan One', Impact, sans-serif",
+      google: 'Luckiest+Guy',
+      alto: 1.45, peso: 400, activo: 400, track: '0.02em', mayus: true, ajuste: 1,
+      trato: { tipo: 'contorno', borde: '#3b6fd1', caida: '#1b2a6b', grosor: '0.06em' },
+    },
+    {
+      /* ESTILO ZELDA. Los textos de Hyrule (Breath of the Wild, Tears of the
+         Kingdom) van en una romana de remates abiertos, como la Friz
+         Quadrata. Marcellus SC es la libre de esa familia: mayúsculas grandes
+         y versalitas, que es como se escribe «The Legend of Zelda». */
+      id: 'zelda', nombre: 'Zelda', grupo: 'juegos',
+      nota: 'romana de remates abiertos, como los textos de Hyrule, con brillo de trifuerza',
+      css: "'Marcellus SC', 'Marcellus', 'Cinzel', Georgia, serif",
+      google: 'Marcellus+SC',
+      alto: 1.55, peso: 400, activo: 400, track: '0.03em', mayus: false, ajuste: 1,
+      trato: { tipo: 'aura', color: 'rgba(255, 206, 92, 0.55)', caida: 'rgba(40, 24, 0, 0.9)' },
+    },
+    {
+      id: 'sonic', nombre: 'Sonic', grupo: 'juegos',
+      nota: 'de carreras y en cursiva, con estela de velocidad detrás de cada letra',
+      css: "'Racing Sans One', 'Russo One', Impact, sans-serif",
+      google: 'Racing+Sans+One',
+      alto: 1.5, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'estela' },
+    },
+    {
+      /* ESTILO FORTNITE. La del juego (Burbank Big Condensed) es de pago. El
+         parecido está en tres cosas: estrechísima, negrísima y en cursiva —
+         el «¡VICTORIA MAGISTRAL!» del final—. Barlow Condensed trae esa
+         cursiva DE VERDAD (no inventada por el navegador); se piden también
+         las rectas, por si algún efecto del modo edit fuerza letra recta. */
+      id: 'fortnite', nombre: 'Fortnite', grupo: 'juegos',
+      nota: 'estrecha, negrísima y en cursiva: el «¡victoria magistral!» del battle royale',
+      css: "'Barlow Condensed', 'Oswald', 'Arial Narrow', sans-serif",
+      google: 'Barlow+Condensed:ital,wght@0,800;0,900;1,800;1,900',
+      alto: 1.35, peso: 800, activo: 900, track: '0.01em', mayus: true, ajuste: 1,
+      cursiva: true,
+      trato: { tipo: 'caida', caida: '#1b2a6b', grosor: '0.06em' },
+    },
+    {
       /* ESTILO HALO · dos caminos en una sola lista.
 
          1) Si en ESTE ordenador está instalada una fuente que se llame
@@ -218,6 +343,53 @@
       css: "'Halo', 'Halo 4', 'Orbitron', 'Michroma', 'Segoe UI', sans-serif",
       google: 'Orbitron:wght@500;700;900',
       alto: 1.7, peso: 500, activo: 900, track: '0.08em', mayus: true, ajuste: 1,
+    },
+    {
+      id: 'cod', nombre: 'Call of Duty', grupo: 'juegos',
+      nota: 'militar de plantilla, cortada como las letras de una caja de munición',
+      css: "'Black Ops One', 'Saira Stencil One', Impact, sans-serif",
+      google: 'Black+Ops+One',
+      alto: 1.5, peso: 400, activo: 400, track: '0.02em', mayus: false, ajuste: 1,
+      trato: { tipo: 'caida', caida: 'rgba(0, 0, 0, 0.9)', grosor: '0.06em' },
+    },
+    {
+      id: 'streetfighter', nombre: 'Street Fighter', grupo: 'juegos',
+      nota: 'a brochazos y en cursiva, con el contorno rojo de los carteles de pelea',
+      css: "'Knewave', 'Kaushan Script', Impact, cursive",
+      google: 'Knewave',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'contorno', borde: '#b8141c', caida: '#000', grosor: '0.045em' },
+    },
+    {
+      id: 'brawl', nombre: 'Brawl Stars', grupo: 'juegos',
+      nota: 'gorda y redonda con contorno negro y sombra abajo, como Brawl Stars y Clash Royale',
+      css: "'Lilita One', 'Titan One', Impact, sans-serif",
+      google: 'Lilita+One',
+      alto: 1.45, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'contorno', borde: '#000', caida: '#000', grosor: '0.055em' },
+    },
+    {
+      id: 'animalcrossing', nombre: 'Animal Crossing', grupo: 'juegos',
+      nota: 'redonda y amable, como los bocadillos de diálogo de Nintendo',
+      css: "'M PLUS Rounded 1c', 'Zen Maru Gothic', 'Nunito', sans-serif",
+      google: 'M+PLUS+Rounded+1c:wght@500;800',
+      alto: 1.6, peso: 500, activo: 800, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'castlevania', nombre: 'Castlevania', grupo: 'juegos', tambien: ['goticas'],
+      nota: 'gótica hecha de píxeles, de castillo con vampiro, con brillo de sangre',
+      css: "'Jacquard 24', 'UnifrakturMaguntia', 'VT323', serif",
+      google: 'Jacquard+24',
+      alto: 1.6, peso: 400, activo: 400, track: '0.02em', mayus: false, ajuste: 1,
+      trato: { tipo: 'aura', color: 'rgba(190, 0, 20, 0.7)' },
+    },
+    {
+      id: 'darksouls', nombre: 'Dark Souls', grupo: 'juegos', tambien: ['goticas'],
+      nota: 'capitales finas y separadas como el «HAS MUERTO», con neblina roja',
+      css: "'Cormorant SC', 'Cormorant Garamond', 'Cinzel', Georgia, serif",
+      google: 'Cormorant+SC:wght@500;700',
+      alto: 1.5, peso: 500, activo: 700, track: '0.12em', mayus: true, ajuste: 1,
+      trato: { tipo: 'aura', color: 'rgba(150, 10, 10, 0.65)' },
     },
     {
       id: 'silkscreen', nombre: 'Arcade', grupo: 'juegos',
@@ -258,11 +430,382 @@
       id: 'teko', nombre: 'Teko', grupo: 'juegos',
       nota: 'estrecha y alta: marcador de esports',
       css: "'Teko', 'Oswald', 'Arial Narrow', sans-serif",
-      google: 'Teko:wght@400;600;700',
+      google: 'Teko:wght@400;500;600;700',
       alto: 1.35, peso: 500, activo: 700, track: '0.03em', mayus: true, ajuste: 1,
     },
 
+    /* ══════════ GÓTICAS ══════════
+       Letra negra de verdad, medievales, de terror y de rock. Ojo con las
+       más cerradas (la Gótica clásica, Vampira): son preciosas pero piden
+       leer despacio; para letras largas, mejor la Gótica moderna. */
+    {
+      id: 'unifraktur', nombre: 'Gótica', grupo: 'goticas',
+      nota: 'letra gótica de verdad: medieval, metal y cabecera de periódico',
+      css: "'UnifrakturMaguntia', 'Pirata One', Georgia, serif",
+      google: 'UnifrakturMaguntia',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'gotisch', nombre: 'Gótica moderna', grupo: 'goticas',
+      nota: 'gótica de verdad pero fácil de leer: la mejor para letras largas',
+      css: "'Grenze Gotisch', 'UnifrakturMaguntia', Georgia, serif",
+      google: 'Grenze+Gotisch:wght@400;700',
+      alto: 1.55, peso: 400, activo: 700, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'texturina', nombre: 'Texturina', grupo: 'goticas',
+      nota: 'textura medieval suavizada: parece un libro antiguo y se lee de corrido',
+      css: "'Texturina', Georgia, serif",
+      google: 'Texturina:ital,wght@0,400;0,700;1,400',
+      alto: 1.6, peso: 400, activo: 700, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'pirata', nombre: 'Pirata', grupo: 'goticas',
+      nota: 'negra y estrecha, entre letra gótica y bandera pirata',
+      css: "'Pirata One', 'UnifrakturMaguntia', Georgia, serif",
+      google: 'Pirata+One',
+      alto: 1.5, peso: 400, activo: 400, track: '0.02em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'fruktur', nombre: 'Fraktur', grupo: 'goticas',
+      nota: 'fraktur gordita y con ritmo, de rótulo alemán antiguo',
+      css: "'Fruktur', 'UnifrakturMaguntia', Georgia, serif",
+      google: 'Fruktur',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'metal', nombre: 'Heavy metal', grupo: 'goticas',
+      nota: 'con pinchos, de portada de disco de metal',
+      css: "'Metal Mania', 'New Rocker', Impact, serif",
+      google: 'Metal+Mania',
+      alto: 1.55, peso: 400, activo: 400, track: '0.02em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'rocker', nombre: 'Rock gótico', grupo: 'goticas',
+      nota: 'gótica con filo, de camiseta de banda de rock',
+      css: "'New Rocker', 'Pirata One', Georgia, serif",
+      google: 'New+Rocker',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'victoriana', nombre: 'Victoriana', grupo: 'goticas',
+      nota: 'de imprenta antigua con la tinta corrida, como un cuento de Poe',
+      css: "'IM Fell English', 'Cormorant Garamond', Georgia, serif",
+      google: 'IM+Fell+English:ital@0;1',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'medieval', nombre: 'Medieval', grupo: 'goticas',
+      nota: 'de pergamino y pluma: castillos, espadas y juglares',
+      css: "'MedievalSharp', 'Almendra', Georgia, serif",
+      google: 'MedievalSharp',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'almendra', nombre: 'Almendra', grupo: 'goticas',
+      nota: 'caligrafía medieval legible, con un punto de cuento',
+      css: "'Almendra', 'MedievalSharp', Georgia, serif",
+      google: 'Almendra:ital,wght@0,400;0,700;1,400',
+      alto: 1.55, peso: 400, activo: 700, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'vampira', nombre: 'Vampira', grupo: 'goticas',
+      nota: 'caligrafía gótica con florituras, de carta de vampiro; pide leer despacio',
+      css: "'Mea Culpa', 'Great Vibes', 'Segoe Script', cursive",
+      google: 'Mea+Culpa',
+      alto: 1.7, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'bruja', nombre: 'Bruja', grupo: 'goticas',
+      nota: 'a pluma y torcida, de libro de hechizos',
+      css: "'Jim Nightshade', 'Segoe Script', cursive",
+      google: 'Jim+Nightshade',
+      alto: 1.65, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'sangre', nombre: 'Sangre', grupo: 'goticas',
+      nota: 'chorreando sangre; ancha, para las canciones de miedo',
+      css: "'Nosifer', 'Creepster', Impact, cursive",
+      google: 'Nosifer',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: true, ajuste: 0.85,
+    },
+    {
+      id: 'zombi', nombre: 'Zombi', grupo: 'goticas',
+      nota: 'mordida y deshecha, de peli de zombis',
+      css: "'Eater', 'Creepster', Impact, cursive",
+      google: 'Eater',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: true, ajuste: 1,
+    },
+
+    /* ══════════ BONITAS ══════════
+       Cursivas bonitas, redondas tiernas y elegantes de revista. */
+    {
+      id: 'pacifico', nombre: 'Pacifico', grupo: 'bonitas',
+      nota: 'cursiva redonda de tabla de surf: la más alegre de todas',
+      css: "'Pacifico', 'Lobster', 'Segoe Script', cursive",
+      google: 'Pacifico',
+      alto: 1.75, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'lobster', nombre: 'Lobster', grupo: 'bonitas',
+      nota: 'cursiva gorda de letrero de cafetería',
+      css: "'Lobster', 'Pacifico', 'Segoe Script', cursive",
+      google: 'Lobster',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'sacramento', nombre: 'Sacramento', grupo: 'bonitas',
+      nota: 'de un solo trazo fino, como una firma elegante',
+      css: "'Sacramento', 'Great Vibes', 'Segoe Script', cursive",
+      google: 'Sacramento',
+      alto: 1.7, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'parisienne', nombre: 'Parisienne', grupo: 'bonitas',
+      nota: 'caligrafía francesa, elegante sin pasarse',
+      css: "'Parisienne', 'Great Vibes', 'Segoe Script', cursive",
+      google: 'Parisienne',
+      alto: 1.7, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'satisfy', nombre: 'Satisfy', grupo: 'bonitas',
+      nota: 'de pincel fino, suelta y fácil de leer',
+      css: "'Satisfy', 'Dancing Script', 'Segoe Script', cursive",
+      google: 'Satisfy',
+      alto: 1.65, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'yellowtail', nombre: 'Yellowtail', grupo: 'bonitas',
+      nota: 'cursiva de los cincuenta, con chispa de rótulo antiguo',
+      css: "'Yellowtail', 'Lobster', 'Segoe Script', cursive",
+      google: 'Yellowtail',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'courgette', nombre: 'Courgette', grupo: 'bonitas',
+      nota: 'cursiva gordita y muy legible: la más cómoda de las bonitas',
+      css: "'Courgette', 'Dancing Script', 'Segoe Script', cursive",
+      google: 'Courgette',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'berkshire', nombre: 'Berkshire Swash', grupo: 'bonitas',
+      nota: 'con florituras en las mayúsculas, de libro de cuentos',
+      css: "'Berkshire Swash', 'Lobster', Georgia, serif",
+      google: 'Berkshire+Swash',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'macondo', nombre: 'Macondo', grupo: 'bonitas',
+      nota: 'con adornos de cuento; se llama como el pueblo de Cien años de soledad',
+      css: "'Macondo', 'Almendra', Georgia, serif",
+      google: 'Macondo',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'bodoni', nombre: 'Portada de moda', grupo: 'bonitas',
+      nota: 'Bodoni de alto contraste, la de las portadas de revista de moda',
+      css: "'Bodoni Moda', 'Didot', 'Playfair Display', Georgia, serif",
+      google: 'Bodoni+Moda:ital,wght@0,500;0,800;1,500',
+      alto: 1.5, peso: 500, activo: 800, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'italiana', nombre: 'Italiana', grupo: 'bonitas',
+      nota: 'fina y alta, como el anuncio de un perfume',
+      css: "'Italiana', 'Cormorant Garamond', Georgia, serif",
+      google: 'Italiana',
+      alto: 1.55, peso: 400, activo: 400, track: '0.03em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'poiret', nombre: 'Poiret One', grupo: 'bonitas',
+      nota: 'art déco de líneas finas, de los años veinte',
+      css: "'Poiret One', 'Josefin Sans', sans-serif",
+      google: 'Poiret+One',
+      alto: 1.55, peso: 400, activo: 400, track: '0.03em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'josefin', nombre: 'Josefin Sans', grupo: 'bonitas',
+      nota: 'geométrica y vintage: elegante y muy clara',
+      css: "'Josefin Sans', 'Poppins', 'Segoe UI', sans-serif",
+      google: 'Josefin+Sans:ital,wght@0,400;0,700;1,400',
+      alto: 1.55, peso: 400, activo: 700, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'comfortaa', nombre: 'Comfortaa', grupo: 'bonitas',
+      nota: 'redonda y abierta, suave como una almohada',
+      css: "'Comfortaa', 'Nunito', 'Segoe UI', sans-serif",
+      google: 'Comfortaa:wght@500;700',
+      alto: 1.55, peso: 500, activo: 700, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'quicksand', nombre: 'Quicksand', grupo: 'bonitas',
+      nota: 'redonda y fina, limpia y tranquila',
+      css: "'Quicksand', 'Nunito', 'Segoe UI', sans-serif",
+      google: 'Quicksand:wght@500;700',
+      alto: 1.55, peso: 500, activo: 700, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'fredoka', nombre: 'Fredoka', grupo: 'bonitas',
+      nota: 'redonda y gordita: tierna sin ser infantil',
+      css: "'Fredoka', 'Nunito', 'Segoe UI', sans-serif",
+      google: 'Fredoka:wght@500;700',
+      alto: 1.5, peso: 500, activo: 700, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'cherrybomb', nombre: 'Kawaii', grupo: 'bonitas', tambien: ['anime'],
+      nota: 'japonesa gordita y tierna, de pegatina kawaii',
+      css: "'Cherry Bomb One', 'Hachi Maru Pop', 'Nunito', sans-serif",
+      google: 'Cherry+Bomb+One',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'mochiy', nombre: 'Pop japonés', grupo: 'bonitas', tambien: ['anime'],
+      nota: 'redonda y maciza, de caja de golosinas japonesa',
+      css: "'Mochiy Pop One', 'Potta One', 'Nunito', sans-serif",
+      google: 'Mochiy+Pop+One',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+
+    /* ══════════ LLAMATIVAS ══════════
+       Para lucirse: con textura, con volumen, con neón. Las Rubik de
+       fantasía comparten esqueleto y cambian la piel. */
+    {
+      id: 'burbujas', nombre: 'Burbujas', grupo: 'llamativas',
+      nota: 'hinchada como pompas de jabón',
+      css: "'Rubik Bubbles', 'Bagel Fat One', 'Nunito', sans-serif",
+      google: 'Rubik+Bubbles',
+      alto: 1.45, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'vinilo', nombre: 'Vinilo', grupo: 'llamativas',
+      nota: 'con surcos como un disco: la más musical de todas',
+      css: "'Rubik Vinyl', 'Rubik', 'Segoe UI', sans-serif",
+      google: 'Rubik+Vinyl',
+      alto: 1.45, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'glitch', nombre: 'Glitch', grupo: 'llamativas',
+      nota: 'cortada a tiras, como una pantalla que falla',
+      css: "'Rubik Glitch', 'Rubik', 'Segoe UI', sans-serif",
+      google: 'Rubik+Glitch',
+      alto: 1.45, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'ochentera', nombre: 'Ochentera', grupo: 'llamativas',
+      nota: 'rayas que se desvanecen, de logo de los ochenta',
+      css: "'Rubik 80s Fade', 'Rubik', 'Segoe UI', sans-serif",
+      google: 'Rubik+80s+Fade',
+      alto: 1.45, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'grafiti', nombre: 'Grafiti', grupo: 'llamativas',
+      nota: 'de spray, con la pintura salpicada alrededor',
+      css: "'Rubik Spray Paint', 'Rubik', 'Segoe UI', sans-serif",
+      google: 'Rubik+Spray+Paint',
+      alto: 1.45, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'pintura', nombre: 'Pintura fresca', grupo: 'llamativas',
+      nota: 'recién pintada y goteando',
+      css: "'Rubik Wet Paint', 'Rubik', 'Segoe UI', sans-serif",
+      google: 'Rubik+Wet+Paint',
+      alto: 1.5, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'monstruo', nombre: 'Monstruo', grupo: 'llamativas',
+      nota: 'peluda, de monstruo simpático',
+      css: "'Rubik Beastly', 'Rubik', 'Segoe UI', sans-serif",
+      google: 'Rubik+Beastly',
+      alto: 1.5, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'neontubo', nombre: 'Neón de tubo', grupo: 'llamativas',
+      nota: 'hecha de tubos de neón, y brilla como uno',
+      css: "'Tilt Neon', 'Quicksand', 'Segoe UI', sans-serif",
+      google: 'Tilt+Neon',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'neon' },
+    },
+    {
+      id: 'neonmano', nombre: 'Neón a mano', grupo: 'llamativas',
+      nota: 'cursiva de letrero de neón, la de los bares de noche',
+      css: "'Neonderthaw', 'Sacramento', 'Segoe Script', cursive",
+      google: 'Neonderthaw',
+      alto: 1.7, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'neon' },
+    },
+    {
+      id: 'kablam', nombre: '¡Kablam!', grupo: 'llamativas',
+      nota: 'de cómic que tiembla, como una onomatopeya',
+      css: "'Kablammo', 'Bangers', Impact, sans-serif",
+      google: 'Kablammo',
+      alto: 1.5, peso: 400, activo: 400, track: '0.01em', mayus: true, ajuste: 1,
+    },
+    {
+      id: 'sombra3d', nombre: 'Letras 3D', grupo: 'llamativas',
+      nota: 'con volumen de verdad, de letrero de sala de recreativas',
+      css: "'Bungee Shade', 'Bungee', Impact, sans-serif",
+      google: 'Bungee+Shade',
+      alto: 1.45, peso: 400, activo: 400, track: '0em', mayus: true, ajuste: 0.9,
+    },
+    {
+      id: 'cabaret', nombre: 'Cabaret', grupo: 'llamativas',
+      nota: 'de marquesina de teatro de los años treinta, con una línea por dentro',
+      css: "'Fascinate Inline', 'Limelight', Georgia, serif",
+      google: 'Fascinate+Inline',
+      alto: 1.5, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'setentera', nombre: 'Setentera', grupo: 'llamativas',
+      nota: 'gorda y en cursiva, de portada de disco de los setenta',
+      css: "'Shrikhand', 'Lobster', Georgia, cursive",
+      google: 'Shrikhand',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'gatsby', nombre: 'Años veinte', grupo: 'llamativas',
+      nota: 'de cartel de cine mudo, muy Gatsby',
+      css: "'Limelight', 'Poiret One', Georgia, serif",
+      google: 'Limelight',
+      alto: 1.55, peso: 400, activo: 400, track: '0.02em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'retrofuturo', nombre: 'Retrofuturo', grupo: 'llamativas',
+      nota: 'redondeada y ancha: el futuro que se imaginaban en los setenta',
+      css: "'Righteous', 'Audiowide', 'Segoe UI', sans-serif",
+      google: 'Righteous',
+      alto: 1.5, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'bagel', nombre: 'Bagel Fat One', grupo: 'llamativas',
+      nota: 'hinchada hasta reventar; se lee a metros',
+      css: "'Bagel Fat One', 'Nunito', system-ui, sans-serif",
+      google: 'Bagel+Fat+One',
+      alto: 1.5, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 1,
+    },
+
     /* ══════════ SERIES Y CINE ══════════ */
+    {
+      /* ESTILO STRANGER THINGS. El logo va en ITC Benguiat (de pago) y lo que
+         se reconoce es el CONTORNO ROJO que brilla, más que cada letra. Young
+         Serif tiene ese aire de portada de novela de los ochenta; el trazo
+         rojo va encima del color de la carátula, así el karaoke sigue
+         distinguiendo lo cantado de lo que falta. */
+      id: 'stranger', nombre: 'Stranger Things', grupo: 'cine',
+      nota: 'serif ochentera de portada de novela, con el contorno rojo de neón del logo',
+      css: "'Young Serif', 'Libre Baskerville', Georgia, serif",
+      google: 'Young+Serif',
+      alto: 1.5, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'trazo', borde: '#ff3b30', color: 'rgba(255, 40, 40, 0.55)' },
+    },
+    {
+      id: 'anillos', nombre: 'El Señor de los Anillos', grupo: 'cine', tambien: ['goticas'],
+      nota: 'uncial celta de la Tierra Media, con el brillo del anillo en el fuego',
+      css: "'Uncial Antiqua', 'MedievalSharp', Georgia, serif",
+      google: 'Uncial+Antiqua',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      trato: { tipo: 'aura', color: 'rgba(255, 140, 30, 0.6)' },
+    },
     {
       id: 'cinzeldeco', nombre: 'Fantasía épica', grupo: 'cine',
       nota: 'capitales con adorno: tronos, dragones y mapas',
@@ -271,14 +814,14 @@
       alto: 1.55, peso: 400, activo: 700, track: '0.04em', mayus: true, ajuste: 1,
     },
     {
-      id: 'unifraktur', nombre: 'Gótica', grupo: 'cine',
-      nota: 'letra gótica de verdad: medieval, metal y cabecera de periódico',
-      css: "'UnifrakturMaguntia', 'Pirata One', Georgia, serif",
-      google: 'UnifrakturMaguntia',
-      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+      id: 'western', nombre: 'Lejano oeste', grupo: 'cine',
+      nota: 'de cartel de saloon, con remates de madera tallada',
+      css: "'Sancreek', 'Rye', Georgia, serif",
+      google: 'Sancreek',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
     },
     {
-      id: 'creepster', nombre: 'Terror', grupo: 'cine',
+      id: 'creepster', nombre: 'Terror', grupo: 'cine', tambien: ['goticas'],
       nota: 'chorreante de peli de miedo; para Halloween y poco más',
       css: "'Creepster', 'Metal Mania', Impact, cursive",
       google: 'Creepster',
@@ -292,11 +835,12 @@
       alto: 1.7, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
     },
     {
-      id: 'monoton', nombre: 'Neón', grupo: 'cine',
+      id: 'monoton', nombre: 'Neón', grupo: 'cine', tambien: ['llamativas'],
       nota: 'de tubo de neón, con las líneas huecas: noche y sintetizador',
       css: "'Monoton', 'Audiowide', sans-serif",
       google: 'Monoton',
       alto: 1.65, peso: 400, activo: 400, track: '0.03em', mayus: false, ajuste: 1,
+      trato: { tipo: 'neon' },
     },
     {
       id: 'anton', nombre: 'Cartel', grupo: 'cine',
@@ -313,34 +857,184 @@
       alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
     },
 
-    /* ══════════ MODERNAS ══════════ */
+    /* ══════════ NORMALES ══════════
+       Las de todos los días: limpias, se leen solas y no se hacen notar. */
     {
-      id: 'poppins', nombre: 'Poppins', grupo: 'modernas',
+      id: 'poppins', nombre: 'Poppins', grupo: 'normales',
       nota: 'geométrica y limpia; la que no molesta nunca',
       css: "'Poppins', 'Segoe UI', system-ui, sans-serif",
       google: 'Poppins:ital,wght@0,400;0,700;1,500',
       alto: 1.6, peso: 400, activo: 700, track: '0em', mayus: false, ajuste: 1,
     },
     {
-      id: 'nunito', nombre: 'Nunito redonda', grupo: 'modernas',
+      id: 'montserrat', nombre: 'Montserrat', grupo: 'normales',
+      nota: 'nacida de los carteles de un barrio de Buenos Aires: geométrica y firme',
+      css: "'Montserrat', 'Poppins', 'Segoe UI', sans-serif",
+      google: 'Montserrat:ital,wght@0,500;0,800;1,600',
+      alto: 1.55, peso: 500, activo: 800, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'inter', nombre: 'Inter', grupo: 'normales',
+      nota: 'hecha para pantallas: la más clara en tamaños pequeños',
+      css: "'Inter', 'Segoe UI', system-ui, sans-serif",
+      google: 'Inter:wght@500;800',
+      alto: 1.55, peso: 500, activo: 800, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'roboto', nombre: 'Roboto', grupo: 'normales',
+      nota: 'la de Android: la de todos los días',
+      css: "'Roboto', 'Segoe UI', system-ui, sans-serif",
+      google: 'Roboto:wght@500;900',
+      alto: 1.55, peso: 500, activo: 900, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'opensans', nombre: 'Open Sans', grupo: 'normales',
+      nota: 'abierta y neutra, de las más leídas de internet',
+      css: "'Open Sans', 'Segoe UI', system-ui, sans-serif",
+      google: 'Open+Sans:wght@500;800',
+      alto: 1.55, peso: 500, activo: 800, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'lato', nombre: 'Lato', grupo: 'normales',
+      nota: 'redondeada por dentro y seria por fuera: cálida',
+      css: "'Lato', 'Segoe UI', system-ui, sans-serif",
+      google: 'Lato:ital,wght@0,400;0,900;1,400',
+      alto: 1.55, peso: 400, activo: 900, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'raleway', nombre: 'Raleway', grupo: 'normales',
+      nota: 'fina y elegante, con aire de revista',
+      css: "'Raleway', 'Segoe UI', system-ui, sans-serif",
+      google: 'Raleway:ital,wght@0,500;0,800;1,500',
+      alto: 1.55, peso: 500, activo: 800, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'nunito', nombre: 'Nunito redonda', grupo: 'normales',
       nota: 'gorda y de esquinas blandas: alegre',
       css: "'Nunito', 'Segoe UI', system-ui, sans-serif",
       google: 'Nunito:ital,wght@0,700;0,900;1,900',
       alto: 1.45, peso: 700, activo: 900, track: '-0.01em', mayus: false, ajuste: 1,
     },
     {
-      id: 'bebas', nombre: 'Bebas Neue', grupo: 'modernas',
+      id: 'outfit', nombre: 'Outfit', grupo: 'normales',
+      nota: 'geométrica y moderna, de marca de ropa',
+      css: "'Outfit', 'Poppins', 'Segoe UI', sans-serif",
+      google: 'Outfit:wght@500;800',
+      alto: 1.5, peso: 500, activo: 800, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'rubik', nombre: 'Rubik', grupo: 'normales',
+      nota: 'con las esquinas un poco redondas: amable sin ser infantil',
+      css: "'Rubik', 'Segoe UI', system-ui, sans-serif",
+      google: 'Rubik:wght@500;800',
+      alto: 1.5, peso: 500, activo: 800, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'spacegrotesk', nombre: 'Space Grotesk', grupo: 'normales',
+      nota: 'con un punto raro y técnico, de estudio de diseño',
+      css: "'Space Grotesk', 'Segoe UI', system-ui, sans-serif",
+      google: 'Space+Grotesk:wght@500;700',
+      alto: 1.5, peso: 500, activo: 700, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'kanit', nombre: 'Kanit', grupo: 'normales',
+      nota: 'cuadradita y deportiva, muy de camiseta',
+      css: "'Kanit', 'Segoe UI', system-ui, sans-serif",
+      google: 'Kanit:ital,wght@0,500;0,800;1,500',
+      alto: 1.5, peso: 500, activo: 800, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'oswald', nombre: 'Oswald', grupo: 'normales',
+      nota: 'estrecha y alta, de titular de periódico',
+      css: "'Oswald', 'Bebas Neue', 'Arial Narrow', sans-serif",
+      google: 'Oswald:wght@500;700',
+      alto: 1.45, peso: 500, activo: 700, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'bebas', nombre: 'Bebas Neue', grupo: 'normales',
       nota: 'estrecha en mayúsculas: cabe muchísimo por renglón',
       css: "'Bebas Neue', 'Arial Narrow', sans-serif",
       google: 'Bebas+Neue',
       alto: 1.45, peso: 400, activo: 400, track: '0.03em', mayus: true, ajuste: 1,
     },
     {
-      id: 'bagel', nombre: 'Bagel Fat One', grupo: 'modernas',
-      nota: 'hinchada hasta reventar; se lee a metros',
-      css: "'Bagel Fat One', 'Nunito', system-ui, sans-serif",
-      google: 'Bagel+Fat+One',
+      id: 'unbounded', nombre: 'Unbounded', grupo: 'normales',
+      nota: 'ancha y redonda, de cartel moderno; ocupa mucho',
+      css: "'Unbounded', 'Poppins', 'Segoe UI', sans-serif",
+      google: 'Unbounded:wght@500;800',
+      alto: 1.45, peso: 500, activo: 800, track: '0em', mayus: false, ajuste: 0.92,
+    },
+
+    /* ══════════ CLÁSICAS ══════════ */
+    {
+      id: 'playfair', nombre: 'Playfair Display', grupo: 'clasicas',
+      nota: 'la de fábrica: serif con contraste, se lee grande sin cansar',
+      css: "'Playfair Display', Georgia, 'Times New Roman', serif",
+      google: 'Playfair+Display:ital,wght@0,500;0,700;1,600',
+      alto: 1.55, peso: 500, activo: 700, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'cormorant', nombre: 'Cormorant Garamond', grupo: 'clasicas',
+      nota: 'fina y de libro antiguo; para baladas',
+      css: "'Cormorant Garamond', Garamond, Georgia, serif",
+      google: 'Cormorant+Garamond:ital,wght@0,500;0,700;1,600',
+      alto: 1.5, peso: 500, activo: 700, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'lora', nombre: 'Lora', grupo: 'clasicas',
+      nota: 'serif tranquila, la más neutra de todas',
+      css: "'Lora', Georgia, serif",
+      google: 'Lora:ital,wght@0,400;0,700;1,500',
+      alto: 1.6, peso: 400, activo: 700, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'cinzel', nombre: 'Cinzel', grupo: 'clasicas',
+      nota: 'capitales romanas; aire de épica y de crédito de película',
+      css: "'Cinzel', Georgia, serif",
+      google: 'Cinzel:wght@400;700',
+      alto: 1.55, peso: 400, activo: 700, track: '0.04em', mayus: true, ajuste: 1,
+    },
+    {
+      id: 'baskerville', nombre: 'Baskerville', grupo: 'clasicas',
+      nota: 'la de los libros de siempre, seria y cálida',
+      css: "'Libre Baskerville', Baskerville, Georgia, serif",
+      google: 'Libre+Baskerville:ital,wght@0,400;0,700;1,400',
+      alto: 1.6, peso: 400, activo: 700, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'garamond', nombre: 'EB Garamond', grupo: 'clasicas',
+      nota: 'Garamond de imprenta del siglo XVI: para lo poético',
+      css: "'EB Garamond', Garamond, Georgia, serif",
+      google: 'EB+Garamond:ital,wght@0,500;0,800;1,500',
+      alto: 1.55, peso: 500, activo: 800, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'merriweather', nombre: 'Merriweather', grupo: 'clasicas',
+      nota: 'serif robusta pensada para leer en pantalla',
+      css: "'Merriweather', Georgia, serif",
+      google: 'Merriweather:ital,wght@0,400;0,900;1,400',
+      alto: 1.6, peso: 400, activo: 900, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'dmserif', nombre: 'DM Serif Display', grupo: 'clasicas',
+      nota: 'de titular, con mucho contraste y curvas suaves',
+      css: "'DM Serif Display', 'Playfair Display', Georgia, serif",
+      google: 'DM+Serif+Display:ital@0;1',
       alto: 1.5, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'instrument', nombre: 'Instrument Serif', grupo: 'clasicas',
+      nota: 'estrecha y elegante, la serif de moda en los diseños de ahora',
+      css: "'Instrument Serif', 'Playfair Display', Georgia, serif",
+      google: 'Instrument+Serif:ital@0;1',
+      alto: 1.5, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'fraunces', nombre: 'Fraunces', grupo: 'clasicas',
+      nota: 'serif blandita de los setenta, con curvas que parecen derretirse',
+      css: "'Fraunces', 'Playfair Display', Georgia, serif",
+      google: 'Fraunces:ital,wght@0,600;0,900;1,600',
+      alto: 1.5, peso: 600, activo: 900, track: '0em', mayus: false, ajuste: 1,
     },
 
     /* ══════════ A MANO ══════════ */
@@ -348,7 +1042,7 @@
       id: 'dancing', nombre: 'Dancing Script', grupo: 'mano',
       nota: 'manuscrita suelta, la más legible de las de mano',
       css: "'Dancing Script', 'Segoe Script', cursive",
-      google: 'Dancing+Script:wght@400;700',
+      google: 'Dancing+Script:wght@400;500;700',
       alto: 1.7, peso: 500, activo: 700, track: '0em', mayus: false, ajuste: 1,
     },
     {
@@ -371,6 +1065,48 @@
       css: "'Permanent Marker', 'Segoe Script', cursive",
       google: 'Permanent+Marker',
       alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'indie', nombre: 'Indie Flower', grupo: 'mano',
+      nota: 'redondita de cuaderno, como una nota pegada en la nevera',
+      css: "'Indie Flower', 'Segoe Print', cursive",
+      google: 'Indie+Flower',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'shadows', nombre: 'Shadows Into Light', grupo: 'mano',
+      nota: 'fina y rápida, de apunte a lápiz',
+      css: "'Shadows Into Light', 'Segoe Print', cursive",
+      google: 'Shadows+Into+Light',
+      alto: 1.6, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'gloria', nombre: 'Gloria Hallelujah', grupo: 'mano',
+      nota: 'de cómic dibujado a mano, alegre',
+      css: "'Gloria Hallelujah', 'Segoe Print', cursive",
+      google: 'Gloria+Hallelujah',
+      alto: 1.75, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'patrick', nombre: 'Patrick Hand', grupo: 'mano',
+      nota: 'a mano pero ordenada: la más fácil de leer de este grupo',
+      css: "'Patrick Hand', 'Segoe Print', cursive",
+      google: 'Patrick+Hand',
+      alto: 1.55, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'kalam', nombre: 'Kalam', grupo: 'mano',
+      nota: 'de bolígrafo, suelta y con ritmo',
+      css: "'Kalam', 'Segoe Print', cursive",
+      google: 'Kalam:wght@400;700',
+      alto: 1.6, peso: 400, activo: 700, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'rocksalt', nombre: 'Rock Salt', grupo: 'mano',
+      nota: 'de rotulador gastado, escrita deprisa en una pared',
+      css: "'Rock Salt', 'Permanent Marker', cursive",
+      google: 'Rock+Salt',
+      alto: 1.9, peso: 400, activo: 400, track: '0.01em', mayus: true, ajuste: 0.9,
     },
 
     /* ══════════ CONSOLA ══════════ */
@@ -397,6 +1133,34 @@
       css: "'Major Mono Display', 'Share Tech Mono', monospace",
       google: 'Major+Mono+Display',
       alto: 1.8, peso: 400, activo: 400, track: '0.02em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'sixtyfour', nombre: 'Commodore 64', grupo: 'consola',
+      nota: 'de ordenador de los ochenta, con las rayas de la pantalla de tubo',
+      css: "'Sixtyfour', 'VT323', monospace",
+      google: 'Sixtyfour',
+      alto: 1.8, peso: 400, activo: 400, track: '0em', mayus: false, ajuste: 0.8,
+    },
+    {
+      id: 'workbench', nombre: 'Amiga', grupo: 'consola',
+      nota: 'la del escritorio de un Amiga: píxel con rayas de monitor',
+      css: "'Workbench', 'VT323', monospace",
+      google: 'Workbench',
+      alto: 1.7, peso: 400, activo: 400, track: '0.01em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'doto', nombre: 'Pantalla LED', grupo: 'consola',
+      nota: 'de puntitos, como el letrero luminoso de una estación',
+      css: "'Doto', 'DotGothic16', monospace",
+      google: 'Doto:wght@600;900',
+      alto: 1.7, peso: 600, activo: 900, track: '0.02em', mayus: false, ajuste: 1,
+    },
+    {
+      id: 'jersey', nombre: 'Marcador', grupo: 'consola',
+      nota: 'píxel de marcador de estadio',
+      css: "'Jersey 10', 'Silkscreen', monospace",
+      google: 'Jersey+10',
+      alto: 1.5, peso: 400, activo: 400, track: '0.02em', mayus: false, ajuste: 1,
     },
   ];
 
@@ -543,11 +1307,16 @@
     root.style.setProperty('--lyrics-weight-on', String(f.activo));
     root.style.setProperty('--lyrics-tracking', f.track);
     root.style.setProperty('--lyrics-caps', f.mayus ? 'uppercase' : 'none');
+    root.style.setProperty('--lyrics-style', f.cursiva ? 'italic' : 'normal');
     /* Para lo que una variable no arregla: una fuente concreta puede querer
        su propia sombra, su propio interletraje o lo que sea. Con el id en el
        <html>, el CSS puede apuntarle sin que este módulo sepa nada de estilos
        (lo usa la de Minecraft para su sombra dura). */
     root.dataset.lyricsFont = f.id;
+    /* El remate (`trato`): el tipo va en el <html> para que el CSS sepa QUÉ
+       dibujar, y los colores en variables. Sin trato se quita la marca y la
+       letra vuelve al brillo de siempre, el del color de la carátula. */
+    ponerTrato(root, f.trato);
     /* La escala medida la vez pasada se pone YA, sin esperar a la descarga: si
        no, al recargar la página la letra pega un salto de tamaño al llegar. */
     root.style.setProperty('--lyrics-font-scale', String(escalas[f.id] || 1));
@@ -588,12 +1357,24 @@
     });
   };
 
+  /* Escribe el remate de una fuente en un elemento: en el <html> para la
+     letra de verdad, y en la muestra de cada tarjeta de la galería, que así
+     enseña la fuente CON su contorno o su aura, no a medias. */
+  const ponerTrato = (el, t) => {
+    if (!t) { delete el.dataset.lyricsTrato; return; }
+    el.dataset.lyricsTrato = t.tipo;
+    el.style.setProperty('--lf-borde', t.borde || 'transparent');
+    el.style.setProperty('--lf-caida', t.caida || 'rgba(0, 0, 0, 0.8)');
+    el.style.setProperty('--lf-aura', t.color || 'var(--accent-glow)');
+    el.style.setProperty('--lf-grosor', t.grosor || '0.05em');
+  };
+
   /* ══════════════════════════════════════════════════════════
      LA GALERÍA
-     Se construye la PRIMERA vez que se abre, no al arrancar: son 38
-     tarjetas que la mayoría de la gente no va a mirar nunca. Vive colgada
-     del <body> —como la paleta de Ctrl+K— para que ningún `overflow` de
-     los ajustes la recorte.
+     Se construye la PRIMERA vez que se abre, no al arrancar: son más de
+     cien tarjetas que la mayoría de la gente no va a mirar nunca. Vive
+     colgada del <body> —como la paleta de Ctrl+K— para que ningún
+     `overflow` de los ajustes la recorte.
      ══════════════════════════════════════════════════════════ */
   /* Corta a propósito: la muestra va en una línea sin partir, y una frase
      más larga se comía en puntos suspensivos justo las fuentes anchas, que son
@@ -614,6 +1395,7 @@
     /* El botón se dibuja EN la fuente puesta: se ve cuál es sin leerla. */
     nombreEl.style.fontFamily = f.css;
     nombreEl.style.fontWeight = String(f.peso);
+    nombreEl.style.fontStyle = f.cursiva ? 'italic' : 'normal';
     nombreEl.style.textTransform = f.mayus ? 'uppercase' : 'none';
     if (disparador) disparador.setAttribute('aria-label', 'Tipografía de la letra: ' + f.nombre);
   };
@@ -626,16 +1408,19 @@
 
   const nombreGrupo = (id) => (GRUPOS.find(g => g.id === id) || {}).nombre || id;
 
+  /* ¿Sale esta fuente en esta categoría? En la suya, y en las de `tambien`. */
+  const estaEn = (f, g) => f.grupo === g || (f.tambien || []).indexOf(g) >= 0;
+
   /* Texto sin tildes y en minúsculas, para que «gotica» encuentre «Gótica». */
   const plano = (s) => String(s || '').toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
 
   const encaja = (f) => {
-    if (grupoActivo !== 'todas' && f.grupo !== grupoActivo) return false;
+    if (grupoActivo !== 'todas' && !estaEn(f, grupoActivo)) return false;
     if (!filtro) return true;
     const q = plano(filtro);
     return plano(f.nombre).includes(q)
-      || plano(nombreGrupo(f.grupo)).includes(q)
+      || [f.grupo].concat(f.tambien || []).some(g => plano(nombreGrupo(g)).includes(q))
       || plano(f.nota).includes(q);
   };
 
@@ -660,15 +1445,17 @@
     cab.append(n, g, tic);
 
     /* La muestra se dibuja en la fuente de la tarjeta Y con su grosor, su
-       interletraje y sus mayúsculas: es la única forma de elegir sin
-       probártelas una por una en la canción. */
+       interletraje, sus mayúsculas, su cursiva y su remate: es la única
+       forma de elegir sin probártelas una por una en la canción. */
     const m = document.createElement('span');
     m.className = 'fc-muestra';
     m.style.fontFamily = f.css;
     m.style.fontWeight = String(f.peso);
+    m.style.fontStyle = f.cursiva ? 'italic' : 'normal';
     m.style.letterSpacing = f.track;
     m.style.textTransform = f.mayus ? 'uppercase' : 'none';
     m.style.lineHeight = String(f.alto);
+    ponerTrato(m, f.trato);
     m.textContent = MUESTRA;
 
     const nota = document.createElement('span');
@@ -683,7 +1470,7 @@
     if (!lista) return;
     lista.textContent = '';
     const puesta = leer();
-    const salen = CATALOGO.filter(encaja);
+    let salen = CATALOGO.filter(encaja);
     if (!salen.length) {
       const v = document.createElement('p');
       v.className = 'fuentes-vacio';
@@ -691,12 +1478,32 @@
       lista.appendChild(v);
       return;
     }
+    /* En «todas» y sin buscar, van por categorías y con un rótulo delante de
+       cada una: con más de cien tarjetas seguidas no se sabía dónde acababa
+       el anime y empezaban los juegos. Cada fuente sale UNA vez, en su grupo
+       (lo de `tambien` es para cuando se mira una categoría suelta). */
+    const rotulos = grupoActivo === 'todas' && !filtro;
+    if (rotulos) {
+      salen = GRUPOS.slice(1).flatMap(g => salen.filter(f => f.grupo === g.id));
+    } else if (grupoActivo !== 'todas') {
+      // en una categoría, primero las suyas y detrás las que también encajan
+      salen = salen.filter(f => f.grupo === grupoActivo)
+        .concat(salen.filter(f => f.grupo !== grupoActivo));
+    }
+    let grupoPrevio = null;
     salen.forEach(f => {
+      if (rotulos && f.grupo !== grupoPrevio) {
+        grupoPrevio = f.grupo;
+        const r = document.createElement('p');
+        r.className = 'fuentes-sep';
+        r.textContent = nombreGrupo(f.grupo);
+        lista.appendChild(r);
+      }
       const card = construirTarjeta(f);
       if (f.id === puesta) card.classList.add('on');
       lista.appendChild(card);
       /* La hoja de Google se pide cuando la tarjeta ASOMA, no antes: abrir la
-         galería no puede costar 38 descargas. */
+         galería no puede costar cien descargas. */
       if (mirador) mirador.observe(card); else cargar(f);
     });
   };

@@ -723,6 +723,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
   font-weight: var(--lyrics-weight, normal);
   line-height: var(--lyrics-line, 1.9);   /* aire para la línea activa, que crece */
   text-transform: var(--lyrics-caps, none);
+  font-style: var(--lyrics-style, normal); /* la de Fortnite va entera en cursiva */
   color: var(--text-dim);
   padding: 8px 12px 8px 0;           /* small right padding so scaled text never touches edge */
   text-align: left;
@@ -1244,7 +1245,11 @@ body.perf-tactil .tab-bar.se-esconde::after {
    El id de la fuente lo pone js/fonts.js en el <html>: cualquier otra fuente
    del catálogo puede pedir su propio trato igual, sin tocar el módulo.
    ========================================================== */
-:root[data-lyrics-font="pixel"] .lyrics-body .lyric-line.active {
+/* Las palabras ya cantadas del karaoke llevan sombra propia, que pisa la
+   del verso: sin repetir aquí la de la fuente, el remate se caía palabra
+   a palabra conforme se cantaban (pasa igual en Mario y Halo, abajo). */
+:root[data-lyrics-font="pixel"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-font="pixel"] .lyrics-body.sync .lyric-line.active .w.sung {
   text-shadow:
     0 0 10px var(--accent-glow),
     0.13em 0.13em 0 rgba(0, 0, 0, 0.95);
@@ -1267,7 +1272,8 @@ body.perf-tactil .tab-bar.se-esconde::after {
    lados (no hay `text-stroke` fiable en todos los navegadores) y se le deja
    un resplandor por detrás para que siga siendo esta app y no un emulador. */
 :root[data-lyrics-font="mario"] .lyrics-body .lyric-line.active,
-:root[data-lyrics-font="mario"] .lyrics-body .lyric-line.active .w-big {
+:root[data-lyrics-font="mario"] .lyrics-body .lyric-line.active .w-big,
+:root[data-lyrics-font="mario"] .lyrics-body.sync .lyric-line.active .w.sung {
   text-shadow:
     0 0 14px var(--accent-glow),
     -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000,
@@ -1283,7 +1289,8 @@ body.perf-tactil .tab-bar.se-esconde::after {
    la letra en vez de derramado. Se cambia el halo suelto de la app por un
    doble contorno corto: se lee metálico, no de neón. Las MAYÚSCULAS y el
    interletraje abierto los pide la propia fuente en el catálogo. */
-:root[data-lyrics-font="halo"] .lyrics-body .lyric-line.active {
+:root[data-lyrics-font="halo"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-font="halo"] .lyrics-body.sync .lyric-line.active .w.sung {
   text-shadow:
     0 0 2px var(--accent),
     0 0 12px var(--accent-glow),
@@ -1338,6 +1345,131 @@ body.perf-tactil .tab-bar.se-esconde::after {
 :root[data-lyrics-font="retro"] .fp-now {
   font-synthesis: none;
   text-shadow: 0.05em 0 0 currentColor, 0 0 6px var(--accent-glow), 0 0 14px var(--accent-glow);
+}
+
+/* ==========================================================
+   EL REMATE DE CADA TIPOGRAFÍA (`trato` en js/fonts.js)
+
+   Lo que hace que una letra «parezca» Pokémon o Dragon Ball casi nunca es
+   la forma de cada letra: es el contorno azul, el borde rojo, la neblina
+   de Dark Souls. fonts.js pone el TIPO en el <html> (data-lyrics-trato) y
+   los colores en variables (--lf-borde, --lf-caida, --lf-aura,
+   --lf-grosor); aquí se dibuja cada tipo UNA vez y lo usan todas las
+   fuentes que lo pidan. Una fuente nueva con contorno no toca este archivo.
+
+   Va en cinco sitios: el verso que suena, su palabra destacada y las ya
+   cantadas del karaoke (cada una lleva su propia sombra, que pisa la del
+   verso: sin repetirla aquí el remate se caía al cantarse la palabra), la
+   muestra de ajustes, y la tarjeta de la galería, que lleva sus propias
+   variables para enseñar SU remate y no el de la fuente puesta.
+
+   Sombras sin desenfoque salvo el último brillo, y en em: la palabra
+   destacada (1,18 em) lleva el borde en proporción. El relleno sigue
+   siendo el color de la carátula, como en toda la app.
+
+   Los brillos (lo que lleva desenfoque) van por --lf-brillo: la muestra
+   de ajustes y la de cada tarjeta viven en una caja que recorta —lleva
+   puntos suspensivos— y un brillo de 44 px se cortaba en seco y dibujaba
+   un RECTÁNGULO alrededor de la letra. Ahí va a un cuarto; bordes y
+   sombras duras, enteros.
+   ========================================================== */
+.fp-now, .fc-muestra { --lf-brillo: 0.25; }
+
+/* contorno: borde de color alrededor de cada letra y sombra dura abajo.
+   Ocho sombras duras y no text-stroke, que se come la letra por dentro.
+   El grosor tiene suelo en píxeles: la letra suele ir a 15-30 px, y ahí
+   0,06 em se queda en un pelo (medido: el azul de Pokémon ni se veía). */
+:root[data-lyrics-trato="contorno"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-trato="contorno"] .lyrics-body .lyric-line.active .w-big,
+:root[data-lyrics-trato="contorno"] .lyrics-body.sync .lyric-line.active .w.sung,
+:root[data-lyrics-trato="contorno"] .fp-now,
+.fuentes-lista .fuente-card .fc-muestra[data-lyrics-trato="contorno"] {
+  --lf-g: max(1.5px, var(--lf-grosor));
+  text-shadow:
+    var(--lf-g) 0 0 var(--lf-borde),
+    calc(var(--lf-g) * -1) 0 0 var(--lf-borde),
+    0 var(--lf-g) 0 var(--lf-borde),
+    0 calc(var(--lf-g) * -1) 0 var(--lf-borde),
+    calc(var(--lf-g) * 0.7) calc(var(--lf-g) * 0.7) 0 var(--lf-borde),
+    calc(var(--lf-g) * -0.7) calc(var(--lf-g) * 0.7) 0 var(--lf-borde),
+    calc(var(--lf-g) * 0.7) calc(var(--lf-g) * -0.7) 0 var(--lf-borde),
+    calc(var(--lf-g) * -0.7) calc(var(--lf-g) * -0.7) 0 var(--lf-borde),
+    calc(var(--lf-g) * 1.4) calc(var(--lf-g) * 1.8) 0 var(--lf-caida),
+    0 0 calc(16px * var(--lf-brillo, 1)) var(--accent-glow);
+}
+
+/* aura: resplandor de un color propio (la energía maldita, la sangre de
+   Castlevania, el fuego del anillo) en vez del de la carátula */
+:root[data-lyrics-trato="aura"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-trato="aura"] .lyrics-body .lyric-line.active .w-big,
+:root[data-lyrics-trato="aura"] .lyrics-body.sync .lyric-line.active .w.sung,
+:root[data-lyrics-trato="aura"] .fp-now,
+.fuentes-lista .fuente-card .fc-muestra[data-lyrics-trato="aura"] {
+  text-shadow:
+    0 0 2px var(--lf-aura),
+    0 0 calc(12px * var(--lf-brillo, 1)) var(--lf-aura),
+    0 0 calc(30px * var(--lf-brillo, 1)) var(--lf-aura),
+    0.04em 0.06em 0 var(--lf-caida);
+}
+
+/* caída: solo la sombra dura desplazada, de cartel impreso */
+:root[data-lyrics-trato="caida"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-trato="caida"] .lyrics-body .lyric-line.active .w-big,
+:root[data-lyrics-trato="caida"] .lyrics-body.sync .lyric-line.active .w.sung,
+:root[data-lyrics-trato="caida"] .fp-now,
+.fuentes-lista .fuente-card .fc-muestra[data-lyrics-trato="caida"] {
+  --lf-g: max(1.5px, var(--lf-grosor));
+  text-shadow:
+    calc(var(--lf-g) * 1.2) calc(var(--lf-g) * 1.6) 0 var(--lf-caida),
+    0 0 calc(14px * var(--lf-brillo, 1)) var(--accent-glow);
+}
+
+/* estela: tres copias cada vez más tenues hacia atrás, como la carrera
+   de Sonic; del color de la carátula */
+:root[data-lyrics-trato="estela"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-trato="estela"] .lyrics-body .lyric-line.active .w-big,
+:root[data-lyrics-trato="estela"] .lyrics-body.sync .lyric-line.active .w.sung,
+:root[data-lyrics-trato="estela"] .fp-now,
+.fuentes-lista .fuente-card .fc-muestra[data-lyrics-trato="estela"] {
+  text-shadow:
+    -0.06em 0 0 color-mix(in oklab, var(--accent) 50%, transparent),
+    -0.12em 0 0 color-mix(in oklab, var(--accent) 26%, transparent),
+    -0.18em 0 0 color-mix(in oklab, var(--accent) 12%, transparent),
+    0 0 calc(12px * var(--lf-brillo, 1)) var(--accent-glow),
+    0.05em 0.05em 0 rgba(0, 0, 0, 0.7);
+}
+
+/* neón: el tubo encendido — un núcleo del color de la propia letra y el
+   halo abriéndose en tres capas */
+:root[data-lyrics-trato="neon"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-trato="neon"] .lyrics-body .lyric-line.active .w-big,
+:root[data-lyrics-trato="neon"] .lyrics-body.sync .lyric-line.active .w.sung,
+:root[data-lyrics-trato="neon"] .fp-now,
+.fuentes-lista .fuente-card .fc-muestra[data-lyrics-trato="neon"] {
+  text-shadow:
+    0 0 3px currentColor,
+    0 0 calc(10px * var(--lf-brillo, 1)) var(--accent-glow),
+    0 0 calc(22px * var(--lf-brillo, 1)) var(--accent-glow),
+    0 0 calc(44px * var(--lf-brillo, 1)) var(--accent-glow);
+}
+
+/* trazo: contorno fino de color ENCIMA de la letra (el rojo de Stranger
+   Things) con su resplandor. text-stroke se hereda, así que también lo
+   llevan las palabras y la copia que se llena en el karaoke. */
+:root[data-lyrics-trato="trazo"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-trato="trazo"] .fp-now,
+.fuentes-lista .fuente-card .fc-muestra[data-lyrics-trato="trazo"] {
+  -webkit-text-stroke: max(1px, 0.025em) var(--lf-borde);
+}
+:root[data-lyrics-trato="trazo"] .lyrics-body .lyric-line.active,
+:root[data-lyrics-trato="trazo"] .lyrics-body .lyric-line.active .w-big,
+:root[data-lyrics-trato="trazo"] .lyrics-body.sync .lyric-line.active .w.sung,
+:root[data-lyrics-trato="trazo"] .fp-now,
+.fuentes-lista .fuente-card .fc-muestra[data-lyrics-trato="trazo"] {
+  text-shadow:
+    0 0 1px var(--lf-borde),
+    0 0 calc(8px * var(--lf-brillo, 1)) var(--lf-aura),
+    0 0 calc(22px * var(--lf-brillo, 1)) var(--lf-aura);
 }
 
 /* palabra destacada: más grande y en cursiva, como pal-grande del regalo */
@@ -1547,6 +1679,7 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
   font-family: var(--lyrics-font, 'VT323', monospace);
   font-weight: var(--lyrics-weight, normal);
   text-transform: var(--lyrics-caps, none);
+  font-style: var(--lyrics-style, normal);
 }
 .lyrics-edit .lyrics-empty { padding: 0 24px; }
 
@@ -3870,6 +4003,29 @@ body.reduce-motion .fuentes-caja { animation: none; }
   font-size: 18px;
   color: var(--text-muted);
 }
+/* Rótulo de cada categoría en «todas» (lo pone js/fonts.js): con más de
+   cien tarjetas seguidas no se sabía dónde acababa una cosa y empezaba
+   otra. Ocupa la fila entera de la rejilla y no es una tarjeta: la galería
+   ni lo observa ni descarga nada por él. */
+.fuentes-sep {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 2px 0;
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+  line-height: 1.2;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+.fuentes-sep:first-child { margin-top: 2px; }
+.fuentes-sep::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: var(--border-dark);
+}
 
 .fuente-card {
   display: flex;
@@ -4001,6 +4157,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   line-height: var(--lyrics-line, 1.9);
   letter-spacing: var(--lyrics-tracking, 0.02em);
   text-transform: var(--lyrics-caps, none);
+  font-style: var(--lyrics-style, normal);
 }
 .font-preview span { display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 /* Los tamaños llevan --lyrics-scale, que es lo que mueven S · M · L · XL.

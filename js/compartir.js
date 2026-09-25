@@ -87,6 +87,8 @@
     peso: css('--lyrics-weight-on', '700'),
     caps: css('--lyrics-caps', 'none') === 'uppercase',
     track: css('--lyrics-tracking', '0.02em'),
+    // «italic » o nada: va delante del peso en ctx.font (la de Fortnite)
+    estilo: css('--lyrics-style', 'normal') === 'italic' ? 'italic ' : '',
   });
 
   const UI = "'VT323', monospace";
@@ -108,7 +110,9 @@
   const fuentesListas = async () => {
     if (!document.fonts || !document.fonts.load) return;
     const f = fuenteLetra();
-    const pedir = [`700 64px ${f.familia}`, `italic 40px ${f.familia}`,
+    // la cara EXACTA del verso (peso y cursiva): con otra, el lienzo pinta
+    // la de reserva hasta que llegue
+    const pedir = [`${f.estilo}${f.peso} 64px ${f.familia}`, `italic 40px ${f.familia}`,
       `40px ${UI}`, `16px ${MARCA}`];
     try {
       await Promise.all(pedir.map((p) => document.fonts.load(p, 'Ag')));
@@ -351,7 +355,7 @@
       const trozos = [];
       let total = 0;
       elegidos.forEach((v, n) => {
-        ctx.font = `${f.peso} ${tamV}px ${f.familia}`;
+        ctx.font = `${f.estilo}${f.peso} ${tamV}px ${f.familia}`;
         if ('letterSpacing' in ctx) ctx.letterSpacing = f.track;
         const lineas = envolver(f.caps ? String(v.text).toUpperCase() : v.text, anchoUtil);
         let altoV = lineas.length * interlinea;
@@ -408,7 +412,7 @@
     let y = y0;
     ctx.textAlign = 'left';
     bloque.trozos.forEach(({ lineas, tl }) => {
-      ctx.font = `${f.peso} ${tam}px ${f.familia}`;
+      ctx.font = `${f.estilo}${f.peso} ${tam}px ${f.familia}`;
       if ('letterSpacing' in ctx) ctx.letterSpacing = f.track;
       ctx.fillStyle = texto;
       ctx.save();
