@@ -11,7 +11,7 @@
    La encienden y apagan las letras (js/lyrics.js).
 
    Aquí NO se detecta nada: el bombo y las bandas los da BeatModule /
-   VisualizerModule, igual que en ambient.js y cinema.js. Todo lo que
+   VisualizerModule, igual que en ambient.js y vertical.js. Todo lo que
    se escribe es transform / opacity / una variable, y solo cuando el
    valor cambió de verdad.
    ========================================================== */
@@ -57,8 +57,8 @@
      trabajo de estilo tirado a la basura.
 
      OJO: el memo va COLGADO DEL ELEMENTO, no en un diccionario con la
-     clave `el.id + prop` como en cinema.js. Allí solo se escribe en nodos
-     con id; aquí las 48 barras del espectro son <i> sin id, y con esa
+     clave `el.id + prop` como en el cine de antes. Allí solo se escribía en
+     nodos con id; aquí las 48 barras del espectro son <i> sin id, y con esa
      clave las 48 compartirían la misma entrada y se pisarían entre ellas:
      cada barra que coincidiera con la última escrita se quedaría clavada. */
   const escribir = (el, prop, val) => {
@@ -114,11 +114,11 @@
   let raf = 0;
   let cuenta = 0;
 
-  /* Con el cine abierto el panel queda debajo de una capa a pantalla completa:
-     se ve tanto como en otra pestaña de la app, o sea nada. */
+  /* Solo con la letra a la vista: en otra pestaña de la app no se ve nada.
+     (Con el cine o el vídeo 9:16 abiertos la pestaña vive en su marco y
+     sigue activa: ahí sí se ve, y se pinta.) */
   const aLaVista = () => !panel.hidden &&
     !document.hidden &&
-    !document.body.classList.contains('cinema-open') &&
     !!(tabLyrics && tabLyrics.classList.contains('active'));
 
   const relojPintado = { ultimo: 0 };

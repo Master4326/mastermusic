@@ -583,6 +583,21 @@
             </div>
           </section>
 
+          <!-- VÍDEO 9:16 · la puerta de ajustes al modo de grabar para TikTok.
+               Sus opciones (estilo, dónde empieza, cuánto dura, sonido, guías)
+               NO están aquí: viven en el panel del propio modo, al lado del
+               marco, donde se ve en el acto lo que hace cada una. -->
+          <section class="settings-block" id="cfg-video" data-titulo="vídeo 9:16" data-ico="▯">
+            <h3>~ vídeo 9:16 ~</h3>
+            <div class="set-row" data-buscar="video 916 vertical tiktok reels shorts grabar grabacion celular movil historia formato">
+              <span class="set-label">para tiktok</span>
+              <button class="retro-btn small" id="verticalAbrir" type="button"
+                      title="La app en formato de móvil (9:16), con la letra, la carátula y la música, lista para grabar un TikTok, un Reel o un Short. Graba solo el marco, con el sonido. Tecla V.">
+                <span class="bracket">[</span> abrir el modo 9:16 <span class="bracket">]</span>
+              </button>
+            </div>
+          </section>
+
           <!-- Los tres colores estaban en tres bloques sueltos con el botón de
                restablecer en un cuarto. Aquí van juntos: es UNA cosa. -->
           <section class="settings-block" id="cfg-colores" data-titulo="colores" data-ico="▩">
@@ -700,8 +715,10 @@
               <kbd>B</kbd><span>listas</span>
               <kbd>Q</kbd><span>cola</span>
               <kbd>H</kbd><span>historial</span>
+              <kbd>V</kbd><span>vídeo 9:16 para tiktok (dentro, <kbd>R</kbd> graba y para)</span>
               <kbd>S</kbd><span>configuración (y otra vez para volver)</span>
-              <kbd>esc</kbd><span>cerrar el buscador o el cine — y volver desde configuración</span>
+              <kbd>1 2 3 · E</kbd><span>dentro del cine: estilo app, vinilo o letra · letra en lista o edit</span>
+              <kbd>esc</kbd><span>cerrar el buscador, el cine o el vídeo 9:16 — y volver desde configuración</span>
             </div>
           </section>
 
@@ -787,8 +804,17 @@
                   aria-label="Laboratorio de efectos: probar las animaciones sin música"
                   title="Laboratorio de efectos: probar todas las animaciones sin música" hidden><i class="sb-ico ico ico-lab" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">lab</span></button>
           <button class="ctrl-btn vol-btn side-btn" id="cinemaBtn"
-                  aria-label="Modo cine: letra a pantalla completa con la carátula girando"
-                  title="Modo cine: letra animada + carátula girando (Esc para salir)"><i class="sb-ico ico ico-cine" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">cine</span></button>
+                  aria-label="Modo cine: la letra a pantalla completa, en tres estilos: app, vinilo y letra"
+                  title="Modo cine: la letra a pantalla completa en tres estilos — app, vinilo o letra (dentro, 1 2 3 y E; Esc para salir)"><i class="sb-ico ico ico-cine" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">cine</span></button>
+          <!-- ▯ VÍDEO 9:16 · la app en formato de móvil, para grabar un TikTok,
+               un Reel o un Short. Va al lado del cine porque es de la misma
+               familia: otra pantalla completa para la letra. Abre un escenario
+               con el marco vertical y su panel (js/vertical.js lo cuelga del
+               <body>, como el cine y la tarjeta ❝). En el teléfono no sale:
+               allí la app ya es vertical y el navegador no graba la pantalla. -->
+          <button class="ctrl-btn vol-btn side-btn" id="verticalBtn"
+                  aria-label="Vídeo 9:16: la app en formato de móvil, para grabar TikToks"
+                  title="Vídeo 9:16: la app en formato de móvil, lista para grabar un TikTok, un Reel o un Short (V)"><i class="sb-ico ico ico-vertical" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">9:16</span></button>
         </div>
 
         <div class="ctl-musica">
@@ -862,87 +888,6 @@
       <span class="filler" aria-hidden="true"></span>
       <span id="clock">--:--</span>
     </div>
-  </div>
-
-  <!-- MODO CINE: letra gigante sobre la carátula difuminada (opcional) -->
-  <div class="cinema" id="cinema" hidden>
-    <div class="cinema-bg" id="cinemaBg"></div>
-    <div class="cinema-veil" id="cinemaVeil"></div>
-
-    <!-- AURA estilo Apple Music: manchas de color sacadas de la carátula que
-         se mueven despacio y respiran con la canción. Sustituye al estrobo y
-         a las ondas por bombo, que daban flashazos en vez de ambiente. -->
-    <div class="cinema-aura" id="cinemaAura" aria-hidden="true">
-      <span class="au-blob b1"></span>
-      <span class="au-blob b2"></span>
-      <span class="au-blob b3"></span>
-      <span class="au-blob b4"></span>
-    </div>
-
-    <!-- Capa reactiva: destellos con los platillos (lo pinta cinema.js) -->
-    <div class="cinema-fx" id="cinemaFx" aria-hidden="true">
-      <div class="cin-destellos" id="cinDestellos"></div>
-    </div>
-
-    <!-- Acabado de película: grano animado + viñeta. Puro CSS, sobre todo. -->
-    <div class="cinema-grano" aria-hidden="true"></div>
-    <div class="cinema-vineta" aria-hidden="true"></div>
-
-    <button class="cinema-close" id="cinemaClose" title="Salir del modo cine (Esc)">✕</button>
-    <div class="cinema-head">
-      <div class="cinema-cover" id="cinemaCover"></div>
-      <div class="cinema-meta">
-        <div class="cinema-title" id="cinemaTitle"></div>
-        <div class="cinema-artist" id="cinemaArtist"></div>
-      </div>
-    </div>
-    <div class="cinema-body">
-      <!-- el disco gasta su transform en el giro, así que el latido va en
-           el envoltorio (misma razón que las notas del panel normal) -->
-      <div class="cinema-disc-wrap" id="cinemaDiscWrap">
-        <!-- vinilo de verdad: pasta negra con surcos, y la carátula SOLO en
-             la etiqueta central (antes la portada cubría el disco entero con
-             los surcos encima y quedaba embarrado) -->
-        <div class="cinema-disc" id="cinemaDisc">
-          <span class="cin-brillo" aria-hidden="true"></span>
-          <span class="cin-label" id="cinemaLabel"></span>
-        </div>
-        <!-- brazo con geometría de tocadiscos: pivote fuera del plato y
-             recorrido real de fuera hacia dentro según avanza la canción -->
-        <div class="cinema-brazo" id="cinemaBrazo" aria-hidden="true">
-          <span class="br-base"></span>
-          <span class="br-arm"><i class="br-head"></i></span>
-        </div>
-      </div>
-      <div class="cinema-stage" id="cinemaStage">
-        <div class="cinema-clave" id="cinemaClave" aria-hidden="true"></div>
-        <div class="cinema-ghost prev" id="cinemaPrev" aria-hidden="true"></div>
-        <div class="cinema-ghost next" id="cinemaNext" aria-hidden="true"></div>
-        <!-- aquí se muda #lyricsEdit mientras el cine está abierto -->
-      </div>
-      <div class="cinema-msg" id="cinemaMsg" hidden></div>
-      <!-- cuenta de los huecos instrumentales, en grande -->
-      <div class="cinema-gap" id="cinemaGap" hidden aria-hidden="true"><i></i><i></i><i></i></div>
-    </div>
-
-    <!-- Controles: asoman al mover el ratón y se esconden solos -->
-    <div class="cinema-ctl" id="cinemaCtl">
-      <span class="cin-time" id="cinTimeCur">0:00</span>
-      <button class="cin-btn" id="cinPrev" title="Anterior">
-        <i class="ico ico-anterior" aria-hidden="true"></i>
-      </button>
-      <button class="cin-btn cin-play" id="cinPlay" title="Reproducir / pausa (espacio)">
-        <i class="ico ico-play" id="cinPlayIcon" aria-hidden="true"></i>
-        <i class="ico ico-pausa" id="cinPauseIcon" aria-hidden="true" hidden></i>
-      </button>
-      <button class="cin-btn" id="cinNext" title="Siguiente">
-        <i class="ico ico-siguiente" aria-hidden="true"></i>
-      </button>
-      <span class="cin-time" id="cinTimeTot">0:00</span>
-    </div>
-
-    <!-- Onda de progreso: espectro que baila + porción reproducida en acento -->
-    <canvas class="cinema-wave" id="cinemaWave" title="Clic o arrastra para saltar"></canvas>
   </div>
 
   <!-- DROP OVERLAY -->
@@ -1023,7 +968,10 @@
        los versos), de fonts.js (le pide la tipografía puesta) y de
        seven.js (le pide los colores que ya están en el CSS). -->
   <script defer src="js/compartir.js"></script>
-  <script defer src="js/cinema.js"></script>
+  <!-- ▯ VÍDEO 9:16 y ⛶ MODO CINE, los dos en el mismo escenario. Después de
+       todo lo que muda al marco: la letra, el espectro, Spotify. Solo
+       pregunta por ellos al abrirse, nunca al cargar. -->
+  <script defer src="js/vertical.js"></script>
   <script defer src="js/colors.js"></script>
   <script defer src="js/ambient.js"></script>
   <!-- escena de las canciones sin letra: solo pinta, lee beat.js igual que ambient -->

@@ -598,17 +598,15 @@
   100% { opacity: 0; transform: translate(var(--dx, 40px), var(--dy, -40px)) rotate(180deg); }
 }/* ── ed-invertido: corte seco, fondo acento + texto oscuro (v18/v19) ──
    El fondo vive como hermano del stack (la cámara no lo arrastra):
-   en el panel llena el cuadro de letras; en modo cine se ancla FIJO
-   al viewport para pintar la pantalla completa, vinilo y onda incluidos. */
+   en el panel llena el cuadro de letras; en el marco del cine y del
+   9:16, donde la letra no tiene panel, se estira con un margen negativo
+   y el marco lo recorta (ver «.v916» en style.css). */
 .ed-fondo {
   position: absolute;
   inset: 0;
   background: var(--accent);
   animation: ed-fondo-in 0.16s steps(2, end) both;
   pointer-events: none;
-}body.cinema-open .cinema-stage .ed-fondo {
-  position: fixed;
-  inset: 0;
 }@keyframes ed-fondo-in {
   from { opacity: 0; }
   to   { opacity: 1; }

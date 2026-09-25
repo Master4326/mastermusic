@@ -86,8 +86,8 @@
     if (!nav() || nav().actual() !== 'settings') return;
     if (document.body.classList.contains('paleta-abierta')) return;
     if (document.body.classList.contains('comp-abierta')) return;
-    const cine = document.getElementById('cinema');
-    if (cine && !cine.hidden) return;
+    // el cine y el vídeo 9:16 se quedan su Esc (js/vertical.js)
+    if (document.body.classList.contains('v916-open')) return;
     /* Por clase y no por id: la galería de tipografías no está en el HTML,
        la cuelga js/fonts.js del <body> al abrirla por primera vez. Un
        getElementById contra un id que no existe en index.html es justo lo

@@ -23,6 +23,13 @@
   let connected = false, attaching = false;
   // Captura del audio del sistema (modo sync, para Spotify Connect)
   let capStream = null, capSource = null, capAnalyser = null;
+  /* El sonido de «grabar esta pestaña» del vídeo 9:16 (js/vertical.js): lo
+     que se oye (recSrc → recAnalyser/recDet, para que el fondo baile) y la
+     rama que va al vídeo (recOrigen → recGain → recDest). Ver «EL SONIDO
+     DEL VÍDEO 9:16», más abajo. Arriba del todo para que nadie las use
+     antes de declararlas. */
+  let recSrc = null, recAnalyser = null, recDet = null;
+  let recDest = null, recGain = null, recOrigen = null, recVolT = null;
 
   /* ---- Analizador CRUDO, solo para el detector de ritmo (js/beat.js) ----
      Va aparte del que dibuja. Aquel suaviza a propósito (0.82) para que las
@@ -211,7 +218,11 @@
       if (!window.PlayerCore || !window.PlayerCore.audio) return;
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
-      audioCtx = new AC();
+      /* Se REUTILIZA el contexto si ya existe (el ◈ o el vídeo 9:16 pueden
+         haberlo creado antes que el primer play): uno nuevo dejaría sus
+         nodos en otro contexto, y los nodos de dos contextos no se pueden
+         conectar entre sí. */
+      if (!audioCtx) audioCtx = new AC();
       if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
       source = audioCtx.createMediaElementSource(window.PlayerCore.audio);
       analyser = audioCtx.createAnalyser();
@@ -234,7 +245,9 @@
       connected = true;
     } catch (e) {
       console.warn('[viz] no se pudo conectar (el audio sigue sonando):', e);
-      connected = false; audioCtx = null; source = null; analyser = null;
+      connected = false; source = null; analyser = null;
+      // el contexto se suelta solo si no lo usa nadie más (◈ o el vídeo 9:16)
+      if (!capSource && !recSrc) audioCtx = null;
       detAnalyser = null; detSink = null;   // que el detector no herede un nodo suelto
     } finally {
       attaching = false;
@@ -315,6 +328,8 @@
   };
   const fuente = () => {
     if (capAnalyser && !(porMic() && localSonando())) return capAnalyser;
+    // el sonido de la pestaña que trae el vídeo 9:16 (ver más abajo)
+    if (recAnalyser && !localSonando()) return recAnalyser;
     return analyser;
   };
 
@@ -322,6 +337,7 @@
     if (!audioCtx || audioCtx.state !== 'running') return false;
     // Modo sync: el espectro viene del audio del sistema (Spotify u otro)
     if (capAnalyser && !(porMic() && localSonando())) return true;
+    if (recAnalyser && !localSonando()) return true;
     return localSonando();
   };
 
@@ -717,6 +733,128 @@
   fantasma(document.getElementById('timeCurrent'));
   fantasma(document.getElementById('timeTotal'));
 
+  /* ══════════════════════════════════════════════════════════
+     EL SONIDO DEL VÍDEO 9:16 (js/vertical.js)
+     ══════════════════════════════════════════════════════════
+     Tres trabajos, cada uno por una razón:
+
+     · GRABAR. Un MediaStreamAudioDestinationNode con lo que suena, para
+       meterlo en el vídeo. Con tu música importada sale DIRECTO del
+       <audio>: sin micrófono, sin ruido de la habitación y sin depender de
+       por dónde lo mande Windows. Con Spotify sonando en esta pestaña el
+       audio del SDK va cifrado y NO entra en el grafo — pero el permiso de
+       «grabar esta pestaña» sí trae su sonido, y ese flujo es el que se usa.
+       Con Spotify en otro aparato solo queda el ◈ (el audio del sistema).
+
+     · EL VOLUMEN NO CUENTA. `audio.volume` escala la señal ANTES de entrar
+       al grafo, y lo mismo el volumen del SDK en lo que captura la pestaña:
+       oyendo al 20 %, el vídeo saldría al 20 %. La rama de grabar lleva una
+       ganancia 1/volumen, así que el vídeo sale a nivel completo oigas tú
+       como oigas. En 0 no hay nada que recuperar: saldría mudo, y el modo
+       9:16 lo avisa antes de grabar. Al ◈ no se le toca: el volumen de otra
+       app no es el de esta.
+
+     · BAILAR. Con Spotify el espectro va a ciegas: sin FFT no hay nada que
+       medir y todo late «estimado». Mientras dure el permiso de la pestaña,
+       ese mismo flujo se enchufa a un analizador propio y el fondo, la onda
+       de la letra y los brillos bailan con la música DE VERDAD — también
+       dentro del vídeo. Si hay señal directa (un mp3) o ◈, mandan esas,
+       como siempre (ver fuente() e isLive()). */
+  const ctxListo = async () => {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
+    return audioCtx;
+  };
+
+  const oirFlujo = (flujo) => {
+    soltarFlujo();
+    if (!audioCtx || !flujo || !flujo.getAudioTracks().length) return false;
+    try {
+      recSrc = audioCtx.createMediaStreamSource(flujo);
+      recAnalyser = audioCtx.createAnalyser();
+      recAnalyser.fftSize = FFT_SIZE;
+      recAnalyser.smoothingTimeConstant = 0.82;
+      recAnalyser.minDecibels = -90;
+      recAnalyser.maxDecibels = -10;
+      recSrc.connect(recAnalyser);
+      // rama sin salida, igual que la del ◈: un MediaStreamSource corre solo
+      recDet = crearDetector(audioCtx);
+      recSrc.connect(recDet);
+      if (!freqData) freqData = new Uint8Array(recAnalyser.frequencyBinCount);
+      return true;
+    } catch (e) {
+      console.warn('[viz] el sonido de la pestaña no entró en el grafo:', e);
+      recSrc = recAnalyser = recDet = null;
+      return false;
+    }
+  };
+
+  const volumenApp = () => {
+    const PC = window.PlayerCore;
+    const v = PC && PC.state ? PC.state.volume : 1;
+    return isFinite(v) ? v : 1;
+  };
+  const ajustarGanancia = () => {
+    if (!recGain) return;
+    const v = volumenApp();
+    // por debajo del 2 % ya no queda señal que rescatar: se deja tal cual
+    const g = v > 0.02 ? Math.min(50, 1 / v) : 1;
+    try { recGain.gain.setTargetAtTime(g, recGain.context.currentTime, 0.03); }
+    catch (e) { recGain.gain.value = g; }
+  };
+
+  const soltarSonido = () => {
+    clearInterval(recVolT);
+    recVolT = null;
+    // solo la conexión que se hizo aquí: el origen sigue sonando y midiendo
+    try { if (recOrigen && recGain) recOrigen.disconnect(recGain); } catch (e) {}
+    try { if (recGain) recGain.disconnect(); } catch (e) {}
+    recDest = null; recGain = null; recOrigen = null;
+  };
+
+  function soltarFlujo() {
+    if (recOrigen && recOrigen === recSrc) soltarSonido();
+    try { if (recSrc) recSrc.disconnect(); } catch (e) {}
+    recSrc = null; recAnalyser = null; recDet = null;
+  }
+
+  /* La pista de audio para el MediaRecorder, o null si no hay de dónde.
+     `conPestana`: usar el sonido de la pestaña (ya enchufado con oirFlujo). */
+  const sonidoParaGrabar = async (conPestana) => {
+    soltarSonido();
+    const PC = window.PlayerCore;
+    let origen = null, tipo = '';
+    if (conPestana && recSrc) { origen = recSrc; tipo = 'pestana'; }
+    else {
+      const local = !!(PC && PC.state && PC.state.currentTrack && !PC.isSpotify());
+      if (local) {
+        await ctxListo();
+        if (!connected) await tryAttach();
+        if (source) { origen = source; tipo = 'local'; }
+      }
+      if (!origen && capSource) { origen = capSource; tipo = 'sync'; }
+    }
+    if (!origen) return null;
+    try {
+      // los nodos, del MISMO contexto que el origen: si no, no se conectan
+      const ac = origen.context;
+      recDest = ac.createMediaStreamDestination();
+      recGain = ac.createGain();
+      recGain.gain.value = 1;
+      origen.connect(recGain);
+      recGain.connect(recDest);
+      recOrigen = origen;
+    } catch (e) {
+      console.warn('[viz] no se pudo sacar el sonido para el vídeo:', e);
+      soltarSonido();
+      return null;
+    }
+    if (tipo !== 'sync') { ajustarGanancia(); recVolT = setInterval(ajustarGanancia, 250); }
+    return recDest.stream.getAudioTracks()[0] || null;
+  };
+
   // API pública mínima
   window.VisualizerModule = {
     /* «Hay FFT real ahora mismo», que es lo que preguntan quienes la usan.
@@ -732,11 +870,20 @@
        sus datos son el espectro sin suavizar, feo de dibujar. */
     getDetector: () => {
       // misma preferencia que el espectro: lo directo gana al micrófono
-      const a = (capDet && !(porMic() && localSonando())) ? capDet : detAnalyser;
+      const a = (capDet && !(porMic() && localSonando())) ? capDet
+        : (recDet && !localSonando()) ? recDet : detAnalyser;
       if (!a || !audioCtx || audioCtx.state !== 'running') return null;
       return a;
     },
     getSampleRate: () => (audioCtx ? audioCtx.sampleRate : 44100),
+    /* El vídeo 9:16 (js/vertical.js): el contexto en marcha DENTRO del clic
+       de grabar (un AudioContext nace suspendido si no hay gesto), el sonido
+       de la pestaña para que el fondo baile, y la pista que va al vídeo. */
+    prepararSonido: () => ctxListo(),
+    oirFlujo,
+    soltarFlujo,
+    sonidoParaGrabar,
+    soltarSonido,
     // Espectro suavizado remuestreado a n bandas (0..1, graves → agudos).
     // Con señal en vivo (local o ◈ sync) es FFT real; sin señal, la onda idle.
     getBands: (n) => {

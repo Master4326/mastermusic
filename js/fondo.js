@@ -76,12 +76,15 @@
   let W = 0, H = 0, dpr = 1;
   let degradado = null;
 
+  /* El tamaño, del LAYOUT (clientWidth) y no de la caja de pantalla: grabando
+     el vídeo 9:16 en 1080p el marco va girado (js/vertical.js) y la caja de
+     pantalla sale con el ancho y el alto cambiados. Sin girar son lo mismo. */
   const medir = () => {
-    const r = canvas.getBoundingClientRect();
-    if (!r.width || !r.height) { W = H = 0; return; }
+    const cw = canvas.clientWidth, ch = canvas.clientHeight;
+    if (!cw || !ch) { W = H = 0; return; }
     dpr = Math.min(window.devicePixelRatio || 1, movil() ? 1 : 1.5);
-    const w = Math.round(r.width * dpr);
-    const h = Math.round(r.height * dpr);
+    const w = Math.round(cw * dpr);
+    const h = Math.round(ch * dpr);
     if (w === canvas.width && h === canvas.height) return;
     canvas.width = w; canvas.height = h;
     W = w; H = h;
@@ -279,11 +282,22 @@
     }
     if (!r || !r.width || !r.height) return null;
 
-    const cx = (r.left + r.width / 2 - cv.left) * dpr;
-    const cy = (r.top + r.height / 2 - cv.top) * dpr;
     // fuera del lienzo (un verso a medio salir) no ancla nada
-    if (cy < -H * 0.2 || cy > H * 1.2) return null;
-    return { cx, cy, semi: (r.width / 2) * dpr, alto: r.height * dpr };
+    const dentro = (cx, cy, semi, alto) =>
+      (cy < -H * 0.2 || cy > H * 1.2 ? null : { cx, cy, semi, alto });
+
+    /* El marco del vídeo 9:16 TUMBADO (rotate(-90deg), ver js/vertical.js):
+       las cajas de pantalla vienen giradas. Se deshace el giro alrededor del
+       centro del lienzo —en pantalla (X, Y) es en el lienzo (−Y, X)— y el
+       ancho del verso es lo que en pantalla sale como alto. */
+    if (window.MMVertical && window.MMVertical.giro && window.MMVertical.giro() === -90) {
+      const dX = r.left + r.width / 2 - (cv.left + cv.width / 2);
+      const dY = r.top + r.height / 2 - (cv.top + cv.height / 2);
+      return dentro((W / dpr / 2 - dY) * dpr, (H / dpr / 2 + dX) * dpr,
+        (r.height / 2) * dpr, r.width * dpr);
+    }
+    return dentro((r.left + r.width / 2 - cv.left) * dpr, (r.top + r.height / 2 - cv.top) * dpr,
+      (r.width / 2) * dpr, r.height * dpr);
   };
 
   /* Lo medido (a saltos) y lo pintado (suave). La onda no salta de un
@@ -622,7 +636,6 @@
 
   const activo = () =>
     body.classList.contains('fondo-ondas') &&
-    !body.classList.contains('cinema-open') &&
     !!(tabLyrics && tabLyrics.classList.contains('active')) &&
     !(window.MMSettings && window.MMSettings.reduceMotion());
 

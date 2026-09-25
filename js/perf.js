@@ -262,8 +262,8 @@
     // Factor ≤1 para encoger los adornos de fondo. 1 en 1080p o menos.
     escalaFondo: () => escala,
     /* ¿Es una pantalla lo bastante grande como para que rehacer un desenfoque
-       en cada frame salga caro? Lo consultan ambient.js y cinema.js para
-       dejar quieta la carátula de fondo en vez de reescalarla. */
+       en cada frame salga caro? Lo consulta ambient.js para dejar quieta
+       la carátula de fondo en vez de reescalarla. */
     fondoFijo: () => nivel >= 1 || superficie > BASE_MPX * 1.25,
     hercios: () => Math.round(refresco),
     cuantos,

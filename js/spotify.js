@@ -2694,6 +2694,22 @@
     },
     // Último estado conocido del aparato y los modos (lo refresca el sondeo)
     device: () => lastDevice,
+    /* ¿Suena AQUÍ, en esta pestaña (el aparato del SDK)? Lo pregunta el
+       vídeo 9:16 (js/vertical.js) para saber de dónde sacar el sonido: si
+       suena aquí, el permiso de grabar la pestaña trae la música; si suena
+       en otro aparato, el vídeo saldría mudo. */
+    suenaAqui: () => !!sdkActivo,
+    /* Mandar la música a esta pestaña: lo mismo que elegir «aquí» en el
+       menú ◎. Devuelve false si el reproductor de la pestaña no está listo
+       (cuenta sin Premium, navegador sin DRM…). */
+    pasarAqui: async () => {
+      if (!sdkDeviceId) return false;
+      await spTransfer(sdkDeviceId);
+      destinoElegido = null;
+      lastTrackId = null;      // que el sondeo refresque sin esperar
+      startPolling();
+      return true;
+    },
     // playlist/album del que sale lo que suena (lo usa la pestana «cola»)
     context: () => lastContext,
     shuffle: () => lastShuffle,

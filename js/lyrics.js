@@ -10,7 +10,14 @@
   const lyricsIdle = document.getElementById('lyricsIdle');
   const modeBtn = document.getElementById('lyricsModeBtn');
   let editMode = localStorage.getItem('mm_lyrics_mode') === 'edit';
-  let forceEdit = false;      // true mientras el modo cine está abierto
+  /* Vista impuesta desde fuera SIN tocar la preferencia: el modo cine ⛶ y
+     el vídeo 9:16 (js/vertical.js) piden 'edit' o 'lista', según lo que se
+     elija allí. null = manda la preferencia de siempre (editMode). */
+  let forzado = null;
+  /* ¿Se pinta la vista edit AHORA? Declaración `function` por lo mismo que
+     repintarAhora(): la llama repartirHidden(), que corre al arrancar el
+     módulo, antes de que existan las const de más abajo. */
+  function vistaEdit() { return forzado ? forzado === 'edit' : editMode; }
   let parsedLines = [];       // [{ time, text }]
   let activeIdx = -1;
   /* Último segundo que vio tick(). Quien necesita repintar «lo de ahora»
@@ -109,11 +116,11 @@
     /* Ni lista ni edit cuando manda una escena de las que van por fuera:
        el reposo (sin canción) o la escena NCS (canción sin letra). */
     const fuera = idleOn || ncsOn;
-    /* `forceEdit` cuenta igual que la preferencia, como en tick(): el modo
-       cine pinta en #lyricsEdit sin tocar `editMode`, así que sin esto un
-       cambio de canción con el cine abierto y la vista lista elegida
+    /* La vista impuesta cuenta igual que la preferencia, como en tick(): el
+       modo cine pinta en #lyricsEdit sin tocar `editMode`, así que sin esto
+       un cambio de canción con el cine abierto y la vista lista elegida
        escondía la letra DENTRO del propio cine. */
-    const edit = editMode || forceEdit;
+    const edit = vistaEdit();
     lyricsBody.hidden = fuera || edit;
     lyricsEdit.hidden = fuera || !edit;
   }
@@ -222,7 +229,7 @@
       'en el buscador, shift + enter encola la canción en vez de ponerla',
       'la cola (Q) dice de qué lista sale lo que suena — y se pulsa para abrirla',
       'pulsa ✦ para el modo edit — la letra a pantalla completa, animada',
-      '⛶ es modo cine: carátula girando y letra gigante',
+      '⛶ es el modo cine: la letra a pantalla completa, como app, vinilo o solo letra',
       '◈ sync engancha el espectro al audio del sistema (ideal con Spotify)',
       'clic en cualquier verso para saltar a ese momento',
       '¿letra adelantada? ajústala en config ⚙ — se guarda por canción',
@@ -377,7 +384,7 @@
       }
       if (nodo.textContent !== txt) nodo.textContent = txt;
     }
-    if (editMode || forceEdit) pintarTradEdit(edIdx);
+    if (vistaEdit()) pintarTradEdit(edIdx);
   };
 
   const pintarTradEdit = (i) => {
@@ -2174,7 +2181,7 @@
       if (fx === 'ed-invertido') {
         stack.classList.add('ed-stack-inv');
         // el fondo va FUERA del stack (la cámara no lo mueve) y detrás de él;
-        // en modo cine se ancla fijo al viewport para cubrir TODA la pantalla
+        // (en el marco del cine y del 9:16 se estira con un margen negativo)
         const fondo = document.createElement('div');
         fondo.className = 'ed-fondo';
         lyricsEdit.insertBefore(fondo, stack);
@@ -2393,7 +2400,7 @@
     modeBtn.setAttribute('aria-pressed', editMode ? 'true' : 'false');
     modeBtn.setAttribute('aria-label', modeBtn.title);
     lyricsEdit.innerHTML = '';
-    if (editMode && parsedLines.length && parsedLines[0].time < 0) {
+    if (vistaEdit() && parsedLines.length && parsedLines[0].time < 0) {
       lyricsEdit.innerHTML = '<p class="lyrics-empty">Esta letra no está sincronizada — el modo edit necesita tiempos. Usa la vista ≡ lista.</p>';
     }
     activeIdx = -2;   // fuerza repintado inmediato de la vista elegida
@@ -2408,11 +2415,10 @@
       /* Y te LLEVA a la letra. Este botón vive en la barra de abajo, que se
          ve desde cualquier pestaña: pulsarlo desde configuración encendía
          el modo edit en un panel que no estabas mirando, así que parecía
-         que no funcionaba. (Con el cine abierto no hace falta: la letra ya
-         está a pantalla completa delante de todo.) */
-      const cine = document.getElementById('cinema');
-      const enCine = cine && !cine.hidden;
-      if (!enCine && window.MMNav) window.MMNav.ir('lyrics');
+         que no funcionaba. (Con el cine o el vídeo 9:16 abiertos no hace
+         falta: la letra ya está en su marco, delante de todo.) */
+      const enMarco = document.body.classList.contains('v916-open');
+      if (!enMarco && window.MMNav) window.MMNav.ir('lyrics');
       if (window.SevenStatus) {
         window.SevenStatus(editMode ? '✦ modo edit · la letra en grande, con efectos'
                                     : '≡ vista lista · la letra entera');
@@ -2576,7 +2582,7 @@
   window.addEventListener('resize', () => {
     clearTimeout(edResizeTimer);
     edResizeTimer = setTimeout(() => {
-      if ((editMode || forceEdit) && activeIdx >= 0 && !labOpen) pintarEdit(activeIdx);
+      if (vistaEdit() && activeIdx >= 0 && !labOpen) pintarEdit(activeIdx);
     }, 250);
   });
 
@@ -2591,7 +2597,7 @@
       clearTimeout(obsTimer);
       obsTimer = setTimeout(() => {
         if (labOpen || !lyricsEdit.clientHeight) return;
-        if (!(editMode || forceEdit) || activeIdx < 0) return;
+        if (!vistaEdit() || activeIdx < 0) return;
         if (edPerdido(activeIdx)) pintarEdit(activeIdx);
       }, 120);
     }).observe(lyricsEdit);
@@ -3005,18 +3011,18 @@
 
   const tick = (currentTime) => {
     if (labOpen) return;   // el lab manda: la canción no pisa la demo
-    ultimoT = currentTime;   // la guardan applyMode / repintar / forceEdit
+    ultimoT = currentTime;   // la guardan applyMode / repintar / forzarVista
     if (!parsedLines.length || parsedLines[0].time < 0) return;
     // Apply user-adjustable offset: positive = letras se adelantan
     const t = currentTime + offset;
     const idx = buscarIdx(t);
-    const modoEdit = editMode || forceEdit;
+    const modoEdit = vistaEdit();
 
     if (idx !== activeIdx) {
       const prev = activeIdx;
       activeIdx = idx;
       /* MODO EDIT: solo la línea actual, gigante y con efectos
-         (forceEdit = el modo cine lo activa sin tocar la preferencia) */
+         (vistaEdit() cuenta la vista que imponen el cine o el vídeo 9:16) */
       if (modoEdit) {
         if (idx >= 0) pintarEdit(idx);
         else {
@@ -3171,13 +3177,21 @@
       repintarAhora();
     },
 
-    forceEdit: (on) => {
-      forceEdit = !!on;
+    /* El cine y el vídeo 9:16 (js/vertical.js) eligen vista por su cuenta
+       —'edit', 'lista' o null para volver a la preferencia— sin tocar la
+       preferencia y sin ocuparse de los `hidden`: que los reparta quien
+       sabe (el reposo y la escena sin letra también cuentan). Repinta el
+       verso de ahora en la vista nueva. */
+    forzarVista: (v) => {
+      forzado = v === 'edit' || v === 'lista' ? v : null;
+      repartirHidden();
       lyricsEdit.innerHTML = '';
       activeIdx = -2;
       edIdx = -3;
       repintarAhora();
     },
+    // qué vista se está pintando de verdad (la impuesta o la preferencia)
+    vistaActual: () => (vistaEdit() ? 'edit' : 'lista'),
   };
 
 

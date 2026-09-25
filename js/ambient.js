@@ -259,7 +259,7 @@
      valor pintado y, al volver, la primera escritura que coincida con él se
      descarta — el elemento se queda apagado hasta que el valor cambie de
      verdad. Se notaba poco cuando esto solo corría al quedarse en silencio;
-     ahora también se apaga al abrir el modo cine, así que tiene que cerrar. */
+     ahora también se apaga con «menos movimiento», así que tiene que cerrar. */
   const apagarPanel = () => {
     [laMarco, laEstrobo, laCover, laSuelo, laCircular].forEach((el) => {
       escribir(el, 'opacity', '0');
@@ -319,11 +319,18 @@
        RE-RASTERIZAR toda la letra —tipografía gigante con sombras— en cada
        frame, y ese 1,5 % que casi no se ve es de lo más caro que hacía la
        app en un teléfono. En PC se queda tal cual. */
-    if (!enMovil()) {
+    /* En el MODO CINE tampoco: ahí la letra ocupa media pantalla o la
+       pantalla entera, y re-rasterizarla en cada frame es justo lo que el
+       cine de antes se ahorraba. El memo de `escribir` hace que dejarla en
+       su sitio cueste nada. */
+    if (!enMovil() && !document.body.classList.contains('cine-open')) {
       const resp = 1 + (graves * 0.005 + boom * 0.015) * (0.4 + e) - m.anticipo * 0.0035;
       const t = `scale(${resp.toFixed(4)})`;
       escribir(lyricsEdit, 'transform', t);
       escribir(lyricsBody, 'transform', t);
+    } else {
+      escribir(lyricsEdit, 'transform', '');
+      escribir(lyricsBody, 'transform', '');
     }
 
     // suelo synthwave: corre más rápido cuanto más movida va la canción
@@ -428,30 +435,18 @@
 
   let ultimoPintado = 0;
 
-  /* Con el MODO CINE abierto, todo lo que pinta este módulo —los tres focos
-     del fondo y las nueve capas del panel de la letra— queda debajo de una
-     capa opaca a pantalla completa (`.cinema`, z-index 9000, `background:
-     #000`). Seguir pintándolo era trabajo puro tirado, y no poco: medido con
-     el cine abierto en el móvil, este bucle seguía escribiendo unas 55
-     variables por segundo y moviendo tres manchas desenfocadas a pantalla
-     completa que no veía nadie.
-
-     Se comprueba aquí y no se para el bucle desde cinema.js a propósito: así
-     sigue valiendo aunque el cine se abra o se cierre por cualquier vía (el
-     botón, Esc, F11, el propio `fullscreenchange`), y al cerrar vuelve en el
-     frame siguiente sin tener que arrancar nada. El visualizador ya resuelve
-     lo mismo con su IntersectionObserver; a este módulo le faltaba. */
-  let tapadoPorCine = false;
+  /* Con el MODO CINE o el VÍDEO 9:16 abiertos (`body.v916-open`), el panel
+     de la letra vive en su marco y se sigue pintando —es lo que se ve—, pero
+     la ventana de la app queda escondida debajo (visibility: hidden), y con
+     ella los tres focos del fondo: esos se apagan UNA vez y a callar.
+     Se comprueba aquí, frame a frame, y no se para desde fuera: así vale
+     abra o cierre quien abra o cierre, y al volver sigue en el frame
+     siguiente sin tener que arrancar nada. */
+  let focosTapados = false;
 
   const bucle = () => {
     raf = requestAnimationFrame(bucle);
     if (document.hidden) return;
-    if (document.body.classList.contains('cinema-open')) {
-      // se apaga UNA vez, para no dejar nada pintado debajo, y a callar
-      if (!tapadoPorCine) { tapadoPorCine = true; apagar(); apagarPanel(); }
-      return;
-    }
-    tapadoPorCine = false;
     const ahoraMs = performance.now();
     if (window.MMPerf && window.MMPerf.salta(relojPintado, ahoraMs)) return;
     /* Tiempo desde el frame que SÍ se pintó: con el tope de 30 fps del
@@ -501,10 +496,15 @@
     // la caja también pinta, pero en el centro y más plana que el bombo
     if (m.cajaAhora && visible && m.cajaFuerza > 0.35) brillar(m.cajaFuerza * 0.6, m.energia, ahora);
 
-    /* ---- focos del fondo de la app ---- */
-    pintar(focos[0], 0, 1 + m.graves * 0.38 + m.boom * m.boomFuerza * 0.1, 0.1 + m.graves * 0.48);
-    pintar(focos[1], 1, 1 + m.medios * 0.3, 0.08 + m.medios * 0.38);
-    pintar(focos[2], 2, 1 + m.agudos * 0.25 + m.brillo * 0.06, 0.06 + m.agudos * 0.32);
+    /* ---- focos del fondo de la app (tapados con el cine o el 9:16) ---- */
+    if (document.body.classList.contains('v916-open')) {
+      if (!focosTapados) { focosTapados = true; apagar(); }
+    } else {
+      focosTapados = false;
+      pintar(focos[0], 0, 1 + m.graves * 0.38 + m.boom * m.boomFuerza * 0.1, 0.1 + m.graves * 0.48);
+      pintar(focos[1], 1, 1 + m.medios * 0.3, 0.08 + m.medios * 0.38);
+      pintar(focos[2], 2, 1 + m.agudos * 0.25 + m.brillo * 0.06, 0.06 + m.agudos * 0.32);
+    }
 
     pintarPanel(m);
   };
