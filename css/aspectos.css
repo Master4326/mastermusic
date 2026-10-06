@@ -1,0 +1,908 @@
+/* ==========================================================
+   ASPECTOS · la cara de toda la app (js/aspecto.js)
+
+   La app nació en 8 bits y lo sigue siendo de fábrica: este archivo NO se
+   descarga si no eliges otro aspecto. Si lo eliges, lo pide el guion del
+   <head> de index.html antes de pintar (blocking="render"), así que la app
+   abre ya con su cara, sin enseñar el 8 bits un instante.
+
+   Tres aspectos modernos, con nombre propio:
+     · cristal — cristal esmerilado sobre la carátula difuminada a pantalla
+                 entera, letra del sistema, esquinas generosas;
+     · estudio — negro profundo con el resplandor de la carátula arriba,
+                 chips en píldora y el play blanco y redondo;
+     · noche   — gris carbón teñido por la carátula, tarjetas planas y el
+                 play redondo en el color de la canción.
+   Los colores siguen saliendo de la carátula en los tres (la regla de la
+   casa: nada de colores de marca). Inspirados en la estética de las apps de
+   música de hoy, pero sin copiar ninguna: ni logos, ni nombres, ni su verde
+   (las reglas de Spotify prohíben imitar su app y usar su color).
+
+   CÓMO FUNCIONA. style.css lleva lo que hace «8 bits» a la app en
+   variables con el valor de siempre de respaldo (ver «LOS AJUSTES DEL
+   ASPECTO» allí): las fuentes (--f-ui, --f-mono, --f-pixel, --f-num), los
+   relieves (--bisel) y los bordes del marco (--marco-g, --marco-*). Aquí se
+   rellenan esas variables, y luego se pule cada pieza.
+     · Las fuentes pixel se ven mucho más pequeñas que una normal al mismo
+       tamaño (medido: la x de VT323 es 0,40 em; la de una sans, 0,50), así
+       que cada una va con su `font-size-adjust`: la sans se escala para
+       ocupar lo que ocupaba la pixel y no se descuadra nada.
+     · La LETRA de la canción no se toca: tiene su tipografía elegida en
+       config ⚙ (ver tipografia-unica-letra), su tamaño y su brillo.
+
+   ICONOS DE LÍNEA: Lucide v0.544.0, licencia ISC —
+     Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2023
+     as part of Feather (MIT). All other copyright (c) for Lucide are held
+     by Lucide Contributors 2025.
+     Permission to use, copy, modify, and/or distribute this software for
+     any purpose with or without fee is hereby granted, provided that the
+     above copyright notice and this permission notice appear in all copies.
+     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+     WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+     WARRANTIES OF MERCHANTABILITY AND FITNESS.
+   Play, pausa, anterior, siguiente, parar, grabar y el corazón lleno van
+   dibujados aquí, macizos.
+   ========================================================== */
+
+/* ══════════ 1. LO COMÚN A LOS TRES ══════════ */
+html.moderno {
+  /* fuera relieves y marcos pixel */
+  --bisel: 0;
+  --marco-g: 0;
+  /* la letra de la interfaz (la de la canción va aparte) */
+  --f-ui: var(--f-moderna);
+  --f-mono: var(--f-moderna);
+  --f-pixel: var(--f-moderna);
+  --f-num: var(--f-moderna);
+  --f-ui-aj: 0.44;
+  --f-mono-aj: 0.5;
+  --f-pixel-aj: 0.72;
+  --f-num-aj: none;
+  /* esquinas */
+  --r-s: 8px;
+  --r-m: 12px;
+  --r-l: 18px;
+  --r-pill: 999px;
+  /* capas sobre el fondo, sacadas del texto de la paleta */
+  --m-linea: color-mix(in oklab, var(--text) 10%, transparent);
+  --m-hover: color-mix(in oklab, var(--text) 8%, transparent);
+  --m-activo: color-mix(in oklab, var(--text) 15%, transparent);
+  --m-tenue: color-mix(in oklab, var(--text) 64%, transparent);
+  --m-tenue-2: color-mix(in oklab, var(--text) 46%, transparent);
+  /* el espectro de la izquierda, en barras lisas (js/visualizer.js) */
+  --viz-estilo: barras;
+  -webkit-font-smoothing: antialiased;
+  font-smooth: auto;
+  color-scheme: dark;
+
+  /* ---- los iconos de línea (Lucide) y los macizos ---- */
+  --ico-ajustes: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915' /%3E%3Ccircle cx='12' cy='12' r='3' /%3E%3C/svg%3E");
+  --ico-aleatorio: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='m18 14 4 4-4 4' /%3E%3Cpath d='m18 2 4 4-4 4' /%3E%3Cpath d='M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22' /%3E%3Cpath d='M2 6h1.972a4 4 0 0 1 3.6 2.2' /%3E%3Cpath d='M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45' /%3E%3C/svg%3E");
+  --ico-ancha: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Crect width='18' height='18' x='3' y='3' rx='2' /%3E%3Cpath d='M12 3v18' /%3E%3C/svg%3E");
+  --ico-buscar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='m21 21-4.34-4.34' /%3E%3Ccircle cx='11' cy='11' r='8' /%3E%3C/svg%3E");
+  --ico-casete: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Crect width='20' height='16' x='2' y='4' rx='2' /%3E%3Ccircle cx='8' cy='10' r='2' /%3E%3Cpath d='M8 12h8' /%3E%3Ccircle cx='16' cy='10' r='2' /%3E%3Cpath d='m6 20 .7-2.9A1.4 1.4 0 0 1 8.1 16h7.8a1.4 1.4 0 0 1 1.4 1l.7 3' /%3E%3C/svg%3E");
+  --ico-cerrar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M18 6 6 18' /%3E%3Cpath d='m6 6 12 12' /%3E%3C/svg%3E");
+  --ico-cine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M8 3H5a2 2 0 0 0-2 2v3' /%3E%3Cpath d='M21 8V5a2 2 0 0 0-2-2h-3' /%3E%3Cpath d='M3 16v3a2 2 0 0 0 2 2h3' /%3E%3Cpath d='M16 21h3a2 2 0 0 0 2-2v-3' /%3E%3C/svg%3E");
+  --ico-cita: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z' /%3E%3Cpath d='M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z' /%3E%3C/svg%3E");
+  --ico-cola: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M16 5H3' /%3E%3Cpath d='M11 12H3' /%3E%3Cpath d='M11 19H3' /%3E%3Cpath d='M21 16V5' /%3E%3Ccircle cx='18' cy='16' r='3' /%3E%3C/svg%3E");
+  --ico-corazon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5' /%3E%3C/svg%3E");
+  --ico-descargar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M12 15V3' /%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' /%3E%3Cpath d='m7 10 5 5 5-5' /%3E%3C/svg%3E");
+  --ico-disp: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M5.5 20H8' /%3E%3Cpath d='M17 9h.01' /%3E%3Crect width='10' height='16' x='12' y='4' rx='2' /%3E%3Cpath d='M8 6H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h4' /%3E%3Ccircle cx='17' cy='15' r='1' /%3E%3C/svg%3E");
+  --ico-edit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z' /%3E%3Cpath d='M20 2v4' /%3E%3Cpath d='M22 4h-4' /%3E%3Ccircle cx='4' cy='20' r='2' /%3E%3C/svg%3E");
+  --ico-enchufe: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M12 22v-5' /%3E%3Cpath d='M9 8V2' /%3E%3Cpath d='M15 8V2' /%3E%3Cpath d='M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z' /%3E%3C/svg%3E");
+  --ico-enlace: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' /%3E%3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' /%3E%3C/svg%3E");
+  --ico-historial: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M5 21v-6' /%3E%3Cpath d='M12 21V3' /%3E%3Cpath d='M19 21V9' /%3E%3C/svg%3E");
+  --ico-lab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2' /%3E%3Cpath d='M6.453 15h11.094' /%3E%3Cpath d='M8.5 2h7' /%3E%3C/svg%3E");
+  --ico-letra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='m11 7.601-5.994 8.19a1 1 0 0 0 .1 1.298l.817.818a1 1 0 0 0 1.314.087L15.09 12' /%3E%3Cpath d='M16.5 21.174C15.5 20.5 14.372 20 13 20c-2.058 0-3.928 2.356-6 2-2.072-.356-2.775-3.369-1.5-4.5' /%3E%3Ccircle cx='16' cy='7' r='5' /%3E%3C/svg%3E");
+  --ico-lista: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M3 5h.01' /%3E%3Cpath d='M3 12h.01' /%3E%3Cpath d='M3 19h.01' /%3E%3Cpath d='M8 5h13' /%3E%3Cpath d='M8 12h13' /%3E%3Cpath d='M8 19h13' /%3E%3C/svg%3E");
+  --ico-listas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Crect width='8' height='18' x='3' y='3' rx='1' /%3E%3Cpath d='M7 3v18' /%3E%3Cpath d='M20.4 18.9c.2.5-.1 1.1-.6 1.3l-1.9.7c-.5.2-1.1-.1-1.3-.6L11.1 5.1c-.2-.5.1-1.1.6-1.3l1.9-.7c.5-.2 1.1.1 1.3.6Z' /%3E%3C/svg%3E");
+  --ico-mas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M5 12h14' /%3E%3Cpath d='M12 5v14' /%3E%3C/svg%3E");
+  --ico-max: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Crect width='18' height='18' x='3' y='3' rx='2' /%3E%3C/svg%3E");
+  --ico-min: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M5 12h14' /%3E%3C/svg%3E");
+  --ico-persona: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2' /%3E%3Ccircle cx='12' cy='7' r='4' /%3E%3C/svg%3E");
+  --ico-reloj: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M12 6v6l4 2' /%3E%3Ccircle cx='12' cy='12' r='10' /%3E%3C/svg%3E");
+  --ico-repetir: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='m17 2 4 4-4 4' /%3E%3Cpath d='M3 11v-1a4 4 0 0 1 4-4h14' /%3E%3Cpath d='m7 22-4-4 4-4' /%3E%3Cpath d='M21 13v1a4 4 0 0 1-4 4H3' /%3E%3C/svg%3E");
+  --ico-sync: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M2 10v3' /%3E%3Cpath d='M6 6v11' /%3E%3Cpath d='M10 3v18' /%3E%3Cpath d='M14 8v7' /%3E%3Cpath d='M18 5v13' /%3E%3Cpath d='M22 10v3' /%3E%3C/svg%3E");
+  --ico-teclado: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M10 8h.01' /%3E%3Cpath d='M12 12h.01' /%3E%3Cpath d='M14 8h.01' /%3E%3Cpath d='M16 12h.01' /%3E%3Cpath d='M18 8h.01' /%3E%3Cpath d='M6 8h.01' /%3E%3Cpath d='M7 16h10' /%3E%3Cpath d='M8 12h.01' /%3E%3Crect width='20' height='16' x='2' y='4' rx='2' /%3E%3C/svg%3E");
+  --ico-vertical: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Crect width='14' height='20' x='5' y='2' rx='2' ry='2' /%3E%3Cpath d='M12 18h.01' /%3E%3C/svg%3E");
+  --ico-vinilo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Ccircle cx='12' cy='12' r='10' /%3E%3Cpath d='M6 12c0-1.7.7-3.2 1.8-4.2' /%3E%3Ccircle cx='12' cy='12' r='2' /%3E%3Cpath d='M18 12c0 1.7-.7 3.2-1.8 4.2' /%3E%3C/svg%3E");
+  --ico-vol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z' /%3E%3Cpath d='M16 9a5 5 0 0 1 0 6' /%3E%3Cpath d='M19.364 18.364a9 9 0 0 0 0-12.728' /%3E%3C/svg%3E");
+  --ico-vol-bajo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z' /%3E%3Cpath d='M16 9a5 5 0 0 1 0 6' /%3E%3C/svg%3E");
+  --ico-vol-mudo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z' /%3E%3Cline x1='22' x2='16' y1='9' y2='15' /%3E%3Cline x1='16' x2='22' y1='9' y2='15' /%3E%3C/svg%3E");
+  --ico-play: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Cpath d='M7.2 4.6v14.8a1.2 1.2 0 0 0 1.8 1l12-7.4a1.2 1.2 0 0 0 0-2L9 3.6a1.2 1.2 0 0 0-1.8 1z'/%3E%3C/svg%3E");
+  --ico-pausa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Crect x='5.8' y='4' width='4.6' height='16' rx='1.6'/%3E%3Crect x='13.6' y='4' width='4.6' height='16' rx='1.6'/%3E%3C/svg%3E");
+  --ico-anterior: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Cpath d='M19 5.6v12.8a1.1 1.1 0 0 1-1.7.9L8.4 13a1.2 1.2 0 0 1 0-2l8.9-6.3a1.1 1.1 0 0 1 1.7.9z'/%3E%3Crect x='4.6' y='4.8' width='2.8' height='14.4' rx='1.4'/%3E%3C/svg%3E");
+  --ico-siguiente: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Cpath d='M5 5.6v12.8a1.1 1.1 0 0 0 1.7.9l8.9-6.3a1.2 1.2 0 0 0 0-2L6.7 4.7A1.1 1.1 0 0 0 5 5.6z'/%3E%3Crect x='16.6' y='4.8' width='2.8' height='14.4' rx='1.4'/%3E%3C/svg%3E");
+  --ico-parar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Crect x='5.5' y='5.5' width='13' height='13' rx='2.6'/%3E%3C/svg%3E");
+  --ico-grabar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Ccircle cx='12' cy='12' r='7.5'/%3E%3C/svg%3E");
+  --ico-corazon-lleno: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5' /%3E%3C/svg%3E");
+}
+/* El aire alrededor de la ventana NO se toca aquí: es el de style.css
+   (20 px en el ordenador, 6 en el teléfono, 4 tumbado, 0 instalada), y la
+   altura de la ventana se calcula restando justo ese aire. Con un padding
+   propio, en el teléfono la ventana se salía 12 px por debajo de la
+   pantalla y se comía las pestañas de abajo. */
+html.moderno body {
+  -webkit-font-smoothing: antialiased;
+  font-smooth: auto;
+}
+
+/* La letra de la canción y las muestras de tipografía se quedan como
+   están: ni su tamaño se ajusta, ni se les quita el brillo o el interletraje. */
+html.moderno :is(.lyrics-body, .lyrics-edit, .font-preview, .fc-muestra, #fontActual) {
+  font-size-adjust: none;
+}
+
+/* Lo pixel que no tiene sentido fuera del 8 bits: el brillo de fósforo en
+   el texto, el «doble golpe» que hacía de negrita y el interletraje de
+   una fuente de 8 × 8. Fuera la letra de la canción y sus muestras.
+   Va dentro de :where() para que no sume especificidad: el #fontActual de
+   la lista le daba la de un id y ganaba a cualquier !important de aquí
+   (el interletraje del título no se aplicaba nunca). */
+html.moderno body :where(:not(:is(.lyrics-body, .lyrics-edit, .font-preview, .fc-muestra, #fontActual),
+    :is(.lyrics-body, .lyrics-edit, .font-preview, .fc-muestra, #fontActual) *)) {
+  text-shadow: none !important;
+  letter-spacing: normal !important;
+}
+
+/* El acabado de monitor viejo: fuera */
+html.moderno :is(.crt, .scanlines) { display: none !important; }
+html.moderno body::after { display: none; }                /* el grano */
+html.moderno .window::after { display: none; }             /* el agarre pixel */
+html.moderno .cover-frame::before,
+html.moderno .cover-art.has-image::after,
+html.moderno .time[data-g]::before,
+html.moderno .progress-bg::before,
+html.moderno .progress-fill::before,
+html.moderno .progress-fill::after,
+html.moderno .volume-fill::after,
+html.moderno .la-corner { display: none; }
+html.moderno ::-webkit-resizer { background: none; }
+
+/* ---- barras de desplazamiento finas y redondas ---- */
+html.moderno ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.moderno ::-webkit-scrollbar-track { background: transparent; border: 0; }
+html.moderno ::-webkit-scrollbar-thumb {
+  background: var(--m-activo);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: var(--r-pill);
+  box-shadow: none;
+}
+html.moderno ::-webkit-scrollbar-thumb:hover { background-color: color-mix(in oklab, var(--text) 28%, transparent); }
+html.moderno ::-webkit-scrollbar-corner { background: transparent; }
+
+/* ══════════ 2. LA VENTANA ══════════ */
+html.moderno .window {
+  border: 0;
+  border-radius: var(--r-l);
+  background: var(--m-ventana);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55), inset 0 0 0 1px var(--m-linea);
+}
+html.moderno .window.maximized { border-radius: 0; box-shadow: none; }
+/* Instalada, la ventana ES la del sistema (style.css la estira a toda la
+   pantalla): sin esquinas ni sombra, igual que maximizada. */
+@media (display-mode: standalone), (display-mode: window-controls-overlay) {
+  html.moderno .window { border-radius: 0; box-shadow: none; }
+}
+html.moderno .title-bar {
+  background: transparent;
+  height: 44px;
+  padding: 0 12px 0 18px;
+}
+/* Instalada con la barra propia: la barra mide lo que diga el sistema y deja
+   libre el hueco de sus botones (las mismas cuentas que style.css). Sin
+   esto, lo de la derecha quedaba debajo de minimizar y cerrar. */
+@media (display-mode: window-controls-overlay) {
+  html.moderno .title-bar {
+    height: env(titlebar-area-height, 44px);
+    padding-left: calc(env(titlebar-area-x, 0px) + 18px);
+    padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 12px);
+  }
+}
+/* el logo: la misma X de puntos, ahora redondos */
+html.moderno .pixel-icon { gap: 2px; grid-template-columns: repeat(3, 4px); }
+html.moderno .pixel-icon span { border-radius: 50%; box-shadow: none; }
+html.moderno .title-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.14em !important;
+}
+html.moderno .paleta-btn {
+  height: 32px;
+  padding: 0 8px 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--m-hover);
+  font-size: 18px;
+  color: var(--m-tenue);
+  box-shadow: none !important;
+}
+html.moderno .paleta-btn:hover,
+html.moderno .paleta-btn:focus-visible { background: var(--m-activo); color: var(--text); }
+html.moderno .tb-btn {
+  width: 30px;
+  height: 26px;
+  border-radius: var(--r-s);
+  background: transparent;
+  color: var(--m-tenue);
+}
+html.moderno .tb-btn:hover { background: var(--m-hover); color: var(--text); }
+html.moderno .tb-close:hover { background: #e5484d; color: #fff; }
+html.moderno .main-grid {
+  background: transparent;
+  gap: 18px;
+  padding: 4px 18px 14px;
+}
+
+/* ══════════ 3. LA COLUMNA DE LA IZQUIERDA ══════════ */
+html.moderno .cover-frame {
+  padding: 0;
+  background: transparent;
+  border-radius: var(--r-m);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.5);
+}
+html.moderno .cover-inner {
+  border-radius: var(--r-m);
+  box-shadow: none;
+  background: var(--m-hover);
+}
+html.moderno .cover-placeholder {
+  font-size: 56px;
+  color: var(--m-tenue-2);
+  animation: none;
+}
+html.moderno .vinyl-toggle {
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+html.moderno .track-info {
+  background: transparent;
+  padding: 2px 2px 0;
+  box-shadow: none;
+}
+html.moderno .ti-title {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 23px;
+}
+html.moderno .ti-artist { color: var(--m-artista, var(--m-tenue)); font-size: 18px; font-weight: 500; }
+html.moderno .ti-album { color: var(--m-tenue-2); font-size: 15px; }
+html.moderno .ti-eq i,
+html.moderno .mini-eq i {
+  border-radius: 2px;
+  box-shadow: none;
+  animation-timing-function: ease-in-out !important;
+}
+html.moderno .visualizer-frame {
+  background: transparent;
+  border-radius: var(--r-m);
+  padding: 4px 0 0;
+  box-shadow: none;
+}
+html.moderno #visualizer { filter: none; }
+html.moderno .viz-sync {
+  border-radius: var(--r-pill);
+  background: var(--m-hover);
+  border: 0;
+  box-shadow: none;
+}
+
+/* ══════════ 4. EL PANEL DE LA DERECHA ══════════ */
+html.moderno .right-panel {
+  background: var(--m-panel);
+  border-radius: var(--r-l);
+  box-shadow: var(--m-panel-sombra, none);
+}
+html.moderno .tab-bar {
+  background: transparent;
+  padding: 10px 12px;
+  gap: 4px;
+}
+html.moderno .tab {
+  border-radius: var(--r-s);
+  padding: 7px 12px;
+  color: var(--m-tenue);
+  border-bottom: 0 !important;
+  font-weight: 500;
+}
+html.moderno .tab-bar.se-esconde { padding-top: 0; padding-bottom: 0; }
+html.moderno .tab:hover { background: var(--m-hover); color: var(--text); }
+html.moderno .tab.active {
+  color: var(--m-sel-texto);
+  background: var(--m-sel-fondo);
+}
+html.moderno .tab.active .ico { color: inherit; }
+html.moderno body.perf-tactil .tab-bar.se-esconde::after { background: var(--m-activo); box-shadow: none; }
+
+/* ---- botones, chips y opciones ---- */
+html.moderno .retro-btn {
+  border-radius: var(--r-pill);
+  background: var(--m-activo);
+  color: var(--text);
+  padding: 8px 18px;
+  font-size: 16px;
+  font-weight: 600;
+  box-shadow: none;
+}
+html.moderno .retro-btn:hover { background: color-mix(in oklab, var(--text) 22%, transparent); color: var(--text); }
+html.moderno .retro-btn:active { transform: scale(0.97); }
+html.moderno .retro-btn .bracket { display: none; }
+html.moderno .retro-btn.small { padding: 5px 12px; }
+
+html.moderno .seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  width: max-content;
+  max-width: 100%;
+  justify-self: start;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--m-hover);
+}
+html.moderno .seg-btn,
+html.moderno .lib-chip {
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--m-tenue);
+  padding: 4px 14px;
+  font-weight: 500;
+  box-shadow: none !important;
+}
+html.moderno .lib-chip { background: var(--m-hover); }
+html.moderno .seg-btn:hover,
+html.moderno .lib-chip:hover { color: var(--text); background: var(--m-hover); }
+html.moderno .seg-btn.active,
+html.moderno .lib-chip.active {
+  color: var(--m-sel-texto);
+  background: var(--m-sel-fondo);
+}
+html.moderno .lib-refresh,
+html.moderno .lib-back {
+  border-radius: 50%;
+  background: var(--m-hover);
+  color: var(--text);
+}
+html.moderno .lib-refresh:hover,
+html.moderno .lib-back:hover { background: var(--m-activo); color: var(--text); }
+
+/* ---- filas de canciones y tarjetas ----
+   Las listas de verdad son .sp-result (tu música, buscar, cola,
+   historial); .track-row queda de la lista vieja. */
+html.moderno .sp-result { border-radius: var(--r-s); border-color: transparent; }
+html.moderno .sp-result:hover { border-color: transparent; background: var(--m-hover); }
+html.moderno .sp-result.sp-now {
+  border-color: transparent;
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
+}
+html.moderno .sp-result.sp-now .sp-name { font-weight: 600; }
+html.moderno .sp-name { font-weight: 500; }
+html.moderno .sp-artist,
+html.moderno .sp-dur { color: var(--m-tenue-2); }
+html.moderno .sp-thumb { border-radius: 6px; }
+html.moderno .sp-play {
+  border-radius: 50%;
+  color: var(--text);
+  background: transparent;
+}
+html.moderno .sp-play:hover {
+  background: var(--m-play-fondo);
+  color: var(--m-play-icono);
+  box-shadow: none;
+}
+html.moderno .track-row { border-radius: var(--r-s); }
+html.moderno .track-row:hover { background: var(--m-hover); color: var(--text); }
+html.moderno .track-row.playing {
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+  border-color: transparent;
+  color: var(--accent);
+}
+html.moderno .lib-card { border-radius: var(--r-m); }
+html.moderno .lib-card:hover { background: var(--m-hover); }
+html.moderno .lib-card-art { border-radius: var(--r-s); overflow: hidden; }
+html.moderno .lib-card-play {
+  border-radius: 50%;
+  background: var(--m-play-fondo);
+  color: var(--m-play-icono);
+  border: 0;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- ajustes ---- */
+html.moderno .cfg-head { background: transparent; box-shadow: none; }
+html.moderno .cfg-volver {
+  border-radius: var(--r-pill);
+  background: var(--m-hover);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: none;
+}
+html.moderno .cfg-volver:hover { background: var(--m-activo); color: var(--text); }
+html.moderno .cfg-buscar {
+  border-radius: var(--r-pill);
+  background: var(--m-hover);
+  border: 0;
+  box-shadow: none;
+}
+html.moderno .cfg-ayuda {
+  border-radius: 50%;
+  border: 0;
+  background: var(--m-hover);
+  box-shadow: none;
+}
+html.moderno .cfg-chip {
+  border-radius: var(--r-pill);
+  border: 0;
+  box-shadow: none;
+}
+html.moderno .settings-block h3 {
+  background: var(--m-cabecera, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+html.moderno .settings-block h3 .h3-tilde { display: none; }
+html.moderno .set-label { color: var(--m-tenue); }
+html.moderno .swatch { border-radius: 50%; box-shadow: none; }
+
+/* ══════════ 5. LA BARRA DE ABAJO ══════════ */
+html.moderno .playback-bar {
+  background: transparent;
+  padding: 2px 22px 12px;
+  gap: 4px;
+}
+html.moderno .progress-bg {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--m-activo);
+  box-shadow: none !important;
+  overflow: visible;
+  transition: height 0.15s ease;
+}
+html.moderno .progress-bar:hover .progress-bg,
+html.moderno body.barra-agarrada .progress-bg { height: 6px; }
+html.moderno .progress-fill {
+  border-radius: var(--r-pill);
+  background: var(--m-prog);
+  box-shadow: none;
+}
+html.moderno .progress-thumb,
+html.moderno body.barra-agarrada .progress-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+html.moderno .time {
+  font-size: 12px;
+  color: var(--m-tenue);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+html.moderno .time-total { border-radius: var(--r-s); }
+html.moderno .time-total:hover { border-color: transparent; background: var(--m-hover); }
+
+html.moderno .ctrl-btn:not(.side-btn) {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+html.moderno .ctrl-btn:hover { background: var(--m-hover); color: var(--text); }
+html.moderno .ctrl-btn { box-shadow: none; }
+html.moderno .ctrl-btn:active { transform: scale(0.94); box-shadow: none; }
+html.moderno .ctrl-btn.active { color: var(--accent); box-shadow: none; }
+/* encendido (aleatorio, repetir): el puntito de debajo, como en el móvil */
+html.moderno .ctl-musica .ctrl-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+html.moderno .rep-badge { bottom: 6px; right: 7px; font-size: 10px; font-weight: 700; }
+html.moderno .ctrl-btn.play-btn:not(.side-btn),
+html.moderno .ctrl-btn.play-btn:not(.side-btn):hover,
+html.moderno .ctrl-btn.play-btn:not(.side-btn):active,
+html.moderno .ctrl-btn.play-btn:not(.side-btn).active {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--m-play-fondo);
+  color: var(--m-play-icono);
+  box-shadow: var(--m-play-sombra, none);
+  filter: none;
+}
+html.moderno .ctrl-btn.play-btn:not(.side-btn):hover { transform: scale(1.05); }
+html.moderno .ctrl-btn.play-btn:not(.side-btn):active { transform: scale(0.96); }
+html.moderno .play-btn .ico { --ico-tam: 22px; }
+
+/* la fila de la vista: fantasma, con el nombre debajo */
+html.moderno .ctl-vista .side-btn { border-radius: var(--r-m); }
+html.moderno .ctl-vista .side-btn:hover { background: var(--m-hover); border-color: transparent; }
+html.moderno .ctl-vista .side-btn.on {
+  color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+  border-color: transparent;
+}
+html.moderno .sb-txt { font-weight: 500; }
+html.moderno .vol-btn { background: transparent; }
+
+/* volumen: riel fino y redondo */
+html.moderno .volume-bg {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--m-activo);
+  box-shadow: none;
+}
+html.moderno .volume-fill { border-radius: var(--r-pill); background: var(--text); box-shadow: none; }
+html.moderno .volume-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+}
+html.moderno .vol-pct { color: var(--m-tenue); }
+
+/* la barra de estado: discreta */
+html.moderno .status-bar {
+  background: transparent;
+  color: var(--m-tenue-2);
+  font-size: 15px;
+  padding: 6px 20px 10px;
+}
+html.moderno #statusText { color: var(--m-tenue); }
+html.moderno #statusText.flash { animation: none; }
+html.moderno .status-bar .filler { background: none; }
+html.moderno #clock { color: var(--m-tenue-2); }
+
+/* ══════════ 6. CRISTAL ══════════
+   La carátula difuminada a pantalla entera y la ventana como un cristal
+   esmerilado encima. El desenfoque va UNA vez, en una capa quieta del
+   fondo: la ventana no lleva backdrop-filter (con la letra animándose
+   encima, re-desenfocar cada frame costaría batería), solo transparencia
+   sobre algo que ya está borroso. */
+html[data-aspecto="cristal"] {
+  --f-moderna: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --m-ventana: color-mix(in oklab, var(--dyn-2, #0a0e2e) 30%, rgb(14 14 18 / 0.42));
+  --m-panel: rgb(255 255 255 / 0.06);
+  --m-panel-sombra: inset 0 0 0 1px rgb(255 255 255 / 0.07);
+  --m-cabecera: rgb(30 30 36 / 0.55);
+  --m-sel-fondo: rgb(255 255 255 / 0.92);
+  --m-sel-texto: #141418;
+  --m-play-fondo: rgb(255 255 255 / 0.16);
+  --m-play-icono: #fff;
+  --m-play-sombra: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  --m-prog: rgb(255 255 255 / 0.88);
+  --m-artista: var(--accent);
+  --r-l: 22px;
+  background: #0b0b0f;
+}
+html[data-aspecto="cristal"] body { background: transparent; }
+html[data-aspecto="cristal"] body::before {
+  content: '';
+  position: fixed;
+  inset: -12%;
+  z-index: -1;
+  background:
+    var(--portada, none) center / cover no-repeat,
+    radial-gradient(ellipse at 30% 20%, var(--dyn-1, #1a1f4a) 0%, var(--dyn-2, #0a0e2e) 60%, #000 100%);
+  filter: blur(90px) saturate(1.7) brightness(0.62);
+  pointer-events: none;
+}
+html[data-aspecto="cristal"] .ambient { opacity: 0.6; }
+
+/* ══════════ 7. ESTUDIO ══════════
+   Negro casi puro y el color de la canción como un resplandor que cae de
+   arriba a la izquierda. Sin paneles: el contenido flota en el negro. */
+html[data-aspecto="estudio"] {
+  --f-moderna: "Roboto", "Segoe UI", system-ui, sans-serif;
+  --m-ventana:
+    radial-gradient(90% 75% at 8% -10%, color-mix(in oklab, var(--dyn-1, #1a1f4a) 70%, transparent) 0%, transparent 70%),
+    radial-gradient(70% 55% at 55% -15%, color-mix(in oklab, var(--accent) 22%, transparent) 0%, transparent 70%),
+    #030303;
+  --m-panel: transparent;
+  --m-cabecera: rgb(8 8 8 / 0.8);
+  --m-sel-fondo: #f1f1f1;
+  --m-sel-texto: #0f0f0f;
+  --m-play-fondo: #f1f1f1;
+  --m-play-icono: #0f0f0f;
+  --m-play-sombra: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --m-prog: var(--accent);
+  --r-s: 6px;
+  --r-m: 8px;
+  --r-l: 14px;
+  background: #000;
+}
+html[data-aspecto="estudio"] body { background: #000; }
+html[data-aspecto="estudio"] .ambient { display: none; }
+html[data-aspecto="estudio"] .tab,
+html[data-aspecto="estudio"] .tab:hover { background: transparent; }
+html[data-aspecto="estudio"] .tab.active {
+  background: transparent;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: inset 0 -2px 0 #fff;
+  border-radius: 0;
+}
+html[data-aspecto="estudio"] .paleta-btn {
+  border-radius: var(--r-m);
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12) !important;
+}
+html[data-aspecto="estudio"] .lib-chip,
+html[data-aspecto="estudio"] .seg-btn { background: rgb(255 255 255 / 0.1); color: #f1f1f1; }
+html[data-aspecto="estudio"] .seg { background: transparent; padding: 0; gap: 8px; }
+html[data-aspecto="estudio"] .lib-chip:hover,
+html[data-aspecto="estudio"] .seg-btn:hover { background: rgb(255 255 255 / 0.2); }
+html[data-aspecto="estudio"] .lib-chip.active,
+html[data-aspecto="estudio"] .seg-btn.active { background: #f1f1f1; color: #0f0f0f; }
+html[data-aspecto="estudio"] .ctl-musica { gap: 14px; }
+html[data-aspecto="estudio"] .ctl-musica .ctrl-btn:not(.play-btn) .ico { --ico-tam: 26px; }
+html[data-aspecto="estudio"] .ctrl-btn.play-btn:not(.side-btn) { width: 56px; height: 56px; }
+html[data-aspecto="estudio"] .tab,
+html[data-aspecto="estudio"] .seg-btn,
+html[data-aspecto="estudio"] .lib-chip { border-radius: var(--r-s); }
+html[data-aspecto="estudio"] .seg { border-radius: var(--r-m); }
+html[data-aspecto="estudio"] .progress-thumb { background: var(--accent); }
+
+/* ══════════ 8. NOCHE ══════════
+   Gris carbón con un tinte de la carátula, tarjetas planas y el color de
+   la canción solo donde importa: el play, lo que suena y lo elegido. El
+   panel de la derecha cae de un degradado del color de la canción. */
+html[data-aspecto="noche"] {
+  --f-moderna: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --m-ventana: #000;
+  --m-panel:
+    linear-gradient(180deg, color-mix(in oklab, var(--accent) 38%, transparent) 0, transparent 300px),
+    color-mix(in oklab, var(--dyn-2, #0a0e2e) 14%, #121214);
+  --m-cabecera: color-mix(in oklab, var(--dyn-2, #0a0e2e) 14%, rgb(18 18 20 / 0.86));
+  --m-sel-fondo: var(--accent);
+  --m-sel-texto: #0b0b0c;
+  --m-play-fondo: var(--accent);
+  --m-play-icono: #0b0b0c;
+  --m-play-sombra: 0 8px 24px color-mix(in oklab, var(--accent) 35%, transparent);
+  --m-prog: var(--accent);
+  --r-s: 6px;
+  --r-m: 8px;
+  --r-l: 12px;
+  background: #000;
+}
+html[data-aspecto="noche"] body { background: #000; }
+html[data-aspecto="noche"] .ambient { display: none; }
+html[data-aspecto="noche"] .left-panel {
+  background: color-mix(in oklab, var(--dyn-2, #0a0e2e) 14%, #121214);
+  border-radius: var(--r-l);
+  padding: 12px;
+}
+html[data-aspecto="noche"] .main-grid { gap: 8px; padding: 0 8px 8px; }
+html[data-aspecto="noche"] .cover-frame { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+html[data-aspecto="noche"] .tab { border-radius: var(--r-pill); }
+html[data-aspecto="noche"] .seg { background: transparent; padding: 0; gap: 8px; }
+html[data-aspecto="noche"] .seg-btn,
+html[data-aspecto="noche"] .lib-chip { background: rgb(255 255 255 / 0.08); color: var(--text); }
+html[data-aspecto="noche"] .seg-btn.active,
+html[data-aspecto="noche"] .lib-chip.active { background: var(--accent); color: #0b0b0c; font-weight: 700; }
+html[data-aspecto="noche"] .paleta-btn { background: rgb(255 255 255 / 0.08); }
+html[data-aspecto="noche"] .ctrl-btn.play-btn:not(.side-btn) { width: 50px; height: 50px; }
+html[data-aspecto="noche"] .ti-title { font-weight: 800; }
+html[data-aspecto="noche"] .tab { font-weight: 600; }
+
+/* «pantalla crt» no hace nada fuera del 8 bits (no hay monitor viejo que
+   encender): un botón que no hace nada es un fallo, así que no se enseña. */
+html.moderno .set-row:has(> .seg[data-set="crt"]) { display: none; }
+
+/* ══════════ 9. EN EL TELÉFONO ══════════
+   La franja de arriba (carátula + canción), las pestañas al pie
+   (js/movil.js), el engranaje de la barra de título y el play, que allí es
+   más ancho que alto y aquí vuelve a ser un círculo. */
+html.moderno body.disp-movil .left-panel {
+  background: var(--m-franja, var(--m-hover));
+  border-radius: var(--r-m);
+  padding: 0 8px;
+  box-shadow: none;
+}
+html[data-aspecto="noche"] body.disp-movil .left-panel { padding: 0 8px; }
+html.moderno body.disp-movil .cover-frame { padding: 0; border-radius: var(--r-s); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45); }
+html.moderno body.disp-movil .cover-inner { border-radius: var(--r-s); }
+html.moderno body.disp-movil .visualizer-frame { opacity: 0.14; }
+html.moderno body.disp-movil .tb-cfg {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+}
+html.moderno body.disp-movil .tb-cfg.active { color: var(--accent); background: var(--m-hover); }
+html.moderno body.disp-movil .ctl-musica .ctrl-btn.play-btn:not(.side-btn) {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  max-width: none;
+}
+html.moderno body.disp-movil .ctl-musica .ctrl-btn:not(.play-btn):not(.side-btn) { height: 48px; }
+html.moderno body.disp-movil .window > .tab-bar {
+  background: var(--m-pie, transparent);
+  box-shadow: inset 0 1px 0 var(--m-linea);
+}
+html.moderno body.disp-movil .window > .tab-bar .tab,
+html.moderno body.disp-movil .window > .tab-bar .tab:hover {
+  background: transparent;
+  border-radius: 0;
+  color: var(--m-tenue-2);
+  box-shadow: none;
+}
+html.moderno body.disp-movil .window > .tab-bar .tab.active {
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: none;
+}
+/* la rayita del acento, arriba de la pestaña puesta: corta y redonda */
+html.moderno body.disp-movil .window > .tab-bar .tab.active::before {
+  left: calc(50% - 14px);
+  right: auto;
+  width: 28px;
+  border-radius: 0 0 3px 3px;
+  box-shadow: none;
+}
+/* los chips de las listas se deslizan por debajo del ⟳: se funden antes de
+   llegar a él, en vez de asomar por detrás */
+html.moderno body.disp-movil .lib-nav {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 70px), transparent calc(100% - 40px), #000 calc(100% - 40px));
+  mask-image: linear-gradient(90deg, #000 calc(100% - 70px), transparent calc(100% - 40px), #000 calc(100% - 40px));
+}
+html.moderno body.disp-movil .lib-refresh {
+  box-shadow: none;
+  background: rgb(0 0 0 / 0.45);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+html[data-aspecto="estudio"] { --m-pie: #0a0a0a; --m-franja: rgb(255 255 255 / 0.06); }
+html[data-aspecto="noche"] { --m-pie: #000; --m-franja: color-mix(in oklab, var(--dyn-2, #0a0e2e) 14%, #121214); }
+
+/* ══════════ 10. EL CINE Y EL VÍDEO 9:16 (js/vertical.js) ══════════
+   El escenario hereda las fuentes y se queda sin relieves solo; aquí van
+   su barra (anterior, play, siguiente, salir), el progreso de celdas, que
+   pasa a ser un riel fino, y los mandos del estilo «app». */
+html.moderno .cine-tr,
+html.moderno .cine-x {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.28);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  filter: none;
+}
+html.moderno .cine-tr:hover,
+html.moderno .cine-x:hover { color: var(--text); background: rgb(255 255 255 / 0.14); }
+html.moderno .cine-play,
+html.moderno .cine-play:hover {
+  width: 52px;
+  height: 52px;
+  background: var(--m-play-fondo);
+  color: var(--m-play-icono);
+  box-shadow: var(--m-play-sombra, none);
+  filter: none;
+}
+html.moderno .v916-riel {
+  height: max(4px, 0.8cqw);
+  border-radius: var(--r-pill);
+  background: rgb(255 255 255 / 0.18);
+  box-shadow: none;
+  overflow: hidden;
+}
+html.moderno .v916-riel::before,
+html.moderno .v916-lleno::after { display: none; }
+html.moderno .v916-lleno { background: var(--m-prog); }
+html.moderno .v916-cabeza { display: none; }
+html.moderno .v916-t[data-g]::before { display: none; }
+html.moderno .v916-t { color: var(--m-tenue); }
+html.moderno .v916-m {
+  border-radius: 50%;
+  width: 11cqw;
+  height: 11cqw;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+}
+html.moderno .v916-m-play {
+  width: 15cqw;
+  height: 15cqw;
+  background: var(--m-play-fondo);
+  color: var(--m-play-icono);
+  box-shadow: var(--m-play-sombra, none);
+}
+html.moderno .v916-portada { border-radius: var(--r-s); border: 0; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); }
+html.moderno .v916-titulo { font-weight: 700; }
+
+/* Los «▒» de los mensajes vacíos (los envuelve js/aspecto.js): marco del
+   mensaje en 8 bits, ruido aquí. */
+html.moderno .adorno-8bits { display: none; }
+
+/* ══════════ 11. LO QUE FLOTA ENCIMA ══════════
+   El buscador (Ctrl+K), el panel de tipografías, los diálogos de «¿seguro?»
+   y la ventana del Client ID: tarjetas redondeadas con sombra blanda en
+   vez de cajas con el borde del acento encendido. El desenfoque del fondo
+   solo cuesta mientras están abiertas. */
+html.moderno :is(.paleta-fondo, .fuentes-fondo),
+html.moderno .cid-fondo {
+  background: rgb(0 0 0 / 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+html.moderno :is(.paleta-caja, .fuentes-caja, .cid-ventana) {
+  border: 0;
+  border-radius: var(--r-l);
+  background: var(--m-flota);
+  -webkit-backdrop-filter: var(--m-flota-filtro, none);
+  backdrop-filter: var(--m-flota-filtro, none);
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.6), inset 0 0 0 1px var(--m-linea);
+  overflow: hidden;
+}
+html.moderno .paleta-fila { background: transparent; }
+html.moderno .paleta-prompt { color: var(--m-tenue); }
+html.moderno .paleta-input { font-size: 20px; }
+html.moderno .paleta-lista { padding: 6px; }
+html.moderno .paleta-fila-r { border-radius: var(--r-s); border-color: transparent; }
+html.moderno .paleta-fila-r:hover { background: var(--m-hover); }
+html.moderno .paleta-fila-r.sel { border-color: transparent; background: var(--m-activo); box-shadow: none; }
+html.moderno .paleta-fila-r.sel .paleta-tit,
+html.moderno .paleta-fila-r.sel .paleta-pista { color: var(--text); }
+html.moderno .paleta-ico { border-radius: var(--r-s); background-color: var(--m-hover); color: var(--text); }
+html.moderno .paleta-seccion { color: var(--m-tenue-2); font-weight: 600; }
+html.moderno .paleta-pie { background: transparent; color: var(--m-tenue-2); }
+html.moderno .paleta-pie kbd { border-radius: 4px; border: 0; background: var(--m-activo); box-shadow: none; }
+html.moderno :is(.paleta-x, .cid-x) {
+  border-radius: 50%;
+  border: 0;
+  background: var(--m-hover);
+  box-shadow: none;
+}
+html.moderno .fuentes-grupos { background: transparent; padding: 10px 12px; }
+html.moderno .fg-chip {
+  border-radius: var(--r-pill);
+  background: var(--m-hover);
+  color: var(--m-tenue);
+  font-weight: 500;
+}
+html.moderno .fg-chip:hover { color: var(--text); background: var(--m-activo); }
+html.moderno .fg-chip.on { background: var(--m-sel-fondo); color: var(--m-sel-texto); box-shadow: none; }
+html.moderno .fuentes-lista { gap: 8px; padding: 10px; }
+html.moderno .fuente-card { border-radius: var(--r-m); background: var(--m-hover); }
+html.moderno .fuente-card:hover,
+html.moderno .fuente-card:focus-visible { background: var(--m-activo); box-shadow: none; }
+html.moderno .fuente-card.on { box-shadow: inset 0 0 0 2px var(--accent); }
+html.moderno .fc-nombre { font-weight: 600; }
+html.moderno .cid-barra { background: transparent; }
+html.moderno .cid-puntos span { border-radius: 50%; }
+html.moderno .cid-titulo { font-weight: 700; color: var(--text); }
+html.moderno :is(.cid-copiar, .cid-cancelar, .cid-ok) { border-radius: var(--r-pill); padding: 7px 16px; font-weight: 600; box-shadow: none; }
+html.moderno .cid-cancelar { background: var(--m-hover); border-color: transparent; color: var(--text); }
+html.moderno .cid-ok { background: var(--m-sel-fondo); border-color: transparent; color: var(--m-sel-texto); }
+html.moderno .cid-copiar { background: var(--m-hover); border-color: transparent; color: var(--text); }
+html.moderno :is(.cid-entrada, .cid-uri) { border-radius: var(--r-s); border-color: transparent; background: var(--m-hover); }
+html[data-aspecto="cristal"] { --m-flota: rgb(30 30 36 / 0.72); --m-flota-filtro: blur(30px) saturate(1.5); }
+html[data-aspecto="estudio"] { --m-flota: #1f1f1f; }
+html[data-aspecto="noche"] { --m-flota: color-mix(in oklab, var(--dyn-2, #0a0e2e) 12%, #1c1c1e); }

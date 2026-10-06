@@ -103,6 +103,24 @@
     && typeof window.MediaRecorder === 'function'
     && window.CropTarget && typeof window.CropTarget.fromElement === 'function');
 
+  /* ▯ EL VÍDEO 9:16 ES SOLO DE LA COPIA LOCAL (29-sep-2026).
+     Grabar el audio de Spotify en un archivo es lo que sus términos llaman
+     «stream ripping», y su política también prohíbe sincronizar sus
+     canciones con vídeo. El usuario lo quiere para él, en su equipo, y NO en
+     la página publicada: el modo solo existe abriendo la app en local
+     (127.0.0.1, localhost o el archivo suelto), igual que el ⚗ laboratorio
+     de js/lyrics.js. En la web publicada no hay botón, ni sección en
+     ajustes, ni mando en el buscador, ni tecla V, y `abrir()` se niega a
+     abrirlo. El CINE, que usa este mismo escenario, no cambia en nada.
+     Va al revés de lo que parece: style.css esconde esas puertas SIEMPRE, y
+     aquí se destapan con `html.con-916` solo en local. Así la página
+     publicada no enseña el botón ni un instante mientras carga este archivo
+     (los <script> van con defer y la ventana se pinta antes). */
+  const enLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+    || location.protocol === 'file:';
+  const videoDisponible = enLocal;
+  document.documentElement.classList.toggle('con-916', videoDisponible);
+
   // ---------- Opciones (se recuerdan) ----------
   const OPC = {
     estilo:  { key: 'mm_916_estilo',  def: 'app',  vals: ['app', 'vinilo', 'letra'] },
@@ -565,6 +583,8 @@
      quieren llevar la misma letra. */
   const abrir = (que) => {
     if (abierto) return;
+    // el vídeo 9:16 no existe en la página publicada (ver `videoDisponible`)
+    if (que !== 'cine' && !videoDisponible) return;
     construir();
     tabLyrics = $('tab-lyrics');
     if (!tabLyrics) return;
@@ -1606,9 +1626,14 @@
   const PASAN = new Set(['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyM', 'Tab',
     'Enter', 'NumpadEnter', 'ShiftLeft', 'ShiftRight']);
   window.addEventListener('keydown', (e) => {
+    // con una ventana de la casa abierta (js/dialogo.js), las teclas son suyas
+    if (window.MMDialogo && window.MMDialogo.abierto()) return;
     if (!abierto) {
       // V abre el modo (si la tecla es de la app y no de un cuadro de texto)
-      if ((e.key === 'v' || e.key === 'V') && !e.repeat && libre(e)) { e.preventDefault(); abrir(); }
+      if (videoDisponible && (e.key === 'v' || e.key === 'V') && !e.repeat && libre(e)) {
+        e.preventDefault();
+        abrir();
+      }
       return;
     }
     if (e.key === 'Escape') {
@@ -1693,6 +1718,8 @@
     abrir: () => abrir('video'),
     cerrar,
     abierto: () => abierto,
+    // ¿existe el vídeo 9:16 aquí? Solo en la copia local (ver `videoDisponible`)
+    disponible: () => videoDisponible,
     cine: () => abierto && enCine(),
     // el marco tumbado para grabar en 1080p: js/fondo.js deshace el giro al medir
     giro: () => (tumbado ? -90 : 0),

@@ -179,9 +179,11 @@
     /* Antes decía «spotify no deja ver la lista desde aquí», y era mentira:
        lo que pasaba es que la app pedía `/playlists/{id}/tracks`, retirado en
        feb-2026. Con `/items` las playlists propias listan. Si aun así no llega
-       nada, lo normal es que sea una de las que hace Spotify. */
+       nada, lo normal es que no sea tuya: desde feb-2026 Spotify solo deja
+       ver por dentro las tuyas y en las que colaboras (no solo las que hace
+       él: también las de otra gente que sigues). */
     if (!s || !s.recibidos) return 'esta playlist no devolvió ninguna canción<br>'
-      + '<span style="opacity:.7">si la hizo spotify (daily mix, radio, descubrimiento…) no deja abrirla desde otras apps</span>';
+      + '<span style="opacity:.7">si no es tuya, spotify no deja verla por dentro desde otras apps · se puede poner igual</span>';
     // Llegaron ítems pero ninguno era una canción: episodios de podcast,
     // pistas retiradas del catálogo o archivos locales de la playlist.
     if (s.episodios && s.episodios >= s.recibidos - s.nulos) return 'aquí solo hay episodios de podcast';
@@ -198,6 +200,11 @@
   const enLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
     || location.protocol === 'file:'
     || /[?&]diag\b/.test(location.search);
+
+  // La de otro (ver `esAjena`): se dice sin pedir nada y se ofrece ponerla
+  const msgAjena = (d) => 'spotify solo deja ver por dentro tus playlists y en las que colaboras<br>'
+    + '<span style="opacity:.7">' + (d && d.owner ? 'esta es de ' + escapeHtml(d.owner) + ' · ' : '')
+    + 'se puede poner igual, y al sonar se ven sus canciones</span>';
 
   const botonesDeRescate = () =>
     '<br><button class="retro-btn small" id="libPlayQueue" style="margin-top:10px">'
@@ -227,16 +234,36 @@
     cover: (a.images && a.images[0]) ? a.images[0].url : null,
   });
 
-  const mapPlaylist = (p) => ({
-    id: p.id,
-    uri: p.uri,
-    name: p.name,
-    owner: (p.owner && (p.owner.display_name || p.owner.id)) || '',
+  const mapPlaylist = (p) => {
     /* `items` desde feb-2026, `tracks` antes. Leer solo el viejo era lo que
-       dejaba el «0 de 0 canciones» en la cabecera de cada playlist. */
-    total: ((p.items || p.tracks) || {}).total || 0,
-    cover: (p.images && p.images[0]) ? p.images[0].url : null,
-  });
+       dejaba el «0 de 0 canciones» en la cabecera de cada playlist. Y si no
+       viene NINGUNO de los dos —las que no son tuyas pueden llegar solo con
+       sus datos, sin su contenido—, el total es desconocido (null), no
+       cero: «0 canciones» en una lista llena parece un fallo de la app. */
+    const ref = p.items || p.tracks;
+    return {
+      id: p.id,
+      uri: p.uri,
+      name: p.name,
+      owner: (p.owner && (p.owner.display_name || p.owner.id)) || '',
+      ownerId: (p.owner && p.owner.id) || null,
+      colab: !!p.collaborative,
+      total: (ref && typeof ref.total === 'number') ? ref.total : null,
+      cover: (p.images && p.images[0]) ? p.images[0].url : null,
+    };
+  };
+
+  /* ¿Es de otro? Desde feb-2026 `GET /playlists/{id}/items` SOLO funciona
+     con las playlists tuyas o en las que colaboras; con las demás (las que
+     sigues de otra gente y las que hace Spotify) contesta 403, y el objeto
+     playlist llega sin canciones. Antes se pedían igual —dos peticiones
+     tiradas— y el cartel decía que era «de spotify», aunque fuera la lista
+     de un amigo. Sabiéndolo antes, ni se pide. Si todavía no se sabe quién
+     eres (null), se prueba como siempre. */
+  const esAjena = (p) => {
+    const yo = window.SpotifyModule && window.SpotifyModule.yo ? window.SpotifyModule.yo() : null;
+    return !!(p && yo && p.ownerId && p.ownerId !== yo && !p.colab);
+  };
 
   // ---------- Render ----------
   const list = () => $('libList');
@@ -290,7 +317,9 @@
         <button class="lib-card-play sp-play" title="Reproducir">▶</button>
       </div>
       <div class="lib-card-name">${escapeHtml(p.name)}</div>
-      <div class="lib-card-sub">${p.total} ${p.total === 1 ? 'canción' : 'canciones'}${p.owner ? ' · ' + escapeHtml(p.owner) : ''}</div>
+      <div class="lib-card-sub">${p.total != null
+        ? p.total + ' ' + (p.total === 1 ? 'canción' : 'canciones') + (p.owner ? ' · ' + escapeHtml(p.owner) : '')
+        : (p.owner ? 'de ' + escapeHtml(p.owner) : 'playlist')}</div>
     </li>`;
 
   /* Álbum y artista usan la MISMA tarjeta que las playlists: es la misma
@@ -428,7 +457,7 @@
             : empty('nada que se llame así en esta lista'))
         : empty(d.tipo === 'artist'
             ? 'este artista no devolvió discos'
-            : statsMsg(d.stats) + botonesDeRescate());
+            : (d.ajena ? msgAjena(d) : statsMsg(d.stats)) + botonesDeRescate());
       /* Cuántas filas hay puestas ya: con la lista entera entrando por
          detrás, cada página añade solo las suyas en vez de rehacerlo todo.
          Con el filtro puesto no vale el atajo y se repinta entero. */
@@ -485,26 +514,23 @@
     }
     if (/Spotify API 403/.test(msg)) {
       const scope = col && COLS[col] && COLS[col].scope;
-      return scope
-        ? 'esta sección necesita un permiso nuevo (<b>' + scope + '</b>):<br>'
-          + 'desconecta y vuelve a conectar spotify en config ⚙'
-        : 'spotify no autorizó esta petición' + detailOf(msg);
+      if (scope) {
+        return 'esta sección necesita un permiso nuevo (<b>' + scope + '</b>):<br>'
+          + 'desconecta y vuelve a conectar spotify en config ⚙';
+      }
     }
-    if (/Spotify API 404/.test(msg)) {
-      // Sin detailOf: aquí la API solo dice "Resource not found", que no
-      // añade nada y alarga un mensaje que ya explica la causa real.
-      return 'esta playlist la hace spotify (descubrimiento semanal, daily mix, radio…)<br>'
-        + 'y no deja abrirlas desde otras apps';
+    if (/Spotify API 404/.test(msg) && !col) {
+      /* Dentro de una lista abierta. Antes decía SIEMPRE que era «de las que
+         hace spotify», también para las colecciones, donde un 404 no tiene
+         nada que ver con eso. */
+      return 'esta lista ya no existe, o es de las que spotify no deja abrir desde otras apps';
     }
-    if (/Spotify API 429/.test(msg)) {
-      // el freno de spotify.js mete los segundos que faltan en el mensaje
-      // Era `(d+)`: sin la barra, buscaba letras «d» literales y NUNCA sacaba
-      // los segundos, así que el aviso salía siempre sin el dato que importa.
-      const seg = (msg.match(/espera (\d+)s/) || [])[1];
-      return 'spotify pidió esperar: demasiadas peticiones'
-        + (seg ? '<br>vuelve a intentarlo en <b>' + seg + ' s</b>' : '<br>espera un momento y pulsa ⟳');
-    }
-    console.error('[Biblioteca] fallo:', msg);
+    if (!/Spotify API/.test(msg) && !/No token/.test(msg)) console.error('[Biblioteca] fallo:', msg);
+    /* Lo demás lo cuenta spotify.js, que lee el motivo de verdad (el freno
+       del 429 con sus segundos, la cuota agotada, un corte de red, un 5xx…)
+       en vez de decir «¿sin conexión?» a todo. */
+    const S = window.SpotifyModule;
+    if (S && S.explicar) return escapeHtml(S.explicar(e, 'cargar esto'));
     return 'no se pudo cargar (¿sin conexión?)' + detailOf(msg);
   };
 
@@ -615,6 +641,17 @@
       cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
       view.detail = { id: p.id, uri: p.uri, name: p.name, cover: p.cover || null, owner: p.owner || '',
                       sub: '· cargando ·', rows: [], next: 0, total: p.total, cargando: true };
+      /* La de otro: Spotify no deja listarla (403). Ni se pide —eran dos
+         peticiones tiradas— y se ofrece lo que sí funciona: ponerla. */
+      if (esAjena(p)) {
+        const d = view.detail;
+        d.ajena = true;
+        d.cargando = false;
+        d.next = null;
+        d.sub = p.total != null ? p.total + ' ' + (p.total === 1 ? 'canción' : 'canciones') : '';
+        paint();
+        return;
+      }
       paint();
       const ul0 = list();
       if (ul0) ul0.innerHTML = skeletons(6);
@@ -630,7 +667,8 @@
       d.stats = stats;
       d.via = data.via;
       d.rows = d.rows.concat(rows);
-      d.total = data.total || d.total;
+      // el total de la tarjeta puede ser «no se sabe» (null): nunca «de null»
+      d.total = data.total || d.total || d.rows.length;
       d.next = data.more ? d.next + data.items.length : null;
       d.sub = `${d.rows.length} de ${d.total} ${d.total === 1 ? 'canción' : 'canciones'}`;
     } catch (e) {
@@ -925,8 +963,10 @@
     try {
       await window.SpotifyModule.playContext(p.uri);
     } catch (e) {
-      if (ul) ul.innerHTML = empty('no se pudo reproducir: abre spotify (premium) en algún dispositivo'
-        + detailOf(e.message));
+      // el motivo de verdad (ver SpotifyModule.explicar), no «abre spotify» a todo
+      const S = window.SpotifyModule;
+      if (ul) ul.innerHTML = empty(S.explicar ? escapeHtml(S.explicar(e, 'ponerla'))
+        : 'no se pudo reproducir' + detailOf(e.message));
       return;
     }
     setStatus('▶ reproduciendo: ' + p.name);
@@ -961,7 +1001,8 @@
       await window.SpotifyModule.playContext(p.uri);
       setStatus('▶ reproduciendo: ' + p.name);
     } catch (e) {
-      setStatus('✕ sin dispositivo activo. Abre Spotify (Premium) y vuelve a intentar.');
+      const S = window.SpotifyModule;
+      setStatus('✕ ' + (S.explicar ? S.explicar(e, 'ponerla') : 'no se pudo reproducir'));
     }
   };
 
@@ -1096,10 +1137,18 @@
       if (e.target.closest('.sp-del')) {
         e.stopPropagation();
         if (!item.local || !window.PlayerCore || !window.PlayerCore.removeTrack) return;
-        if (!confirm('¿Quitar «' + item.name + '» de tu música?\n\nNo borra el archivo de tu disco.')) return;
-        window.PlayerCore.removeTrack(item.id);
-        setStatus('▣ quitada: ' + item.name);
-        paint();
+        // la ventana de la casa (js/dialogo.js); la del navegador solo de respaldo
+        const pregunta = { titulo: 'tu música', texto: '¿quitar «' + item.name + '» de tu música?',
+          detalle: 'no borra el archivo de tu disco.', si: 'quitar', no: 'cancelar' };
+        (window.MMDialogo
+          ? window.MMDialogo.confirmar(pregunta)
+          : Promise.resolve(confirm(pregunta.texto + '\n\n' + pregunta.detalle))
+        ).then((ok) => {
+          if (!ok) return;
+          window.PlayerCore.removeTrack(item.id);
+          setStatus('▣ quitada: ' + item.name);
+          paint();
+        });
         return;
       }
       /* Dentro de un artista, las tarjetas son sus DISCOS: se abren. Va antes

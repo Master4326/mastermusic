@@ -13,6 +13,8 @@
     VERIFIER: 'sp_verifier',
     STATE: 'sp_state',
     SCOPES: 'sp_scopes_v',
+    AUTORIZADO: 'sp_autorizado',       // cuándo se pasó por la pantalla de Spotify
+    AVISO_CADUCA: 'sp_aviso_caduca',   // el último día que se avisó de que caduca
   };
 
   // Spotify exige que la Redirect URI coincida EXACTAMENTE con la
@@ -65,10 +67,9 @@
     // Si tu sesión es anterior a esto, desconecta y vuelve a conectar.
     'user-read-recently-played',
     'user-top-read',
-    /* NO se pide `user-library-modify`: el ❤ se retiró porque Spotify
-       responde 403 a las apps en modo desarrollo aunque lo concedas, y
-       pedir un permiso que no se usa solo asusta en la pantalla de
-       consentimiento ("Agregar y eliminar elementos en Tu biblioteca"). */
+    /* (Aquí decía que `user-library-modify` NO se pedía. Era de agosto,
+       cuando el ♥ se retiró; volvió en la v89 con `/me/library` y el permiso
+       está más arriba. El comentario se quedó contradiciendo a la lista.) */
   ].join(' ');
 
   // -------- PKCE helpers --------
@@ -119,7 +120,7 @@
                 <button type="button" class="cid-copiar" id="cidCopiar">copiar</button>
               </span>
             </li>
-            <li>marca <b>Web API</b> y guarda</li>
+            <li>marca <b>Web API</b> y <b>Web Playback SDK</b> (la música suena aquí gracias al segundo) y guarda</li>
             <li>copia el <b>Client ID</b> y pégalo aquí:</li>
           </ol>
           <input id="cidInput" class="cid-entrada" placeholder="client id…" aria-label="Client ID"
@@ -223,12 +224,30 @@
       redirect_uri: REDIRECT_URI,
       code_verifier: verifier,
     });
-    const res = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    });
-    if (!res.ok) return false;
+    let res;
+    try {
+      res = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+      });
+    } catch (e) {
+      avisarLuego('✕ sin conexión con spotify al volver de autorizar · pulsa [ conectar spotify ] otra vez');
+      return false;
+    }
+    if (!res.ok) {
+      /* Antes esto devolvía `false` en silencio: volvías de autorizar y la
+         app seguía como si nada, sin conectar y sin decir por qué. Los
+         motivos de verdad son pocos y se pueden decir: el código ya se usó o
+         caducó (`invalid_grant`), el Client ID no vale (`invalid_client`) o
+         la Redirect URI no es la registrada. */
+      let motivo = '';
+      try { const j = await res.json(); motivo = j.error_description || j.error || ''; } catch (e) {}
+      console.warn('[Spotify] no se pudo canjear el código:', res.status, motivo);
+      avisarLuego('✕ spotify no aceptó la conexión' + (motivo ? ' («' + motivo + '»)' : '')
+        + ' · pulsa [ conectar spotify ] otra vez');
+      return false;
+    }
     const data = await res.json();
     saveTokens(data);
     /* Solo AQUÍ se apunta la versión de permisos, nunca en refreshToken():
@@ -236,6 +255,12 @@
        no pone al día nada. Esto se escribe al salir de la pantalla de
        autorización, que es el único momento en que se conceden de verdad. */
     try { localStorage.setItem(STORAGE.SCOPES, SCOPES_V); } catch (x) {}
+    /* Y CUÁNDO se autorizó. Desde jul-2026 el permiso (el refresh token) dura
+       seis meses contados desde aquí, y renovar el token de cada hora NO los
+       alarga; Spotify no dice en ninguna respuesta cuándo caduca, así que la
+       doc pide apuntarlo uno mismo. Con esto `avisoCaducidad` puede avisar
+       unos días antes en vez de que un día, sin más, deje de funcionar. */
+    try { localStorage.setItem(STORAGE.AUTORIZADO, String(Date.now())); } catch (x) {}
     // limpieza de la marca que dejó el ❤ retirado (sesiones anteriores)
     try { localStorage.removeItem('mm_like_bloqueado'); } catch (x) {}
     permisoCaducado = false;   // permiso nuevo: la sesión vuelve a estar viva
@@ -431,14 +456,23 @@
 
     const token = await getValidToken();
     if (!token) throw new Error('No token');
+    const { _otraVez, ...opciones } = opts;
     const res = await fetch('https://api.spotify.com/v1' + path, {
-      ...opts,
+      ...opciones,
       headers: {
         Authorization: 'Bearer ' + token,
         'Content-Type': 'application/json',
         ...(opts.headers || {}),
       },
     });
+    /* 401 con un token que según su hora aún valía: se lo retiraron (el
+       usuario quitó el acceso, o Spotify lo invalidó antes de tiempo). Se
+       renueva UNA vez y se repite la misma petición; si renovar tampoco sale
+       —`invalid_grant`—, `refreshToken` ya se encarga de decirlo. Antes el
+       401 subía tal cual y cada pantalla lo contaba a su manera. */
+    if (res.status === 401 && !_otraVez && await refreshToken()) {
+      return api(path, { ...opts, _otraVez: true });
+    }
     if (res.status === 429) {
       // El cuerpo dice si fue el ritmo o la cuota entera (ver `frenar`)
       let cuerpo = '';
@@ -459,6 +493,70 @@
     const txt = await res.text();
     if (!txt) return null;
     try { return JSON.parse(txt); } catch (e) { return null; }
+  };
+
+  /* -------- QUÉ DIJO SPOTIFY, EN CRISTIANO --------
+
+     Cada mando tenía su propio mensaje de error escrito a mano, y casi todos
+     daban por hecho lo mismo: «¿hay un dispositivo activo?», «abre la app de
+     Spotify (Premium) en algún dispositivo». Eso era verdad cuando la app
+     era solo un mando a distancia. Desde que suena en la propia pestaña (el
+     SDK) casi nunca es el motivo, y el mensaje mandaba a abrir Spotify a
+     quien lo tenía sonando aquí mismo — también cuando lo que pasaba era un
+     429, un corte de red o un 502 de Spotify.
+
+     Ahora el motivo se lee del error de verdad —el código HTTP, el `reason`
+     que Spotify manda en el cuerpo (NO_ACTIVE_DEVICE, PREMIUM_REQUIRED,
+     VOLUME_CONTROL_DISALLOW…), el freno del 429 o la falta de red— y se dice
+     en una línea. `que` es lo que se intentaba («saltar de canción»). */
+  const leerError = (e) => {
+    const m = String((e && e.message) || e || '');
+    const r = { status: 0, reason: '', message: '', red: false, sinSesion: false, cuota: false, freno: 0 };
+    if (/No token/.test(m)) { r.sinSesion = true; return r; }
+    const s = m.match(/Spotify API (\d{3})/);
+    if (s) r.status = +s[1];
+    else if (/Failed to fetch|NetworkError|Load failed|network/i.test(m)) r.red = true;
+    const j = m.indexOf('{');
+    if (j >= 0) {
+      try {
+        const o = JSON.parse(m.slice(j));
+        const er = (o && o.error) || o || {};
+        r.reason = er.reason || '';
+        r.message = typeof er.message === 'string' ? er.message : '';
+      } catch (x) { /* cuerpo que no es JSON: se queda sin detalle */ }
+    }
+    const f = m.match(/espera (\d+)s/);
+    if (f) r.freno = +f[1];
+    r.cuota = /cuota agotada|QUOTA_EXCEEDED/.test(m);
+    return r;
+  };
+
+  const explicar = (e, que) => {
+    const r = leerError(e);
+    const hacer = que || 'hacer eso';
+    if (r.sinSesion || r.status === 401) return 'la sesión de spotify caducó · pulsa [ conectar spotify ] en ajustes';
+    if (r.status === 429) {
+      if (r.cuota) return 'spotify agotó la cuota de tu app por ahora · tu música importada sigue funcionando';
+      return 'spotify pidió un respiro' + (r.freno ? ' · prueba otra vez en ' + r.freno + ' s' : ' · prueba en un momento');
+    }
+    if (r.reason === 'PREMIUM_REQUIRED' || /premium/i.test(r.message)) return 'para ' + hacer + ' hace falta spotify premium';
+    if (r.reason === 'NO_ACTIVE_DEVICE' || /no active device/i.test(r.message)
+        || (r.status === 404 && /player|device/i.test(r.message))) {
+      return sdkDeviceId
+        ? 'no hay nada sonando en spotify · pon una canción y sonará aquí'
+        : 'spotify no tiene dónde sonar · abre spotify en el móvil o el pc (o prueba otro navegador)';
+    }
+    if (r.reason === 'VOLUME_CONTROL_DISALLOW') return 'ese aparato no deja cambiar su volumen desde fuera';
+    if (r.reason === 'DEVICE_NOT_CONTROLLABLE' || r.reason === 'REMOTE_CONTROL_DISALLOW') {
+      return 'ese aparato no deja que lo manejen desde otra app';
+    }
+    if (r.status === 403) {
+      return 'spotify no deja ' + hacer + ' ahora mismo' + (r.message ? ' («' + r.message + '»)' : '');
+    }
+    if (r.status === 404) return 'spotify no encuentra eso (quizá ya no existe)';
+    if (r.status >= 500) return 'spotify no respondió · prueba otra vez en un momento';
+    if (r.red) return 'sin conexión con spotify · mira tu internet';
+    return 'no se pudo ' + hacer + (r.message ? ' («' + r.message + '»)' : '');
   };
 
   /* ==========================================================
@@ -502,6 +600,37 @@
   let ventana = null;
   let ultimaPrecarga = null;   // para no repetir la misma precarga en cada evento
 
+  /* ---- Volver a conectar el aparato de la pestaña ----
+     `not_ready` = el aparato se cayó. `connect()` del mismo reproductor lo
+     vuelve a dar de alta en Spotify (con otro `device_id`, que llega en un
+     `ready` nuevo). Esperas que se alargan para no martillear, y un intento
+     inmediato en cuanto el navegador dice que vuelve a haber red. */
+  let sdkPerdido = false;         // se cayó y aún no ha vuelto
+  let sdkReautenticado = false;   // ya se probó a renovar tras un authentication_error
+  let reconexionN = 0;
+  let reconexionT = null;
+  const ESPERAS_RECONEXION = [3000, 8000, 20000, 60000];
+
+  const reconectarSDK = () => {
+    clearTimeout(reconexionT);
+    if (!sdkPlayer || sdkVetado || !sdkPerdido) return;
+    const espera = ESPERAS_RECONEXION[Math.min(reconexionN, ESPERAS_RECONEXION.length - 1)];
+    reconexionN++;
+    reconexionT = setTimeout(() => {
+      if (!sdkPlayer || sdkVetado || !sdkPerdido) return;
+      if (navigator.onLine === false) { reconectarSDK(); return; }   // sin red: ni lo intentes
+      Promise.resolve(sdkPlayer.connect())
+        .then((ok) => { if (!ok && sdkPerdido) reconectarSDK(); })
+        .catch(() => { if (sdkPerdido) reconectarSDK(); });
+    }, espera);
+  };
+
+  window.addEventListener('online', () => {
+    if (!sdkPerdido) return;
+    reconexionN = 0;              // vuelve la red: primer intento ya, sin esperar el minuto
+    reconectarSDK();
+  });
+
   const somos = (id) => !!id && id === sdkDeviceId;
 
   /* Si el SDK no llegó a arrancar devuelve null, y entonces las llamadas van
@@ -514,6 +643,15 @@
     if (!id) return path;
     return path + (path.includes('?') ? '&' : '?') + 'device_id=' + id;
   };
+
+  /* Los mandos sobre LO QUE YA SUENA (pausa, siguiente, aleatorio, encolar)
+     van al aparato donde está sonando, que no es por fuerza el de por
+     defecto. Con `conDestino` iban SIEMPRE a esta pestaña: con la música
+     puesta desde el móvil, pausar desde la app apuntaba a un aparato parado
+     y fallaba, y darle al play se llevaba la música del móvil a la pestaña.
+     Si el sondeo sabe dónde suena, sin `device_id` (Spotify lo manda al
+     aparato activo); si no suena nada en ningún sitio, a donde toca empezar. */
+  const alQueSuena = (path) => ((lastDevice && !sdkActivo) ? path : conDestino(path));
 
   /* -------- Seguir donde ibas --------
      Pega NUEVA que trae el SDK, y conviene tenerla clara: como el aparato es
@@ -591,6 +729,8 @@
     sdkVetado = true;
     sdkActivo = false;
     sdkDeviceId = null;
+    sdkPerdido = false;              // vetado no se reconecta: no hay nada que arreglar
+    clearTimeout(reconexionT);
     console.warn('[Spotify SDK]', motivo, detalle || '');
     setStatus('◎ ' + motivo + ' · sigue funcionando como mando a distancia');
     try { if (sdkPlayer) sdkPlayer.disconnect(); } catch (e) {}
@@ -647,10 +787,12 @@
     if (!sdkActivo) {
       sdkActivo = true;
       stopPolling(true);          // corta la red, deja vivo el reloj de la barra
-      lastDevice = { id: sdkDeviceId, name: NOMBRE_APARATO, type: 'Computer', is_active: true };
+      lastDevice = { id: sdkDeviceId, name: NOMBRE_APARATO, type: 'Computer', is_active: true, supports_volume: true };
       pintarChipAparato();
+      pintarVolAjeno(false);      // el volumen de aquí siempre se deja tocar
       if (!rafId) smoothLoop();
     }
+    leerPermisos(state.disallows);
 
     const it = state.track_window && state.track_window.current_track;
     if (it) {
@@ -714,25 +856,57 @@
       sdkPlayer = new window.Spotify.Player({
         name: NOMBRE_APARATO,
         /* Se le da un token FRESCO cada vez que lo pide (también cuando el
-           suyo caduca a la hora), no uno guardado al arrancar. */
-        getOAuthToken: (cb) => { getValidToken().then((t) => { if (t) cb(t); }); },
+           suyo caduca a la hora), no uno guardado al arrancar. Si no hay
+           ninguno que darle, el SDK se queda esperando para siempre: al menos
+           que se sepa por qué. */
+        getOAuthToken: (cb) => {
+          getValidToken().then((t) => {
+            if (t) cb(t);
+            else if (!permisoCaducado) setStatus('◎ la sesión de spotify caducó · pulsa [ conectar spotify ] en ajustes');
+          });
+        },
         volume: Math.max(0, Math.min(1, vol)),
+        /* LA FICHA DEL SISTEMA con Spotify sonando aquí. El audio del SDK
+           suena dentro de SU marco (un iframe de sdk.scdn.co), así que la
+           ficha que publica js/mediasession.js —que es de esta página— no
+           llegaba nunca a verse con Spotify: ni la carátula en el aviso de
+           Windows, ni las teclas ⏯ ⏭ del teclado, ni los botones de los
+           auriculares o de la pantalla de bloqueo del móvil. La doc del SDK
+           tiene una opción justo para eso: que el propio SDK publique la
+           ficha y atienda esos botones. */
+        enableMediaSession: true,
       });
 
       sdkPlayer.addListener('ready', ({ device_id }) => {
+        const volvio = sdkPerdido;
         sdkDeviceId = device_id;
+        sdkPerdido = false;
+        sdkReautenticado = false;    // conectado: si un día vuelve a quejarse, otro intento
+        reconexionN = 0;
+        clearTimeout(reconexionT);
         console.log('[Spotify] reproductor listo en esta pestaña:', device_id);
         pintarChipAparato();
+        if (volvio) setStatus('◆ el reproductor de esta pestaña volvió');
         /* Ya hay dónde retomar: si no había nada sonando en ningún sitio, se
            deja puesta la canción de la última vez. */
         restaurarUltimo();
         resolve(true);
       });
 
+      /* SE CAYÓ EL APARATO (sin red, el portátil que se durmió, Spotify que
+         cortó la sesión). Antes aquí solo se apuntaba y ya: el aparato
+         MASTER MUSIC desaparecía de «dónde suena» hasta recargar la página,
+         y el siguiente play acababa en un «no hay dispositivo». Ahora se
+         vuelve a conectar solo, con esperas que se alargan (3, 8, 20, 60 s) y
+         en cuanto vuelve la red. */
       sdkPlayer.addListener('not_ready', ({ device_id }) => {
         if (sdkDeviceId === device_id) sdkDeviceId = null;
+        const sonabaAqui = sdkActivo;
         if (sdkActivo) { sdkActivo = false; startPolling(); }
+        sdkPerdido = true;
         pintarChipAparato();
+        if (sonabaAqui) setStatus('◎ se cortó el reproductor de esta pestaña · reconectando…');
+        reconectarSDK();
       });
 
       sdkPlayer.addListener('player_state_changed', sdkEstado);
@@ -742,12 +916,29 @@
         vetarSDK('este navegador no puede reproducir Spotify dentro de la página', message);
         resolve(false);
       });
-      // Token sin `streaming`, o caducado sin poder renovarse
+      /* Token rechazado. Puede ser una sesión de antes del reproductor (sin
+         `streaming`: eso solo se arregla autorizando otra vez) o un token
+         que se quedó viejo mientras el equipo dormía. Lo segundo tiene
+         arreglo sin molestar a nadie: renovar y volver a conectar, UNA vez.
+         Antes se vetaba el reproductor a la primera y con el aviso de «tu
+         sesión es anterior», que casi nunca era verdad. */
       sdkPlayer.addListener('authentication_error', ({ message }) => {
         console.warn('[Spotify SDK] autenticación:', message);
+        if (scopesAlDia() && !sdkReautenticado) {
+          sdkReautenticado = true;
+          refreshToken().then((ok) => {
+            if (ok && sdkPlayer) { sdkPlayer.connect(); return; }
+            setStatus('◎ spotify no aceptó el permiso del reproductor · pulsa [ conectar spotify ] en ajustes');
+          });
+          return;
+        }
         sdkVetado = true;
-        avisoReconexion = false;   // este aviso sí merece salir
-        avisarReconexion();
+        if (scopesAlDia()) {
+          setStatus('◎ spotify no aceptó el permiso del reproductor · pulsa [ conectar spotify ] en ajustes');
+        } else {
+          avisoReconexion = false;   // este aviso sí merece salir
+          avisarReconexion();
+        }
         resolve(false);
       });
       // Cuenta free: el SDK no reproduce, punto
@@ -755,9 +946,13 @@
         vetarSDK('para que suene aquí hace falta Spotify Premium', message);
         resolve(false);
       });
+      /* No toda queja del SDK es un fallo que haya que enseñar: «no list was
+         loaded» sale al pedirle siguiente/anterior sin nada cargado (lo hacen
+         a veces las teclas multimedia), y no ha pasado nada que arreglar. */
       sdkPlayer.addListener('playback_error', ({ message }) => {
         console.warn('[Spotify SDK] reproducción:', message);
-        setStatus('✕ Spotify no pudo reproducir esa pista aquí');
+        if (/no list was loaded/i.test(message || '')) return;
+        setStatus('✕ spotify no pudo cargar esa canción aquí · prueba otra vez o elige otro aparato en ◎');
       });
       sdkPlayer.addListener('autoplay_failed', () => {
         setStatus('▸ toca la pantalla una vez: el navegador no deja arrancar el audio solo');
@@ -803,6 +998,50 @@
   let lastShuffle = null;      // true/false; null = todavía no se sabe
   let lastRepeat = null;       // 'off' | 'context' | 'track'
 
+  /* LO QUE SPOTIFY DEJA HACER AHORA MISMO. Tanto el SDK (`disallows`) como
+     `/me/player` (`actions.disallows`) dicen qué NO se puede hacer con lo
+     que suena: ir a la anterior en la primera de una lista, saltar o
+     adelantar en ciertos contenidos… Hasta ahora no se miraba, así que
+     pulsar el botón acababa en un «✕ no se pudo volver atrás (¿hay un
+     dispositivo activo?)» que no tenía nada que ver. Ahora se sabe antes:
+     «anterior» sin anterior vuelve al principio de la canción (lo que hacen
+     las apps de Spotify) y lo demás lo dice en vez de fallar. */
+  const TODO_PERMITIDO = { prev: true, next: true, seek: true, shuffle: true, repeat: true };
+  let permisos = { ...TODO_PERMITIDO };
+  const leerPermisos = (dis) => {
+    const d = dis || {};
+    permisos = {
+      prev: !d.skipping_prev,
+      next: !d.skipping_next,
+      seek: !d.seeking,
+      shuffle: !d.toggling_shuffle,
+      repeat: !(d.toggling_repeat_context || d.toggling_repeat_track),
+    };
+  };
+
+  /* EL VOLUMEN DE UN APARATO QUE NO SE DEJA. Hay aparatos (los iPhone por
+     Spotify Connect, algunos altavoces) con `supports_volume: false`: la API
+     rechaza cualquier cambio de volumen y la app se lo tragaba en silencio,
+     así que la barra se movía y no pasaba nada. Ahora no se manda nada, la
+     barra se ve apagada y se dice una vez por aparato. */
+  let avisoVolumenDe = null;
+  const pintarVolAjeno = (on) => { document.body.classList.toggle('vol-ajeno', !!on); };
+  const volAjeno = () => {
+    // solo si lo que suena es de Spotify: con tu música la barra es del <audio> de aquí
+    const PC = window.PlayerCore;
+    const cur = PC && PC.state && PC.state.currentTrack;
+    return !!(cur && cur.spotify) && !sdkActivo && !!(lastDevice && lastDevice.supports_volume === false);
+  };
+  const avisarSinVolumen = () => {
+    const d = lastDevice;
+    pintarVolAjeno(true);
+    const clave = (d && d.id) || '?';
+    if (avisoVolumenDe === clave) return;
+    avisoVolumenDe = clave;
+    setStatus('◎ ' + (d && d.name ? '«' + d.name + '»' : 'ese aparato')
+      + ' no deja cambiar su volumen desde fuera · usa sus propios botones');
+  };
+
   /* Avisa UNA vez por cambio, no en cada sondeo. Quien pinta los botones
      escucha este evento; nadie llama al manejador del clic, así que pintar
      desde aquí no puede disparar una petición de vuelta. */
@@ -820,7 +1059,10 @@
     window.dispatchEvent(new CustomEvent('mm:spotify-modes', {
       detail: { shuffle: sh, repeat: rp, device: dev, deviceChanged: cambioDev },
     }));
-    if (cambioDev) pintarChipAparato();
+    if (cambioDev) {
+      pintarChipAparato();
+      pintarVolAjeno(volAjeno());
+    }
   };
 
   // El polling llega cada 2s; entre poll y poll interpolamos con un reloj
@@ -978,6 +1220,8 @@
         // aparato despierto y en pausa, y el aleatorio sigue teniendo estado.
         if (data) leerModos(data);
         if (data) lastContext = (data.context && data.context.uri) || null;
+        // qué deja hacer Spotify con lo que suena (ver `leerPermisos`)
+        if (data) leerPermisos(data.actions && data.actions.disallows);
         if (data && data.item) {
           const it = data.item;
           const track = pistaDesde(it);
@@ -1079,6 +1323,8 @@
     lastShuffle = null;
     lastRepeat = null;
     lastContext = null;
+    permisos = { ...TODO_PERMITIDO };
+    pintarVolAjeno(false);
     pintarChipAparato();
   };
 
@@ -1115,10 +1361,11 @@
       // No hay que pintar nada a mano: `player_state_changed` llega solo.
       try { await sdkPlayer.togglePlay(); return; } catch (e) { /* cae a la API */ }
     }
+    const pausar = lastIsPlaying;
     try {
       /* Con destino: darle al play sin nada sonando en ningún sitio era el
          404 de siempre. Apuntando a esta pestaña, arranca aquí. */
-      await api(conDestino(lastIsPlaying ? '/me/player/pause' : '/me/player/play'), { method: 'PUT' });
+      await api(alQueSuena(pausar ? '/me/player/pause' : '/me/player/play'), { method: 'PUT' });
       lastIsPlaying = !lastIsPlaying;
       // Refleja el cambio al instante; el polling lo confirma después.
       document.getElementById('playIcon').hidden = lastIsPlaying;
@@ -1126,30 +1373,52 @@
       document.body.classList.toggle('playing', lastIsPlaying);
       startPolling();
     } catch (e) {
-      setStatus('✕ Spotify no respondió. Abre la app de Spotify (Premium) en algún dispositivo.');
+      /* El aparato elegido ya no existe (el móvil se apagó, la tele se
+         durmió): se vuelve a esta pestaña y se prueba otra vez, en vez de
+         mandar a abrir Spotify a quien lo tiene aquí mismo. */
+      if (!pausar && leerError(e).status === 404 && sdkDeviceId) {
+        destinoElegido = null;
+        lastDevice = null;         // el de antes ya no está: que el sondeo diga el nuevo
+        try {
+          await api(conDestino('/me/player/play'), { method: 'PUT' });
+          lastIsPlaying = true;
+          startPolling();
+          setStatus('◆ ese aparato ya no estaba · suena aquí');
+          return;
+        } catch (e2) { e = e2; }
+      }
+      setStatus('✕ ' + explicar(e, pausar ? 'pausar' : 'reproducir'));
     }
   };
 
   const spNext = async () => {
+    if (!permisos.next) { setStatus('▣ spotify no deja saltar esta canción'); return; }
     if (sdkActivo && sdkPlayer) {
       try { await sdkPlayer.nextTrack(); return; } catch (e) { /* cae a la API */ }
     }
     try {
-      await api('/me/player/next', { method: 'POST' });
+      await api(alQueSuena('/me/player/next'), { method: 'POST' });
       lastTrackId = null;          // fuerza al polling a refrescar la canción
       startPolling();
-    } catch (e) { setStatus('✕ no se pudo saltar de canción (¿hay un dispositivo activo?)'); }
+    } catch (e) { setStatus('✕ ' + explicar(e, 'saltar de canción')); }
   };
 
   const spPrev = async () => {
+    /* Sin anterior (la primera de la lista, o algo que no lo deja): las apps
+       de Spotify vuelven al principio de la canción, y eso se hace aquí. */
+    if (!permisos.prev) {
+      if (permisos.seek) await spSeek(0);
+      else setStatus('▣ spotify no deja volver atrás con esto');
+      return;
+    }
     if (sdkActivo && sdkPlayer) {
       try { await sdkPlayer.previousTrack(); return; } catch (e) { /* cae a la API */ }
     }
     try {
-      await api('/me/player/previous', { method: 'POST' });
+      await api(alQueSuena('/me/player/previous'), { method: 'POST' });
       lastTrackId = null;
       startPolling();
-    } catch (e) { setStatus('✕ no se pudo volver atrás (¿hay un dispositivo activo?)'); }
+    } catch (e) { setStatus('✕ ' + explicar(e, 'volver a la anterior')); }
   };
 
   const spSetVolume = async (pct) => {
@@ -1159,8 +1428,14 @@
     if (sdkActivo && sdkPlayer) {
       try { await sdkPlayer.setVolume(pct / 100); return; } catch (e) {}
     }
+    // un aparato que no deja tocarle el volumen: ni se intenta (ver `volAjeno`)
+    if (volAjeno()) { avisarSinVolumen(); return; }
     try { await api('/me/player/volume?volume_percent=' + pct, { method: 'PUT' }); }
-    catch (e) { /* algunos dispositivos no aceptan volumen remoto; silencioso */ }
+    catch (e) {
+      const r = leerError(e);
+      if (r.reason === 'VOLUME_CONTROL_DISALLOW' || r.status === 403) avisarSinVolumen();
+      // lo demás (un 429, un corte) no merece aviso: el próximo paso de la barra lo reintenta
+    }
   };
 
   /* Aleatorio y repetir en el aparato de verdad. Hasta ahora estos dos
@@ -1169,26 +1444,34 @@
      error a propósito — quien pulsó necesita saber que no se aplicó para
      devolver el botón a su sitio, que es peor mentira que no tenerlo. */
   const spSetShuffle = async (on) => {
+    if (!permisos.shuffle) {
+      setStatus('▣ spotify no deja cambiar el aleatorio con lo que suena');
+      throw new Error('aleatorio no permitido');   // app.js devuelve el botón a su sitio
+    }
     try {
-      /* Con `device_id`: el SDK no tiene método local para aleatorio ni
-         repetir, así que estos dos siguen saliendo a la API — pero apuntando
-         a esta pestaña, que si no Spotify busca un aparato activo y sin
-         ninguno responde 404. */
-      await api(conDestino('/me/player/shuffle?state=' + (on ? 'true' : 'false')), { method: 'PUT' });
+      /* Con `device_id` cuando no suena nada: el SDK no tiene método local
+         para aleatorio ni repetir, así que estos dos siguen saliendo a la
+         API — y sin ningún aparato activo Spotify contesta 404. Con algo
+         sonando, al aparato donde suena (ver `alQueSuena`). */
+      await api(alQueSuena('/me/player/shuffle?state=' + (on ? 'true' : 'false')), { method: 'PUT' });
       lastShuffle = !!on;
     } catch (e) {
-      setStatus('✕ Spotify no aceptó el aleatorio (¿hay un dispositivo activo?)');
+      setStatus('✕ ' + explicar(e, 'cambiar el aleatorio'));
       throw e;
     }
   };
 
   // modo: 'off' | 'context' (toda la lista) | 'track' (una canción)
   const spSetRepeat = async (modo) => {
+    if (!permisos.repeat) {
+      setStatus('▣ spotify no deja cambiar la repetición con lo que suena');
+      throw new Error('repetir no permitido');
+    }
     try {
-      await api(conDestino('/me/player/repeat?state=' + modo), { method: 'PUT' });
+      await api(alQueSuena('/me/player/repeat?state=' + modo), { method: 'PUT' });
       lastRepeat = modo;
     } catch (e) {
-      setStatus('✕ Spotify no aceptó el modo de repetición (¿hay un dispositivo activo?)');
+      setStatus('✕ ' + explicar(e, 'cambiar la repetición'));
       throw e;
     }
   };
@@ -1201,16 +1484,15 @@
     if (!uri) return;
     try {
       await arrancarSDK();
-      await api(conDestino('/me/player/queue?uri=' + encodeURIComponent(uri)), { method: 'POST' });
+      await api(alQueSuena('/me/player/queue?uri=' + encodeURIComponent(uri)), { method: 'POST' });
       setStatus('＋ en cola: ' + (nombre || 'canción'));
       // Si la cola está abierta, que se vea entrar
       if (window.SevenQueueRefresh) window.SevenQueueRefresh();
     } catch (e) {
-      /* El motivo literal importa: sin dispositivo activo Spotify responde
-         404 «NO_ACTIVE_DEVICE», que es un problema distinto de un 403. */
-      setStatus(/404/.test(e.message)
-        ? '✕ no hay ningún dispositivo activo en Spotify: abre la app y dale al play'
-        : '✕ no se pudo encolar. ' + detalleSpotify(e));
+      /* Sin nada sonando en ningún sitio no hay cola a la que añadir:
+         Spotify contesta 404 NO_ACTIVE_DEVICE. `explicar` lo dice así, y si
+         el reproductor de la pestaña está listo, lo que sirve es ponerla. */
+      setStatus('✕ ' + explicar(e, 'añadirla a la cola'));
     }
   };
 
@@ -1248,6 +1530,11 @@
       progStamp = performance.now();
       paintProgress(progBase);
     };
+    if (!permisos.seek) {
+      setStatus('▣ spotify no deja moverse dentro de esta canción');
+      paintProgress(posicionActual());     // la barra vuelve a donde de verdad va
+      return;
+    }
     if (sdkActivo && sdkPlayer) {
       try { await sdkPlayer.seek(Math.round(ms)); anclar(); return; } catch (e) {}
     }
@@ -1256,7 +1543,10 @@
       // re-ancla el reloj local ya, sin esperar al siguiente poll (2s)
       anclar();
     }
-    catch (e) { setStatus('✕ no se pudo adelantar en Spotify'); }
+    catch (e) {
+      setStatus('✕ ' + explicar(e, 'moverse en la canción'));
+      paintProgress(posicionActual());
+    }
   };
 
   /* Aquí vivieron estaGuardada()/guardar(), el ❤ de "Tus me gusta".
@@ -1338,7 +1628,7 @@
         setStatus('✕ Spotify no deja guardar desde apps en modo desarrollo');
         console.warn('[♥] 403 también con /me/library:', detalleSpotify(e));
       } else {
-        setStatus('✕ no se pudo guardar. ' + detalleSpotify(e));
+        setStatus('✕ ' + explicar(e, quiero ? 'guardarla en tus me gusta' : 'quitarla de tus me gusta'));
       }
     }
   };
@@ -1374,6 +1664,12 @@
     if (window.SevenStatus) window.SevenStatus(msg);
     else { const s = document.getElementById('statusText'); if (s) s.textContent = msg; }
   };
+
+  /* Un aviso que puede llegar mientras la app aún arranca: la barra de
+     estado la monta js/seven.js, que carga después que este archivo, y en
+     su repaso de cada 500 ms repinta el nombre de la canción. Dicho al
+     instante, el aviso duraría medio segundo; dicho un poco después, se lee. */
+  const avisarLuego = (msg, ms) => { setTimeout(() => setStatus(msg), ms || 1200); };
 
   const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -2240,11 +2536,14 @@
       } else if (!scopesAlDia()) {
         /* Lo más probable a partir de este cambio: sesión abierta antes de
            que existiera el reproductor propio. No es culpa de la canción. */
-        setStatus('◎ pulsa [ conectar spotify ] para autorizar el reproductor de esta pestaña');
-        alert('Tu sesión de Spotify es anterior al reproductor propio.\n\nPulsa [ conectar spotify ] y autoriza otra vez: a partir de ahí la música suena aquí, sin tener que abrir Spotify en ningún sitio.');
+        setStatus('◎ tu sesión de spotify es de antes del reproductor propio · pulsa [ conectar spotify ] en ajustes');
       } else {
-        setStatus('✕ no se pudo reproducir. ' + detalleSpotify(e));
-        alert('No se pudo reproducir la canción completa.\n\n· Hace falta Spotify Premium.\n· Si tu navegador no admite contenido protegido (DRM), abre Spotify en el móvil o el PC y elígelo en «dónde suena».\n\nMotivo: ' + detalleSpotify(e));
+        /* Aquí había DOS `alert()` del navegador —la ventana gris que
+           congela la página— y el de siempre culpaba a Premium o al DRM,
+           también cuando el motivo era un 429, un corte de red o un 502 de
+           Spotify. Ahora, una línea en la barra de estado con el motivo de
+           verdad (ver `explicar`). */
+        setStatus('✕ ' + explicar(e, 'poner esa canción'));
       }
     }
   };
@@ -2515,7 +2814,7 @@
           lastTrackId = null;      // que el sondeo refresque sin esperar
           startPolling();
         } catch (err) {
-          setStatus('✕ no se pudo cambiar de dispositivo. ' + detalleSpotify(err));
+          setStatus('✕ ' + explicar(err, 'cambiar de aparato'));
         }
       });
     }
@@ -2530,7 +2829,7 @@
       pintarMenuDev(await spDevices());
     } catch (e) {
       devLista.innerHTML = `<div class="dev-vacio">▒ no se pudo consultar ▒
-        <span>${escapeHtml(detalleSpotify(e))}</span></div>`;
+        <span>${escapeHtml(explicar(e, 'ver los aparatos'))}</span></div>`;
     }
     colocarMenuDev();   // el alto cambió al pintar la lista
   };
@@ -2558,11 +2857,41 @@
   };
 
   // -------- Public --------
+  /* Quién es la cuenta conectada. Hace falta para una cosa concreta: desde
+     feb-2026 Spotify solo deja LISTAR por dentro las playlists que son tuyas
+     o en las que colaboras (las demás dan 403), y sabiendo tu id la
+     biblioteca lo sabe antes de pedir nada. */
+  let miId = null;
+
+  /* EL PERMISO CADUCA A LOS SEIS MESES (jul-2026). Cuando pasa, renovar da
+     `invalid_grant` y hay que volver a autorizar (lo lleva `olvidarPermiso`).
+     La doc pide avisar ANTES, y como Spotify no dice cuándo caduca, se
+     cuenta desde la fecha apuntada en `exchangeCode`. Un aviso al día en la
+     barra de estado, solo los últimos diez días. Las sesiones de antes de
+     apuntar la fecha no avisan: no hay de dónde sacarla. */
+  const SEIS_MESES = 182 * 24 * 3600 * 1000;
+  const avisoCaducidad = () => {
+    let t = 0;
+    try { t = parseInt(localStorage.getItem(STORAGE.AUTORIZADO) || '0', 10); } catch (e) { return; }
+    if (!t) return;
+    const quedan = Math.ceil((t + SEIS_MESES - Date.now()) / 86400000);
+    if (quedan > 10 || quedan < 1) return;
+    const hoy = new Date().toISOString().slice(0, 10);
+    try {
+      if (localStorage.getItem(STORAGE.AVISO_CADUCA) === hoy) return;
+      localStorage.setItem(STORAGE.AVISO_CADUCA, hoy);
+    } catch (e) { return; }
+    avisarLuego('◎ el permiso de spotify caduca en ' + quedan + (quedan === 1 ? ' día' : ' días')
+      + ' · pulsa [ conectar spotify ] en ajustes cuando quieras para renovarlo', 3000);
+  };
+
   const loadUser = async () => {
     try {
       const me = await api('/me');
+      miId = (me && me.id) || null;
       window.PlayerCore.setUser(me.display_name || me.id, (me.images && me.images[0]) ? me.images[0].url : null);
       window.PlayerCore.setSpotifyConnected(true);
+      avisoCaducidad();
       showSearchBlock(true);
       pintarChipAparato();   // conectado: el chip ya puede ofrecer elegir aparato
       if (window.LibraryModule) window.LibraryModule.onAuthChange(true);
@@ -2580,6 +2909,18 @@
       arrancarSDK();
     } catch (e) {
       console.warn('Spotify load user failed', e);
+      /* Antes esto se quedaba en la consola y la app parecía conectada a
+         medias: sin biblioteca, sin buscar y sin decir nada. El caso típico
+         es un 403 con la sesión recién abierta: la app está en «modo
+         desarrollo» y esa cuenta no está en su lista de usuarios (User
+         Management del dashboard, máximo 5), o el dueño de la app perdió el
+         Premium — la doc dice que entonces la app deja de funcionar. */
+      const r = leerError(e);
+      if (r.status === 403) {
+        avisarLuego('✕ spotify no deja entrar a esta cuenta en tu app · añádela en «User Management» del dashboard de spotify', 1500);
+      } else if (!r.sinSesion) {
+        avisarLuego('✕ ' + explicar(e, 'cargar tu cuenta'), 1500);
+      }
     }
   };
 
@@ -2592,7 +2933,15 @@
       return;
     }
     if (isLoggedIn()) {
-      const ok = confirm('Ya estás conectado a Spotify. ¿Cerrar sesión?');
+      /* La ventana de la casa en vez del confirm() del navegador (que además
+         congelaba la letra mientras estaba abierto). Solo cierra la sesión:
+         tu historial y tu música se quedan como están. */
+      const pregunta = { titulo: 'spotify', texto: '¿cerrar la sesión de spotify?',
+        detalle: 'tu música importada y tu historial se quedan como están. para volver, «conectar spotify».',
+        si: 'cerrar sesión', no: 'cancelar' };
+      const ok = window.MMDialogo
+        ? await window.MMDialogo.confirmar(pregunta)
+        : confirm(pregunta.texto);
       if (ok) {
         localStorage.removeItem(STORAGE.TOKEN);
         localStorage.removeItem(STORAGE.REFRESH);
@@ -2602,6 +2951,11 @@
         sdkDeviceId = null;
         sdkActivo = false;
         sdkIntento = null;
+        sdkPerdido = false;
+        sdkVetado = false;           // otra cuenta (o esta otra vez) merece su oportunidad
+        sdkReautenticado = false;
+        clearTimeout(reconexionT);
+        miId = null;
         destinoElegido = null;
         ventana = null;
         ultimaPrecarga = null;
@@ -2618,6 +2972,7 @@
         window.PlayerCore.setSpotifyConnected(false);
         window.PlayerCore.setUser('Invitado', null);
         if (window.LibraryModule) window.LibraryModule.onAuthChange(false);
+        setStatus('◎ sesión de spotify cerrada');
       }
       return;
     }
@@ -2625,15 +2980,44 @@
   };
 
   // -------- Handle redirect with ?code=... --------
+  /* UNA sola vez. Abajo hay dos caminos para arrancar —el DOMContentLoaded y
+     el «si el documento ya cargó»— y como este archivo va con `defer` se
+     cumplían LOS DOS: todo arrancaba dos veces. Dos `GET /me`, la biblioteca
+     cargada dos veces, dos limpiezas de la lista puente… el doble de cuota
+     en cada visita, que desde jul-2026 se cuenta por cuenta de desarrollador. */
+  let iniciado = false;
+
   const init = async () => {
+    if (iniciado) return;
+    iniciado = true;
+    /* PlayerCore (js/app.js) se carga DESPUÉS de este archivo. Con los
+       scripts ya en caché casi siempre está cuando se llega aquí, pero no
+       hay por qué jugársela: se espera a que exista (como mucho 5 s). */
+    if (!window.PlayerCore) {
+      await new Promise((listo) => {
+        const t0 = Date.now();
+        const mirar = () => ((window.PlayerCore || Date.now() - t0 > 5000) ? listo() : setTimeout(mirar, 30));
+        mirar();
+      });
+    }
     cablearChipDev();
     cablearLike();
+    /* El volumen apagado de un aparato que no lo deja tocar es cosa de
+       Spotify: con tu música sonando, fuera. */
+    if (window.PlayerCore && window.PlayerCore.onTrack) {
+      window.PlayerCore.onTrack(() => { pintarVolAjeno(volAjeno()); });
+    }
     const url = new URL(window.location.href);
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
     if (error) {
-      alert('Error de autorización Spotify: ' + error);
+      /* Era un `alert()` con el código crudo («access_denied»). Lo normal es
+         que sea eso: que en la pantalla de Spotify se pulsara «cancelar». */
+      avisarLuego(error === 'access_denied'
+        ? '◎ se canceló la conexión con spotify · puedes volver a intentarlo cuando quieras'
+        : '✕ spotify no dejó conectar (' + error + ') · pulsa [ conectar spotify ] otra vez');
       url.searchParams.delete('error');
+      url.searchParams.delete('state');
       window.history.replaceState({}, '', url.pathname);
     }
     if (code) {
@@ -2668,6 +3052,11 @@
 
   window.SpotifyModule = {
     connect, api, search: doSearch, playTrack, playContext, isLoggedIn,
+    /* El motivo de un fallo de la API en una línea para quien usa la app
+       (la cola y la biblioteca lo piden en vez de escribir el suyo). */
+    explicar,
+    // el id de la cuenta conectada (null si aún no se sabe)
+    yo: () => miId,
     togglePlay: spTogglePlay, next: spNext, prev: spPrev, seek: spSeek,
     setVolume: spSetVolume,
     setShuffle: spSetShuffle, setRepeat: spSetRepeat,
@@ -2726,13 +3115,7 @@
     playing: () => lastIsPlaying,
   };
 
-  // Wait for PlayerCore to be ready
-  document.addEventListener('DOMContentLoaded', () => {
-    if (window.PlayerCore) init();
-    else window.addEventListener('load', init);
-  });
-  // If DOM is already loaded
-  if (document.readyState !== 'loading') {
-    setTimeout(init, 0);
-  }
+  // Arranque: un camino u otro, nunca los dos (el pestillo está en `init`)
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else setTimeout(init, 0);
 })();

@@ -1731,3 +1731,37 @@ body.reduce-motion .ed-stack[class*="edcam-"] { animation: none !important; }
   66%  { opacity: 1; transform: translate(calc(var(--sx, 1) * 0.07em), calc(var(--sx, 1) * 0.06em)) rotate(calc(var(--sx, 1) * 4deg));   filter: none; }
   100% { opacity: 1; transform: translate(0, 0) rotate(0); }
 }
+
+/* ══════ ✎ «ESCRIBE» · el edit de TikTok (edEscribe en lyrics.js) ══════
+   La letra no se anima: APARECE. Cada letra está en su sitio desde el
+   principio, invisible, y se enciende de golpe a su hora (--d, que puede ser
+   negativo: lo ya cantado sale escrito). En pausa se para el tecleo, igual
+   que la voz. Blanco cálido con una sombra blanda para leerse sobre
+   cualquier fondo; en las cartas, tinta lisa sin sombra.
+   La tipografía es la elegida (hereda de .lyrics-edit): aquí solo peso,
+   mayúsculas (las pone lyrics.js) e interlineado. */
+.esc-stack { left: 5%; right: 5%; }
+.esc-texto {
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: 0.01em;
+  color: #fbf8f1;
+  text-shadow: 0 0.04em 0.2em rgba(0, 0, 0, 0.6), 0 0 0.6em rgba(0, 0, 0, 0.25);
+  text-wrap: balance;
+}
+.esc-w { display: inline-block; white-space: nowrap; }
+.esc-l {
+  opacity: 0;
+  animation: esc-aparece 1ms linear var(--d, 0ms) forwards;
+}
+@keyframes esc-aparece { to { opacity: 1; } }
+body:not(.playing) .esc-l { animation-play-state: paused; }
+
+/* LAS CARTAS: corte seco a blanco o a negro al entrar (sin el parpadeo del
+   invertido); al irse, el fundido de siempre del fondo (sal-*). Como el
+   invertido, llenan el panel de la letra y, en el cine y el 9:16, el marco. */
+.ed-fondo.esc-carta { animation: none; }
+.ed-fondo.esc-blanco { background: #f4f2ed; }
+.ed-fondo.esc-negro  { background: #000; }
+.esc-sobre-blanco .esc-texto { color: #121212; text-shadow: none; }
+.esc-sobre-negro .esc-texto  { color: #f6f4ef; text-shadow: none; }

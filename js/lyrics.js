@@ -2009,6 +2009,120 @@
   let edIdx = -3;          // índice de la línea que pintó (nunca coincide al arrancar)
   let edMedidoVacio = false;   // se midió con el panel oculto: hay que repetirlo
 
+  /* ══════ ✎ «ESCRIBE» · EL EDIT DE TIKTOK, DENTRO DEL MODO EDIT ══════
+     Lo del vídeo que trajo el usuario (30-sep-2026): el verso se ESCRIBE
+     letra a letra al ritmo de la voz, en mayúsculas, y se queda quieto hasta
+     el siguiente. Algunos de estos versos cortan a una carta lisa —blanca
+     con letra negra o negra con letra blanca— y ese corte es el golpe.
+     Lo quiso dentro del modo edit, como una animación más: le toca a uno de
+     cada cinco versos, más o menos (ESC_PROB), y sale también en el cine y
+     en el vídeo 9:16, que pintan este mismo modo.
+       · Las letras NO se animan: aparecen. Todas están en su sitio desde el
+         principio (invisibles), así que el renglón no baila al crecer: se
+         maqueta el verso entero y se va destapando, como en el vídeo.
+       · El reparto del tiempo sale de las sílabas de cada palabra dentro de
+         lo que dura el verso cantado (duracionCantada, la misma cuenta que
+         el karaoke), así que va CON la voz y no a velocidad fija. LRClib da
+         el tiempo del verso, no el de cada palabra: es una aproximación,
+         la misma que ya usa el barrido del karaoke.
+       · Si el verso se pinta tarde (repintar, abrir el cine a media frase)
+         lo ya cantado sale escrito de golpe: los retrasos se cuentan desde
+         el inicio del verso, no desde que se pinta.
+       · Quieto: sin cámara ni inclinación, centrado. Se despide con la
+         salida de siempre del verso que llega, y su carta con el fundido
+         del fondo del invertido.
+       · Todo con la semilla del índice canónico: el estribillo se escribe
+         (y corta a carta) igual cada vuelta. Nunca dos cartas seguidas, y
+         no en versos largos.
+       · La fuente es la elegida en config ⚙ (ver tipografia-unica-letra):
+         aquí solo se pone peso y mayúsculas. */
+  const ESC_PROB = 20;       // % de versos que se escriben
+  const ESC_CARTA = 45;      // % de esos que cortan a carta (38 % → +15 en los movidos)
+  let escPrevCarta = -9;     // índice del último verso que cortó a carta
+
+  const escToca = (ci, words) => words.length <= 12 && semilla(ci, 97, 100) < ESC_PROB;
+
+  const escCarta = (i, ci, words) => {
+    if (escPrevCarta === i - 1) return '';
+    if (words.length > 7 || edLargo(words.join(' ')) > 40) return '';
+    const prob = ESC_CARTA + (intensidadAuto(i) === 'hype' ? 15 : 0);
+    if (semilla(ci, 83, 100) >= prob) return '';
+    return semilla(ci, 89, 2) ? 'blanco' : 'negro';
+  };
+
+  // el verso entero tiene que caber: ninguna palabra más ancha que el
+  // panel y el bloque, como mucho, a un 78 % del alto
+  const escEncajar = (p) => {
+    if (!p || !p.isConnected) return;
+    const W = lyricsEdit.clientWidth, H = lyricsEdit.clientHeight;
+    if (!W || !H) return;
+    for (let v = 0; v < 6; v++) {
+      const px = parseFloat(p.style.fontSize) || 20;
+      const ancho = Math.max(1, ...[...p.querySelectorAll('.esc-w')].map((w) => w.offsetWidth));
+      const f = Math.min(1, (W * 0.9) / ancho, (H * 0.78) / Math.max(1, p.offsetHeight));
+      if (f >= 0.995) return;
+      const nuevo = Math.max(12, px * f * 0.98);
+      if (nuevo >= px - 0.2) return;
+      p.style.fontSize = nuevo.toFixed(1) + 'px';
+    }
+  };
+
+  const edEscribe = (stack, i, ci, words) => {
+    stack.className = 'ed-stack esc-stack';
+    stack.style.setProperty('--top', '50%');
+    stack.style.setProperty('--tilt', '0deg');
+
+    const carta = escCarta(i, ci, words);
+    if (carta) {
+      escPrevCarta = i;
+      stack.classList.add('esc-sobre-' + carta);
+      // como el del invertido: fuera del stack y detrás de él
+      const fondo = document.createElement('div');
+      fondo.className = 'ed-fondo esc-carta esc-' + carta;
+      lyricsEdit.insertBefore(fondo, stack);
+    }
+
+    /* Cuándo sale cada letra. Cada palabra pesa sus sílabas más un respiro
+       (el hueco entre palabras también se canta), y dentro de la palabra
+       las letras van a partes iguales. */
+    const cantado = duracionCantada(i) * 1000 * 0.92;
+    const pesos = words.map((w) => silabas(w) + 0.4);
+    const total = pesos.reduce((s, x) => s + x, 0) || 1;
+    const linea = parsedLines[i];
+    const yaVa = linea && linea.time >= 0 ? Math.max(0, (ultimoT + offset - linea.time) * 1000) : 0;
+
+    const p = document.createElement('div');
+    p.className = 'esc-texto';
+    // S · M · L · XL de config ⚙ y lo que iguala cada tipografía
+    const cs = getComputedStyle(lyricsEdit);
+    const escala = (parseFloat(cs.getPropertyValue('--lyrics-scale')) || 1)
+      * (parseFloat(cs.getPropertyValue('--lyrics-font-scale')) || 1);
+    p.style.fontSize = (Math.min(panelW() / 10, panelH() * 0.1) * escala).toFixed(1) + 'px';
+
+    let t = 0;
+    words.forEach((w, j) => {
+      const tramo = (cantado * pesos[j]) / total;
+      const letras = [...w.toUpperCase()];
+      const caja = document.createElement('span');
+      caja.className = 'esc-w';
+      letras.forEach((ch, k) => {
+        const s = document.createElement('span');
+        s.className = 'esc-l';
+        s.textContent = ch;
+        const cuando = t + (tramo * 0.8 * k) / letras.length;
+        s.style.setProperty('--d', Math.round(cuando - yaVa) + 'ms');
+        caja.appendChild(s);
+      });
+      p.appendChild(caja);
+      if (j < words.length - 1) p.appendChild(document.createTextNode(' '));
+      t += tramo;
+    });
+    stack.appendChild(p);
+    escEncajar(p);
+    // por si la tipografía o el tamaño del panel todavía se estaban asentando
+    requestAnimationFrame(() => escEncajar(p));
+  };
+
   const renderEdit = (i) => {
     /* TODAS las semillas del render usan el índice canónico, no el de la
        línea: así un estribillo repetido sale idéntico cada vuelta. */
@@ -2053,6 +2167,9 @@
       renderInstrumental(stack);
       return;
     }
+
+    // ✎ uno de cada cinco versos se escribe con la voz (en el ⚗ lab, no)
+    if (!demoFx && escToca(ci, words)) { edEscribe(stack, i, ci, words); return; }
 
     let delay = 100;
     // ¿Sale como TÍTULO GIGANTE? Antes solo con ≤3 palabras (casi nunca en

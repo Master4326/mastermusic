@@ -22,6 +22,40 @@
        ninguna regla de style.css toca esas clases, así que no hay empates de
        cascada que dependan del orden entre los dos archivos. -->
   <link rel="stylesheet" href="css/edit-fx.css" />
+  <!-- ASPECTO DE LA APP (config ⚙ → apariencia → aspecto; js/aspecto.js).
+       De fábrica es el 8 bits y aquí no se pide nada más. Con otro elegido,
+       su CSS se pide AQUÍ, antes de pintar y bloqueando el pintado hasta que
+       llegue (blocking="render"), para que la app abra ya con su cara y sin
+       enseñar el 8 bits un instante. Su tipografía, si la tiene, se pide sin
+       bloquear: mientras llega se ve la del sistema, que se le parece. -->
+  <script>
+    (function () {
+      var FUENTES = {
+        estudio: 'https://fonts.googleapis.com/css2?family=Roboto:wght@400..700&display=swap',
+        noche: 'https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&display=swap'
+      };
+      window.MMAspectoBase = { css: 'css/aspectos.css', fuentes: FUENTES };
+      var a = null;
+      try { a = localStorage.getItem('mm_aspecto'); } catch (e) { return; }
+      if (a !== 'cristal' && a !== 'estudio' && a !== 'noche') return;
+      var h = document.documentElement;
+      h.setAttribute('data-aspecto', a);
+      h.classList.add('moderno');
+      var l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = 'css/aspectos.css';
+      l.id = 'aspectoCss';
+      l.setAttribute('blocking', 'render');
+      document.head.appendChild(l);
+      if (FUENTES[a]) {
+        var f = document.createElement('link');
+        f.rel = 'stylesheet';
+        f.href = FUENTES[a];
+        f.id = 'aspectoFuente';
+        document.head.appendChild(f);
+      }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- Nunito 900 (+cursiva) es la tipografía redondeada gruesa que usan los
@@ -453,6 +487,20 @@
 
           <section class="settings-block" id="cfg-apariencia" data-titulo="apariencia" data-ico="◈">
             <h3>~ apariencia ~</h3>
+            <!-- ASPECTO · la cara de toda la app (js/aspecto.js). «8 bits» es
+                 la de siempre; los otros tres viven en css/aspectos.css, que
+                 solo se descarga si eliges uno. Los colores siguen saliendo
+                 de la carátula en todos, y la letra va con su tipografía. -->
+            <div class="set-row" data-buscar="aspecto estilo tema cara 8 bits pixel retro moderno cristal estudio noche clasico elegante">
+              <span class="set-label">aspecto</span>
+              <div class="seg" data-set="aspecto"
+                   title="La cara de toda la app. 8 bits es la de siempre; cristal, estudio y noche son modernas. Los colores siguen saliendo de la carátula y la letra conserva su tipografía.">
+                <button class="seg-btn" data-val="8bits">8 bits</button>
+                <button class="seg-btn" data-val="cristal">cristal</button>
+                <button class="seg-btn" data-val="estudio">estudio</button>
+                <button class="seg-btn" data-val="noche">noche</button>
+              </div>
+            </div>
             <!-- AMBIENTE · qué se ve por detrás de la letra. «ondas» es la
                  escena nueva estilo NCS (js/fondo.js); «clásico» deja la
                  carátula difuminada de siempre; «liso» apaga las dos. -->
@@ -715,10 +763,12 @@
               <kbd>B</kbd><span>listas</span>
               <kbd>Q</kbd><span>cola</span>
               <kbd>H</kbd><span>historial</span>
-              <kbd>V</kbd><span>vídeo 9:16 para tiktok (dentro, <kbd>R</kbd> graba y para)</span>
+              <!-- el vídeo 9:16 solo existe en la copia local: estas dos solo
+                   se ven con html.con-916, que pone js/vertical.js en local -->
+              <kbd class="tecla-916">V</kbd><span class="tecla-916">vídeo 9:16 para tiktok (dentro, <kbd>R</kbd> graba y para; <kbd>esc</kbd> sale)</span>
               <kbd>S</kbd><span>configuración (y otra vez para volver)</span>
               <kbd>1 2 3 · E</kbd><span>dentro del cine: estilo app, vinilo o letra · letra en lista o edit</span>
-              <kbd>esc</kbd><span>cerrar el buscador, el cine o el vídeo 9:16 — y volver desde configuración</span>
+              <kbd>esc</kbd><span>cerrar el buscador o el cine — y volver desde configuración</span>
             </div>
           </section>
 
@@ -918,6 +968,12 @@
        robársela al navegador (Ctrl+B, Ctrl+H…) ni al botón que tiene el
        foco. Va lo primero porque los dos cargan después. -->
   <script defer src="js/teclas.js"></script>
+  <!-- DIÁLOGO DE LA CASA · la ventana con la que la app pregunta («¿cerrar
+       la sesión de spotify?», «¿borrar tu historial?») en vez del confirm()
+       gris del navegador, que además congelaba la página mientras estaba
+       abierto. Temprano y sin depender de nadie: los demás lo llaman con
+       salvaguarda (`window.MMDialogo ? … : confirm(…)`). -->
+  <script defer src="js/dialogo.js"></script>
   <!-- EL TELÉFONO EN VERTICAL · muda de sitio lo que tiene que estar al
        alcance del pulgar (pestañas al pie, ♡ a la franja de la carátula,
        ◎ a la fila de vista, los avisos a la franja). Va de los PRIMEROS a
@@ -953,9 +1009,12 @@
   <script defer src="js/stats.js"></script>
   <script defer src="js/visualizer.js"></script>
   <!-- beat.js va DESPUÉS del visualizador (le pide el analizador crudo) y
-       ANTES de ambient.js, dcque solo pinta lo que este detecta -->
+       ANTES de ambient.js, que solo pinta lo que este detecta -->
   <script defer src="js/beat.js"></script>
   <script defer src="js/seven.js"></script>
+  <!-- aspecto.js va ANTES de settings.js: al cambiar el ajuste, settings le
+       pide el aspecto nuevo -->
+  <script defer src="js/aspecto.js"></script>
   <script defer src="js/settings.js"></script>
   <!-- tipografía de la letra: va DESPUÉS de settings.js (comparte el bloque
        de ajustes) y después de lyrics.js, a quien le pide el repintado -->

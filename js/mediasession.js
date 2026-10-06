@@ -11,6 +11,13 @@
    en otro dispositivo), así que ahí no aparece — y no hace falta, porque
    el propio Spotify ya publica su ficha en el sistema. Los mandos se
    registran igual: no cuesta nada y así los dos casos comparten camino.
+
+   Y CON SPOTIFY SONANDO EN ESTA PESTAÑA (el Web Playback SDK) tampoco es
+   esta la ficha que se ve: el audio del SDK suena dentro de su propio marco
+   (un iframe de sdk.scdn.co) y el sistema enseña la ficha de quien suena.
+   Por eso js/spotify.js arranca el SDK con `enableMediaSession: true`, la
+   opción de su documentación para que publique él la canción y atienda
+   las teclas multimedia, los auriculares y la pantalla de bloqueo.
    ========================================================== */
 (() => {
   'use strict';
@@ -70,13 +77,15 @@
   mando('pause', () => { const p = PC(); if (p && p.playing()) p.togglePlay(); });
   mando('previoustrack', () => { const p = PC(); if (p) p.prev(); });
   mando('nexttrack',     () => { const p = PC(); if (p) p.next(); });
+  // con un podcast, 15 s: el salto que las guías de Spotify piden para episodios
+  const salto = (p) => ((p.state && p.state.currentTrack && p.state.currentTrack.podcast) ? 15 : SALTO);
   mando('seekbackward', (d) => {
     const p = PC(); if (!p) return;
-    p.seek(p.position() - ((d && d.seekOffset) || SALTO));
+    p.seek(p.position() - ((d && d.seekOffset) || salto(p)));
   });
   mando('seekforward', (d) => {
     const p = PC(); if (!p) return;
-    p.seek(p.position() + ((d && d.seekOffset) || SALTO));
+    p.seek(p.position() + ((d && d.seekOffset) || salto(p)));
   });
   mando('seekto', (d) => {
     const p = PC(); if (!p || !d || d.seekTime == null) return;

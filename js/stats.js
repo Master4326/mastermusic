@@ -188,7 +188,14 @@
     if (pl) { crearPlaylist(pl); return; }
     const borrar = e.target.closest('#statsBorrar');
     if (borrar) {
-      if (!confirm('¿Borrar TODO tu historial de escuchas?\n\nEsto no se puede deshacer, y Spotify no guarda una copia: lo que se borre aquí se pierde.')) return;
+      // la ventana de la casa (js/dialogo.js); la del navegador solo de respaldo
+      const pregunta = { titulo: 'historial', texto: '¿borrar TODO tu historial de escuchas?',
+        detalle: 'no se puede deshacer, y spotify no guarda una copia: lo que se borre aquí se pierde.',
+        si: 'borrarlo todo', no: 'cancelar' };
+      const ok = window.MMDialogo
+        ? await window.MMDialogo.confirmar(pregunta)
+        : confirm(pregunta.texto + '\n\n' + pregunta.detalle);
+      if (!ok) return;
       await window.Historial.borrar();
       cargar();
       if (window.SevenStatus) window.SevenStatus('▣ historial borrado');

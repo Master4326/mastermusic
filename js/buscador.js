@@ -250,9 +250,13 @@
       hacer: () => { if (window.CinemaModule) window.CinemaModule.abrir('vinilo'); } },
     { n: 'modo cine · letra', alias: 'pantalla completa cine estilo letra sola edit', ico: 'cine',
       hacer: () => { if (window.CinemaModule) window.CinemaModule.abrir('letra'); } },
-    { n: 'vídeo 9:16 para tiktok', alias: 'grabar grabacion vertical reels shorts historia celular movil formato 916 video tiktok',
+    /* El vídeo 9:16 solo existe en la copia local de la app (js/vertical.js,
+       `disponible`): en la página publicada ni se ofrece. */
+    ...(window.MMVertical && window.MMVertical.disponible && window.MMVertical.disponible() ? [{
+      n: 'vídeo 9:16 para tiktok', alias: 'grabar grabacion vertical reels shorts historia celular movil formato 916 video tiktok',
       ico: 'vertical',
-      hacer: () => { if (window.MMVertical) window.MMVertical.abrir(); } },
+      hacer: () => window.MMVertical.abrir(),
+    }] : []),
     { n: 'modo edit (letra animada)', alias: 'efectos tiktok', ico: 'edit',
       hacer: () => { const b = document.getElementById('lyricsModeBtn'); if (b) b.click(); } },
     { n: 'letra ancha', alias: 'esconder caratula portada ancho completo w', ico: 'ancha',
@@ -319,8 +323,21 @@
       hacer: () => AJU() ? AJU().abrir('colores') : irPestania('settings') },
     { n: 'ajustes · letras', alias: 'tamaño tipografia fuente traduccion sincronia configuracion', ico: 'ajustes',
       hacer: () => AJU() ? AJU().abrir('letra') : irPestania('settings') },
-    { n: 'ajustes · apariencia', alias: 'ambiente crt movimiento microfono listas configuracion', ico: 'ajustes',
+    { n: 'ajustes · apariencia', alias: 'aspecto ambiente crt movimiento microfono listas configuracion', ico: 'ajustes',
       hacer: () => AJU() ? AJU().abrir('apariencia') : irPestania('settings') },
+    /* La cara de la app (config ⚙ → apariencia → aspecto). Se pulsa su
+       botón de ajustes: así se guarda, se aplica y lo dice la barra de
+       estado igual que si lo eligieras allí (js/settings.js). */
+    ...[['8bits', '8 bits', 'pixel retro original de siempre'],
+      ['cristal', 'cristal', 'moderno transparente esmerilado elegante'],
+      ['estudio', 'estudio', 'moderno negro oscuro chips'],
+      ['noche', 'noche', 'moderno oscuro tarjetas']].map(([v, nombre, alias]) => ({
+      n: 'aspecto · ' + nombre, alias: 'estilo tema cara apariencia ' + alias, ico: 'ajustes',
+      hacer: () => {
+        const b = document.querySelector('.seg[data-set="aspecto"] .seg-btn[data-val="' + v + '"]');
+        if (b) b.click();
+      },
+    })),
     { n: 'ajustes · datos', alias: 'cache letras borrar biblioteca memoria configuracion', ico: 'ajustes',
       hacer: () => AJU() ? AJU().abrir('datos') : irPestania('settings') },
     { n: 'ajustes · atajos de teclado', alias: 'teclas shortcuts ayuda configuracion', ico: 'teclado',

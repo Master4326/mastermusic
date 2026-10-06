@@ -78,7 +78,7 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: #000;
-  font-family: 'VT323', 'Share Tech Mono', monospace;
+  font-family: var(--f-ui, 'VT323', 'Share Tech Mono', monospace); font-size-adjust: var(--f-ui-aj, none);
   color: var(--text);
   cursor: default;
   user-select: none;
@@ -173,7 +173,7 @@ body.perf-bajo::after { display: none; }
   width: min(1440px, 100%);
   height: min(900px, calc(100vh - 40px));
   background: var(--bg-window);
-  border: 2px solid var(--border-light);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   box-shadow:
     inset 0 0 0 1px var(--border-dark),
     /* el halo sale del acento de la canción: era el cian de fábrica escrito
@@ -265,7 +265,7 @@ body:has(.window.maximized) { padding: 0; }
 .title-bar {
   height: 36px;
   background: linear-gradient(180deg, var(--bg-frame) 0%, var(--bg-window) 100%);
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -290,7 +290,7 @@ body:has(.window.maximized) { padding: 0; }
    espaciado va en píxeles enteros por lo mismo. Vale para toda la app: si
    se usa esta fuente, a 8/16/24. */
 .title-text {
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;
   letter-spacing: 1px;
   color: var(--accent);
@@ -300,15 +300,15 @@ body:has(.window.maximized) { padding: 0; }
 .tb-btn {
   width: 24px; height: 22px;
   background: var(--bg-frame);
-  border: 1px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-light), inset -1px -1px 0 var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-light), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   color: var(--text);
   font-size: 12px;
   line-height: 1;
   display: flex; align-items: center; justify-content: center;
 }
 .tb-btn:hover { background: var(--border-pixel); }
-.tb-btn:active { box-shadow: inset -1px -1px 0 var(--border-light), inset 1px 1px 0 var(--border-dark); }
+.tb-btn:active { box-shadow: inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-light), inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark); }
 .tb-close:hover { background: #c33; color: #fff; }
 
 .pixel-icon {
@@ -361,10 +361,10 @@ body:has(.window.maximized) { padding: 0; }
   width: 100%;
   aspect-ratio: 1;
   background: var(--bg-frame);
-  border: 2px solid var(--border-light);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   box-shadow:
-    inset 1px 1px 0 var(--border-hi),
-    inset -1px -1px 0 var(--border-dark),
+    inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi),
+    inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark),
     0 0 12px color-mix(in oklab, var(--accent-glow) 20%, transparent);
   padding: 6px;
   position: relative;
@@ -380,7 +380,7 @@ body:has(.window.maximized) { padding: 0; }
   width: 100%;
   height: 100%;
   background: #000;
-  border: 1px solid var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
   overflow: hidden;
   position: relative;
@@ -420,7 +420,7 @@ body:has(.window.maximized) { padding: 0; }
   pointer-events: none;
 }
 .cover-placeholder {
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 64px;
   color: var(--accent);
   text-shadow: 0 0 8px var(--accent-glow);
@@ -433,8 +433,8 @@ body:has(.window.maximized) { padding: 0; }
 
 .track-info {
   background: var(--bg-panel);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-pixel), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   padding: 8px 10px;
   font-size: 18px;
   line-height: 1.2;
@@ -536,8 +536,8 @@ body.reduce-motion .ti-desborda {
 
 .visualizer-frame {
   background: #000;
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-pixel), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   padding: 4px;
   flex: 1;
   min-height: 80px;
@@ -586,8 +586,8 @@ body.perf-bajo #visualizer { filter: none; }
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-pixel), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   min-height: 0;
   overflow: hidden;
 }
@@ -598,7 +598,7 @@ body.perf-bajo #visualizer { filter: none; }
   gap: 4px;
   padding: 6px 8px;
   background: var(--bg-panel-2);
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   font-size: 18px;
   /* La barra se esconde sola en la pestaña de letras (seven.js), como los
      controles del cine. Colapsa DE VERDAD (max-height) para que la letra
@@ -1781,8 +1781,8 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   flex-direction: column;
   gap: 6px;
   background: rgba(8, 8, 14, 0.93);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark),
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark),
               0 0 20px rgba(0, 0, 0, 0.55);
   padding: 8px;
   overflow-y: auto;
@@ -1799,7 +1799,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 }
 .fx-lab-close {
   background: none;
-  border: 1px solid var(--border-light);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   color: var(--text);
   font-family: inherit;
   font-size: 13px;
@@ -1809,10 +1809,10 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 .fx-lab-close:hover { background: var(--border-pixel); }
 .fx-lab-text {
   background: #000;
-  border: 1px solid var(--border-dark);
-  box-shadow: inset 1px 1px 0 var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark);
   color: var(--text);
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   padding: 4px 6px;
   outline: none;
@@ -1832,7 +1832,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 }
 .fx-chip {
   background: var(--bg-frame);
-  border: 1px solid var(--border-light);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   color: var(--accent);
   font-family: inherit;
   font-size: 13px;
@@ -1854,8 +1854,8 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 .fx-lab-accion {
   flex: 1;
   background: var(--bg-frame);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   color: var(--accent);
   font-family: inherit;
   font-size: 14px;
@@ -1934,8 +1934,8 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 }
 .retro-btn {
   background: var(--bg-frame);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   color: var(--accent);
   padding: 6px 10px;
   font-size: 16px;
@@ -1945,7 +1945,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 }
 .retro-btn:hover { background: var(--border-pixel); color: var(--text); }
 .retro-btn:active {
-  box-shadow: inset -1px -1px 0 var(--border-hi), inset 1px 1px 0 var(--border-dark);
+  box-shadow: inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark);
   transform: translate(1px, 1px);
 }
 /* Los corchetes «[ … ]» iban en --magenta, un rosa fijo: ahora en el segundo
@@ -1954,7 +1954,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 .retro-btn.small { padding: 4px 8px; font-size: 13px; }
 
 #offsetValue {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 18px;
   color: var(--accent);
   text-shadow: 0 0 4px var(--accent-glow);
@@ -1967,8 +1967,8 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   width: 100%;
   height: 6px;
   background: #000;
-  border: 1px solid var(--border-dark);
-  box-shadow: inset 1px 1px 0 var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark);
   outline: none;
   cursor: pointer;
 }
@@ -1997,8 +1997,8 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   margin-bottom: 12px;
   padding: 6px 10px;
   background: #000;
-  border: 2px solid var(--border-dark);
-  box-shadow: inset 1px 1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark);
 }
 .prompt {
   color: var(--accent);
@@ -2050,7 +2050,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 .tr-del:hover { color: var(--magenta); text-shadow: 0 0 6px var(--magenta); }
 .track-row:hover {
   background: var(--bg-frame);
-  border: 1px solid var(--border-pixel);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--accent);
 }
 .track-row.playing {
@@ -2078,11 +2078,11 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   margin: 0 -20px 10px;
   padding: 6px 20px 7px;
   background: var(--bg-panel);
-  border-bottom: 1px solid var(--border-dark);
+  border-bottom: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   /* Press Start 2P está dibujada en 8 × 8: solo sale nítida a 8, 16, 24 px.
      A 9 px cada «píxel» medía 1,125 y se emborronaba. El espaciado, en
      píxeles enteros por lo mismo. */
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -2103,20 +2103,20 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 .swatch {
   width: 32px; height: 32px;
   background: var(--c);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 rgba(255,255,255,0.3), inset -1px -1px 0 var(--border-dark), 0 0 8px var(--c);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,0.3), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark), 0 0 8px var(--c);
   cursor: pointer;
 }
 .swatch:hover { transform: scale(1.1); }
 .swatch.active {
   border-color: #fff;
-  box-shadow: inset 1px 1px 0 rgba(255,255,255,0.5), inset -1px -1px 0 var(--border-dark), 0 0 12px var(--c);
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,0.5), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark), 0 0 12px var(--c);
 }
 .swatch-auto {
   --c: var(--accent);
   background: conic-gradient(#ff5c5c, #ffe45c, #22ff77, #5ce1e6, #b58cff, #ff77c8, #ff5c5c);
   color: #fff;
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;
   text-shadow: 0 0 4px #000, 1px 1px 0 #000;
   display: flex;
@@ -2141,7 +2141,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 }
 .custom-label {
   color: #fff;
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 16px;
   text-shadow: 0 0 4px #000, 1px 1px 0 #000;
   pointer-events: none;
@@ -2167,28 +2167,28 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   width: 14px;
   height: 14px;
   background: #000;
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark);
   cursor: pointer;
   position: relative;
 }
 .radio-row input[type="radio"]:checked {
   background: var(--accent);
-  box-shadow: inset 1px 1px 0 var(--border-dark), 0 0 6px var(--accent-glow);
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark), 0 0 6px var(--accent-glow);
 }
 .radio-row input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
   width: 14px; height: 14px;
   background: #000;
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark);
   cursor: pointer;
   position: relative;
 }
 .radio-row input[type="checkbox"]:checked {
   background: var(--accent);
-  box-shadow: inset 1px 1px 0 var(--border-dark), 0 0 6px var(--accent-glow);
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark), 0 0 6px var(--accent-glow);
 }
 .radio-row input[type="checkbox"]:checked::after {
   content: '✓';
@@ -2212,7 +2212,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
    ========================================================== */
 .playback-bar {
   background: var(--bg-panel-2);
-  border-top: 2px solid var(--border-dark);
+  border-top: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   padding: 8px 12px;
   display: flex;
   flex-direction: column;
@@ -2238,7 +2238,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
   font-display: swap;
 }
 .time {
-  font-family: 'DSEG7', 'VT323', monospace;
+  font-family: var(--f-num, 'DSEG7', 'VT323', monospace); font-size-adjust: var(--f-num-aj, none);
   font-size: 12px;              /* sus cifras llenan el em entero: 12 px de DSEG ≈ 16 de VT323 */
   color: var(--accent);
   min-width: 42px;
@@ -2280,7 +2280,7 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 .progress-bg {
   height: 12px;
   background: linear-gradient(180deg, #000 0%, #0b0b16 100%);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   box-shadow:
     inset 1px 1px 0 rgba(0, 0, 0, 0.85),
     0 1px 0 var(--border-hi);
@@ -2431,8 +2431,8 @@ body.barra-agarrada .prog-tip { opacity: 1; }
   position: relative;
   width: 32px; height: 26px;
   background: var(--bg-frame);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   color: var(--text);
   font-size: 14px;
   display: flex; align-items: center; justify-content: center;
@@ -2441,7 +2441,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 .ctrl-btn:hover { background: var(--border-pixel); color: var(--accent); }
 .ctrl-btn:active,
 .ctrl-btn.active {
-  box-shadow: inset -1px -1px 0 var(--border-hi), inset 1px 1px 0 var(--border-dark);
+  box-shadow: inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark);
   color: var(--accent);
   text-shadow: 0 0 4px var(--accent-glow);
 }
@@ -2450,7 +2450,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 .rep-badge {
   position: absolute;
   bottom: 0; right: 2px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 12px;
   line-height: 1;
   color: var(--accent);
@@ -2471,7 +2471,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
   border-color: var(--accent);
   box-shadow:
     inset 1px 1px 0 rgba(255, 255, 255, 0.45),
-    inset -2px -2px 0 var(--accent-dim),
+    inset calc(-2px * var(--bisel, 1)) calc(-2px * var(--bisel, 1)) 0 var(--accent-dim),
     0 0 10px var(--accent-glow);
   text-shadow: none;
 }
@@ -2483,7 +2483,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 .play-btn:active,
 .play-btn.active {
   color: var(--bg-deep);
-  box-shadow: inset 2px 2px 0 var(--accent-dim), inset -1px -1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: inset calc(2px * var(--bisel, 1)) calc(2px * var(--bisel, 1)) 0 var(--accent-dim), inset -1px -1px 0 rgba(255, 255, 255, 0.35);
 }
 
 /* ==========================================================
@@ -2534,8 +2534,8 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 .volume-bg {
   height: 6px;
   background: #000;
-  border: 1px solid var(--border-dark);
-  box-shadow: inset 1px 1px 0 var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark);
   position: relative;
   overflow: visible;
 }
@@ -2571,9 +2571,16 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 .volume-bar:hover .volume-thumb,
 .volume-ctl.dragging .volume-thumb { opacity: 1; }
 
+/* Suena en un aparato que NO deja cambiar su volumen desde fuera (Spotify
+   dice `supports_volume: false`: iPhones por Spotify Connect, algunos
+   altavoces). La barra seguía moviéndose sin cambiar nada; ahora se ve
+   apagada y js/spotify.js lo dice una vez. La pone y la quita él. */
+body.vol-ajeno .volume-ctl,
+body.vol-ajeno .dev-vol { opacity: 0.4; }
+
 /* Porcentaje: solo aparece mientras se usa el control */
 .vol-pct {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   color: var(--accent);
   text-shadow: 0 0 4px var(--accent-glow);
@@ -2598,7 +2605,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
    ========================================================== */
 .status-bar {
   background: var(--bg-window);
-  border-top: 2px solid var(--border-dark);
+  border-top: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   padding: 4px 12px;
   font-size: 14px;
   color: var(--text-dim);
@@ -2720,7 +2727,7 @@ body.playing .status-bar .filler {
   margin: 8px 0 4px;
 }
 .st-dato {
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   padding: 8px 6px;
   text-align: center;
   background: var(--bg-panel-2);
@@ -2796,7 +2803,7 @@ body.playing .status-bar .filler {
   align-items: center;
   gap: 5px;
   background: transparent;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--text-dim);
   font: inherit;
   font-size: 0.86em;
@@ -2840,8 +2847,8 @@ body.playing .status-bar .filler {
   max-height: 46vh;
   overflow-y: auto;
   background: var(--bg-panel-2);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), 0 6px 22px rgba(0, 0, 0, 0.55);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), 0 6px 22px rgba(0, 0, 0, 0.55);
   padding: 4px;
 }
 .dev-menu[hidden] { display: none; }
@@ -2926,7 +2933,7 @@ body.playing .status-bar .filler {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: clamp(13px, 1.1cqw, 17px);
   letter-spacing: 1px;
   line-height: 1;
@@ -2963,7 +2970,7 @@ body.playing .status-bar .filler {
   text-align: center;
 }
 .drop-card h2 {
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 16px;
   color: var(--accent);
   text-shadow: 0 0 8px var(--accent-glow);
@@ -2992,12 +2999,12 @@ body.playing .status-bar .filler {
 ::-webkit-scrollbar { width: 12px; height: 10px; }
 ::-webkit-scrollbar-track {
   background: var(--bg-panel-2);
-  border-left: 1px solid var(--border-dark);
+  border-left: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
 }
 ::-webkit-scrollbar-thumb {
   background: var(--bg-frame);
-  border: 1px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi);
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-pixel); }
 ::-webkit-scrollbar-corner { background: var(--bg-panel-2); }
@@ -3162,7 +3169,7 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
     margin-right: 0;
     padding: 12px 10px;          /* franja gorda: se arrastra con el pulgar */
     background: var(--bg-panel);
-    border: 2px solid var(--border-pixel);
+    border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
     z-index: 40;
   }
@@ -3203,12 +3210,12 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
   position: absolute;
   top: 6px; right: 6px;
   z-index: 5;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 14px;
   line-height: 1;
   padding: 3px 8px;
   background: rgba(0, 0, 0, 0.55);
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--text-dim);
   cursor: pointer;
   opacity: 0.5;
@@ -3244,7 +3251,7 @@ body.reduce-motion .viz-sync.sugerido { animation: none; }
   z-index: 6;
   width: 26px; height: 26px;
   background: rgba(0, 0, 0, 0.5);
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--text-dim);
   cursor: pointer;
   font-size: 13px;
@@ -3358,7 +3365,7 @@ body.vinyl-mode .cover-inner::after {
   padding-top: 0;
 }
 .sp-search-head {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 18px;
   letter-spacing: 1px;
   color: var(--accent);
@@ -3388,11 +3395,11 @@ body.vinyl-mode .cover-inner::after {
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-  border: 1px solid var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
 }
 .sp-meta { flex: 1; min-width: 0; }
 .sp-name {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 14px;
   color: var(--text);
   white-space: nowrap;
@@ -3400,7 +3407,7 @@ body.vinyl-mode .cover-inner::after {
   text-overflow: ellipsis;
 }
 .sp-artist {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
@@ -3408,7 +3415,7 @@ body.vinyl-mode .cover-inner::after {
   text-overflow: ellipsis;
 }
 .sp-dur {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   color: var(--text-muted);
   flex-shrink: 0;
@@ -3416,7 +3423,7 @@ body.vinyl-mode .cover-inner::after {
 .sp-play {
   flex-shrink: 0;
   background: transparent;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--accent);
   width: 30px;
   height: 30px;
@@ -3435,7 +3442,7 @@ body.vinyl-mode .cover-inner::after {
 .sp-queue {
   flex-shrink: 0;
   background: transparent;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--text-muted);
   width: 30px;
   height: 30px;
@@ -3457,7 +3464,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   list-style: none;
   text-align: center;
   padding: 14px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 16px;
   color: var(--text-muted);
 }
@@ -3473,12 +3480,12 @@ body.perf-tactil .sp-queue { opacity: 1; }
   margin-bottom: 10px;
 }
 .lib-chip {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 17px;
   letter-spacing: 1px;
   padding: 2px 10px;
   background: var(--bg-panel-2);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   color: var(--text-dim);
   cursor: pointer;
   line-height: 1.5;
@@ -3495,7 +3502,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   width: 28px;
   height: 26px;
   background: transparent;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--accent);
   cursor: pointer;
   font-size: 15px;
@@ -3509,14 +3516,14 @@ body.perf-tactil .sp-queue { opacity: 1; }
   gap: 10px;
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
 }
 .lib-back {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
   background: transparent;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--accent);
   cursor: pointer;
   font-size: 20px;
@@ -3525,7 +3532,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
 .lib-back:hover { background: var(--accent); color: var(--bg-deep); }
 .lib-head-meta { flex: 1; min-width: 0; }
 .lib-head-title {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 20px;
   letter-spacing: 1px;
   color: var(--accent);
@@ -3535,7 +3542,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   text-overflow: ellipsis;
 }
 .lib-head-sub {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 12px;
   color: var(--text-dim);
 }
@@ -3558,7 +3565,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   position: relative;
   aspect-ratio: 1 / 1;
   background: var(--bg-frame) center/cover no-repeat;
-  border: 1px solid var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3583,7 +3590,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
 .lib-card:hover .lib-card-play { opacity: 1; transform: translateY(0); }
 .lib-card-play:hover { background: var(--accent); color: var(--bg-deep); box-shadow: 0 0 10px var(--accent-glow); }
 .lib-card-name {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 13px;
   color: var(--text);
   white-space: nowrap;
@@ -3591,7 +3598,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   text-overflow: ellipsis;
 }
 .lib-card-sub {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 11px;
   color: var(--text-dim);
   white-space: nowrap;
@@ -3605,7 +3612,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   height: 68px;
   flex-shrink: 0;
   background: var(--bg-frame) center/cover no-repeat;
-  border: 1px solid var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3613,7 +3620,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   color: var(--text-muted);
 }
 .lib-head-kind {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 10px;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -3636,7 +3643,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   flex-shrink: 0;
   width: 22px;
   text-align: right;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   color: var(--text-muted);
 }
@@ -3670,12 +3677,12 @@ body.playing .sp-eq i:nth-child(3) { animation-duration: 1s; animation-delay: 0.
 body.reduce-motion .sp-eq i { animation: none !important; transform: scaleY(0.5) !important; }
 .q-section {
   list-style: none;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 16px;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--text-muted);
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   padding-bottom: 4px;
   margin: 14px 0 6px;
 }
@@ -3687,7 +3694,7 @@ body.reduce-motion .sp-eq i { animation: none !important; transform: scaleY(0.5)
    que se lea igual en los dos sitios. */
 .q-fuente {
   list-style: none;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   color: var(--accent);
   opacity: .72;
@@ -3737,7 +3744,7 @@ body.reduce-motion .sp-eq i { animation: none !important; transform: scaleY(0.5)
   flex: 1;
   min-width: 0;
   background: var(--bg-panel-2);
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--text);
   font-family: inherit;
   font-size: 0.78em;
@@ -3756,7 +3763,7 @@ body.reduce-motion .sp-eq i { animation: none !important; transform: scaleY(0.5)
   flex-shrink: 0;
   width: 28px; height: 28px;
   background: transparent;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--accent);
   cursor: pointer;
   font-size: 14px;
@@ -3848,12 +3855,12 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
   gap: 6px;
 }
 .seg-btn {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 17px;
   letter-spacing: 1px;
   padding: 2px 12px;
   background: var(--bg-panel-2);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   color: var(--text-dim);
   cursor: pointer;
   line-height: 1.5;
@@ -3890,7 +3897,7 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
   gap: 10px;
   padding: 5px 10px;
   background: var(--bg-panel-2);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   color: var(--text);
   cursor: pointer;
   text-align: left;
@@ -3912,7 +3919,7 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
 }
 .fa-mas {
   flex-shrink: 0;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   letter-spacing: 1px;
   color: var(--accent);
@@ -3944,7 +3951,7 @@ body.rows-compact .sp-thumb { width: 30px; height: 30px; }
   background: var(--bg-panel);
   border: 3px solid var(--accent);
   box-shadow: 0 0 34px var(--accent-glow), 0 18px 60px rgba(0, 0, 0, .6),
-              inset 1px 1px 0 var(--border-pixel);
+              inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel);
   animation: paletaEntra .16s ease-out both;
 }
 body.reduce-motion .fuentes-caja { animation: none; }
@@ -3957,7 +3964,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   padding: 8px 10px;
   overflow-x: auto;
   background: var(--bg-panel-2);
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   /* una sola fila que se arrastra: envolverlas volvería a ser una pared.
      Aquí iba `scrollbar-width: thin`, y con él Chrome ignora la barra pixel
      (ver «BARRAS DE DESPLAZAMIENTO PIXEL»): la fina se pide por su alto. */
@@ -3965,14 +3972,14 @@ body.reduce-motion .fuentes-caja { animation: none; }
 .fuentes-grupos::-webkit-scrollbar { height: 8px; }
 .fg-chip {
   flex: 0 0 auto;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 17px;
   letter-spacing: 1px;
   line-height: 1.2;
   padding: 5px 12px;
   min-height: 32px;
   background: var(--bg-frame);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   color: var(--text-dim);
   cursor: pointer;
   white-space: nowrap;
@@ -3999,7 +4006,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   grid-column: 1 / -1;
   padding: 26px 10px;
   text-align: center;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 18px;
   color: var(--text-muted);
 }
@@ -4013,7 +4020,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   align-items: center;
   gap: 10px;
   margin: 10px 2px 0;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 17px;
   line-height: 1.2;
   letter-spacing: 2px;
@@ -4033,7 +4040,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   gap: 4px;
   padding: 9px 11px;
   background: var(--bg-panel-2);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   color: var(--text);
   cursor: pointer;
   text-align: left;
@@ -4073,7 +4080,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   line-height: 1.2;
 }
 .fc-nombre {
@@ -4118,7 +4125,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   text-shadow: 0 0 8px var(--accent-glow);
 }
 .fc-nota {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 14px;
   line-height: 1.25;
   color: var(--text-muted);
@@ -4149,7 +4156,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
 .font-preview {
   margin-top: 10px;
   padding: 10px 14px;
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   background: var(--bg-panel-2);
   overflow: hidden;
   font-family: var(--lyrics-font, 'VT323', monospace);
@@ -4204,7 +4211,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
    que es como se lee en un teléfono.
    ========================================================== */
 .set-label {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 17px;
   letter-spacing: 1px;
   line-height: 1.4;
@@ -4219,7 +4226,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   margin: 0 -6px;
   transition: background 0.14s ease-out;
 }
-.set-row + .set-row { border-top: 1px dashed var(--border-dark); }
+.set-row + .set-row { border-top: calc(1px * var(--marco-g, 1)) dashed var(--marco-dark, var(--border-dark)); }
 /* Posarse encima ata la etiqueta con su control: en una lista de filas
    parecidas, saber cuál estás tocando es medio acierto menos. */
 .set-row:hover,
@@ -4233,7 +4240,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
 .set-row .retro-btn { justify-self: start; }
 /* El número de la sección «datos»: cuántas letras, cuántas pistas */
 .set-dato {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
@@ -4270,7 +4277,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
 .offset-ctl input[type="range"]::-webkit-slider-runnable-track,
 .dev-vol-rango::-webkit-slider-runnable-track {
   height: 8px;
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   background-color: var(--bg-panel-2);
   background-image:
     repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 8px),
@@ -4288,13 +4295,13 @@ body.reduce-motion .fuentes-caja { animation: none; }
   height: 18px;
   margin-top: -5px;            /* (8 del riel − 18 del tirador) / 2 */
   background: var(--text);
-  border: 2px solid var(--border-dark);
-  box-shadow: inset -2px -2px 0 var(--accent-dim);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
+  box-shadow: inset calc(-2px * var(--bisel, 1)) calc(-2px * var(--bisel, 1)) 0 var(--accent-dim);
 }
 .offset-ctl input[type="range"]::-moz-range-track,
 .dev-vol-rango::-moz-range-track {
   height: 8px;
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   background-color: var(--bg-panel-2);
   background-image: repeating-linear-gradient(90deg, var(--bg-frame) 0 6px, transparent 6px 8px);
 }
@@ -4310,11 +4317,11 @@ body.reduce-motion .fuentes-caja { animation: none; }
   height: 18px;
   border-radius: 0;
   background: var(--text);
-  border: 2px solid var(--border-dark);
-  box-shadow: inset -2px -2px 0 var(--accent-dim);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
+  box-shadow: inset calc(-2px * var(--bisel, 1)) calc(-2px * var(--bisel, 1)) 0 var(--accent-dim);
 }
 .offset-val {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 18px;
   color: var(--accent);
   min-width: 62px;
@@ -4326,15 +4333,15 @@ body.reduce-motion .fuentes-caja { animation: none; }
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 4px 12px;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 12px;
   color: var(--text-dim);
 }
 .keys-grid kbd {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   background: var(--bg-panel-2);
-  border: 1px solid var(--border-pixel);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--accent);
   padding: 0 6px;
   white-space: nowrap;
@@ -4407,7 +4414,7 @@ body.reduce-motion .tab-content.active { animation: none; }
   background: var(--bg-deep);
   border: 2px solid var(--accent);
   color: var(--accent);
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   line-height: 1.4;
   pointer-events: none;
@@ -4565,7 +4572,7 @@ body.reduce-motion .skel-line::after { animation: none; display: none; }
 /* el nombre, con la separación cromática justa para que se sienta CRT */
 .li-mark {
   position: relative;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: clamp(26px, 3.4cqw, 44px);
   letter-spacing: 4px;
   color: var(--accent);
@@ -4591,7 +4598,7 @@ body.reduce-motion .skel-line::after { animation: none; display: none; }
 }
 
 .li-sub {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 13px;
   color: var(--text-dim);
   letter-spacing: 0.03em;
@@ -4609,10 +4616,10 @@ body.reduce-motion .skel-line::after { animation: none; display: none; }
   position: relative;
   min-width: 168px;
   padding: 14px 16px 12px;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 60%), var(--bg-panel-2);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 4px 0 var(--border-dark);
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   overflow: hidden;
   /* Eran <div>: el centrado y el color los heredaban del panel, y un
      <button> no hereda ninguno de los dos. */
@@ -4677,7 +4684,7 @@ body.reduce-motion .li-way:active { transform: none; }
   margin-top: 8px;
   min-height: 1.4em;
   max-width: 46ch;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -4867,7 +4874,7 @@ body.playing .ncs-brillo { animation-play-state: running; }
   gap: 4px;
 }
 .ncs-titulo {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: clamp(20px, 2.9cqw, 40px);
   line-height: 1.1;
   letter-spacing: 1px;
@@ -4876,7 +4883,7 @@ body.playing .ncs-brillo { animation-play-state: running; }
   overflow-wrap: anywhere;
 }
 .ncs-artista {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: clamp(11px, 1.3cqw, 17px);
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -5303,7 +5310,7 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   right: 4px; top: 50%;
   transform: translateY(-50%);
   width: 22px; height: 22px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   color: var(--text-muted);
 }
@@ -5316,7 +5323,7 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   margin-top: 9px;
 }
 .sp-rec-tit {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 11px;
   color: var(--text-muted);
   margin-right: 2px;
@@ -5324,11 +5331,11 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
 .sp-rec {
   max-width: 148px;
   padding: 3px 8px;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 11px;
   color: var(--text-dim);
   background: var(--bg-panel-2);
-  border: 1px solid var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5353,13 +5360,13 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   color: var(--accent-dim);
 }
 .sp-empty-inicio b {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 20px;
   letter-spacing: 1px;
   color: var(--text);
 }
 .sp-empty-tip {
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -5367,7 +5374,7 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   padding: 0 4px;
   color: var(--text-dim);
   background: var(--bg-panel-2);
-  border: 1px solid var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
 }
 
 /* ==========================================================
@@ -5582,7 +5589,7 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
 .tab.icon-tab { gap: 6px; }
 .tab-ico { font-size: 1.05em; line-height: 1; }
 .tab-txt {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   letter-spacing: 1px;
   line-height: 1;
 }
@@ -5597,12 +5604,12 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   margin: 2px 0 4px;
 }
 .sp-tipo {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 16px;
   letter-spacing: 1px;
   padding: 2px 12px;
   background: var(--bg-panel-2);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   color: var(--text-dim);
   cursor: pointer;
   line-height: 1.5;
@@ -5659,11 +5666,11 @@ body.perf-tactil .sp-del { opacity: 1; }
 .q-desde {
   max-width: 100%;
   padding: 2px 10px;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 12px;
   color: var(--text-dim);
   background: var(--bg-panel-2);
-  border: 1px solid var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -5689,7 +5696,7 @@ body.perf-tactil .sp-del { opacity: 1; }
   align-items: center;
   gap: 10px;
   padding: 0 5px 0 10px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 19px;
   letter-spacing: 0.5px;
   line-height: 1;
@@ -5699,7 +5706,7 @@ body.perf-tactil .sp-del { opacity: 1; }
      en la barra, y el usuario lo pidió así (22-sep-2026, igual que la
      fila de vista). */
   background: transparent;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   box-shadow: none;
   cursor: pointer;
   transition: border-color var(--t-rapida) ease, box-shadow var(--t-rapida) ease, color var(--t-rapida) ease;
@@ -5761,7 +5768,7 @@ body.perf-tactil .sp-del { opacity: 1; }
   background: var(--bg-panel);
   border: 3px solid var(--accent);
   box-shadow: 0 0 34px var(--accent-glow), 0 18px 60px rgba(0, 0, 0, .6),
-              inset 1px 1px 0 var(--border-pixel);
+              inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel);
   animation: paletaEntra .16s ease-out both;
 }
 @keyframes paletaEntra {
@@ -5776,7 +5783,7 @@ body.reduce-motion .paleta-caja { animation: none; }
   gap: 10px;
   padding: 10px 14px;
   background: #000;
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   flex: 0 0 auto;
 }
 .paleta-prompt {
@@ -5792,7 +5799,7 @@ body.reduce-motion .paleta-caja { animation: none; }
   border: none;
   outline: none;
   color: var(--text);
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 24px;
   line-height: 1.2;
 }
@@ -5801,7 +5808,7 @@ body.reduce-motion .paleta-caja { animation: none; }
   flex-shrink: 0;
   width: 26px; height: 26px;
   background: transparent;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--text-dim);
   cursor: pointer;
   font-size: 12px;
@@ -5819,7 +5826,7 @@ body.reduce-motion .paleta-caja { animation: none; }
 }
 .paleta-seccion {
   padding: 8px 8px 3px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 14px;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -5849,7 +5856,7 @@ body.reduce-motion .paleta-caja { animation: none; }
   align-items: center;
   justify-content: center;
   background: var(--bg-frame) center/cover no-repeat;
-  border: 1px solid var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   color: var(--text-dim);
   font-size: 16px;
 }
@@ -5857,7 +5864,7 @@ body.reduce-motion .paleta-caja { animation: none; }
 .paleta-txt { flex: 1; min-width: 0; }
 .paleta-tit {
   display: block;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 14px;
   color: var(--text);
   white-space: nowrap;
@@ -5867,7 +5874,7 @@ body.reduce-motion .paleta-caja { animation: none; }
 .paleta-fila-r.sel .paleta-tit { color: var(--accent); }
 .paleta-sub {
   display: block;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 11.5px;
   color: var(--text-dim);
   white-space: nowrap;
@@ -5876,7 +5883,7 @@ body.reduce-motion .paleta-caja { animation: none; }
 }
 .paleta-dur {
   flex-shrink: 0;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   color: var(--text-muted);
 }
@@ -5884,7 +5891,7 @@ body.reduce-motion .paleta-caja { animation: none; }
   flex-shrink: 0;
   width: 26px; height: 26px;
   background: transparent;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
@@ -5908,7 +5915,7 @@ body.perf-tactil .pie-dedo { display: inline; }
    todas a la vez es una columna de ruido que nadie lee. */
 .paleta-pista {
   flex-shrink: 0;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 13px;
   letter-spacing: 1px;
   color: var(--accent-dim);
@@ -5919,7 +5926,7 @@ body.perf-tactil .pie-dedo { display: inline; }
   list-style: none;
   text-align: center;
   padding: 30px 16px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 17px;
   line-height: 1.7;
   color: var(--text-muted);
@@ -5932,8 +5939,8 @@ body.perf-tactil .pie-dedo { display: inline; }
   gap: 4px 14px;
   padding: 6px 14px;
   background: var(--bg-panel-2);
-  border-top: 2px solid var(--border-dark);
-  font-family: 'Share Tech Mono', monospace;
+  border-top: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 10.5px;
   color: var(--text-muted);
   flex: 0 0 auto;
@@ -5942,7 +5949,7 @@ body.perf-tactil .pie-dedo { display: inline; }
   display: inline-block;
   padding: 0 4px;
   background: var(--bg-frame);
-  border: 1px solid var(--border-pixel);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--text-dim);
   font-family: inherit;
   font-size: 10px;
@@ -6061,7 +6068,7 @@ body.letra-ancha .title-bar { height: clamp(36px, 4cqh, 48px); }
   margin: 0;
   padding: 2px 8px 2px 2px;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-pixel);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   color: var(--text);
   text-align: left;
   overflow: hidden;
@@ -6078,7 +6085,7 @@ body.letra-ancha .title-bar { height: clamp(36px, 4cqh, 48px); }
   width: clamp(18px, 2cqh, 30px);
   height: clamp(18px, 2cqh, 30px);
   background: #000 center/cover no-repeat;
-  border: 1px solid var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
   display: flex; align-items: center; justify-content: center;
   font-size: clamp(11px, 1.2cqh, 18px);
@@ -6278,7 +6285,7 @@ body.reduce-motion .la-ncs { display: none; }
   flex: 0 0 auto;
   padding: 8px 20px 0;
   background: var(--bg-panel-2);
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
   position: relative;
   z-index: 4;
@@ -6296,13 +6303,13 @@ body.reduce-motion .la-ncs { display: none; }
   align-items: center;
   gap: 6px;
   padding: 4px 11px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 17px;
   letter-spacing: 1px;
   color: var(--accent);
   background: var(--bg-frame);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   text-shadow: 0 0 4px var(--accent-glow);
   cursor: pointer;
   white-space: nowrap;
@@ -6323,7 +6330,7 @@ body.reduce-motion .cv-flecha { transition: none; }
   gap: 6px;
   padding: 2px 8px;
   background: var(--bg-deep);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   transition: border-color var(--t-rapida), box-shadow var(--t-rapida);
 }
 .cfg-buscar:focus-within {
@@ -6337,7 +6344,7 @@ body.reduce-motion .cv-flecha { transition: none; }
   background: none;
   border: none;
   outline: none;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 17px;
   letter-spacing: 1px;
   color: var(--text);
@@ -6362,12 +6369,12 @@ body.reduce-motion .cv-flecha { transition: none; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 19px;
   color: var(--text-dim);
   background: var(--bg-frame);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   cursor: pointer;
 }
 .cfg-ayuda:hover { color: var(--text); }
@@ -6401,12 +6408,12 @@ body.reduce-motion .cv-flecha { transition: none; }
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 16px;
   letter-spacing: 1px;
   color: var(--text-dim);
   background: var(--bg-panel);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   cursor: pointer;
   white-space: nowrap;
   transition: color var(--t-rapida), border-color var(--t-rapida);
@@ -6436,7 +6443,7 @@ body.reduce-motion .cv-flecha { transition: none; }
 .set-ver {
   justify-self: end;
   padding: 2px 8px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 15px;
   letter-spacing: 1px;
   /* Se ve SIN posar el ratón: con el dedo no hay hover, y un botón que
@@ -6444,7 +6451,7 @@ body.reduce-motion .cv-flecha { transition: none; }
      existe. Al posarse o al enfocarlo se enciende, nada más. */
   color: var(--text-dim);
   background: none;
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   cursor: pointer;
   white-space: nowrap;
   transition: color 0.14s, border-color 0.14s, transform 0.14s;
@@ -6467,7 +6474,7 @@ body.reduce-motion .set-ver:hover { transform: none; }
   display: none;
   grid-column: 1 / -1;
   margin: 3px 0 0;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 11px;
   line-height: 1.55;
   color: var(--text-muted);
@@ -6479,7 +6486,7 @@ body.reduce-motion .set-ver:hover { transform: none; }
 .cfg-vacio {
   text-align: center;
   padding: 34px 10px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 18px;
   letter-spacing: 1px;
   color: var(--text-muted);
@@ -6584,7 +6591,7 @@ body.reduce-motion .set-row-late {
   background: var(--bg-panel);
   border: 3px solid var(--accent);
   box-shadow: 0 0 34px var(--accent-glow), 0 18px 60px rgba(0, 0, 0, .6),
-              inset 1px 1px 0 var(--border-pixel);
+              inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel);
   animation: paletaEntra .16s ease-out both;
 }
 body.reduce-motion .comp-caja { animation: none; }
@@ -6596,11 +6603,11 @@ body.reduce-motion .comp-caja { animation: none; }
   gap: 10px;
   padding: 7px 10px;
   background: var(--bg-panel-2);
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
 }
 .comp-tit {
   flex: 1;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 19px;
   letter-spacing: 1px;
   color: var(--accent);
@@ -6632,7 +6639,7 @@ body.reduce-motion .comp-caja { animation: none; }
   max-height: min(460px, 56vh);
   width: auto;
   height: auto;
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
   background: var(--bg-deep);
 }
@@ -6646,7 +6653,7 @@ body.reduce-motion .comp-caja { animation: none; }
 }
 .comp-ayuda {
   margin: 0;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -6663,13 +6670,13 @@ body.reduce-motion .comp-caja { animation: none; }
   gap: 2px;
   padding: 4px;
   background: var(--bg-panel-2);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
 }
 .comp-verso {
   flex: 0 0 auto;
   text-align: left;
   padding: 5px 8px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 16px;
   letter-spacing: 0.5px;
   line-height: 1.35;
@@ -6690,7 +6697,7 @@ body.reduce-motion .comp-caja { animation: none; }
   margin: auto;
   padding: 14px 8px;
   text-align: center;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 16px;
   color: var(--text-muted);
 }
@@ -6802,7 +6809,7 @@ body.reduce-motion .comp-caja { animation: none; }
   flex: 0 0 auto;
   min-width: 4ch;
   text-align: right;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 18px;
   color: var(--accent);
   text-shadow: 0 0 4px var(--accent-glow);
@@ -6858,8 +6865,8 @@ body.disp-movil .tb-cfg {
   height: 36px;
   padding: 0;
   background: var(--bg-frame);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   color: var(--text-dim);
   -webkit-tap-highlight-color: transparent;
 }
@@ -6896,8 +6903,8 @@ body.disp-movil .left-panel {
   height: 78px;
   padding: 0 3px 0 7px;
   background: var(--bg-panel);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-pixel), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   overflow: hidden;
 }
 body.disp-movil .cover-frame {
@@ -7013,7 +7020,7 @@ body.disp-movil .ctl-vista .like-btn::after {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 13px;
   letter-spacing: 0;
 }
@@ -7138,7 +7145,7 @@ body.disp-movil .window > .tab-bar {
   align-items: stretch;
   background: var(--bg-window);
   border-bottom: 0;
-  border-top: 2px solid var(--border-dark);
+  border-top: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   font-size: 15px;
 }
 body.disp-movil .window > .tab-bar .tab {
@@ -7229,7 +7236,7 @@ body.disp-movil .dev-vol {
   gap: 10px;
   margin-top: 4px;
   padding: 10px 8px 8px;
-  border-top: 1px dashed var(--border-dark);
+  border-top: calc(1px * var(--marco-g, 1)) dashed var(--marco-dark, var(--border-dark));
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -7290,13 +7297,13 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   max-height: 100%;
   overflow: auto;
   background: var(--bg-panel);
-  border: 2px solid var(--border-light);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   box-shadow:
-    inset 1px 1px 0 var(--border-pixel),
-    inset -1px -1px 0 var(--border-dark),
+    inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel),
+    inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark),
     0 0 24px color-mix(in oklab, var(--accent-glow) 16%, transparent),
     0 12px 36px rgba(0, 0, 0, 0.6);
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   color: var(--text);
   user-select: text;
 }
@@ -7306,7 +7313,7 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   gap: 8px;
   padding: 6px 6px 6px 10px;
   background: linear-gradient(180deg, var(--bg-frame) 0%, var(--bg-window) 100%);
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
 }
 .cid-puntos {
   display: grid;
@@ -7317,7 +7324,7 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
 }
 .cid-puntos i:nth-child(odd) { background: var(--accent); box-shadow: 0 0 2px var(--accent-glow); }
 .cid-titulo {
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;               /* su rejilla: 8 / 16 / 24 */
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -7328,12 +7335,12 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   margin-left: auto;
   width: 24px; height: 22px;
   background: var(--bg-frame);
-  border: 1px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-light), inset -1px -1px 0 var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-light), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   color: var(--text);
   font-size: 12px;
 }
-.cid-x:active { box-shadow: inset -1px -1px 0 var(--border-light), inset 1px 1px 0 var(--border-dark); }
+.cid-x:active { box-shadow: inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-light), inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-dark); }
 .cid-cuerpo {
   display: grid;
   gap: 12px;
@@ -7353,7 +7360,7 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
 }
 .cid-pasos li::marker {
   color: var(--accent-2);
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;
 }
 .cid-campo {
@@ -7362,7 +7369,7 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   gap: 6px;
   margin-top: 5px;
   padding: 3px 3px 3px 8px;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
 }
 .cid-uri {
   flex: 1 1 auto;
@@ -7370,14 +7377,14 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   background: transparent;
   border: 0;
   color: var(--text);
-  font-family: 'Share Tech Mono', monospace;
+  font-family: var(--f-mono, 'Share Tech Mono', monospace); font-size-adjust: var(--f-mono-aj, none);
   font-size: 14px;
   text-overflow: ellipsis;
 }
 .cid-copiar,
 .cid-cancelar,
 .cid-ok {
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 20px;
   line-height: 1;
   padding: 4px 12px;
@@ -7388,16 +7395,16 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   padding: 2px 8px;
   color: var(--accent);
   background: var(--bg-frame);
-  border: 1px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-light), inset -1px -1px 0 var(--border-dark);
+  border: calc(1px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-light), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
 }
 .cid-entrada {
   width: 100%;
   padding: 6px 10px;
   background: transparent;
-  border: 2px solid var(--border-light);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   color: var(--text);
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 22px;
 }
 .cid-entrada::placeholder { color: var(--text-dim); opacity: 0.8; }
@@ -7413,6 +7420,16 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
 }
 .cid-ok:active { transform: translate(1px, 1px); }
 .cid-fino { color: var(--text-dim); font-size: 17px; }
+
+/* EL DIÁLOGO DE LA CASA (js/dialogo.js) · la misma ventana, para preguntar
+   en vez del confirm() del navegador. Más estrecha: aquí solo hay una
+   pregunta y dos botones. Por encima de todo, también de la paleta de
+   Ctrl+K (10000) y del cine: si algo pregunta, se ve. */
+.dlg-fondo { z-index: 10050; }
+.dlg-ventana { width: min(430px, 100%); }
+.dlg-texto { font-size: 22px; }
+.dlg-detalle { margin-top: -4px; }
+.dlg-ventana .cid-botones { margin-top: 4px; }
 
 /* ==========================================================
    APP INSTALADA EN EL PC · la barra de la app ES la de la ventana
@@ -7632,6 +7649,18 @@ body.disp-movil #cfg-video,
 body.perf-tactil .cfg-chip[data-destino="cfg-video"],
 body.disp-movil .cfg-chip[data-destino="cfg-video"] { display: none; }
 
+/* …y en la página PUBLICADA no existe: grabar el audio de Spotify es
+   «stream ripping» para sus términos, así que el vídeo 9:16 se queda en la
+   copia local (29-sep-2026). Escondido SIEMPRE, y js/vertical.js lo
+   destapa con html.con-916 solo abriendo la app en 127.0.0.1 / localhost /
+   archivo suelto. Al revés no valdría: el botón asomaría un instante en la
+   web mientras carga el script. `!important` porque js/ajustes-ui.js pone y
+   quita `hidden` a las secciones al filtrar, y eso no debe destaparlo. */
+html:not(.con-916) #verticalBtn,
+html:not(.con-916) #cfg-video,
+html:not(.con-916) .cfg-chip[data-destino="cfg-video"],
+html:not(.con-916) .tecla-916 { display: none !important; }
+
 /* Con el escenario abierto, la ventana de debajo no se pinta (se ve tanto
    como con el cine: nada) y el acabado CRT global tampoco, que si no las
    scanlines saldrían encima del vídeo. */
@@ -7647,7 +7676,7 @@ body.v916-open .scanlines { display: none; }
   overflow: hidden;
   background: #000;
   color: var(--text);
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   opacity: 0;
   transition: opacity 0.26s ease-out;
 }
@@ -7669,7 +7698,7 @@ body.reduce-motion .v916 { transition: none; }
   top: calc(var(--v916-y, 0px) - 2px);
   width: calc(var(--v916-w, 360px) + 4px);
   height: calc(var(--v916-h, 640px) + 4px);
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   box-shadow: 0 0 44px color-mix(in oklab, var(--accent-glow) 22%, transparent);
   pointer-events: none;
   transition: border-color 0.3s, box-shadow 0.3s;
@@ -7800,7 +7829,7 @@ body.perf-bajo .v916-acabado {
   height: 100%;
   aspect-ratio: 1;
   background: var(--bg-panel-2) center / cover no-repeat;
-  border: 2px solid var(--border-pixel);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   box-shadow: 0 0 0 1px var(--border-dark), 0 6px 18px rgba(0, 0, 0, 0.5);
   display: grid;
   place-items: center;
@@ -7872,7 +7901,7 @@ body.perf-bajo .v916-acabado {
 .v916-t {
   position: relative;
   z-index: 0;
-  font-family: 'DSEG7', 'VT323', monospace;
+  font-family: var(--f-num, 'DSEG7', 'VT323', monospace); font-size-adjust: var(--f-num-aj, none);
   font-size: 2.9cqw;
   color: var(--accent);
   text-shadow: 0 0 4px var(--accent-glow);
@@ -7891,7 +7920,7 @@ body.perf-bajo .v916-acabado {
   position: relative;
   height: max(8px, 2.3cqw);
   background: linear-gradient(180deg, #000 0%, #0b0b16 100%);
-  border: 2px solid var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.85), 0 1px 0 var(--border-hi);
 }
 .v916-riel::before {
@@ -7932,7 +7961,7 @@ body.playing .v916-cabeza { animation: prog-head 1s steps(2, jump-none) infinite
   left: 0;
   right: 0;
   text-align: center;
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;               /* la Press Start, solo a 8/16/24: su rejilla */
   letter-spacing: 2px;
   color: var(--text-dim);
@@ -7961,7 +7990,7 @@ body.playing .v916-cabeza { animation: prog-head 1s steps(2, jump-none) infinite
   gap: 2.6cqw;
   padding: 0 3.6cqw;
   background: linear-gradient(180deg, var(--bg-frame) 0%, var(--bg-window) 100%);
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   --ico-tam: 24px;
 }
 .v916-tb-ico {
@@ -7979,7 +8008,7 @@ body.playing .v916-cabeza { animation: prog-head 1s steps(2, jump-none) infinite
 .v916-tb-txt {
   flex: 1;
   min-width: 0;
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;
   letter-spacing: 1px;
   color: var(--text);
@@ -7996,7 +8025,7 @@ body.playing .v916-cabeza { animation: prog-head 1s steps(2, jump-none) infinite
   right: 0;
   height: 12.6cqh;
   padding: 1.7cqh 4.4cqw;
-  border-bottom: 2px solid var(--border-dark);
+  border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   background: color-mix(in oklab, var(--bg-panel-2) 55%, transparent);
 }
 /* el espectro, detrás de la franja y al 22 %: el del móvil de la app */
@@ -8018,8 +8047,8 @@ body.playing .v916-cabeza { animation: prog-head 1s steps(2, jump-none) infinite
   left: 3.2cqw;
   right: 3.2cqw;
   background: var(--bg-panel);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-pixel), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
 }
 /* los botones de TikTok caen a la derecha: la letra deja más aire ahí */
 .v916-marco[data-estilo="app"] .lyrics-body { padding-right: 11cqw; }
@@ -8044,8 +8073,8 @@ body.playing .v916-cabeza { animation: prog-head 1s steps(2, jump-none) infinite
   height: 9cqw;
   color: var(--text-dim);
   background: var(--bg-frame);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   cursor: pointer;
   --ico-tam: 24px;
 }
@@ -8058,7 +8087,7 @@ body.playing .v916-cabeza { animation: prog-head 1s steps(2, jump-none) infinite
   color: var(--bg-deep);
   background: var(--accent);
   border-color: var(--accent);
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45), inset -2px -2px 0 var(--accent-dim),
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45), inset calc(-2px * var(--bisel, 1)) calc(-2px * var(--bisel, 1)) 0 var(--accent-dim),
     0 0 12px var(--accent-glow);
 }
 .v916-m-play:hover { color: var(--bg-deep); filter: brightness(1.1); }
@@ -8072,7 +8101,7 @@ body:not(.playing) .v916 .v916-tr-play .ico-pausa { display: none; }
   margin: auto -4.4cqw 0;
   padding: 1.3cqh 0 1.6cqh;
   background: var(--bg-panel-2);
-  border-top: 2px solid var(--border-dark);
+  border-top: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
 }
 .v916-tabs span {
   display: flex;
@@ -8347,7 +8376,7 @@ body.reduce-motion .v916-bg-img { animation: none; }
   z-index: 8;
   pointer-events: none;
   color: rgba(255, 255, 255, 0.72);
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
 }
 .v916-guias .g-seguro {
   position: absolute;
@@ -8448,7 +8477,7 @@ body.reduce-motion .v916-bg-img { animation: none; }
   background: radial-gradient(circle, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.55) 72%);
 }
 .v916-cuenta b {
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-weight: normal;
   font-size: 96px;              /* múltiplo de 8: la rejilla de la Press Start */
   line-height: 1;
@@ -8488,8 +8517,8 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
   overflow-y: auto;
   padding: 12px 14px 14px;
   background: var(--bg-panel);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-pixel), inset -1px -1px 0 var(--border-dark),
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark),
     0 12px 44px rgba(0, 0, 0, 0.6);
   color-scheme: dark;
   outline: none;
@@ -8506,7 +8535,7 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -8518,7 +8547,7 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
   display: none;
   align-items: center;
   gap: 5px;
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -8578,8 +8607,8 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
   height: 36px;
   color: var(--text-dim);
   background: var(--bg-frame);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-hi), inset -1px -1px 0 var(--border-dark);
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
   --ico-tam: 24px;
 }
 .v916-tr:hover { color: var(--text); }
@@ -8588,7 +8617,7 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
   color: var(--bg-deep);
   background: var(--accent);
   border-color: var(--accent);
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45), inset -2px -2px 0 var(--accent-dim),
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45), inset calc(-2px * var(--bisel, 1)) calc(-2px * var(--bisel, 1)) 0 var(--accent-dim),
     0 0 10px var(--accent-glow);
 }
 .v916-tr-play:hover { color: var(--bg-deep); filter: brightness(1.1); }
@@ -8602,13 +8631,13 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
   align-items: center;
   justify-content: center;
   gap: 10px;
-  font-family: 'VT323', monospace;
+  font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 24px;
   letter-spacing: 2px;
   color: var(--bg-deep);
   background: var(--accent);
   border: 2px solid var(--accent);
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45), inset -2px -2px 0 var(--accent-dim),
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.45), inset calc(-2px * var(--bisel, 1)) calc(-2px * var(--bisel, 1)) 0 var(--accent-dim),
     0 0 14px var(--accent-glow);
   font-variant-numeric: tabular-nums;
   --ico-tam: 24px;
@@ -8635,7 +8664,7 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
 .v916-aviso {
   margin-top: 10px;
   padding: 8px 10px;
-  border: 1px dashed var(--border-pixel);
+  border: calc(1px * var(--marco-g, 1)) dashed var(--marco-pixel, var(--border-pixel));
   font-size: 16px;
   line-height: 1.3;
   color: var(--text-dim);
@@ -8653,7 +8682,7 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
 .v916-hecho {
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 2px solid var(--border-dark);
+  border-top: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   text-align: center;
 }
 .v916-hecho-txt {
@@ -8715,7 +8744,7 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
   align-items: center;
   gap: 6px;
   writing-mode: vertical-rl;
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--f-pixel, 'Press Start 2P', monospace); font-size-adjust: var(--f-pixel-aj, none);
   font-size: 8px;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -8730,7 +8759,7 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
   animation: v916-rec 1s steps(2, jump-none) infinite;
 }
 .v916-tira .t-reloj {
-  font-family: 'DSEG7', 'VT323', monospace;
+  font-family: var(--f-num, 'DSEG7', 'VT323', monospace); font-size-adjust: var(--f-num-aj, none);
   font-weight: normal;
   font-size: 13px;
   color: var(--text);
@@ -9023,8 +9052,8 @@ body:not(.playing) .v916 .cine-play .ico-pausa { display: none; }
   bottom: 4cqh;
   width: calc(var(--col) + var(--pad) * 2);
   background: color-mix(in oklab, var(--bg-panel) 74%, transparent);
-  border: 2px solid var(--border-light);
-  box-shadow: inset 1px 1px 0 var(--border-pixel), inset -1px -1px 0 var(--border-dark),
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
+  box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-pixel), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark),
     0 10px 40px rgba(0, 0, 0, 0.45);
 }
 .v916.cine[data-orient="h"] .v916-marco[data-estilo="app"] .v916-tb { height: 6cqh; }

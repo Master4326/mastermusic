@@ -45,6 +45,10 @@
        (js/seven.js): los dos mandan sobre lo mismo. En el teléfono este es
        su único sitio, porque allí la carátula mide 60 px y el ◉ se la comía. */
     vinilo: { key: 'mm_vinyl', def: 'false' },
+    /* ASPECTO · la cara de toda la app: «8bits» (la de siempre), «cristal»,
+       «estudio» o «noche». Lo aplica js/aspecto.js; al abrir ya lo puso el
+       guion del <head> de index.html, que lee esta misma clave. */
+    aspecto: { key: 'mm_aspecto', def: '8bits' },
     // La intensidad del modo edit NO es un ajuste: lyrics.js la deduce sola
     // del ritmo de cada línea y de los graves (ver intensidadAuto).
   };
@@ -105,6 +109,10 @@
       if (window.VisualizerModule && window.VisualizerModule.refrescarSync) {
         window.VisualizerModule.refrescarSync();
       }
+    } else if (id === 'aspecto') {
+      /* Al arrancar no hace nada nuevo (el <head> ya lo puso); al elegir
+         otro, aspecto.js pide su CSS si hace falta y cambia cuando llega. */
+      if (window.MMAspecto && window.MMAspecto.actual() !== v) window.MMAspecto.poner(v);
     } else if (id === 'vinilo') {
       /* La clase del <body> es lo que hace girar la carátula; el ◉ de
          encima de ella se marca igual, para que los dos digan lo mismo. */
@@ -164,6 +172,7 @@
     ambiente: 'ambiente',
     trad:     'traducción',
     vinilo:   'vinilo',
+    aspecto:  'aspecto',
   };
 
   const elegir = (id, val, conFoco) => {
@@ -264,7 +273,13 @@
   const btnLib = $('clearLibrary');
   if (btnLib) btnLib.addEventListener('click', async () => {
     if (!window.MusicDB) return;
-    if (!confirm('¿Borrar toda la música que importaste?\n\nNo afecta a Spotify ni a los archivos de tu disco.')) return;
+    // la ventana de la casa (js/dialogo.js); la del navegador solo de respaldo
+    const pregunta = { titulo: 'tu música', texto: '¿borrar toda la música que importaste?',
+      detalle: 'no afecta a spotify ni a los archivos de tu disco.', si: 'borrar', no: 'cancelar' };
+    const ok = window.MMDialogo
+      ? await window.MMDialogo.confirmar(pregunta)
+      : confirm(pregunta.texto + '\n\n' + pregunta.detalle);
+    if (!ok) return;
     try {
       await window.MusicDB.clear();
       if (window.PlayerCore && window.PlayerCore.state) {

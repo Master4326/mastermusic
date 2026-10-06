@@ -119,6 +119,8 @@
       accent,
       glow:  toRgb(leer('--accent-glow', '#5ce1e6')),
       claro: aclarar(accent, 0.68),
+      // 'vfd' (los segmentos de siempre) o 'barras' (los aspectos modernos)
+      estilo: leer('--viz-estilo', 'vfd'),
     };
     return paleta;
   };
@@ -674,6 +676,33 @@
     /* Una columna por cada DOS bandas (32 con las 64 del ordenador): en un
        display de segmentos, 64 columnas finísimas se leen como ruido. */
     const nc = Math.max(1, Math.ceil(nb / 2));
+
+    /* En los aspectos modernos (css/aspectos.css pone --viz-estilo: barras)
+       el display de segmentos sobra: barras lisas y redondeadas, sin la
+       rejilla apagada, con el mismo color por tramos de la paleta. Las
+       cuentas de arriba no cambian: solo cómo se pinta. */
+    if (colores().estilo === 'barras') {
+      const { accent, claro } = colores();
+      const gx = nc > 24 ? 3 : 4;
+      const bw = Math.max(1, (W - gx * (nc - 1)) / nc);
+      const rad = Math.min(bw / 2, 3);
+      ctx.clearRect(0, 0, W, H);
+      const grad = ctx.createLinearGradient(0, H, 0, 0);
+      grad.addColorStop(0, rgba(accent, playing ? 0.55 : 0.4));
+      grad.addColorStop(1, rgba(claro, playing ? 0.95 : 0.6));
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      for (let c = 0; c < nc; c++) {
+        const v = Math.max(smooth[2 * c], smooth[2 * c + 1] || 0);
+        const h = Math.max(rad * 2, v * (H - 2));
+        const x = c * (bw + gx);
+        if (ctx.roundRect) ctx.roundRect(x, H - h, bw, h, rad);
+        else ctx.rect(x, H - h, bw, h);
+      }
+      ctx.fill();
+      return;
+    }
+
     const R = rejilla(nc, playing);
     const { filas, cols, rows, tonos, lit } = R;
 

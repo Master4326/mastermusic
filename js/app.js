@@ -789,6 +789,10 @@
      Spotify Connect el sonido no pasa por el navegador, así que mover el
      <audio> mudo de esta pestaña no adelantaba nada. Las flechas eran el
      único mando que no se había enterado del desvío. */
+  /* Con un podcast, 15 s y no 5: es el salto que las guías de Spotify piden
+     para los episodios (y el que tienen todas las apps de podcasts). */
+  const salto = () => (state.currentTrack && state.currentTrack.podcast ? 15 : 5);
+
   document.addEventListener('keydown', (e) => {
     const T = window.MMTeclas;
     if (T ? !T.libre(e) : e.target.tagName === 'INPUT') return;
@@ -796,8 +800,8 @@
     if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
     else if (e.code === 'ArrowRight' && e.shiftKey) playNext();
     else if (e.code === 'ArrowLeft' && e.shiftKey) playPrev();
-    else if (e.code === 'ArrowRight') seekTo(position() + 5);
-    else if (e.code === 'ArrowLeft') seekTo(position() - 5);
+    else if (e.code === 'ArrowRight') seekTo(position() + salto());
+    else if (e.code === 'ArrowLeft') seekTo(position() - salto());
     else if (e.code === 'ArrowUp') { e.preventDefault(); setVolume(state.volume + 0.05); }
     else if (e.code === 'ArrowDown') { e.preventDefault(); setVolume(state.volume - 0.05); }
     else if (e.code === 'KeyM') setVolume(state.volume > 0 ? 0 : lastNonZeroVol);

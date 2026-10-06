@@ -168,7 +168,13 @@
     /* La barra del navegador (Chrome en Android, la app instalada) también
        sigue a la canción: un tono oscuro del acento, para que los iconos
        del sistema se sigan leyendo encima. Era #0a0e2e fijo. */
-    if (metaTema) metaTema.setAttribute('content', rgbToHex(mix(rgb, { r: 10, g: 14, b: 46 }, 0.74)));
+    if (metaTema) {
+      const tono = rgbToHex(mix(rgb, { r: 10, g: 14, b: 46 }, 0.74));
+      /* Con un aspecto moderno (js/aspecto.js) la barra lleva el color base
+         del aspecto; este se guarda para cuando vuelva el 8 bits. */
+      metaTema.dataset.ochoBits = tono;
+      if (!document.documentElement.classList.contains('moderno')) metaTema.setAttribute('content', tono);
+    }
   };
 
   /* ---------- Segundo tono de la paleta (--accent-2) ----------
@@ -1171,11 +1177,15 @@
           txt = 'tu sesión de spotify caducó — reconecta en <b>config ⚙</b>';
         } else if (/Spotify API 403/.test(msg)) {
           txt = 'spotify no deja leer la cola a las apps en <b>modo desarrollo</b>' + detalle;
-        } else if (/Spotify API 404/.test(msg)) {
-          txt = 'no hay ningún dispositivo activo:<br>abre spotify (premium) y dale a reproducir' + detalle;
         } else {
-          console.warn('[Cola] fallo:', msg);
-          txt = 'no se pudo leer la cola de spotify' + detalle;
+          /* El 404 decía «abre spotify (premium) y dale a reproducir» aunque
+             la música sonara en esta misma pestaña. El motivo lo cuenta ahora
+             spotify.js, que sabe si el reproductor de aquí está listo. */
+          if (!/Spotify API/.test(msg)) console.warn('[Cola] fallo:', msg);
+          const S = window.SpotifyModule;
+          txt = (S && S.explicar)
+            ? escapeHtml(S.explicar(e, 'leer la cola'))
+            : 'no se pudo leer la cola de spotify' + detalle;
         }
         queueList.innerHTML = queueEmpty('▒ ' + txt + ' ▒');
       } finally {
