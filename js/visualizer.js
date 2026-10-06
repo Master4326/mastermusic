@@ -122,6 +122,10 @@
       // 'vfd' (los segmentos de siempre), 'barras' (cristal y noche) o
       // 'lineas' (estudio): lo pone css/aspectos.css en --viz-estilo
       estilo: leer('--viz-estilo', 'vfd'),
+      /* Los aspectos claros (vinilo, aero, manga, revista) dicen su tinta en
+         --viz-tinta: el espectro va sin franja negra, pintado en tinta sobre
+         el propio fondo, con el color de la canción oscurecido. */
+      tinta: (() => { const t = leer('--viz-tinta', ''); return t ? toRgb(t) : null; })(),
     };
     return paleta;
   };
@@ -683,14 +687,20 @@
        rejilla apagada, con el mismo color por tramos de la paleta. Las
        cuentas de arriba no cambian: solo cómo se pinta. */
     if (colores().estilo === 'barras') {
-      const { accent, claro } = colores();
+      const { accent, claro, tinta } = colores();
       const gx = nc > 24 ? 3 : 4;
       const bw = Math.max(1, (W - gx * (nc - 1)) / nc);
       const rad = Math.min(bw / 2, 3);
       ctx.clearRect(0, 0, W, H);
       const grad = ctx.createLinearGradient(0, H, 0, 0);
-      grad.addColorStop(0, rgba(accent, playing ? 0.55 : 0.4));
-      grad.addColorStop(1, rgba(claro, playing ? 0.95 : 0.6));
+      if (tinta) {
+        // sobre claro: del color de la canción hondo (abajo) a la tinta (arriba)
+        grad.addColorStop(0, rgba(mezclar(accent, tinta, 0.35), playing ? 0.9 : 0.5));
+        grad.addColorStop(1, rgba(tinta, playing ? 0.92 : 0.55));
+      } else {
+        grad.addColorStop(0, rgba(accent, playing ? 0.55 : 0.4));
+        grad.addColorStop(1, rgba(claro, playing ? 0.95 : 0.6));
+      }
       ctx.fillStyle = grad;
       ctx.beginPath();
       for (let c = 0; c < nc; c++) {
@@ -709,16 +719,18 @@
        un editor de audio; blanca en las puntas y del color de la canción en
        el medio. Mismas cuentas, otra forma, y un solo trazo por frame. */
     if (colores().estilo === 'lineas') {
-      const { accent } = colores();
-      const blanco = { r: 255, g: 255, b: 255 };
+      const { accent, tinta } = colores();
+      // las puntas en blanco sobre oscuro; en tinta sobre claro (vinilo)
+      const puntas = tinta || { r: 255, g: 255, b: 255 };
+      const centro = tinta ? mezclar(accent, tinta, 0.25) : accent;
       const paso = W / nb;
       const lw = Math.max(1, Math.min(3, paso * 0.45));
       const medio = H / 2;
       ctx.clearRect(0, 0, W, H);
       const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, rgba(blanco, playing ? 0.9 : 0.45));
-      grad.addColorStop(0.5, rgba(accent, playing ? 0.95 : 0.5));
-      grad.addColorStop(1, rgba(blanco, playing ? 0.9 : 0.45));
+      grad.addColorStop(0, rgba(puntas, playing ? 0.9 : 0.45));
+      grad.addColorStop(0.5, rgba(centro, playing ? 0.95 : 0.5));
+      grad.addColorStop(1, rgba(puntas, playing ? 0.9 : 0.45));
       ctx.strokeStyle = grad;
       ctx.lineWidth = lw;
       ctx.lineCap = 'round';

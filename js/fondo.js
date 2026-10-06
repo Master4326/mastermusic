@@ -154,25 +154,43 @@
   let colB = [180, 245, 248];
   let colC = [225, 250, 252];
   let colT = 0;
+  /* TINTA · los aspectos claros (vinilo, aero, manga, revista) ponen la
+     letra sobre papel o cristal claro y dicen su tinta en --onda-tinta. La
+     luz sumada ('lighter') de los hilos, que brilla sobre negro, sobre
+     claro no se ve: ahí los hilos se pintan como tinta, en tonos hondos del
+     acento y encima unos de otros. La forma, el baile y la boca alrededor
+     del verso son los mismos. */
+  let tinta = null;
 
   const revisarColor = (ahora) => {
     // cada 300 ms: getComputedStyle es de lo más caro que hay y el acento
     // solo cambia al cambiar de canción o al tocar una muestra de config
     if (ahora - colT < 300 && colFirma) return;
     colT = ahora;
-    const crudo = getComputedStyle(document.documentElement).getPropertyValue('--accent');
-    if (crudo === colFirma) return;
-    colFirma = crudo;
+    const cs = getComputedStyle(document.documentElement);
+    const crudo = cs.getPropertyValue('--accent');
+    const tintaCruda = cs.getPropertyValue('--onda-tinta').trim();
+    const firma = crudo + '|' + tintaCruda;
+    if (firma === colFirma) return;
+    colFirma = firma;
     const rgb = aRgb(crudo) || [92, 225, 230];
     const [h, s, l] = aHsl(rgb);
     /* Un acento casi blanco (el usuario puede elegir blanco puro) daría dos
        grises indistinguibles: se le pone un suelo de saturación para que la
        pareja siga leyéndose como dos colores. */
     const sat = Math.max(s, 0.45);
-    const luz = clamp(l, 0.52, 0.68);
-    colA = deHsl(h, sat, luz);
-    colB = deHsl(h + 0.035, sat * 0.92, Math.min(0.86, luz + 0.2));
-    colC = mezcla(colB, [255, 255, 255], 0.55);
+    tinta = tintaCruda ? (aRgb(tintaCruda) || [20, 20, 20]) : null;
+    if (tinta) {
+      const luz = clamp(l, 0.3, 0.42);
+      colA = deHsl(h, Math.max(sat, 0.5), luz);
+      colB = deHsl(h + 0.035, sat * 0.95, luz + 0.1);
+      colC = mezcla(colA, tinta, 0.35);
+    } else {
+      const luz = clamp(l, 0.52, 0.68);
+      colA = deHsl(h, sat, luz);
+      colB = deHsl(h + 0.035, sat * 0.92, Math.min(0.86, luz + 0.2));
+      colC = mezcla(colB, [255, 255, 255], 0.55);
+    }
     degradado = null;
   };
 
@@ -539,12 +557,13 @@
     }
 
     const g = mascara(on);
-    ctx.globalCompositeOperation = 'lighter';
+    // luz que se suma sobre oscuro; tinta encima de tinta sobre claro
+    ctx.globalCompositeOperation = tinta ? 'source-over' : 'lighter';
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.strokeStyle = g;
 
-    const brillo = clamp(0.55 + nivelL * 0.35 + energiaL * 0.1, 0, 0.95);
+    const brillo = clamp(0.55 + nivelL * 0.35 + energiaL * 0.1, 0, 0.95) * (tinta ? 0.8 : 1);
     const carril = H * (0.8 + energiaR * 0.6);
     const conHalo = !bajo();
     const lista = hilos();
@@ -574,7 +593,8 @@
          'lighter' las dos pasadas se suman en el halo del lienzo (9 px a
          0,18 bajo un hilo de 2,2). */
       if (L.halo && conHalo) {
-        ctx.globalAlpha = brillo * L.al * 0.2;
+        // en tinta el halo ancho se ve como un borrón: más tenue
+        ctx.globalAlpha = brillo * L.al * (tinta ? 0.1 : 0.2);
         ctx.lineWidth = L.w * dpr * 4.2;
         ctx.stroke();
       }

@@ -235,3 +235,65 @@ html[data-aspecto="manga"] .track-info { min-width: 0; overflow: hidden; }
 /* en el teléfono, los nombres de las pestañas y de la vista sin el
    espaciado de los rótulos: si no, «historial» o «compartir» se cortan */
 html[data-aspecto="manga"] body.disp-movil :is(.window > .tab-bar .tab-txt, .ctl-vista .sb-txt) { letter-spacing: 0 !important; font-size: 11px; }
+
+
+/* ══════ EL PANEL DE LA LETRA, CLARO ══════
+   Antes la letra sonaba en un panel negro y el espectro iba en una franja
+   negra: en una app clara se veían como agujeros («si es todo blanco y la
+   letra oscura es medio raro», 5-oct-2026). Ahora el panel es una viñeta blanca, con su marco de tinta y el filete por dentro,
+   y todo lo de dentro va en tinta: la letra, el verso que suena (en el color
+   de la canción oscurecido, para que se lea sobre claro), el karaoke, el
+   modo edit, las listas y ajustes. La onda que rodea el verso pasa a
+   pintarse en tinta (js/fondo.js lee --onda-tinta) y el espectro también
+   (js/visualizer.js lee --viz-tinta), sin su franja.
+   --acento-cancion guarda el color de la canción tal cual: dentro del panel
+   --accent se oscurece, y lo que necesita el vivo (la carta del invertido)
+   tira de él. En el cine la letra se muda fuera del panel y vuelve a su
+   escenario oscuro de siempre, con sus colores de siempre. */
+html[data-aspecto="manga"] {
+  --acento-cancion: var(--accent);
+  --m-panel: #fff;
+  --m-panel-sombra: 0 0 0 3px var(--mg-tinta), inset 0 0 0 6px #fff, inset 0 0 0 7.5px var(--mg-tinta);
+  --onda-tinta: #111;
+  --viz-tinta: #111;
+}
+html[data-aspecto="manga"] .right-panel {
+  --text: #111;
+  --text-dim: #555;
+  --text-muted: #888;
+  --m-tenue: #555;
+  --m-tenue-2: #888;
+  --m-linea: rgb(17 17 17 / 0.16);
+  --m-hover: rgb(17 17 17 / 0.05);
+  --m-activo: rgb(17 17 17 / 0.1);
+  --accent: color-mix(in oklab, var(--acento-cancion) 55%, #111);
+  --accent-glow: color-mix(in oklab, var(--acento-cancion) 30%, transparent);
+  --accent-dim: color-mix(in oklab, var(--acento-cancion) 40%, #111);
+  --m-sel-fondo: var(--mg-tinta);
+  --m-sel-texto: #fff;
+  color: var(--text);
+}
+/* el verso que suena: sin el halo de neón ni la sombra negra de debajo,
+   que sobre claro ensucian; un aura suave del color de la canción */
+html[data-aspecto="manga"] .right-panel .lyrics-body .lyric-line.active { text-shadow: 0 0 22px var(--accent-glow); }
+html[data-aspecto="manga"] .right-panel .lyrics-body.sync .lyric-line.active .w.sung { text-shadow: 0 0 14px var(--accent-glow); }
+/* modo edit: la carta del invertido, del color vivo de la canción con tinta
+   encima; «escribe», en tinta (salvo sobre su carta negra) */
+html[data-aspecto="manga"] .ed-fondo { background: var(--acento-cancion); }
+html[data-aspecto="manga"] .ed-stack-inv .ed-titulo { color: #111; text-shadow: none; }
+html[data-aspecto="manga"] .right-panel .esc-texto { color: var(--text); text-shadow: none; }
+html[data-aspecto="manga"] .right-panel .esc-sobre-negro .esc-texto { color: #f6f4ef; }
+/* las tarjetas del reposo («importar música», «conectar spotify»): traían
+   el azul noche de la app; aquí, del papel */
+html[data-aspecto="manga"] .right-panel .li-way { background: var(--m-hover); box-shadow: inset 0 0 0 1px var(--m-linea); color: var(--text); }
+html[data-aspecto="manga"] .right-panel .li-way:hover { background: var(--m-activo); }
+/* el espectro, sin franja: se pinta en tinta sobre el propio fondo */
+html[data-aspecto="manga"] .visualizer-frame { background: transparent; box-shadow: none; }
+html[data-aspecto="manga"] .right-panel .tab.active { box-shadow: 0 0 0 2.5px var(--mg-tinta); }
+html[data-aspecto="manga"] .right-panel :is(.seg-btn, .lib-chip).active { box-shadow: 0 0 0 2px var(--mg-tinta) !important; }
+html[data-aspecto="manga"] .right-panel .settings-block h3 { color: var(--mg-tinta); }
+/* la carátula difuminada de detrás de la letra: sobre papel, al 7 % de las
+   ondas ya tiñe el panel de un velo; aquí, con las ondas, el blanco de la viñeta queda limpio.
+   Con «clásico» (la carátula detrás a propósito) se ve, pero sin tapar el papel. */
+html[data-aspecto="manga"] body.fondo-ondas .right-panel .la-cover { display: none; }
+html[data-aspecto="manga"] body:not(.fondo-ondas):not(.fondo-liso) .right-panel .la-cover { opacity: 0.14 !important; }
