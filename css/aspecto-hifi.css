@@ -1,0 +1,329 @@
+/* ==========================================================
+   ASPECTO «hifi» · su hoja propia (js/aspecto.js)
+   Solo se descarga si eliges este aspecto: el <head> de index.html la pide
+   junto a css/aspectos.css (la base común de los modernos) y las dos
+   bloquean el pintado hasta llegar, así que la app abre ya con su cara.
+   Va DESPUÉS de aspectos.css: con la misma especificidad, gana esta.
+   En todos los estilos de este tipo la letra de la canción vive en un
+   escenario oscuro (el panel de la derecha): la letra, el modo edit, el
+   karaoke y la onda que la rodea siguen exactamente como siempre.
+   ========================================================== */
+
+/* ══════════ HI-FI ══════════
+   Un equipo de música de los 90: frontal de aluminio cepillado, pantallas
+   de cristal oscuro donde todo brilla en el color de la canción (VFD),
+   teclas con relieve y su rótulo impreso debajo, el tiempo en siete
+   segmentos y el espectro en segmentos, como un ecualizador de cadena. */
+html[data-aspecto="hifi"] {
+  --f-moderna: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  --f-num: "DSEG7", "Rajdhani", monospace;
+  --f-ui-aj: 0.5;
+  --f-num-aj: none;
+  --hf-cristal: #050b08;
+  --hf-metal:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.022) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #3c3f44 0%, #2d2f34 42%, #232529 100%);
+  --hf-tecla: linear-gradient(180deg, #52555c 0%, #3b3d43 52%, #2c2e33 100%);
+  --hf-rotulo: #8e959e;
+  --hf-led: color-mix(in oklab, var(--accent) 100%, transparent);
+  --m-ventana: var(--hf-metal);
+  --m-panel:
+    linear-gradient(180deg, rgb(255 255 255 / 0.05) 0%, transparent 20%),
+    radial-gradient(120% 90% at 50% 15%, color-mix(in oklab, var(--accent) 8%, #0a140f) 0%, var(--hf-cristal) 70%);
+  --m-panel-sombra: inset 0 2px 10px rgb(0 0 0 / 0.9), inset 0 0 0 1px rgb(0 0 0 / 0.85), 0 1px 0 rgb(255 255 255 / 0.09);
+  --m-sel-fondo: var(--accent);
+  --m-sel-texto: #04100a;
+  --m-play-fondo: var(--hf-tecla);
+  --m-play-icono: var(--accent);
+  --m-prog: var(--accent);
+  --m-tenue: #9aa1aa;
+  --m-tenue-2: #6d737b;
+  --m-linea: rgb(255 255 255 / 0.07);
+  --m-hover: rgb(255 255 255 / 0.06);
+  --m-activo: rgb(255 255 255 / 0.12);
+  --m-flota: #26282c;
+  --m-pie: #26282c;
+  --m-franja: var(--hf-cristal);
+  --r-s: 3px;
+  --r-m: 5px;
+  --r-l: 9px;
+  --viz-estilo: vfd;
+  background: #0b0c0e;
+}
+html[data-aspecto="hifi"] body { background: radial-gradient(ellipse at 50% -10%, #272a2f 0%, #0b0c0e 65%); }
+html[data-aspecto="hifi"] .ambient { display: none; }
+html[data-aspecto="hifi"] .window {
+  box-shadow: 0 40px 100px rgb(0 0 0 / 0.75), inset 0 1px 0 rgb(255 255 255 / 0.16),
+    inset 0 -2px 0 rgb(0 0 0 / 0.55), inset 0 0 0 1px rgb(0 0 0 / 0.7);
+}
+html[data-aspecto="hifi"] .title-bar { height: 48px; padding: 0 14px 0 18px; box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.55), 0 1px 0 rgb(255 255 255 / 0.06); }
+html[data-aspecto="hifi"] .pixel-icon span:nth-child(odd) { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+html[data-aspecto="hifi"] .title-text {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.32em !important;
+  color: #d8dce1;
+  text-shadow: 0 -1px 0 rgb(0 0 0 / 0.85) !important;
+}
+html[data-aspecto="hifi"] .title-text::after {
+  content: 'HI-FI STEREO';
+  margin-left: 12px;
+  padding: 2px 6px;
+  border: 1px solid #5b6068;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  color: var(--hf-rotulo);
+  vertical-align: 2px;
+}
+@container win (max-width: 999px) { html[data-aspecto="hifi"] .title-text::after { display: none; } }
+html[data-aspecto="hifi"] .paleta-btn {
+  height: 32px;
+  border-radius: 4px;
+  background: #111214;
+  box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.85), 0 1px 0 rgb(255 255 255 / 0.07) !important;
+  color: var(--hf-rotulo);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em !important;
+}
+html[data-aspecto="hifi"] .paleta-btn .pb-ico { color: var(--accent); }
+html[data-aspecto="hifi"] .tb-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--hf-tecla);
+  box-shadow: 0 1px 0 #111, inset 0 1px 0 rgb(255 255 255 / 0.15);
+  color: #c8cdd3;
+}
+html[data-aspecto="hifi"] .main-grid { gap: 14px; padding: 6px 16px 8px; }
+html[data-aspecto="hifi"] .cover-frame {
+  padding: 7px;
+  border-radius: 6px;
+  background: #151619;
+  box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.85), 0 1px 0 rgb(255 255 255 / 0.08);
+}
+html[data-aspecto="hifi"] .cover-inner { border-radius: 3px; }
+html[data-aspecto="hifi"] :is(.track-info, .visualizer-frame) { background: var(--m-panel); border-radius: 6px; box-shadow: var(--m-panel-sombra); }
+html[data-aspecto="hifi"] .track-info { padding: 10px 14px 12px; }
+html[data-aspecto="hifi"] .ti-title {
+  color: var(--accent);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em !important;
+  text-shadow: 0 0 10px color-mix(in oklab, var(--accent) 70%, transparent) !important;
+}
+html[data-aspecto="hifi"] .ti-artist { color: color-mix(in oklab, var(--accent) 65%, #fff); font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em !important; font-size: 15px; }
+html[data-aspecto="hifi"] .ti-album { color: color-mix(in oklab, var(--accent) 40%, #4a5550); font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em !important; font-size: 12px; }
+html[data-aspecto="hifi"] .ti-eq i { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+html[data-aspecto="hifi"] .visualizer-frame { padding: 8px 10px; }
+html[data-aspecto="hifi"] .viz-sync {
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--accent) 40%, transparent);
+  border-radius: 3px;
+  color: var(--accent);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em !important;
+}
+html[data-aspecto="hifi"] .tab-bar { padding: 10px 14px 6px; gap: 6px; }
+html[data-aspecto="hifi"] .tab,
+html[data-aspecto="hifi"] .tab:hover {
+  border-radius: 3px;
+  padding: 4px 10px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em !important;
+  color: color-mix(in oklab, var(--accent) 38%, #3c4641);
+}
+html[data-aspecto="hifi"] .tab:hover { color: color-mix(in oklab, var(--accent) 70%, #fff); }
+html[data-aspecto="hifi"] .tab.active { background: transparent; color: var(--accent); text-shadow: 0 0 8px var(--accent) !important; }
+html[data-aspecto="hifi"] :is(.seg-btn, .lib-chip) {
+  background: transparent;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 30%, transparent) !important;
+  color: color-mix(in oklab, var(--accent) 60%, #9aa1aa);
+  text-transform: uppercase;
+  letter-spacing: 0.08em !important;
+  font-weight: 700;
+}
+html[data-aspecto="hifi"] .seg { background: transparent; }
+html[data-aspecto="hifi"] :is(.seg-btn, .lib-chip).active { background: var(--accent); color: #04100a; }
+html[data-aspecto="hifi"] .retro-btn { border-radius: 4px; background: var(--hf-tecla); color: #e3e6ea; box-shadow: 0 2px 0 #101113, inset 0 1px 0 rgb(255 255 255 / 0.18); text-transform: uppercase; letter-spacing: 0.1em !important; }
+html[data-aspecto="hifi"] .settings-block h3 { text-transform: uppercase; letter-spacing: 0.2em !important; font-size: 12px; color: var(--accent); }
+html[data-aspecto="hifi"] .playback-bar { padding: 10px 18px 24px; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), inset 0 2px 0 rgb(0 0 0 / 0.35); }
+html[data-aspecto="hifi"] .ctrl-btn:not(.side-btn) {
+  width: 56px;
+  height: 36px;
+  border-radius: 5px;
+  background: var(--hf-tecla);
+  box-shadow: 0 2px 0 #101113, 0 4px 8px rgb(0 0 0 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.18), inset 0 -1px 0 rgb(0 0 0 / 0.3);
+  color: #d4d8dd;
+}
+html[data-aspecto="hifi"] .ctrl-btn:not(.side-btn):hover { background: linear-gradient(180deg, #5b5e65 0%, #42454b 52%, #313338 100%); color: #fff; }
+html[data-aspecto="hifi"] .ctrl-btn:not(.side-btn):active { transform: translateY(2px); box-shadow: 0 0 0 #101113, 0 1px 3px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.1); }
+html[data-aspecto="hifi"] .ctrl-btn.play-btn:not(.side-btn),
+html[data-aspecto="hifi"] .ctrl-btn.play-btn:not(.side-btn):hover,
+html[data-aspecto="hifi"] .ctrl-btn.play-btn:not(.side-btn):active,
+html[data-aspecto="hifi"] .ctrl-btn.play-btn:not(.side-btn).active {
+  width: 82px;
+  height: 40px;
+  border-radius: 5px;
+  background: var(--hf-tecla);
+  color: var(--accent);
+  box-shadow: 0 2px 0 #101113, 0 4px 8px rgb(0 0 0 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent), 0 0 14px color-mix(in oklab, var(--accent) 25%, transparent);
+}
+html[data-aspecto="hifi"] .play-btn .ico { --ico-tam: 22px; filter: drop-shadow(0 0 4px var(--accent)); }
+html[data-aspecto="hifi"] .ctl-musica .ctrl-btn.active { color: #d4d8dd; }
+html[data-aspecto="hifi"] .ctl-musica .ctrl-btn.active::after {
+  top: 5px;
+  bottom: auto;
+  left: 7px;
+  margin: 0;
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+/* el rótulo impreso debajo de cada tecla */
+html[data-aspecto="hifi"] .ctl-musica .ctrl-btn::before {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--hf-rotulo);
+  white-space: nowrap;
+  pointer-events: none;
+}
+html[data-aspecto="hifi"] #shuffleBtn::before { content: 'ALEATORIO'; }
+html[data-aspecto="hifi"] #prevBtn::before { content: 'ANTERIOR'; }
+html[data-aspecto="hifi"] #playBtn::before { content: 'PLAY · PAUSA'; }
+html[data-aspecto="hifi"] #nextBtn::before { content: 'SIGUIENTE'; }
+html[data-aspecto="hifi"] #repeatBtn::before { content: 'REPETIR'; }
+html[data-aspecto="hifi"] body.disp-movil .ctl-musica .ctrl-btn::before { display: none; }
+html[data-aspecto="hifi"] body.disp-movil .playback-bar { padding-bottom: 8px; }
+html[data-aspecto="hifi"] .time {
+  min-width: 74px;
+  padding: 5px 8px;
+  border-radius: 3px;
+  background: var(--hf-cristal);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.9), 0 1px 0 rgb(255 255 255 / 0.07);
+  font-size: 14px;
+  color: var(--accent);
+  text-shadow: 0 0 6px color-mix(in oklab, var(--accent) 80%, transparent) !important;
+}
+html[data-aspecto="hifi"] .time[data-g]::before { display: block; }
+html[data-aspecto="hifi"] .progress-bg {
+  height: 10px;
+  border-radius: 2px;
+  background: var(--hf-cristal);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.9), 0 1px 0 rgb(255 255 255 / 0.07) !important;
+}
+html[data-aspecto="hifi"] .progress-bar:hover .progress-bg,
+html[data-aspecto="hifi"] body.barra-agarrada .progress-bg { height: 10px; }
+html[data-aspecto="hifi"] .progress-bg::before {
+  display: block;
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: repeating-linear-gradient(90deg, color-mix(in oklab, var(--accent) 13%, transparent) 0 5px, transparent 5px 7px);
+}
+html[data-aspecto="hifi"] .progress-fill {
+  height: calc(100% - 4px);
+  margin: 2px;
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 7px);
+  filter: drop-shadow(0 0 3px var(--accent));
+}
+html[data-aspecto="hifi"] .progress-thumb { display: none; }
+html[data-aspecto="hifi"] .ctl-vista .side-btn { border-radius: 4px; color: var(--hf-rotulo); }
+html[data-aspecto="hifi"] .ctl-vista .side-btn:hover { background: rgb(255 255 255 / 0.05); color: #e3e6ea; }
+html[data-aspecto="hifi"] .ctl-vista .side-btn.on { color: var(--accent); background: transparent; }
+html[data-aspecto="hifi"] .sb-txt { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em !important; }
+html[data-aspecto="hifi"] .volume-bg { height: 8px; border-radius: 2px; background: var(--hf-cristal); box-shadow: inset 0 1px 3px #000; }
+html[data-aspecto="hifi"] .volume-fill { border-radius: 0; background: repeating-linear-gradient(90deg, var(--accent) 0 4px, transparent 4px 6px); }
+html[data-aspecto="hifi"] .status-bar {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em !important;
+  color: var(--hf-rotulo);
+  text-shadow: 0 -1px 0 rgb(0 0 0 / 0.7) !important;
+}
+html[data-aspecto="hifi"] #statusText { color: #b6bcc4; }
+html[data-aspecto="hifi"] #clock { font-family: var(--f-num); font-size: 12px; letter-spacing: 0.05em !important; color: var(--accent); text-shadow: 0 0 6px var(--accent) !important; }
+html[data-aspecto="hifi"] :is(#clock::before, #clock::after) { content: none; }
+html[data-aspecto="hifi"] body.disp-movil .left-panel { box-shadow: var(--m-panel-sombra); }
+html[data-aspecto="hifi"] body.disp-movil .window > .tab-bar .tab.active { color: var(--accent); }
+
+/* ---- la columna de la carátula, el espectro y el teléfono ----
+   Su cabecera de la canción es más alta que la de los oscuros: en ventanas
+   grandes la carátula cede un poco para que el espectro quepa debajo, y el
+   espectro nunca empuja (se encoge). */
+html[data-aspecto="hifi"] .visualizer-frame { min-height: 40px; }
+@container win (min-width: 1000px) and (min-height: 600px) {
+  html[data-aspecto="hifi"] body:not(.letra-ancha) .main-grid {
+    grid-template-columns: min(clamp(260px, 29cqw, 480px), 46cqh) 1fr;
+  }
+}
+
+/* ---- lo que flota: el buscador (Ctrl+K) y los diálogos, en aluminio,
+   con la lista dentro de una pantalla como las de la cadena ---- */
+html[data-aspecto="hifi"] :is(.paleta-caja, .cid-ventana) {
+  background: var(--hf-metal);
+  border-radius: 8px;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.14), inset 0 0 0 1px rgb(0 0 0 / 0.7);
+}
+html[data-aspecto="hifi"] .paleta-lista {
+  margin: 0 10px 8px;
+  border-radius: 5px;
+  background: var(--hf-cristal);
+  box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.9);
+}
+html[data-aspecto="hifi"] .paleta-fila-r.sel { background: color-mix(in oklab, var(--accent) 14%, transparent); }
+html[data-aspecto="hifi"] .paleta-fila-r.sel :is(.paleta-tit, .paleta-pista) { color: var(--accent); text-shadow: 0 0 8px var(--accent) !important; }
+html[data-aspecto="hifi"] :is(.paleta-seccion, .cid-titulo) { color: var(--hf-rotulo); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em !important; }
+html[data-aspecto="hifi"] .cid-cuerpo { background: var(--hf-cristal); margin: 0 10px 10px; border-radius: 5px; box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.9); }
+html[data-aspecto="hifi"] .cid-ok,
+html[data-aspecto="hifi"] .cid-ok:hover {
+  border-radius: 4px;
+  background: var(--hf-tecla);
+  color: var(--accent);
+  box-shadow: 0 2px 0 #101113, inset 0 1px 0 rgb(255 255 255 / 0.18);
+}
+
+/* ---- ventanas estrechas y bajas ----
+   Por debajo de 1100 px las teclas encogen y pierden su rótulo (si no,
+   chocan con la vista y el volumen); en el teléfono tumbado la cabecera
+   baja y la ficha de la canción se recorta dentro de su columna. */
+html[data-aspecto="hifi"] .track-info { min-width: 0; overflow: hidden; }
+@container win (max-width: 1100px) {
+  html[data-aspecto="hifi"] .ctrl-btn:not(.side-btn) { width: 44px; }
+  html[data-aspecto="hifi"] .ctrl-btn.play-btn:not(.side-btn),
+  html[data-aspecto="hifi"] .ctrl-btn.play-btn:not(.side-btn):hover,
+  html[data-aspecto="hifi"] .ctrl-btn.play-btn:not(.side-btn):active,
+  html[data-aspecto="hifi"] .ctrl-btn.play-btn:not(.side-btn).active { width: 62px; }
+  html[data-aspecto="hifi"] .ctl-musica .ctrl-btn::before { display: none; }
+  html[data-aspecto="hifi"] .playback-bar { padding-bottom: 10px; }
+}
+@container win (max-height: 560px) {
+  html[data-aspecto="hifi"] .track-info { width: 100%; max-width: 100%; min-width: 0; }
+  html[data-aspecto="hifi"] :is(.ti-title-row, .ti-artist, .ti-album) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html[data-aspecto="hifi"] .title-bar { height: 40px; }
+  html[data-aspecto="hifi"] .title-text { font-size: 13px; letter-spacing: 0.24em !important; }
+  html[data-aspecto="hifi"] .track-info { padding: 6px 8px; }
+  html[data-aspecto="hifi"] .time { min-width: 60px; padding: 3px 6px; font-size: 12px; }
+  html[data-aspecto="hifi"] .playback-bar { padding-top: 6px; padding-bottom: 6px; }
+}
+
+/* en el teléfono, los nombres de las pestañas y de la vista sin el
+   espaciado de los rótulos: si no, «historial» o «compartir» se cortan */
+html[data-aspecto="hifi"] body.disp-movil :is(.window > .tab-bar .tab-txt, .ctl-vista .sb-txt) { letter-spacing: 0 !important; font-size: 11px; }

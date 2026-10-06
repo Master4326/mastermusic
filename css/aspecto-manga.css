@@ -1,0 +1,237 @@
+/* ==========================================================
+   ASPECTO «manga» · su hoja propia (js/aspecto.js)
+   Solo se descarga si eliges este aspecto: el <head> de index.html la pide
+   junto a css/aspectos.css (la base común de los modernos) y las dos
+   bloquean el pintado hasta llegar, así que la app abre ya con su cara.
+   Va DESPUÉS de aspectos.css: con la misma especificidad, gana esta.
+   En todos los estilos de este tipo la letra de la canción vive en un
+   escenario oscuro (el panel de la derecha): la letra, el modo edit, el
+   karaoke y la onda que la rodea siguen exactamente como siempre.
+   ========================================================== */
+
+/* ══════════ MANGA ══════════
+   Una página de manga: papel blanco, tinta negra gruesa, viñetas con su
+   marco, trama de puntos, líneas de enfoque alrededor de la carátula y
+   botones como bocadillos. La letra suena en una viñeta negra, de las
+   dramáticas, con su filete blanco por dentro. El único color es el de la
+   canción, en la sombra del play. */
+html[data-aspecto="manga"] {
+  --f-moderna: "M PLUS Rounded 1c", "Segoe UI", system-ui, sans-serif;
+  --f-ui-aj: none;
+  --f-mono-aj: none;
+  --f-pixel-aj: none;
+  --mg-tinta: #111;
+  --mg-papel: #fdfcf8;
+  --m-ventana: var(--mg-papel);
+  --m-panel: #0e0e0e;
+  --m-panel-sombra: 0 0 0 3px var(--mg-tinta), inset 0 0 0 6px #0e0e0e, inset 0 0 0 7px rgb(255 255 255 / 0.85);
+  --m-sel-fondo: #fff;
+  --m-sel-texto: #111;
+  --m-play-fondo: var(--mg-tinta);
+  --m-play-icono: #fff;
+  --m-play-sombra: 0 0 0 3px var(--mg-tinta), 5px 5px 0 3px var(--accent);
+  --m-prog: var(--mg-tinta);
+  --m-flota: #141414;
+  --m-pie: #fff;
+  --m-franja: #fff;
+  --r-s: 0;
+  --r-m: 0;
+  --r-l: 0;
+  --viz-estilo: barras;
+  background: #e9e5da;
+}
+html[data-aspecto="manga"] :is(.title-bar, .left-panel, .playback-bar, .status-bar),
+html[data-aspecto="manga"] body.disp-movil .window > .tab-bar {
+  --text: #111;
+  --text-dim: #444;
+  --text-muted: #777;
+  --m-tenue: #444;
+  --m-tenue-2: #777;
+  --m-linea: rgb(17 17 17 / 0.25);
+  --m-hover: rgb(17 17 17 / 0.06);
+  --m-activo: rgb(17 17 17 / 0.12);
+  color: var(--text);
+}
+html[data-aspecto="manga"] body { background: radial-gradient(circle, rgb(17 17 17 / 0.2) 0.8px, transparent 1.15px) 0 0 / 6px 6px, #ebe7dc; }
+html[data-aspecto="manga"] .ambient { display: none; }
+html[data-aspecto="manga"] .window { border-radius: 0; box-shadow: 0 0 0 4px var(--mg-tinta), 12px 12px 0 4px var(--mg-tinta); }
+html[data-aspecto="manga"] .title-bar { height: 56px; background: #fff; box-shadow: inset 0 -3px 0 var(--mg-tinta); }
+html[data-aspecto="manga"] .pixel-icon span:nth-child(odd) { background: var(--mg-tinta); border-radius: 0; }
+html[data-aspecto="manga"] .title-text { font-family: "Bangers", "M PLUS Rounded 1c", sans-serif; font-size: 30px; font-weight: 400; letter-spacing: 0.05em !important; color: var(--mg-tinta); }
+html[data-aspecto="manga"] .paleta-btn {
+  height: 36px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 2.5px var(--mg-tinta), 3px 3px 0 2.5px var(--mg-tinta) !important;
+  color: var(--mg-tinta);
+  font-weight: 800;
+}
+html[data-aspecto="manga"] .tb-btn { color: var(--mg-tinta); border-radius: 0; }
+html[data-aspecto="manga"] .tb-btn:hover { background: var(--mg-tinta); color: #fff; }
+html[data-aspecto="manga"] .main-grid { gap: 12px; padding: 12px 14px 12px; }
+html[data-aspecto="manga"] .left-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 14px;
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--mg-tinta);
+}
+/* las líneas de enfoque, saliendo de detrás de la carátula */
+html[data-aspecto="manga"] .left-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(from 0deg at 50% 38%, var(--mg-tinta) 0deg 0.7deg, transparent 0.7deg 6deg);
+  -webkit-mask-image: radial-gradient(circle at 50% 38%, transparent 30%, #000 62%);
+  mask-image: radial-gradient(circle at 50% 38%, transparent 30%, #000 62%);
+  opacity: 0.85;
+  pointer-events: none;
+}
+html[data-aspecto="manga"] .left-panel > * { position: relative; z-index: 1; }
+html[data-aspecto="manga"] .cover-frame { border-radius: 0; box-shadow: 0 0 0 3px var(--mg-tinta), 7px 7px 0 3px var(--mg-tinta); }
+html[data-aspecto="manga"] .cover-inner { border-radius: 0; }
+html[data-aspecto="manga"] .track-info { padding: 8px 12px 10px; background: #fff; box-shadow: 0 0 0 2.5px var(--mg-tinta); }
+html[data-aspecto="manga"] .ti-title { font-family: "Bangers", "M PLUS Rounded 1c", sans-serif; font-size: clamp(26px, 2.7cqw, 46px); font-weight: 400; line-height: 1; letter-spacing: 0.04em !important; color: var(--mg-tinta); }
+html[data-aspecto="manga"] .ti-artist { font-weight: 800; color: var(--mg-tinta); }
+html[data-aspecto="manga"] .ti-album { font-weight: 700; color: #666; }
+html[data-aspecto="manga"] .ti-eq i { background: var(--mg-tinta); }
+html[data-aspecto="manga"] .visualizer-frame { background: var(--mg-tinta); box-shadow: 0 0 0 2.5px var(--mg-tinta); padding: 6px; }
+html[data-aspecto="manga"] .viz-sync { background: #fff; color: var(--mg-tinta); border-radius: 999px; font-weight: 800; }
+html[data-aspecto="manga"] .tab-bar { padding: 14px 16px 6px; gap: 10px; }
+html[data-aspecto="manga"] .tab,
+html[data-aspecto="manga"] .tab:hover {
+  border-radius: 0;
+  padding: 3px 12px 2px;
+  background: #fff;
+  color: var(--mg-tinta);
+  box-shadow: 0 0 0 2.5px var(--mg-tinta);
+  font-family: "Bangers", "M PLUS Rounded 1c", sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase;
+}
+html[data-aspecto="manga"] .tab.active { background: var(--mg-tinta); color: #fff; box-shadow: 0 0 0 2.5px #fff; }
+html[data-aspecto="manga"] :is(.seg-btn, .lib-chip) { border-radius: 999px; background: #fff; color: var(--mg-tinta); font-weight: 800; box-shadow: 0 0 0 2px var(--mg-tinta) !important; }
+html[data-aspecto="manga"] .seg { background: transparent; gap: 8px; }
+html[data-aspecto="manga"] :is(.seg-btn, .lib-chip).active { background: var(--mg-tinta); color: #fff; box-shadow: 0 0 0 2px #fff !important; }
+html[data-aspecto="manga"] .retro-btn { border-radius: 999px; background: #fff; color: var(--mg-tinta); font-weight: 800; box-shadow: 0 0 0 2.5px var(--mg-tinta), 3px 3px 0 2.5px var(--mg-tinta); }
+html[data-aspecto="manga"] .settings-block h3 { font-family: "Bangers", sans-serif; font-size: 24px; font-weight: 400; letter-spacing: 0.06em !important; text-transform: uppercase; color: #fff; }
+html[data-aspecto="manga"] .playback-bar { background: #fff; padding: 10px 18px 12px; box-shadow: inset 0 3px 0 var(--mg-tinta); }
+html[data-aspecto="manga"] .ctrl-btn:not(.side-btn) {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--mg-tinta);
+  box-shadow: 0 0 0 2.5px var(--mg-tinta), 3px 3px 0 2.5px var(--mg-tinta);
+}
+html[data-aspecto="manga"] .ctrl-btn:not(.side-btn):hover { background: #fff; color: var(--mg-tinta); transform: translate(-1px, -1px); }
+html[data-aspecto="manga"] .ctrl-btn:not(.side-btn):active { transform: translate(2px, 2px); box-shadow: 0 0 0 2.5px var(--mg-tinta), 1px 1px 0 2.5px var(--mg-tinta); }
+html[data-aspecto="manga"] .ctl-musica .ctrl-btn.active { background: var(--mg-tinta); color: #fff; }
+html[data-aspecto="manga"] .ctl-musica .ctrl-btn.active::after { display: none; }
+html[data-aspecto="manga"] .ctrl-btn.play-btn:not(.side-btn),
+html[data-aspecto="manga"] .ctrl-btn.play-btn:not(.side-btn):hover,
+html[data-aspecto="manga"] .ctrl-btn.play-btn:not(.side-btn):active,
+html[data-aspecto="manga"] .ctrl-btn.play-btn:not(.side-btn).active { width: 58px; height: 58px; }
+html[data-aspecto="manga"] .progress-bg { height: 12px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 2.5px var(--mg-tinta) !important; }
+html[data-aspecto="manga"] .progress-bar:hover .progress-bg,
+html[data-aspecto="manga"] body.barra-agarrada .progress-bg { height: 12px; }
+html[data-aspecto="manga"] .progress-fill { border-radius: 999px; background: repeating-linear-gradient(-45deg, var(--mg-tinta) 0 3px, #555 3px 5px); }
+html[data-aspecto="manga"] .progress-thumb,
+html[data-aspecto="manga"] body.barra-agarrada .progress-thumb { background: #fff; box-shadow: 0 0 0 2.5px var(--mg-tinta); }
+html[data-aspecto="manga"] .time { font-family: "Bangers", sans-serif; font-size: 21px; font-weight: 400; letter-spacing: 0.05em !important; color: var(--mg-tinta); }
+html[data-aspecto="manga"] .ctl-vista .side-btn { color: var(--mg-tinta); }
+html[data-aspecto="manga"] .ctl-vista .side-btn:hover { background: var(--mg-tinta); color: #fff; }
+html[data-aspecto="manga"] .ctl-vista .side-btn.on { background: var(--mg-tinta); color: #fff; }
+html[data-aspecto="manga"] .sb-txt { font-family: "Bangers", sans-serif; font-size: 14px; font-weight: 400; letter-spacing: 0.06em !important; text-transform: uppercase; }
+html[data-aspecto="manga"] .volume-bg { background: #fff; box-shadow: 0 0 0 2px var(--mg-tinta); height: 8px; }
+html[data-aspecto="manga"] .volume-fill { background: var(--mg-tinta); }
+html[data-aspecto="manga"] .status-bar { background: #fff; color: var(--mg-tinta); font-weight: 800; font-size: 13px; box-shadow: inset 0 2px 0 var(--mg-tinta); }
+html[data-aspecto="manga"] #statusText { color: var(--mg-tinta); }
+html[data-aspecto="manga"] .mini-eq i { background: var(--mg-tinta); }
+html[data-aspecto="manga"] body.disp-movil .left-panel { box-shadow: 0 0 0 3px var(--mg-tinta); }
+html[data-aspecto="manga"] body.disp-movil .left-panel::before { display: none; }
+html[data-aspecto="manga"] body.disp-movil .track-info { box-shadow: none; padding: 0; }
+html[data-aspecto="manga"] body.disp-movil .window > .tab-bar { box-shadow: inset 0 3px 0 var(--mg-tinta); }
+html[data-aspecto="manga"] body.disp-movil .window > .tab-bar .tab,
+html[data-aspecto="manga"] body.disp-movil .window > .tab-bar .tab:hover { box-shadow: none; background: transparent; color: #777; }
+html[data-aspecto="manga"] body.disp-movil .window > .tab-bar .tab.active { color: var(--mg-tinta); background: transparent; }
+html[data-aspecto="manga"] body.disp-movil .window > .tab-bar .tab.active::before { background: var(--mg-tinta); }
+
+/* ---- la columna de la carátula, el espectro y el teléfono ----
+   Su cabecera de la canción es más alta que la de los oscuros: en ventanas
+   grandes la carátula cede un poco para que el espectro quepa debajo, y el
+   espectro nunca empuja (se encoge). En el teléfono va casi invisible
+   detrás de la franja: sin su caja. */
+html[data-aspecto="manga"] .visualizer-frame { min-height: 40px; }
+@container win (min-width: 1000px) and (min-height: 600px) {
+  html[data-aspecto="manga"] body:not(.letra-ancha) .main-grid {
+    grid-template-columns: min(clamp(260px, 29cqw, 480px), 46cqh) 1fr;
+  }
+}
+html[data-aspecto="manga"] body.disp-movil .visualizer-frame { background: transparent; box-shadow: none; }
+
+/* ---- lo que flota: el buscador (Ctrl+K) y los diálogos, como viñetas ---- */
+html[data-aspecto="manga"] :is(.paleta-caja, .cid-ventana) {
+  --text: #111;
+  --text-dim: #444;
+  --text-muted: #777;
+  --m-tenue: #444;
+  --m-tenue-2: #777;
+  --m-linea: rgb(17 17 17 / 0.25);
+  --m-hover: rgb(17 17 17 / 0.06);
+  --m-activo: rgb(17 17 17 / 0.12);
+  color: var(--text);
+  background: #fff;
+  border-radius: 0;
+  box-shadow: 0 0 0 3px var(--mg-tinta), 10px 10px 0 3px var(--mg-tinta);
+}
+html[data-aspecto="manga"] .paleta-fila-r.sel { background: var(--mg-tinta); }
+html[data-aspecto="manga"] .paleta-fila-r.sel :is(.paleta-tit, .paleta-pista) { color: #fff; }
+html[data-aspecto="manga"] .paleta-fila-r.sel .paleta-ico { background-color: #fff; color: var(--mg-tinta); }
+html[data-aspecto="manga"] :is(.paleta-seccion, .cid-titulo) {
+  font-family: "Bangers", "M PLUS Rounded 1c", sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase;
+  color: var(--mg-tinta);
+}
+html[data-aspecto="manga"] .cid-barra { background: #fff; box-shadow: inset 0 -3px 0 var(--mg-tinta); }
+html[data-aspecto="manga"] .cid-cuerpo :is(b, a) { color: var(--mg-tinta); font-weight: 800; }
+html[data-aspecto="manga"] .cid-ok,
+html[data-aspecto="manga"] .cid-ok:hover { background: var(--mg-tinta); color: #fff; box-shadow: 0 0 0 2.5px var(--mg-tinta), 3px 3px 0 2.5px var(--accent); }
+html[data-aspecto="manga"] :is(.cid-cancelar, .cid-copiar) { background: #fff; color: var(--mg-tinta); box-shadow: 0 0 0 2.5px var(--mg-tinta); }
+
+/* ---- ventanas estrechas y bajas ----
+   Las cajas de las pestañas se aprietan y, mientras se ven todos los
+   nombres, sueltan el icono; en el teléfono tumbado todo baja un punto. */
+html[data-aspecto="manga"] .track-info { min-width: 0; overflow: hidden; }
+@container win (max-width: 1250px) {
+  html[data-aspecto="manga"] .tab-bar { gap: 7px; padding-left: 10px; padding-right: 10px; }
+  html[data-aspecto="manga"] .tab,
+  html[data-aspecto="manga"] .tab:hover { padding: 3px 8px 2px; font-size: 16px; }
+}
+@container win (min-width: 861px) and (max-width: 1250px) {
+  html[data-aspecto="manga"] .tab .ico { display: none; }
+}
+@container win (max-height: 560px) {
+  html[data-aspecto="manga"] .track-info { width: 100%; max-width: 100%; min-width: 0; }
+  html[data-aspecto="manga"] :is(.ti-title-row, .ti-artist, .ti-album) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html[data-aspecto="manga"] .title-bar { height: 42px; }
+  html[data-aspecto="manga"] .title-text { font-size: 22px; }
+  html[data-aspecto="manga"] .left-panel { padding: 8px; }
+  html[data-aspecto="manga"] .ti-title { font-size: 20px; }
+  html[data-aspecto="manga"] .ctrl-btn:not(.side-btn) { width: 36px; height: 36px; }
+  html[data-aspecto="manga"] .ctrl-btn.play-btn:not(.side-btn),
+  html[data-aspecto="manga"] .ctrl-btn.play-btn:not(.side-btn):hover,
+  html[data-aspecto="manga"] .ctrl-btn.play-btn:not(.side-btn):active,
+  html[data-aspecto="manga"] .ctrl-btn.play-btn:not(.side-btn).active { width: 46px; height: 46px; }
+  html[data-aspecto="manga"] .time { font-size: 17px; }
+  html[data-aspecto="manga"] .playback-bar { padding-top: 6px; padding-bottom: 8px; }
+}
+
+/* en el teléfono, los nombres de las pestañas y de la vista sin el
+   espaciado de los rótulos: si no, «historial» o «compartir» se cortan */
+html[data-aspecto="manga"] body.disp-movil :is(.window > .tab-bar .tab-txt, .ctl-vista .sb-txt) { letter-spacing: 0 !important; font-size: 11px; }

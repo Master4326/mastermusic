@@ -1,0 +1,218 @@
+/* ==========================================================
+   ASPECTO «revista» · su hoja propia (js/aspecto.js)
+   Solo se descarga si eliges este aspecto: el <head> de index.html la pide
+   junto a css/aspectos.css (la base común de los modernos) y las dos
+   bloquean el pintado hasta llegar, así que la app abre ya con su cara.
+   Va DESPUÉS de aspectos.css: con la misma especificidad, gana esta.
+   En todos los estilos de este tipo la letra de la canción vive en un
+   escenario oscuro (el panel de la derecha): la letra, el modo edit, el
+   karaoke y la onda que la rodea siguen exactamente como siempre.
+   ========================================================== */
+
+/* ══════════ REVISTA ══════════
+   Una revista de diseño suizo: página blanca, tinta negra, una sola tinta
+   de color (la de la canción), retícula estricta, filetes gruesos, el
+   título de la app como cabecera y el tiempo en cifras enormes. La letra
+   va en la doble página negra, como un reportaje a sangre. */
+html[data-aspecto="revista"] {
+  --f-moderna: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-ui-aj: none;
+  --f-mono-aj: none;
+  --f-pixel-aj: none;
+  --rv-papel: #f4f2ed;
+  --rv-tinta: #0d0d0d;
+  --m-ventana: var(--rv-papel);
+  --m-panel: #0d0d0d;
+  --m-panel-sombra: none;
+  --m-sel-fondo: #f4f2ed;
+  --m-sel-texto: #0d0d0d;
+  --m-play-fondo: var(--rv-tinta);
+  --m-play-icono: var(--rv-papel);
+  --m-play-sombra: none;
+  --m-prog: var(--rv-tinta);
+  --m-flota: #141414;
+  --m-pie: var(--rv-papel);
+  --m-franja: var(--rv-papel);
+  --r-s: 0;
+  --r-m: 0;
+  --r-l: 0;
+  --viz-estilo: barras;
+  background: #d9d5cc;
+}
+html[data-aspecto="revista"] :is(.title-bar, .left-panel, .playback-bar, .status-bar),
+html[data-aspecto="revista"] body.disp-movil .window > .tab-bar {
+  --text: #0d0d0d;
+  --text-dim: #4a4a4a;
+  --text-muted: #7a7a7a;
+  --m-tenue: #4a4a4a;
+  --m-tenue-2: #7a7a7a;
+  --m-linea: rgb(13 13 13 / 0.2);
+  --m-hover: rgb(13 13 13 / 0.06);
+  --m-activo: rgb(13 13 13 / 0.12);
+  --rv-color: color-mix(in oklab, var(--accent) 72%, #0d0d0d);
+  color: var(--text);
+}
+html[data-aspecto="revista"] body { background: #d9d5cc; }
+html[data-aspecto="revista"] .ambient { display: none; }
+html[data-aspecto="revista"] .window { box-shadow: 0 30px 80px rgb(0 0 0 / 0.32); }
+html[data-aspecto="revista"] .title-bar { height: 68px; padding: 0 16px 0 24px; box-shadow: inset 0 -4px 0 var(--rv-tinta); }
+html[data-aspecto="revista"] .pixel-icon { display: none; }
+html[data-aspecto="revista"] .title-text {
+  font-size: 38px;
+  font-weight: 900;
+  font-stretch: 68%;
+  line-height: 1;
+  letter-spacing: -0.015em !important;
+  text-transform: uppercase;
+  color: var(--rv-tinta);
+}
+html[data-aspecto="revista"] .paleta-btn {
+  height: 36px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--rv-tinta) !important;
+  color: var(--rv-tinta);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em !important;
+}
+html[data-aspecto="revista"] .paleta-btn:hover,
+html[data-aspecto="revista"] .paleta-btn:focus-visible { background: var(--rv-tinta); color: var(--rv-papel); }
+html[data-aspecto="revista"] .tb-btn { border-radius: 0; color: var(--rv-tinta); }
+html[data-aspecto="revista"] .tb-btn:hover { background: var(--rv-tinta); color: var(--rv-papel); }
+html[data-aspecto="revista"] .main-grid { gap: 24px; padding: 16px 24px 12px; }
+html[data-aspecto="revista"] :is(.cover-frame, .cover-inner) { border-radius: 0; box-shadow: none; }
+html[data-aspecto="revista"] .track-info { margin-top: 2px; padding: 9px 0 0; box-shadow: inset 0 3px 0 var(--rv-tinta); }
+html[data-aspecto="revista"] .ti-title {
+  font-size: clamp(26px, 2.6cqw, 48px);
+  font-weight: 900;
+  font-stretch: 72%;
+  line-height: 0.95;
+  letter-spacing: -0.02em !important;
+  text-transform: uppercase;
+  color: var(--rv-tinta);
+}
+html[data-aspecto="revista"] .ti-artist { font-size: clamp(16px, 1.5cqw, 24px); font-weight: 800; color: var(--rv-color); }
+html[data-aspecto="revista"] .ti-album { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em !important; color: #7a7a7a; }
+html[data-aspecto="revista"] .ti-eq i { background: var(--rv-color); }
+html[data-aspecto="revista"] .visualizer-frame { background: var(--rv-tinta); padding: 8px; }
+html[data-aspecto="revista"] .viz-sync { border-radius: 0; background: transparent; color: #f4f2ed; text-transform: uppercase; font-weight: 800; letter-spacing: 0.1em !important; font-size: 11px; }
+html[data-aspecto="revista"] .tab-bar { counter-reset: rv-tab; padding: 14px 20px 6px; gap: 20px; }
+html[data-aspecto="revista"] .tab,
+html[data-aspecto="revista"] .tab:hover {
+  counter-increment: rv-tab;
+  border-radius: 0;
+  padding: 6px 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em !important;
+  color: rgb(244 242 237 / 0.5);
+}
+html[data-aspecto="revista"] .tab:hover { color: #f4f2ed; }
+html[data-aspecto="revista"] .tab.active { background: transparent; color: #f4f2ed; box-shadow: inset 0 -3px 0 var(--accent); }
+html[data-aspecto="revista"] body:not(.disp-movil) .tab::before { content: counter(rv-tab, decimal-leading-zero); margin-right: 7px; font-weight: 400; }
+html[data-aspecto="revista"] body:not(.disp-movil) .tab .ico { display: none; }
+html[data-aspecto="revista"] :is(.seg-btn, .lib-chip) { border-radius: 0; background: transparent; color: #f4f2ed; box-shadow: inset 0 0 0 1.5px rgb(244 242 237 / 0.35) !important; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em !important; font-size: 12px; }
+html[data-aspecto="revista"] .seg { background: transparent; gap: 6px; }
+html[data-aspecto="revista"] :is(.seg-btn, .lib-chip).active { background: #f4f2ed; color: #0d0d0d; }
+html[data-aspecto="revista"] .retro-btn { border-radius: 0; background: #f4f2ed; color: #0d0d0d; text-transform: uppercase; letter-spacing: 0.1em !important; font-weight: 800; font-size: 13px; }
+html[data-aspecto="revista"] .settings-block h3 { font-size: 26px; font-weight: 900; font-stretch: 72%; text-transform: uppercase; letter-spacing: -0.01em !important; color: #f4f2ed; box-shadow: inset 0 -3px 0 #f4f2ed; }
+html[data-aspecto="revista"] .playback-bar { padding: 8px 24px 14px; box-shadow: inset 0 4px 0 var(--rv-tinta); }
+html[data-aspecto="revista"] .time { min-width: 70px; font-size: 28px; font-weight: 900; font-stretch: 72%; letter-spacing: -0.01em !important; color: var(--rv-tinta); }
+html[data-aspecto="revista"] .progress-bg { height: 6px; border-radius: 0; background: rgb(13 13 13 / 0.12); }
+html[data-aspecto="revista"] .progress-bar:hover .progress-bg,
+html[data-aspecto="revista"] body.barra-agarrada .progress-bg { height: 8px; }
+html[data-aspecto="revista"] .progress-fill { border-radius: 0; background: var(--rv-color); }
+html[data-aspecto="revista"] .progress-thumb,
+html[data-aspecto="revista"] body.barra-agarrada .progress-thumb { width: 5px; height: 20px; border-radius: 0; background: var(--rv-tinta); box-shadow: none; }
+html[data-aspecto="revista"] .ctrl-btn:not(.side-btn) { border-radius: 0; background: transparent; color: var(--rv-tinta); }
+html[data-aspecto="revista"] .ctrl-btn:not(.side-btn):hover { background: var(--rv-tinta); color: var(--rv-papel); }
+html[data-aspecto="revista"] .ctl-musica .ctrl-btn.active { color: var(--rv-color); }
+html[data-aspecto="revista"] .ctrl-btn.play-btn:not(.side-btn),
+html[data-aspecto="revista"] .ctrl-btn.play-btn:not(.side-btn):hover,
+html[data-aspecto="revista"] .ctrl-btn.play-btn:not(.side-btn):active,
+html[data-aspecto="revista"] .ctrl-btn.play-btn:not(.side-btn).active { width: 58px; height: 58px; border-radius: 0; }
+html[data-aspecto="revista"] .ctrl-btn.play-btn:not(.side-btn):hover { background: var(--rv-color); transform: none; }
+html[data-aspecto="revista"] .ctl-vista .side-btn { border-radius: 0; color: var(--rv-tinta); }
+html[data-aspecto="revista"] .ctl-vista .side-btn:hover { background: var(--rv-tinta); color: var(--rv-papel); }
+html[data-aspecto="revista"] .ctl-vista .side-btn.on { background: transparent; color: var(--rv-tinta); box-shadow: inset 0 -3px 0 var(--rv-color); }
+html[data-aspecto="revista"] .sb-txt { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em !important; }
+html[data-aspecto="revista"] .volume-bg { border-radius: 0; background: rgb(13 13 13 / 0.12); }
+html[data-aspecto="revista"] .volume-fill { border-radius: 0; background: var(--rv-tinta); }
+html[data-aspecto="revista"] .status-bar { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.16em !important; color: #7a7a7a; padding: 6px 24px 10px; box-shadow: inset 0 1px 0 var(--rv-tinta); }
+html[data-aspecto="revista"] #statusText { color: var(--rv-tinta); }
+html[data-aspecto="revista"] .mini-eq i { background: var(--rv-tinta); }
+html[data-aspecto="revista"] body.disp-movil .title-bar { height: 52px; }
+html[data-aspecto="revista"] body.disp-movil .title-text { font-size: 28px; }
+html[data-aspecto="revista"] body.disp-movil .left-panel { box-shadow: inset 0 3px 0 var(--rv-tinta), inset 0 -1px 0 var(--rv-tinta); border-radius: 0; }
+html[data-aspecto="revista"] body.disp-movil .window > .tab-bar { box-shadow: inset 0 4px 0 var(--rv-tinta); }
+html[data-aspecto="revista"] body.disp-movil .window > .tab-bar .tab { color: #7a7a7a; }
+html[data-aspecto="revista"] body.disp-movil .window > .tab-bar .tab.active { color: var(--rv-tinta); }
+html[data-aspecto="revista"] body.disp-movil .window > .tab-bar .tab.active::before { background: var(--rv-color); }
+
+/* ---- la columna de la carátula, el espectro y el teléfono ----
+   Su cabecera de la canción es más alta que la de los oscuros: en ventanas
+   grandes la carátula cede un poco para que el espectro quepa debajo, y el
+   espectro nunca empuja (se encoge). En el teléfono va casi invisible
+   detrás de la franja: sin su caja. */
+html[data-aspecto="revista"] .visualizer-frame { min-height: 40px; }
+@container win (min-width: 1000px) and (min-height: 600px) {
+  html[data-aspecto="revista"] body:not(.letra-ancha) .main-grid {
+    grid-template-columns: min(clamp(260px, 29cqw, 480px), 46cqh) 1fr;
+  }
+}
+html[data-aspecto="revista"] body.disp-movil .visualizer-frame { background: transparent; box-shadow: none; }
+
+/* ---- lo que flota: el buscador (Ctrl+K) y los diálogos, en papel con su
+   filete grueso arriba ---- */
+html[data-aspecto="revista"] :is(.paleta-caja, .cid-ventana) {
+  --text: #0d0d0d;
+  --text-dim: #4a4a4a;
+  --text-muted: #7a7a7a;
+  --m-tenue: #4a4a4a;
+  --m-tenue-2: #7a7a7a;
+  --m-linea: rgb(13 13 13 / 0.2);
+  --m-hover: rgb(13 13 13 / 0.06);
+  --m-activo: rgb(13 13 13 / 0.1);
+  color: var(--text);
+  background: var(--rv-papel);
+  border-radius: 0;
+  box-shadow: inset 0 5px 0 var(--rv-tinta), 0 30px 80px rgb(0 0 0 / 0.4);
+}
+html[data-aspecto="revista"] .paleta-fila-r.sel { background: var(--rv-tinta); }
+html[data-aspecto="revista"] .paleta-fila-r.sel :is(.paleta-tit, .paleta-pista) { color: var(--rv-papel); }
+html[data-aspecto="revista"] .paleta-fila-r.sel .paleta-ico { background-color: var(--rv-papel); color: var(--rv-tinta); }
+html[data-aspecto="revista"] :is(.paleta-seccion, .cid-titulo) { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.16em !important; color: var(--rv-tinta); }
+html[data-aspecto="revista"] .cid-cuerpo :is(b, a) { color: color-mix(in oklab, var(--accent) 72%, #0d0d0d); }
+html[data-aspecto="revista"] :is(.cid-ok, .cid-cancelar, .cid-copiar, .paleta-ico) { border-radius: 0; }
+html[data-aspecto="revista"] .cid-ok,
+html[data-aspecto="revista"] .cid-ok:hover { background: var(--rv-tinta); color: var(--rv-papel); text-transform: uppercase; letter-spacing: 0.1em !important; }
+
+/* ---- ventanas estrechas y bajas ----
+   La retícula de pestañas se aprieta; en el teléfono la cabecera, las
+   cifras del tiempo y el play bajan para dejarle sitio a la letra. */
+html[data-aspecto="revista"] .track-info { min-width: 0; overflow: hidden; }
+html[data-aspecto="revista"] body.disp-movil .time { font-size: 22px; }
+@container win (max-width: 1250px) {
+  html[data-aspecto="revista"] .tab-bar { gap: 12px; padding-left: 14px; padding-right: 14px; }
+}
+@container win (max-height: 560px) {
+  html[data-aspecto="revista"] .track-info { width: 100%; max-width: 100%; min-width: 0; }
+  html[data-aspecto="revista"] :is(.ti-title-row, .ti-artist, .ti-album) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html[data-aspecto="revista"] .title-bar { height: 44px; padding-left: 14px; box-shadow: inset 0 -3px 0 var(--rv-tinta); }
+  html[data-aspecto="revista"] .title-text { font-size: 24px; }
+  html[data-aspecto="revista"] .ti-title { font-size: 20px; }
+  html[data-aspecto="revista"] .time { min-width: 52px; font-size: 20px; }
+  html[data-aspecto="revista"] .ctrl-btn.play-btn:not(.side-btn),
+  html[data-aspecto="revista"] .ctrl-btn.play-btn:not(.side-btn):hover,
+  html[data-aspecto="revista"] .ctrl-btn.play-btn:not(.side-btn):active,
+  html[data-aspecto="revista"] .ctrl-btn.play-btn:not(.side-btn).active { width: 46px; height: 46px; }
+  html[data-aspecto="revista"] .playback-bar { padding-top: 4px; padding-bottom: 8px; box-shadow: inset 0 3px 0 var(--rv-tinta); }
+}
+
+/* en el teléfono, los nombres de las pestañas y de la vista sin el
+   espaciado de los rótulos: si no, «historial» o «compartir» se cortan */
+html[data-aspecto="revista"] body.disp-movil :is(.window > .tab-bar .tab-txt, .ctl-vista .sb-txt) { letter-spacing: 0 !important; font-size: 11px; }

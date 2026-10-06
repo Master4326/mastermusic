@@ -18,18 +18,39 @@
 (() => {
   'use strict';
 
-  const LISTA = ['8bits', 'cristal', 'estudio', 'noche'];
+  const LISTA = ['8bits', 'cristal', 'estudio', 'noche', 'hifi', 'vinilo', 'aero', 'manga', 'revista'];
+  /* La base común de los modernos (css/aspectos.css) y, para los cinco
+     «mundos» (hifi, vinilo, aero, manga, revista), su hoja propia: cada
+     uno pesa lo suyo y solo lo paga quien lo elige. Las rutas y las
+     tipografías vienen del guion del <head> (index.html), que es quien
+     abre la app con ellas; aquí solo se repiten por si faltara. */
   const BASE = window.MMAspectoBase || {
     css: 'css/aspectos.css',
+    propias: {
+      hifi: 'css/aspecto-hifi.css',
+      vinilo: 'css/aspecto-vinilo.css',
+      aero: 'css/aspecto-aero.css',
+      manga: 'css/aspecto-manga.css',
+      revista: 'css/aspecto-revista.css',
+    },
     fuentes: {
       estudio: 'https://fonts.googleapis.com/css2?family=Roboto:wght@400..700&display=swap',
       noche: 'https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&display=swap',
+      hifi: 'https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap',
+      vinilo: 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700;1,800&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap',
+      aero: 'https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap',
+      manga: 'https://fonts.googleapis.com/css2?family=Bangers&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap',
+      revista: 'https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap',
     },
   };
   /* El color de la barra del sistema (móvil, ventana instalada). En 8 bits
      lo lleva js/seven.js, que lo saca de la carátula y lo deja apuntado en
-     data-ocho-bits aunque haya un aspecto puesto: al volver se repone ese. */
-  const BARRA = { cristal: '#0b0b0f', estudio: '#000000', noche: '#060607' };
+     data-ocho-bits aunque haya un aspecto puesto: al volver se repone ese.
+     En los claros va claro: el sistema pone sus iconos oscuros encima. */
+  const BARRA = {
+    cristal: '#0b0b0f', estudio: '#000000', noche: '#060607',
+    hifi: '#2c2e33', vinilo: '#efe6d4', aero: '#a6dbf6', manga: '#fdfcf8', revista: '#f4f2ed',
+  };
 
   const root = document.documentElement;
   let pedido = 0;   // solo el último cambio puede aplicarse
@@ -39,16 +60,16 @@
     return LISTA.includes(a) ? a : '8bits';
   };
 
-  // El CSS de los aspectos: si el <head> no lo pidió (se abrió en 8 bits),
+  // Una hoja de los aspectos: si el <head> no la pidió (se abrió con otro),
   // se pide ahora. Se espera a que llegue para no pintar una mezcla.
-  const cssListo = () => new Promise((listo) => {
-    let l = document.getElementById('aspectoCss');
+  const hojaLista = (id, href) => new Promise((listo) => {
+    let l = document.getElementById(id);
     if (l && l.sheet) { listo(true); return; }
     if (!l) {
       l = document.createElement('link');
       l.rel = 'stylesheet';
-      l.href = BASE.css;
-      l.id = 'aspectoCss';
+      l.href = href;
+      l.id = id;
       document.head.appendChild(l);
     }
     l.addEventListener('load', () => listo(true), { once: true });
@@ -56,6 +77,15 @@
     // sin red y sin caché el aspecto no puede llegar: no se espera para siempre
     setTimeout(() => listo(!!l.sheet), 4000);
   });
+  /* La base común y, si el aspecto la tiene, su hoja propia, las dos a la
+     vez. La propia se engancha DESPUÉS de la base (manda en los empates) y
+     se queda puesta al cambiar a otro: todas sus reglas dependen de su
+     data-aspecto, así que una hoja cargada que no toca no pinta nada. */
+  const cssListo = (a) => {
+    const base = hojaLista('aspectoCss', BASE.css);
+    const propia = BASE.propias && BASE.propias[a] ? hojaLista('aspectoCss-' + a, BASE.propias[a]) : Promise.resolve(true);
+    return Promise.all([base, propia]).then(([b, p]) => b && p);
+  };
 
   const ponerFuente = (a) => {
     const url = BASE.fuentes[a];
@@ -101,7 +131,7 @@
       return true;
     }
     ponerFuente(a);
-    const ok = await cssListo();
+    const ok = await cssListo(a);
     if (mio !== pedido) return false;        // llegó otro cambio mientras tanto
     if (!ok) return false;                   // sin el CSS, mejor quedarse como está
     root.setAttribute('data-aspecto', a);

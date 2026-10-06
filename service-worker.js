@@ -4,7 +4,7 @@
    y se pueda instalar en celular y PC.
    Sube el número de CACHE cuando cambies archivos del shell.
    ========================================================== */
-const CACHE = 'mastermusic-v127';
+const CACHE = 'mastermusic-v128';
 
 // Archivos locales que forman la app. Las pistas de música del
 // usuario NO se cachean aquí: viven en IndexedDB (ver js/db.js).
@@ -14,9 +14,15 @@ const SHELL = [
   './manifest.json',
   './css/style.css',
   './css/edit-fx.css',
-  // los aspectos modernos (cristal, estudio, noche): solo se USAN si eliges
-  // uno, pero se guardan para que también abran sin conexión
+  // los aspectos modernos: solo se USAN si eliges uno (al abrir se pide la
+  // base y, en los cinco «mundos», su hoja propia), pero se guardan aquí
+  // para que también abran sin conexión
   './css/aspectos.css',
+  './css/aspecto-hifi.css',
+  './css/aspecto-vinilo.css',
+  './css/aspecto-aero.css',
+  './css/aspecto-manga.css',
+  './css/aspecto-revista.css',
   './css/fuentes/DSEG7ClassicMini-Italic.woff2',
   './js/perf.js',
   './js/teclas.js',

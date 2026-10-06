@@ -331,7 +331,12 @@
     ...[['8bits', '8 bits', 'pixel retro original de siempre'],
       ['cristal', 'cristal', 'moderno transparente esmerilado elegante'],
       ['estudio', 'estudio', 'moderno negro oscuro chips'],
-      ['noche', 'noche', 'moderno oscuro tarjetas']].map(([v, nombre, alias]) => ({
+      ['noche', 'noche', 'moderno oscuro tarjetas'],
+      ['hifi', 'hi-fi', 'hifi equipo musica 90 aluminio lcd estereo teclas'],
+      ['vinilo', 'vinilo', 'disco jazz funda papel crema serif clasico'],
+      ['aero', 'aero', 'brillo 2000 cielo burbujas gel cristal azul'],
+      ['manga', 'manga', 'anime comic tinta blanco negro viñetas bocadillos'],
+      ['revista', 'revista', 'diseño suizo blanco titulares editorial']].map(([v, nombre, alias]) => ({
       n: 'aspecto · ' + nombre, alias: 'estilo tema cara apariencia ' + alias, ico: 'ajustes',
       hacer: () => {
         const b = document.querySelector('.seg[data-set="aspecto"] .seg-btn[data-val="' + v + '"]');

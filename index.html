@@ -32,21 +32,39 @@
     (function () {
       var FUENTES = {
         estudio: 'https://fonts.googleapis.com/css2?family=Roboto:wght@400..700&display=swap',
-        noche: 'https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&display=swap'
+        noche: 'https://fonts.googleapis.com/css2?family=Figtree:wght@400..800&display=swap',
+        hifi: 'https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap',
+        vinilo: 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700;1,800&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap',
+        aero: 'https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap',
+        manga: 'https://fonts.googleapis.com/css2?family=Bangers&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap',
+        revista: 'https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap'
       };
-      window.MMAspectoBase = { css: 'css/aspectos.css', fuentes: FUENTES };
+      /* Los cinco «mundos» llevan además su hoja propia, detrás de la base */
+      var PROPIAS = {
+        hifi: 'css/aspecto-hifi.css',
+        vinilo: 'css/aspecto-vinilo.css',
+        aero: 'css/aspecto-aero.css',
+        manga: 'css/aspecto-manga.css',
+        revista: 'css/aspecto-revista.css'
+      };
+      var MODERNOS = ['cristal', 'estudio', 'noche', 'hifi', 'vinilo', 'aero', 'manga', 'revista'];
+      window.MMAspectoBase = { css: 'css/aspectos.css', propias: PROPIAS, fuentes: FUENTES };
       var a = null;
       try { a = localStorage.getItem('mm_aspecto'); } catch (e) { return; }
-      if (a !== 'cristal' && a !== 'estudio' && a !== 'noche') return;
+      if (MODERNOS.indexOf(a) < 0) return;
       var h = document.documentElement;
       h.setAttribute('data-aspecto', a);
       h.classList.add('moderno');
-      var l = document.createElement('link');
-      l.rel = 'stylesheet';
-      l.href = 'css/aspectos.css';
-      l.id = 'aspectoCss';
-      l.setAttribute('blocking', 'render');
-      document.head.appendChild(l);
+      var hoja = function (href, id) {
+        var l = document.createElement('link');
+        l.rel = 'stylesheet';
+        l.href = href;
+        l.id = id;
+        l.setAttribute('blocking', 'render');
+        document.head.appendChild(l);
+      };
+      hoja('css/aspectos.css', 'aspectoCss');
+      if (PROPIAS[a]) hoja(PROPIAS[a], 'aspectoCss-' + a);
       if (FUENTES[a]) {
         var f = document.createElement('link');
         f.rel = 'stylesheet';
@@ -493,14 +511,19 @@
                  la de siempre; los otros tres viven en css/aspectos.css, que
                  solo se descarga si eliges uno. Los colores siguen saliendo
                  de la carátula en todos, y la letra va con su tipografía. -->
-            <div class="set-row" data-buscar="aspecto estilo tema cara 8 bits pixel retro moderno cristal estudio noche clasico elegante">
+            <div class="set-row" data-buscar="aspecto estilo tema cara 8 bits pixel retro moderno cristal estudio noche hi-fi hifi equipo aluminio vinilo disco jazz papel aero brillo burbujas gel manga comic anime revista suizo clasico elegante">
               <span class="set-label">aspecto</span>
               <div class="seg" data-set="aspecto"
-                   title="La cara de toda la app. 8 bits es la de siempre; cristal, estudio y noche son modernas. Los colores siguen saliendo de la carátula y la letra conserva su tipografía.">
+                   title="La cara de toda la app. 8 bits es la de siempre; cristal, estudio y noche son modernas; hi-fi, vinilo, aero, manga y revista son mundos aparte. Los colores siguen saliendo de la carátula y la letra conserva su tipografía.">
                 <button class="seg-btn" data-val="8bits">8 bits</button>
                 <button class="seg-btn" data-val="cristal">cristal</button>
                 <button class="seg-btn" data-val="estudio">estudio</button>
                 <button class="seg-btn" data-val="noche">noche</button>
+                <button class="seg-btn" data-val="hifi">hi-fi</button>
+                <button class="seg-btn" data-val="vinilo">vinilo</button>
+                <button class="seg-btn" data-val="aero">aero</button>
+                <button class="seg-btn" data-val="manga">manga</button>
+                <button class="seg-btn" data-val="revista">revista</button>
               </div>
             </div>
             <!-- AMBIENTE · qué se ve por detrás de la letra. «ondas» es la
