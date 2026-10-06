@@ -201,7 +201,7 @@ html.moderno .title-bar {
   }
 }
 /* el logo: la misma X de puntos, ahora redondos */
-html.moderno .pixel-icon { gap: 2px; grid-template-columns: repeat(3, 4px); }
+html.moderno .pixel-icon { gap: 2px; grid-template-columns: repeat(3, 4px); width: 16px; height: 16px; }
 html.moderno .pixel-icon span { border-radius: 50%; box-shadow: none; }
 html.moderno .title-text {
   font-size: 12px;
@@ -210,6 +210,7 @@ html.moderno .title-text {
   letter-spacing: 0.14em !important;
 }
 html.moderno .paleta-btn {
+  flex-basis: min(380px, 38cqw);
   height: 32px;
   padding: 0 8px 0 12px;
   border-radius: var(--r-pill);
@@ -290,6 +291,8 @@ html.moderno .viz-sync {
   border: 0;
   box-shadow: none;
 }
+/* en la fila de mandos (el teléfono) va transparente, como sus vecinos */
+html.moderno .viz-sync.en-mandos { background: transparent; }
 
 /* ══════════ 4. EL PANEL DE LA DERECHA ══════════ */
 html.moderno .right-panel {
@@ -610,101 +613,11 @@ html[data-aspecto="cristal"] body::before {
 }
 html[data-aspecto="cristal"] .ambient { opacity: 0.6; }
 
-/* ══════════ 7. ESTUDIO ══════════
-   Negro casi puro y el color de la canción como un resplandor que cae de
-   arriba a la izquierda. Sin paneles: el contenido flota en el negro. */
-html[data-aspecto="estudio"] {
-  --f-moderna: "Roboto", "Segoe UI", system-ui, sans-serif;
-  --m-ventana:
-    radial-gradient(90% 75% at 8% -10%, color-mix(in oklab, var(--dyn-1, #1a1f4a) 70%, transparent) 0%, transparent 70%),
-    radial-gradient(70% 55% at 55% -15%, color-mix(in oklab, var(--accent) 22%, transparent) 0%, transparent 70%),
-    #030303;
-  --m-panel: transparent;
-  --m-cabecera: rgb(8 8 8 / 0.8);
-  --m-sel-fondo: #f1f1f1;
-  --m-sel-texto: #0f0f0f;
-  --m-play-fondo: #f1f1f1;
-  --m-play-icono: #0f0f0f;
-  --m-play-sombra: 0 6px 20px rgba(0, 0, 0, 0.45);
-  --m-prog: var(--accent);
-  --r-s: 6px;
-  --r-m: 8px;
-  --r-l: 14px;
-  background: #000;
-}
-html[data-aspecto="estudio"] body { background: #000; }
-html[data-aspecto="estudio"] .ambient { display: none; }
-html[data-aspecto="estudio"] .tab,
-html[data-aspecto="estudio"] .tab:hover { background: transparent; }
-html[data-aspecto="estudio"] .tab.active {
-  background: transparent;
-  color: #fff;
-  font-weight: 700;
-  box-shadow: inset 0 -2px 0 #fff;
-  border-radius: 0;
-}
-html[data-aspecto="estudio"] .paleta-btn {
-  border-radius: var(--r-m);
-  background: rgb(255 255 255 / 0.08);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12) !important;
-}
-html[data-aspecto="estudio"] .lib-chip,
-html[data-aspecto="estudio"] .seg-btn { background: rgb(255 255 255 / 0.1); color: #f1f1f1; }
-html[data-aspecto="estudio"] .seg { background: transparent; padding: 0; gap: 8px; }
-html[data-aspecto="estudio"] .lib-chip:hover,
-html[data-aspecto="estudio"] .seg-btn:hover { background: rgb(255 255 255 / 0.2); }
-html[data-aspecto="estudio"] .lib-chip.active,
-html[data-aspecto="estudio"] .seg-btn.active { background: #f1f1f1; color: #0f0f0f; }
-html[data-aspecto="estudio"] .ctl-musica { gap: 14px; }
-html[data-aspecto="estudio"] .ctl-musica .ctrl-btn:not(.play-btn) .ico { --ico-tam: 26px; }
-html[data-aspecto="estudio"] .ctrl-btn.play-btn:not(.side-btn) { width: 56px; height: 56px; }
-html[data-aspecto="estudio"] .tab,
-html[data-aspecto="estudio"] .seg-btn,
-html[data-aspecto="estudio"] .lib-chip { border-radius: var(--r-s); }
-html[data-aspecto="estudio"] .seg { border-radius: var(--r-m); }
-html[data-aspecto="estudio"] .progress-thumb { background: var(--accent); }
-
-/* ══════════ 8. NOCHE ══════════
-   Gris carbón con un tinte de la carátula, tarjetas planas y el color de
-   la canción solo donde importa: el play, lo que suena y lo elegido. El
-   panel de la derecha cae de un degradado del color de la canción. */
-html[data-aspecto="noche"] {
-  --f-moderna: "Figtree", "Segoe UI", system-ui, sans-serif;
-  --m-ventana: #000;
-  --m-panel:
-    linear-gradient(180deg, color-mix(in oklab, var(--accent) 38%, transparent) 0, transparent 300px),
-    color-mix(in oklab, var(--dyn-2, #0a0e2e) 14%, #121214);
-  --m-cabecera: color-mix(in oklab, var(--dyn-2, #0a0e2e) 14%, rgb(18 18 20 / 0.86));
-  --m-sel-fondo: var(--accent);
-  --m-sel-texto: #0b0b0c;
-  --m-play-fondo: var(--accent);
-  --m-play-icono: #0b0b0c;
-  --m-play-sombra: 0 8px 24px color-mix(in oklab, var(--accent) 35%, transparent);
-  --m-prog: var(--accent);
-  --r-s: 6px;
-  --r-m: 8px;
-  --r-l: 12px;
-  background: #000;
-}
-html[data-aspecto="noche"] body { background: #000; }
-html[data-aspecto="noche"] .ambient { display: none; }
-html[data-aspecto="noche"] .left-panel {
-  background: color-mix(in oklab, var(--dyn-2, #0a0e2e) 14%, #121214);
-  border-radius: var(--r-l);
-  padding: 12px;
-}
-html[data-aspecto="noche"] .main-grid { gap: 8px; padding: 0 8px 8px; }
-html[data-aspecto="noche"] .cover-frame { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
-html[data-aspecto="noche"] .tab { border-radius: var(--r-pill); }
-html[data-aspecto="noche"] .seg { background: transparent; padding: 0; gap: 8px; }
-html[data-aspecto="noche"] .seg-btn,
-html[data-aspecto="noche"] .lib-chip { background: rgb(255 255 255 / 0.08); color: var(--text); }
-html[data-aspecto="noche"] .seg-btn.active,
-html[data-aspecto="noche"] .lib-chip.active { background: var(--accent); color: #0b0b0c; font-weight: 700; }
-html[data-aspecto="noche"] .paleta-btn { background: rgb(255 255 255 / 0.08); }
-html[data-aspecto="noche"] .ctrl-btn.play-btn:not(.side-btn) { width: 50px; height: 50px; }
-html[data-aspecto="noche"] .ti-title { font-weight: 800; }
-html[data-aspecto="noche"] .tab { font-weight: 600; }
+/* ══════════ 7 y 8. ESTUDIO y NOCHE ══════════
+   Viven al FINAL del archivo (12 y 13), detrás de todo lo común —también
+   del teléfono y de lo que flota—: cada uno cambia la forma entera de la
+   app (dónde va el progreso, cómo se agrupan los mandos, si hay tarjetas)
+   y así no depende del orden para ganar. */
 
 /* «pantalla crt» no hace nada fuera del 8 bits (no hay monitor viejo que
    encender): un botón que no hace nada es un fallo, así que no se enseña. */
@@ -720,7 +633,6 @@ html.moderno body.disp-movil .left-panel {
   padding: 0 8px;
   box-shadow: none;
 }
-html[data-aspecto="noche"] body.disp-movil .left-panel { padding: 0 8px; }
 html.moderno body.disp-movil .cover-frame { padding: 0; border-radius: var(--r-s); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45); }
 html.moderno body.disp-movil .cover-inner { border-radius: var(--r-s); }
 html.moderno body.disp-movil .visualizer-frame { opacity: 0.14; }
@@ -777,8 +689,6 @@ html.moderno body.disp-movil .lib-refresh {
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
-html[data-aspecto="estudio"] { --m-pie: #0a0a0a; --m-franja: rgb(255 255 255 / 0.06); }
-html[data-aspecto="noche"] { --m-pie: #000; --m-franja: color-mix(in oklab, var(--dyn-2, #0a0e2e) 14%, #121214); }
 
 /* ══════════ 10. EL CINE Y EL VÍDEO 9:16 (js/vertical.js) ══════════
    El escenario hereda las fuentes y se queda sin relieves solo; aquí van
@@ -904,5 +814,457 @@ html.moderno .cid-ok { background: var(--m-sel-fondo); border-color: transparent
 html.moderno .cid-copiar { background: var(--m-hover); border-color: transparent; color: var(--text); }
 html.moderno :is(.cid-entrada, .cid-uri) { border-radius: var(--r-s); border-color: transparent; background: var(--m-hover); }
 html[data-aspecto="cristal"] { --m-flota: rgb(30 30 36 / 0.72); --m-flota-filtro: blur(30px) saturate(1.5); }
-html[data-aspecto="estudio"] { --m-flota: #1f1f1f; }
-html[data-aspecto="noche"] { --m-flota: color-mix(in oklab, var(--dyn-2, #0a0e2e) 12%, #1c1c1e); }
+
+/* ══════════ 12. ESTUDIO ══════════
+   Un estudio a oscuras donde la única luz es la carátula (el «modo
+   ambiente» de las apps de vídeo y música: sus colores se derraman por el
+   negro). Sin tarjetas ni paneles: todo flota. Interfaz en blanco y gris,
+   rótulos en MAYÚSCULAS espaciadas, esquinas casi rectas, y el color de la
+   canción solo en la línea del progreso y en lo que suena.
+   La forma también cambia: el progreso es una línea finísima a todo lo
+   ancho, en el borde de arriba de la barra, y los mandos se van a la
+   izquierda con el tiempo al lado («0:51 / 3:34»); aleatorio y repetir, a
+   la derecha con el volumen. */
+html[data-aspecto="estudio"] {
+  --f-moderna: "Roboto", "Segoe UI", system-ui, sans-serif;
+  --m-ventana: #030303;
+  --m-panel: transparent;
+  --m-cabecera: rgb(3 3 3 / 0.88);
+  --m-sel-fondo: #f1f1f1;
+  --m-sel-texto: #0f0f0f;
+  --m-play-fondo: #f1f1f1;
+  --m-play-icono: #0f0f0f;
+  --m-play-sombra: none;
+  --m-prog: var(--accent);
+  --m-tenue: #aaaaaa;
+  --m-tenue-2: #717171;
+  --m-linea: rgb(255 255 255 / 0.1);
+  --m-hover: rgb(255 255 255 / 0.08);
+  --m-activo: rgb(255 255 255 / 0.14);
+  --m-flota: #212121;
+  --m-pie: #030303;
+  --m-franja: transparent;
+  --r-s: 4px;
+  --r-m: 8px;
+  --r-l: 12px;
+  --e-margen: clamp(14px, 1.4cqw, 26px);
+  /* el espectro en líneas finas (js/visualizer.js) */
+  --viz-estilo: lineas;
+  background: #000;
+}
+html[data-aspecto="estudio"] body { background: #000; }
+html[data-aspecto="estudio"] .ambient { display: none; }
+html[data-aspecto="estudio"] .window { box-shadow: 0 30px 90px rgb(0 0 0 / 0.7), inset 0 0 0 1px rgb(255 255 255 / 0.06); }
+
+/* La luz de la carátula. Una capa quieta detrás de todo (.window ya es un
+   contexto de apilado): se pinta una vez por canción, no por frame. */
+html[data-aspecto="estudio"] .window::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: -8%;
+  top: -18%;
+  width: min(80%, 1100px);
+  height: 125%;
+  background:
+    var(--portada, none) center / cover no-repeat,
+    radial-gradient(closest-side, var(--accent), transparent);
+  filter: blur(110px) saturate(1.8);
+  /* se funde en redondo: sin la máscara, el borde de la capa se notaba
+     como una raya vertical a la derecha */
+  -webkit-mask-image: radial-gradient(closest-side, #000 35%, transparent);
+  mask-image: radial-gradient(closest-side, #000 35%, transparent);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ---- arriba: el logo en blanco y un buscador rectangular y ancho ---- */
+html[data-aspecto="estudio"] .title-bar { padding-left: var(--e-margen); padding-right: 10px; }
+@container win (min-width: 1000px) and (min-height: 600px) {
+  html[data-aspecto="estudio"] .title-bar { height: 52px; }
+}
+html[data-aspecto="estudio"] .pixel-icon span:nth-child(odd) { background: #fff; }
+html[data-aspecto="estudio"] .title-text { font-size: 13px; letter-spacing: 0.2em !important; }
+html[data-aspecto="estudio"] .paleta-btn {
+  flex-basis: min(560px, 40cqw);
+  height: 38px;
+  border-radius: var(--r-m);
+  background: rgb(255 255 255 / 0.07);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1) !important;
+  color: var(--m-tenue);
+  font-size: 16px;
+}
+html[data-aspecto="estudio"] .paleta-btn:hover,
+html[data-aspecto="estudio"] .paleta-btn:focus-visible { background: rgb(255 255 255 / 0.12); color: #fff; }
+
+/* ---- la columna de la carátula ---- */
+html[data-aspecto="estudio"] .main-grid { gap: clamp(18px, 2.4cqw, 44px); padding: 4px var(--e-margen) 10px; }
+html[data-aspecto="estudio"] .cover-frame,
+html[data-aspecto="estudio"] .cover-inner { border-radius: var(--r-s); }
+html[data-aspecto="estudio"] .cover-frame { box-shadow: 0 28px 70px rgb(0 0 0 / 0.6); }
+html[data-aspecto="estudio"] .ti-title { font-size: clamp(20px, 2.15cqw, 36px); font-weight: 700; color: #fff; }
+html[data-aspecto="estudio"] .ti-artist { font-size: clamp(15px, 1.45cqw, 24px); font-weight: 400; color: var(--m-tenue); }
+html[data-aspecto="estudio"] .ti-album {
+  font-size: clamp(11px, 0.95cqw, 15px);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em !important;
+  color: var(--m-tenue-2);
+}
+html[data-aspecto="estudio"] .ti-eq i,
+html[data-aspecto="estudio"] .mini-eq i { background: #fff; }
+html[data-aspecto="estudio"] .viz-sync { border-radius: var(--r-s); text-transform: uppercase; letter-spacing: 0.08em !important; font-size: 11px; }
+
+/* ---- pestañas: texto en mayúsculas con raya blanca, sin píldoras ---- */
+html[data-aspecto="estudio"] .tab-bar { padding: 0 6px; gap: clamp(6px, 1.2cqw, 22px); box-shadow: inset 0 -1px 0 var(--m-linea); }
+html[data-aspecto="estudio"] .tab,
+html[data-aspecto="estudio"] .tab:hover {
+  border-radius: 0;
+  background: transparent;
+  padding: 15px 4px 13px;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.09em !important;
+  color: var(--m-tenue);
+}
+html[data-aspecto="estudio"] .tab:hover { color: #fff; }
+html[data-aspecto="estudio"] .tab.active { background: transparent; color: #fff; box-shadow: inset 0 -2px 0 #fff; }
+/* con sitio, solo el nombre (cuando la ventana estrecha y los nombres se
+   esconden, vuelven los iconos: una pestaña nunca se queda vacía) */
+@container win (min-width: 861px) {
+  html[data-aspecto="estudio"] .tab .ico { display: none; }
+}
+
+/* ---- chips y opciones: rectángulos grises, el elegido en blanco ---- */
+html[data-aspecto="estudio"] .seg { background: transparent; padding: 0; gap: 8px; border-radius: 0; }
+html[data-aspecto="estudio"] .seg-btn,
+html[data-aspecto="estudio"] .lib-chip { border-radius: var(--r-m); background: rgb(255 255 255 / 0.1); color: #f1f1f1; }
+html[data-aspecto="estudio"] .seg-btn:hover,
+html[data-aspecto="estudio"] .lib-chip:hover { background: rgb(255 255 255 / 0.2); color: #fff; }
+html[data-aspecto="estudio"] .seg-btn.active,
+html[data-aspecto="estudio"] .lib-chip.active { background: #f1f1f1; color: #0f0f0f; }
+html[data-aspecto="estudio"] .retro-btn { border-radius: var(--r-pill); background: #f1f1f1; color: #0f0f0f; }
+html[data-aspecto="estudio"] .retro-btn:hover { background: #fff; color: #0f0f0f; }
+
+/* ---- listas: filas planas; la que suena lleva la raya del color ---- */
+html[data-aspecto="estudio"] .sp-result { border-radius: 0; }
+html[data-aspecto="estudio"] .sp-result:hover { background: rgb(255 255 255 / 0.06); }
+html[data-aspecto="estudio"] .sp-result.sp-now { background: rgb(255 255 255 / 0.04); box-shadow: inset 3px 0 0 var(--accent); }
+html[data-aspecto="estudio"] .sp-thumb { border-radius: 2px; }
+html[data-aspecto="estudio"] .lib-card,
+html[data-aspecto="estudio"] .lib-card-art { border-radius: var(--r-s); }
+
+/* ---- ajustes: rótulos de sección en mayúsculas, con su raya ---- */
+html[data-aspecto="estudio"] .settings-block h3 {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em !important;
+  color: var(--m-tenue);
+  box-shadow: inset 0 -1px 0 var(--m-linea);
+}
+
+/* ---- la barra de abajo ---- */
+html[data-aspecto="estudio"] .progress-bg { height: 3px; border-radius: 0; background: rgb(255 255 255 / 0.16); }
+html[data-aspecto="estudio"] .progress-bar:hover .progress-bg,
+html[data-aspecto="estudio"] body.barra-agarrada .progress-bg { height: 5px; }
+html[data-aspecto="estudio"] .progress-fill { border-radius: 0; background: var(--accent); }
+html[data-aspecto="estudio"] .progress-thumb,
+html[data-aspecto="estudio"] body.barra-agarrada .progress-thumb { background: var(--accent); }
+html[data-aspecto="estudio"] .time { color: var(--m-tenue); font-size: 13px; font-weight: 400; }
+html[data-aspecto="estudio"] .ctrl-btn:not(.side-btn) { color: #fff; }
+html[data-aspecto="estudio"] .ctrl-btn:not(.side-btn):hover { background: rgb(255 255 255 / 0.1); color: #fff; }
+html[data-aspecto="estudio"] :is(#shuffleBtn, #repeatBtn) { color: var(--m-tenue); }
+html[data-aspecto="estudio"] :is(#shuffleBtn, #repeatBtn).active { color: #fff; }
+html[data-aspecto="estudio"] .ctl-musica .ctrl-btn:not(.play-btn) .ico { --ico-tam: 26px; }
+html[data-aspecto="estudio"] :is(#shuffleBtn, #repeatBtn) .ico { --ico-tam: 22px; }
+html[data-aspecto="estudio"] .ctl-vista .side-btn { border-radius: var(--r-s); color: var(--m-tenue); }
+html[data-aspecto="estudio"] .ctl-vista .side-btn:hover { background: rgb(255 255 255 / 0.08); color: #fff; }
+html[data-aspecto="estudio"] .ctl-vista .side-btn.on { background: transparent; color: #fff; box-shadow: inset 0 -2px 0 var(--accent); }
+html[data-aspecto="estudio"] .sb-txt { font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em !important; }
+html[data-aspecto="estudio"] .vol-btn { color: var(--m-tenue); }
+html[data-aspecto="estudio"] .volume-fill { background: #fff; }
+
+/* El reparto «de estudio»: la línea del progreso arriba, a todo lo ancho
+   de la ventana; debajo, en una sola fila: ⏮ ⏯ ⏭ y el tiempo · la vista
+   en el centro · aleatorio, repetir y el sonido a la derecha.
+   Las filas originales se disuelven (display: contents) y sus botones se
+   colocan en la rejilla: no se mueve ni un nodo, así que el teclado, el
+   móvil y los módulos que los buscan siguen igual. Solo en ventanas de
+   1000 px o más (con menos no caben en un renglón): por debajo vale el
+   reparto de siempre. */
+@container win (min-width: 1000px) {
+  html[data-aspecto="estudio"] body:not(.disp-movil) .playback-bar {
+    display: grid;
+    grid-template-columns: repeat(5, auto) minmax(0, 1fr) repeat(3, auto);
+    grid-template-areas:
+      "barra barra barra barra barra barra barra barra barra"
+      "prev  play  next  t1    t2    vista shuf  rep   sonido";
+    align-items: center;
+    column-gap: 2px;
+    row-gap: 0;
+    padding: 0 var(--e-margen) 6px;
+  }
+  html[data-aspecto="estudio"] body:not(.disp-movil) :is(.progress-row, .controls-row, .ctl-musica) { display: contents; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) .progress-bar {
+    grid-area: barra;
+    margin: 0 calc(-1 * var(--e-margen));
+    padding: 5px 0 9px;
+  }
+  html[data-aspecto="estudio"] body:not(.disp-movil) #prevBtn { grid-area: prev; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) #playBtn { grid-area: play; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) #nextBtn { grid-area: next; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) #shuffleBtn { grid-area: shuf; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) #repeatBtn { grid-area: rep; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) .ctl-vista { grid-area: vista; justify-self: center; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) .ctl-sonido { grid-area: sonido; margin-left: 8px; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) #timeCurrent { grid-area: t1; margin-left: 14px; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) #timeTotal { grid-area: t2; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) :is(#timeCurrent, #timeTotal) { min-width: 0; padding: 0 2px; text-align: left; }
+  html[data-aspecto="estudio"] body:not(.disp-movil) #timeCurrent::after { content: '/'; margin-left: 6px; color: var(--m-tenue-2); }
+  html[data-aspecto="estudio"] body:not(.disp-movil) .ctrl-btn:not(.side-btn) { width: 42px; height: 42px; }
+  /* el play, sin círculo: un icono grande y blanco */
+  html[data-aspecto="estudio"] body:not(.disp-movil) .ctrl-btn.play-btn:not(.side-btn),
+  html[data-aspecto="estudio"] body:not(.disp-movil) .ctrl-btn.play-btn:not(.side-btn):hover,
+  html[data-aspecto="estudio"] body:not(.disp-movil) .ctrl-btn.play-btn:not(.side-btn):active,
+  html[data-aspecto="estudio"] body:not(.disp-movil) .ctrl-btn.play-btn:not(.side-btn).active {
+    width: 54px;
+    height: 54px;
+    background: transparent;
+    color: #fff;
+    box-shadow: none;
+  }
+  html[data-aspecto="estudio"] body:not(.disp-movil) .ctrl-btn.play-btn:not(.side-btn):hover { background: rgb(255 255 255 / 0.1); }
+  html[data-aspecto="estudio"] body:not(.disp-movil) .play-btn .ico { --ico-tam: 40px; }
+}
+
+/* ---- la barra de estado, en rótulo ---- */
+html[data-aspecto="estudio"] .status-bar {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em !important;
+  color: var(--m-tenue-2);
+  padding: 2px var(--e-margen) 9px;
+}
+html[data-aspecto="estudio"] #statusText { color: var(--m-tenue); }
+
+/* ---- lo que flota ---- */
+html[data-aspecto="estudio"] :is(.paleta-caja, .fuentes-caja, .cid-ventana) { border-radius: var(--r-l); }
+
+/* ---- el teléfono: la luz arriba y la franja sin tarjeta ---- */
+html[data-aspecto="estudio"] body.disp-movil .window::before { left: -30%; top: -22%; width: 160%; height: 64%; opacity: 0.45; filter: blur(70px) saturate(1.8); }
+html[data-aspecto="estudio"] body.disp-movil .left-panel { background: transparent; border-radius: 0; box-shadow: inset 0 -1px 0 var(--m-linea); }
+html[data-aspecto="estudio"] body.disp-movil .main-grid { padding: 0 10px 6px; gap: 6px; }
+html[data-aspecto="estudio"] body.disp-movil .window > .tab-bar { background: #030303; padding: 0; }
+html[data-aspecto="estudio"] body.disp-movil .window > .tab-bar .tab.active { color: #fff; }
+html[data-aspecto="estudio"] body.disp-movil .window > .tab-bar .tab.active::before { display: none; }
+
+/* ══════════ 13. NOCHE ══════════
+   Islas en la noche: tarjetas redondeadas, teñidas por la carátula, con
+   8 px de negro entre ellas; la de la letra cae de un baño del color de la
+   canción. Letra de la interfaz gruesa y apretada (Figtree 800), todo en
+   píldoras, y el color de la canción donde se toca: el play, la pestaña
+   puesta, lo elegido, lo que suena.
+   La forma: los mandos en el centro, con el play redondo de color, y el
+   progreso DEBAJO de ellos, más corto; la vista a la izquierda y el
+   volumen —siempre a la vista— a la derecha. */
+html[data-aspecto="noche"] {
+  --f-moderna: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --n-tarjeta: color-mix(in oklab, var(--dyn-2, #0a0e2e) 22%, #141416);
+  --n-tarjeta-2: color-mix(in oklab, var(--dyn-2, #0a0e2e) 16%, #1f1f22);
+  --m-ventana: #000;
+  --m-panel:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--accent) 50%, #141416) 0%,
+      color-mix(in oklab, var(--accent) 18%, #141416) 34%,
+      transparent 66%),
+    var(--n-tarjeta);
+  --m-cabecera: var(--n-tarjeta-2);
+  --m-sel-fondo: var(--accent);
+  --m-sel-texto: #0b0b0c;
+  --m-play-fondo: var(--accent);
+  --m-play-icono: #0b0b0c;
+  --m-play-sombra: 0 10px 28px color-mix(in oklab, var(--accent) 40%, transparent);
+  --m-prog: #fff;
+  --m-tenue: #b3b3b3;
+  --m-tenue-2: #8a8a8a;
+  --m-hover: rgb(255 255 255 / 0.07);
+  --m-activo: rgb(255 255 255 / 0.12);
+  --m-flota: var(--n-tarjeta-2);
+  --m-pie: #000;
+  --m-franja: var(--n-tarjeta);
+  --r-s: 8px;
+  --r-m: 12px;
+  --r-l: 16px;
+  background: #000;
+}
+html[data-aspecto="noche"] body { background: #000; }
+html[data-aspecto="noche"] .ambient { display: none; }
+html[data-aspecto="noche"] .window { box-shadow: 0 30px 80px rgb(0 0 0 / 0.6); }
+
+/* ---- arriba ---- */
+html[data-aspecto="noche"] .title-bar { padding: 0 12px 0 16px; }
+@container win (min-width: 1000px) and (min-height: 600px) {
+  html[data-aspecto="noche"] .title-bar { height: 52px; }
+}
+html[data-aspecto="noche"] .title-text { font-size: 13px; font-weight: 800; letter-spacing: 0.04em !important; }
+html[data-aspecto="noche"] .paleta-btn {
+  flex-basis: min(420px, 38cqw);
+  height: 40px;
+  background: var(--n-tarjeta-2);
+  color: var(--m-tenue);
+  font-size: 16px;
+}
+html[data-aspecto="noche"] .paleta-btn:hover,
+html[data-aspecto="noche"] .paleta-btn:focus-visible {
+  background: var(--n-tarjeta-2);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.3) !important;
+}
+
+/* ---- las islas ---- */
+html[data-aspecto="noche"] .main-grid { gap: 8px; padding: 0 8px; }
+html[data-aspecto="noche"] .left-panel {
+  background: var(--n-tarjeta);
+  border-radius: var(--r-l);
+  padding: 14px 14px 8px;
+  gap: 12px;
+}
+html[data-aspecto="noche"] .right-panel { border-radius: var(--r-l); }
+html[data-aspecto="noche"] .cover-frame,
+html[data-aspecto="noche"] .cover-inner { border-radius: var(--r-m); }
+html[data-aspecto="noche"] .cover-frame { box-shadow: 0 16px 40px rgb(0 0 0 / 0.55); }
+html[data-aspecto="noche"] .ti-title {
+  font-size: clamp(20px, 2.3cqw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.02em !important;
+  color: #fff;
+}
+html[data-aspecto="noche"] .ti-artist { font-weight: 600; color: var(--m-tenue); }
+html[data-aspecto="noche"] .ti-album { font-weight: 500; color: var(--m-tenue-2); }
+html[data-aspecto="noche"] .viz-sync:not(.en-mandos) { background: rgb(0 0 0 / 0.3); }
+
+/* ---- pestañas en píldora; la puesta, del color de la canción ---- */
+html[data-aspecto="noche"] .tab-bar { padding: 12px 14px 4px; gap: 8px; }
+html[data-aspecto="noche"] .tab {
+  border-radius: var(--r-pill);
+  padding: 7px 15px;
+  background: rgb(255 255 255 / 0.08);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+html[data-aspecto="noche"] .tab:hover { background: rgb(255 255 255 / 0.15); color: #fff; }
+html[data-aspecto="noche"] .tab.active { background: var(--accent); color: #0b0b0c; }
+@container win (max-width: 860px) {
+  html[data-aspecto="noche"] .tab-bar { gap: 6px; padding-left: 10px; padding-right: 10px; }
+  html[data-aspecto="noche"] .tab { padding: 7px 10px; }
+}
+
+/* ---- chips, opciones y botones ---- */
+html[data-aspecto="noche"] .seg { background: transparent; padding: 0; gap: 8px; }
+html[data-aspecto="noche"] .seg-btn,
+html[data-aspecto="noche"] .lib-chip { background: rgb(255 255 255 / 0.08); color: #fff; font-weight: 600; }
+html[data-aspecto="noche"] .seg-btn:hover,
+html[data-aspecto="noche"] .lib-chip:hover { background: rgb(255 255 255 / 0.15); color: #fff; }
+html[data-aspecto="noche"] .seg-btn.active,
+html[data-aspecto="noche"] .lib-chip.active { background: var(--accent); color: #0b0b0c; font-weight: 700; }
+html[data-aspecto="noche"] .retro-btn { background: var(--accent); color: #0b0b0c; font-weight: 700; }
+html[data-aspecto="noche"] .retro-btn:hover { background: var(--accent); color: #0b0b0c; transform: scale(1.03); }
+
+/* ---- listas: la que suena, con el nombre en su color ---- */
+html[data-aspecto="noche"] .sp-result { border-radius: var(--r-s); }
+html[data-aspecto="noche"] .sp-result:hover { background: rgb(255 255 255 / 0.08); }
+html[data-aspecto="noche"] .sp-result.sp-now { background: transparent; }
+html[data-aspecto="noche"] .sp-result.sp-now .sp-name { color: var(--accent); font-weight: 700; }
+html[data-aspecto="noche"] .sp-thumb { border-radius: 6px; }
+html[data-aspecto="noche"] .lib-card { background: rgb(255 255 255 / 0.03); }
+html[data-aspecto="noche"] .lib-card:hover { background: rgb(255 255 255 / 0.08); }
+
+/* ---- ajustes: títulos grandes y gruesos ---- */
+html[data-aspecto="noche"] .settings-block h3 {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em !important;
+  color: #fff;
+}
+
+/* ---- la barra de abajo ---- */
+html[data-aspecto="noche"] .progress-bg { height: 4px; background: rgb(255 255 255 / 0.22); }
+html[data-aspecto="noche"] .progress-fill { background: #fff; }
+html[data-aspecto="noche"] .progress-bar:hover .progress-fill,
+html[data-aspecto="noche"] body.barra-agarrada .progress-fill { background: var(--accent); }
+html[data-aspecto="noche"] .time { color: var(--m-tenue); font-size: 12px; font-weight: 500; }
+html[data-aspecto="noche"] .ctl-musica { gap: clamp(14px, 1.7cqw, 28px); }
+html[data-aspecto="noche"] .ctl-musica .ctrl-btn:not(.play-btn) { color: var(--m-tenue); }
+html[data-aspecto="noche"] .ctl-musica .ctrl-btn:not(.play-btn):hover { color: #fff; background: transparent; transform: scale(1.06); }
+html[data-aspecto="noche"] .ctl-musica .ctrl-btn.active { color: var(--accent); }
+html[data-aspecto="noche"] .ctrl-btn.play-btn:not(.side-btn),
+html[data-aspecto="noche"] .ctrl-btn.play-btn:not(.side-btn):hover,
+html[data-aspecto="noche"] .ctrl-btn.play-btn:not(.side-btn):active,
+html[data-aspecto="noche"] .ctrl-btn.play-btn:not(.side-btn).active { width: 48px; height: 48px; }
+html[data-aspecto="noche"] .ctl-vista .side-btn { border-radius: var(--r-m); color: var(--m-tenue); }
+html[data-aspecto="noche"] .ctl-vista .side-btn:hover { background: rgb(255 255 255 / 0.07); color: #fff; }
+html[data-aspecto="noche"] .ctl-vista .side-btn.on { color: var(--accent); background: color-mix(in oklab, var(--accent) 14%, transparent); }
+html[data-aspecto="noche"] .sb-txt { font-size: 11px; font-weight: 600; }
+html[data-aspecto="noche"] .volume-bg { background: rgb(255 255 255 / 0.22); }
+html[data-aspecto="noche"] .volume-fill { background: #fff; }
+html[data-aspecto="noche"] .volume-bar:hover .volume-fill,
+html[data-aspecto="noche"] .volume-ctl.dragging .volume-fill { background: var(--accent); }
+
+/* El reparto «de noche»: arriba los mandos en el centro y, justo debajo,
+   el progreso con sus tiempos, más corto que la ventana; la vista a la
+   izquierda y el sonido a la derecha, centrados en las dos alturas. La
+   fila de mandos se disuelve (display: contents) para que sus tres zonas
+   entren en la rejilla; ningún nodo cambia de sitio. Solo en ventanas de
+   1000 px o más. Los lados miden como mínimo lo que llevan (max-content):
+   con seis botones de vista y el chip de «dónde suena» no se pisan con el
+   progreso del centro. */
+@container win (min-width: 1000px) {
+  html[data-aspecto="noche"] body:not(.disp-movil) .playback-bar {
+    display: grid;
+    grid-template-columns: minmax(max-content, 1fr) minmax(240px, 620px) minmax(max-content, 1fr);
+    grid-template-areas:
+      "vista musica   sonido"
+      "vista progreso sonido";
+    align-items: center;
+    column-gap: 16px;
+    row-gap: 0;
+    padding: 10px 16px 6px;
+  }
+  html[data-aspecto="noche"] body:not(.disp-movil) .controls-row { display: contents; }
+  html[data-aspecto="noche"] body:not(.disp-movil) .progress-row {
+    grid-area: progreso;
+    width: 100%;
+    max-width: 680px;
+    justify-self: center;
+    gap: 10px;
+  }
+  html[data-aspecto="noche"] body:not(.disp-movil) .ctl-vista { grid-area: vista; }
+  html[data-aspecto="noche"] body:not(.disp-movil) .ctl-musica { grid-area: musica; }
+  html[data-aspecto="noche"] body:not(.disp-movil) .ctl-sonido { grid-area: sonido; }
+  html[data-aspecto="noche"] body:not(.disp-movil) .time { min-width: 40px; }
+  html[data-aspecto="noche"] body:not(.disp-movil) #timeCurrent { text-align: right; }
+  html[data-aspecto="noche"] body:not(.disp-movil) #timeTotal { text-align: left; }
+  /* el volumen siempre a la vista, no solo al pasar el ratón */
+  html[data-aspecto="noche"] body:not(.disp-movil) .volume-ctl .volume-bar {
+    width: clamp(84px, 8cqw, 128px);
+    opacity: 1;
+    margin-right: 6px;
+  }
+}
+
+/* ---- la barra de estado ---- */
+html[data-aspecto="noche"] .status-bar { font-size: 12px; padding: 0 18px 8px; color: var(--m-tenue-2); }
+
+/* ---- lo que flota ---- */
+html[data-aspecto="noche"] :is(.paleta-caja, .fuentes-caja, .cid-ventana) { border-radius: 16px; }
+
+/* ---- el teléfono: también en islas ---- */
+html[data-aspecto="noche"] body.disp-movil .main-grid { gap: 8px; padding: 0 8px 8px; }
+html[data-aspecto="noche"] body.disp-movil .left-panel { background: var(--n-tarjeta); border-radius: var(--r-m); padding: 0 8px; }
+html[data-aspecto="noche"] body.disp-movil .right-panel { border-radius: var(--r-m); }
+html[data-aspecto="noche"] body.disp-movil .window > .tab-bar { background: #000; }
+html[data-aspecto="noche"] body.disp-movil .window > .tab-bar .tab.active { color: var(--accent); }
+html[data-aspecto="noche"] body.disp-movil .window > .tab-bar .tab.active::before { display: none; }

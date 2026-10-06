@@ -119,7 +119,8 @@
       accent,
       glow:  toRgb(leer('--accent-glow', '#5ce1e6')),
       claro: aclarar(accent, 0.68),
-      // 'vfd' (los segmentos de siempre) o 'barras' (los aspectos modernos)
+      // 'vfd' (los segmentos de siempre), 'barras' (cristal y noche) o
+      // 'lineas' (estudio): lo pone css/aspectos.css en --viz-estilo
       estilo: leer('--viz-estilo', 'vfd'),
     };
     return paleta;
@@ -700,6 +701,35 @@
         else ctx.rect(x, H - h, bw, h);
       }
       ctx.fill();
+      return;
+    }
+
+    /* «estudio» (--viz-estilo: lineas): una línea fina por banda que crece
+       desde el centro hacia arriba y hacia abajo, como la forma de onda de
+       un editor de audio; blanca en las puntas y del color de la canción en
+       el medio. Mismas cuentas, otra forma, y un solo trazo por frame. */
+    if (colores().estilo === 'lineas') {
+      const { accent } = colores();
+      const blanco = { r: 255, g: 255, b: 255 };
+      const paso = W / nb;
+      const lw = Math.max(1, Math.min(3, paso * 0.45));
+      const medio = H / 2;
+      ctx.clearRect(0, 0, W, H);
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, rgba(blanco, playing ? 0.9 : 0.45));
+      grad.addColorStop(0.5, rgba(accent, playing ? 0.95 : 0.5));
+      grad.addColorStop(1, rgba(blanco, playing ? 0.9 : 0.45));
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = lw;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let i = 0; i < nb; i++) {
+        const h = Math.max(lw, (smooth[i] || 0) * (H - lw * 2)) / 2;
+        const x = paso * (i + 0.5);
+        ctx.moveTo(x, medio - h);
+        ctx.lineTo(x, medio + h);
+      }
+      ctx.stroke();
       return;
     }
 
