@@ -1724,43 +1724,8 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
 body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62; }
 
 
-/* títulos letra a letra */
-.edl-teclea, .edl-cae, .edl-onda, .edl-neon {
-  display: inline-block;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  white-space: pre;
-}
-.edl-teclea { animation-name: edl-teclea; animation-duration: 0.1s; animation-timing-function: steps(1, end); }
-.edl-cae    { animation-name: edl-cae; animation-duration: 0.5s; animation-timing-function: var(--muelle); }
-.edl-onda   { animation-name: edl-onda; animation-duration: 0.55s; animation-timing-function: var(--muelle); }
-.edl-neon   { animation-name: edl-neon; animation-duration: 0.7s; animation-timing-function: linear; }
-
-
-   
-
-
-/* ═══ MODO EDIT · pack de animaciones nuevas (estilo edits TikTok/CapCut) ═══
-   Onda de choque + chispas en los golpes, decode hacker, aberración
-   cromática, destello cromado, sello, enfoque cine y salidas variadas. */
-
-
-/* ══════ TANDA 7 · ENTRADAS NUEVAS ══════
-   El catálogo de entradas está saturado, así que estas cuatro usan mecánicas
-   que NO estaba usando ninguna de las 105: corte en diagonal, copias
-   desplazadas que convergen, empuje encadenado entre palabras y una onda que
-   recorre la frase en 3D. */
-
-
-/* ── títulos letra a letra nuevos ── */
-.edl-explota, .edl-descifra {
-  display: inline-block;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  white-space: pre;
-}
-.edl-explota  { animation-name: edl-explota; animation-duration: var(--t-lenta); animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
-.edl-descifra { animation-name: edl-descifra; animation-duration: var(--t-media); animation-timing-function: linear; }
+/* Los revelados letra a letra (.edl-*) viven en css/edit-fx.css, con el
+   resto del catálogo del modo edit (antes estaban repartidos aquí). */
 
 
 /* ═══ MODO EDIT · fx replicados de los edits de referencia del usuario ═══
@@ -1878,51 +1843,6 @@ body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62;
 @media (max-width: 440px) {
   .fx-lab { width: 156px; font-size: 13px; }
 }
-
-
-/* ═══ TANDA 4 · pedidos del usuario + tendencias caption 2026 ═══ */
-
-/* ── TÍTULOS ── */
-
-/* ed-esquinas: cada letra llega volando desde una esquina */
-.edl-esquina {
-  display: inline-block;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  white-space: pre;
-  animation-name: edl-esquina;
-  animation-duration: var(--t-lenta);
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-
-/* ed-tetris: letras caen a saltos duros y encajan como bloques */
-.edl-tetris {
-  display: inline-block;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  white-space: pre;
-  animation-name: edl-tetris;
-  animation-duration: 0.45s;
-  animation-timing-function: steps(5, end);
-}
-
-
-/* ed-persiana: letras se abren como persianas, origen alternado */
-.edl-persiana {
-  display: inline-block;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  white-space: pre;
-  animation-name: edl-persiana;
-  animation-duration: 0.5s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  transform-origin: center top;
-}
-.edl-persiana:nth-child(even) { transform-origin: center bottom; }
-
-
-/* ── FRASES ── */
 
 
 /* ----- Library tab ----- */
@@ -4903,29 +4823,6 @@ body.reduce-motion .lyrics-ncs:not(.live) .ncs-rad i { animation: none; }
   .ncs-rad i { box-shadow: none; }
 }
 
-/* ==========================================================
-   MODO EDIT · TANDA 5 — títulos de fila completa
-   Regla del proyecto: NUNCA animar propiedades de layout
-   (letter-spacing, width, font-size…). Solo transform, opacity,
-   filter, clip-path, color, text-shadow y background-position.
-   ========================================================== */
-
-
-/* ==========================================================
-   MODO EDIT · TANDA 5 — títulos letra a letra
-   ========================================================== */
-.edl-difumina, .edl-gira, .edl-alterna, .edl-empuja {
-  display: inline-block;
-  animation-fill-mode: both;
-  animation-delay: var(--d, 0ms);
-  white-space: pre;
-}
-.edl-difumina { animation-name: edl-difumina; animation-duration: 0.55s; animation-timing-function: ease-out; }
-.edl-gira     { animation-name: edl-gira; animation-duration: var(--t-lenta); animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
-.edl-alterna  { animation-name: edl-alterna; animation-duration: 0.55s; animation-timing-function: var(--muelle); }
-.edl-empuja   { animation-name: edl-empuja; animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
-/* las letras impares entran por el otro lado: da ritmo alterno */
-.edl-alterna:nth-child(even) { animation-name: edl-alterna-inv; }
 
 
 /* ==========================================================
@@ -8359,10 +8256,8 @@ body.reduce-motion .v916-bg-img { animation: none; }
 /* NO con position: fixed, como en el cine: ambient.js le pone un transform a
    #lyricsEdit en cada frame (la respiración) y un transform ancla lo fixed al
    propio #lyricsEdit, o sea al hueco de la letra: otra caja. Un margen
-   negativo sobrado, y el marco (contain: paint) lo recorta al borde. Lo
-   mismo para el fogonazo blanco de los golpes fuertes, que mide igual. */
-.v916-marco[data-estilo="letra"] .lyrics-edit .ed-fondo,
-.v916-marco[data-estilo="letra"] .lyrics-edit .ed-flash { inset: -40cqh -20cqw; }
+   negativo sobrado, y el marco (contain: paint) lo recorta al borde. */
+.v916-marco[data-estilo="letra"] .lyrics-edit .ed-fondo { inset: -40cqh -20cqw; }
 .v916-marco[data-estilo="vinilo"] .lyrics-edit {
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 86%, transparent 100%);
   mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 86%, transparent 100%);
@@ -9179,8 +9074,7 @@ body:not(.playing) .v916 .cine-play .ico-pausa { display: none; }
   mask-image: none;
   overflow: visible;
 }
-.v916.cine[data-orient="h"] .v916-marco[data-estilo="vinilo"] .lyrics-edit .ed-fondo,
-.v916.cine[data-orient="h"] .v916-marco[data-estilo="vinilo"] .lyrics-edit .ed-flash { inset: -40cqh -20cqw -40cqh -64cqw; }
+.v916.cine[data-orient="h"] .v916-marco[data-estilo="vinilo"] .lyrics-edit .ed-fondo { inset: -40cqh -20cqw -40cqh -64cqw; }
 
 /* ════════ TUMBADO · LETRA — la letra sola, en medio ════════ */
 .v916.cine[data-orient="h"] .v916-marco[data-estilo="letra"] { --v916-letra: 5.2cqh; }
