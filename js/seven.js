@@ -165,6 +165,10 @@
     root.style.setProperty('--border-pixel', rgbToHex(mix(mid, { r: 0, g: 0, b: 0 }, 0.25)));
     root.style.setProperty('--border-dark',  rgbToHex(mix(mid, { r: 0, g: 0, b: 0 }, 0.7)));
     root.style.setProperty('--accent-2', segundoTono(rgb));
+    /* --color-2: la segunda tinta de la luz de borde (js/luz.js). Por
+       defecto, el segundo tono; con el acento automático, applyAccentFromCover
+       la cambia por un color de verdad de la carátula. */
+    root.style.setProperty('--color-2', segundoTono(rgb));
     /* La barra del navegador (Chrome en Android, la app instalada) también
        sigue a la canción: un tono oscuro del acento, para que los iconos
        del sistema se sigan leyendo encima. Era #0a0e2e fijo. */
@@ -225,10 +229,12 @@
     || ((localStorage.getItem(STORAGE_KEYS.THEME) || localStorage.getItem(STORAGE_KEYS.ACCENT)) ? 'manual' : 'auto');
   let lastCoverAccent = null;
 
-  const applyAccentFromCover = (hex) => {
+  const applyAccentFromCover = (hex, hex2) => {
     lastCoverAccent = hex;
     if (accentMode !== 'auto') return;
     applyAccent(hex); // solo pinta; no persiste como elección manual
+    // el segundo color de la carátula, para la luz de borde
+    if (hex2) root.style.setProperty('--color-2', hex2);
   };
 
   const resetAccentFromCover = () => {

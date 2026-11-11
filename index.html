@@ -321,6 +321,11 @@
           <div class="lyrics-body" id="lyricsBody"></div>
           <!-- MODO EDIT: una sola línea gigante con efectos, estilo edit de TikTok -->
           <div class="lyrics-edit" id="lyricsEdit" hidden></div>
+          <!-- ◉ VISTA PALABRA: la letra palabra a palabra, apilada en 3D, con
+               la palabra que suena sobre un rótulo y su icono. El escenario
+               lo monta js/palabra.js, que (con css/palabra.css) solo se
+               descarga la primera vez que se elige esta vista. -->
+          <div class="lyrics-palabra" id="lyricsPalabra" hidden></div>
         </div>
 
         <!-- SEARCH TAB (buscar en spotify) -->
@@ -539,6 +544,27 @@
               </div>
               <button class="set-ver" type="button" data-ver="lyrics">ver ▸</button>
             </div>
+            <!-- LUZ DE BORDE · el filo de la ventana encendido con los colores
+                 de la carátula (js/luz.js). «al ritmo» late con la música;
+                 «quieta» respira despacio; nunca tapa nada: es luz, no marco. -->
+            <div class="set-row" data-buscar="luz borde brillo filo marco glow resplandor ritmo latido colores caratula lumn">
+              <span class="set-label">luz de borde</span>
+              <div class="seg" data-set="luz"
+                   title="El filo de la ventana se enciende con los colores de la carátula. «al ritmo» late con la música; «quieta» respira despacio; «no» la apaga.">
+                <button class="seg-btn" data-val="ritmo">al ritmo</button>
+                <button class="seg-btn" data-val="quieta">quieta</button>
+                <button class="seg-btn" data-val="no">no</button>
+              </div>
+            </div>
+            <div class="set-row" data-buscar="grosor luz borde ancho fina">
+              <span class="set-label">grosor de la luz</span>
+              <div class="seg" data-set="luzGrosor"
+                   title="Cuánto se mete la luz de borde hacia dentro de la ventana.">
+                <button class="seg-btn" data-val="fina">fina</button>
+                <button class="seg-btn" data-val="media">media</button>
+                <button class="seg-btn" data-val="ancha">ancha</button>
+              </div>
+            </div>
             <!-- VINILO · la carátula gira como un disco. En el ordenador sigue
                  teniendo su ◉ encima de la carátula; en el teléfono la carátula
                  mide 60 px y un botón encima se la comía entera, así que allí
@@ -616,6 +642,26 @@
                 <button class="seg-btn" data-val="off">no</button>
               </div>
               <button class="set-ver" type="button" data-ver="lyrics">ver ▸</button>
+            </div>
+            <!-- ◉ VISTA PALABRA · su forma y sus iconos. Los mandos van aquí
+                 y no encima de la letra: el panel se queda limpio. -->
+            <div class="set-row" data-buscar="vista palabra pila lente tambor 3d palabra a palabra verci iconos">
+              <span class="set-label">vista palabra</span>
+              <div class="seg" data-set="palabra"
+                   title="Cómo se apilan las palabras en la vista ◉ palabra: en una pila inclinada en 3D, o en un tambor que gira, como vistas por una lente.">
+                <button class="seg-btn" data-val="pila">pila</button>
+                <button class="seg-btn" data-val="lente">lente</button>
+              </div>
+              <button class="set-ver" type="button" data-ver="lyrics" data-vista="palabra">ver ▸</button>
+            </div>
+            <div class="set-row" data-buscar="iconos vista palabra dibujos simbolos">
+              <span class="set-label">iconos</span>
+              <div class="seg" data-set="palabraIco"
+                   title="Algunas palabras llevan su icono al lado en la vista ◉ palabra (you 👤, llámame 📞, minuto 🕐…), como mucho tres por verso.">
+                <button class="seg-btn" data-val="si">sí</button>
+                <button class="seg-btn" data-val="no">no</button>
+              </div>
+              <button class="set-ver" type="button" data-ver="lyrics" data-vista="palabra">ver ▸</button>
             </div>
             <!-- TIPOGRAFÍA · antes había aquí una PARED de botones, uno por
                  fuente y todos al lado. Con más de cien no cabe: esta fila
@@ -863,6 +909,12 @@
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" aria-pressed="false"
                   aria-label="Modo edit: la letra a pantalla completa, animada"
                   title="Modo edit (letra animada)"><i class="sb-ico ico ico-edit" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">edit</span></button>
+          <!-- ◉ VISTA PALABRA · la tercera forma de ver la letra. En el
+               teléfono no cabe un botón más en esta fila: allí se esconde y
+               el de ✦ recorre las tres vistas (js/lyrics.js). -->
+          <button class="ctrl-btn vol-btn side-btn" id="palabraBtn" aria-pressed="false"
+                  aria-label="Vista palabra: la letra palabra a palabra, con iconos"
+                  title="Vista palabra: la letra palabra a palabra, con iconos"><i class="sb-ico ico ico-palabra" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">palabra</span></button>
           <!-- ❝ COMPARTIR LA LETRA · elige los versos y sale una imagen con
                la carátula, el título y esos versos. Va aquí, con ✦ ◧ ⛶,
                porque el panel de la letra se queda limpio: el panel de
@@ -1058,6 +1110,10 @@
   <script defer src="js/vertical.js"></script>
   <script defer src="js/colors.js"></script>
   <script defer src="js/ambient.js"></script>
+  <!-- LUZ DE BORDE: el filo de la ventana con los colores de la carátula,
+       latiendo con la música (la idea de Lumn). Ligera: el brillo se pinta
+       una vez y por fotograma solo cambia una opacidad. -->
+  <script defer src="js/luz.js"></script>
   <!-- escena de las canciones sin letra: solo pinta, lee beat.js igual que ambient -->
   <script defer src="js/ncs.js"></script>
   <!-- ONDAS DEL FONDO · le pide el espectro al visualizador y el ritmo a

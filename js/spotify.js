@@ -790,7 +790,7 @@
       lastDevice = { id: sdkDeviceId, name: NOMBRE_APARATO, type: 'Computer', is_active: true, supports_volume: true };
       pintarChipAparato();
       pintarVolAjeno(false);      // el volumen de aquí siempre se deja tocar
-      if (!rafId) smoothLoop();
+      smoothLoop();
     }
     leerPermisos(state.disallows);
 
@@ -1094,11 +1094,23 @@
 
   let ultimaAncla = 0;   // último re-anclaje contra el reproductor de la pestaña
 
-  const smoothLoop = () => {
-    rafId = requestAnimationFrame(smoothLoop);
-    if (!lastIsPlaying || !progStamp) return;
+  /* QUIÉN PIDE EL FOTOGRAMA: el reloj de la app (js/perf.js).
+     Este bucle se pedía a sí mismo un fotograma en cada vsync mientras
+     hubiera sesión de Spotify, sonara algo o no, y sin tope: en un monitor
+     de 144 Hz movía la barra y la letra 144 veces por segundo. Ahora corre
+     a 60 como el de la música importada, y solo mientras Spotify suena: en
+     pausa no hay nada que mover y el hilo principal duerme. */
+  let relojVivo = false;       // ¿hay sesión con el reloj de la barra en marcha?
+  let mandoReloj = null;
+  const relojActivo = () => {
+    if (!relojVivo || !lastIsPlaying || !progStamp) return false;
     const st = window.PlayerCore && window.PlayerCore.state;
-    if (st && st.isPreview) return;   // el preview de 30s ya lo mueve el audio local
+    return !(st && st.isPreview);   // el preview de 30s ya lo mueve el audio local
+  };
+  const despertarReloj = () => { if (mandoReloj) mandoReloj.despertar(); };
+
+  const pasoReloj = () => {
+    if (!relojActivo()) return;
     const ahora = performance.now();
 
     /* Sonando aquí no hay sondeo que vuelva a poner el reloj en hora —esa es
@@ -1120,6 +1132,21 @@
 
     const sec = progBase + (ahora - progStamp) / 1000;
     paintProgress(progDur ? Math.min(progDur, sec) : sec);
+  };
+
+  // arranca el reloj de la barra (llamarlo dos veces no hace nada)
+  const smoothLoop = () => {
+    if (relojVivo) { despertarReloj(); return; }
+    relojVivo = true;
+    const P = window.MMPerf;
+    if (P && P.bucle) {
+      if (!mandoReloj) mandoReloj = P.bucle(pasoReloj, { ms: 13, activo: relojActivo });
+      else mandoReloj.despertar();
+      return;
+    }
+    // sin js/perf.js: el bucle de siempre
+    const propio = () => { rafId = requestAnimationFrame(propio); pasoReloj(); };
+    propio();
   };
 
   /* -------- Pintado de la pista, compartido --------
@@ -1181,6 +1208,7 @@
     document.getElementById('playIcon').hidden = playing;
     document.getElementById('pauseIcon').hidden = !playing;
     document.body.classList.toggle('playing', playing);
+    if (playing) despertarReloj();   // el reloj de la barra duerme en pausa
   };
 
   /* Va aparte del pintado a propósito: pedir la letra es caro y solo debe
@@ -1206,7 +1234,7 @@
        pausa, siguiente, cambio de aparato…) y bastaría olvidarse de uno para
        volver a las 30 peticiones por minuto. El reloj de la barra sí tiene
        que seguir corriendo. */
-    if (sdkActivo) { if (!rafId) smoothLoop(); return; }
+    if (sdkActivo) { smoothLoop(); return; }
     if (pollTimer) return;
     const poll = async () => {
       try {
@@ -1244,7 +1272,14 @@
               ? progBase + (t1 - progStamp) / 1000
               : null;
             if (playing && est !== null && Math.abs(anchor - est) < 0.8) {
-              anchor = est + (anchor - est) * 0.35;
+              /* Cuánto se le cree a esta muestra depende de lo que tardó en
+                 volver (10-nov-2026): la mitad del viaje es la duda que
+                 tiene `anchor`. Una respuesta rápida (≤150 ms) corrige el
+                 35 % de siempre; una de 600 ms, un 9 %. Así una petición
+                 lenta ya no tuerce el reloj de la letra, y las buenas lo
+                 ponen en hora enseguida. */
+              const peso = 0.35 * Math.min(1, 150 / Math.max(150, t1 - t0));
+              anchor = est + (anchor - est) * peso;
             }
             progBase = anchor;
             progStamp = t1;
@@ -1299,7 +1334,7 @@
 
     poll();
     siguiente();
-    if (!rafId) smoothLoop();
+    smoothLoop();
   };
 
   document.addEventListener('visibilitychange', () => {
@@ -1315,6 +1350,7 @@
     if (pollTimer) clearTimeout(pollTimer);
     pollTimer = null;
     if (soloRed) return;
+    relojVivo = false;
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     progStamp = 0;
     // Sin sondeo no se sabe nada del aparato: dejarlo puesto haría que la

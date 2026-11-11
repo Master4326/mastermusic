@@ -40,6 +40,21 @@
   --t-media: 0.3s;
   --t-lenta: 0.6s;
   --muelle: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* LAS CURVAS DEL MOVIMIENTO (10-nov-2026). Nacieron en el modo edit
+     (css/edit-fx.css, 15-oct) y ahora las usa toda la letra —lista,
+     palabra, la luz del borde—: la misma familia de movimiento en todas
+     partes. Nada de goma: --muelle queda para los botones. */
+  --ed-sale:  cubic-bezier(0.16, 1, 0.3, 1);      /* entra decidido y se posa largo */
+  --ed-suave: cubic-bezier(0.25, 1, 0.5, 1);      /* lo tranquilo */
+  --ed-firme: cubic-bezier(0.05, 0.7, 0.1, 1);    /* frena en seco: los golpes */
+  --ed-cruza: cubic-bezier(0.83, 0, 0.17, 1);     /* barridos y máscaras */
+  --ed-va:    cubic-bezier(0.55, 0, 0.8, 0.3);    /* las salidas: acelera al irse */
+  --ed-lento: cubic-bezier(0.45, 0.05, 0.3, 1);   /* las cámaras */
+  /* Muelles de verdad: oscilador amortiguado con velocidad de salida, uno
+     con un 2 % de rebote (no se ve, se siente) y otro con un 7 %. Calculados
+     con scratchpad/muelle2.js; los navegadores sin linear() caen a `ease`. */
+  --ed-muelle: linear(0 0%, 0.04 0.7%, 0.11 1.9%, 0.195 3.5%, 0.288 5.4%, 0.384 7.5%, 0.479 9.9%, 0.569 12.5%, 0.653 15.3%, 0.728 18.2%, 0.793 21.3%, 0.849 24.6%, 0.896 28.1%, 0.933 31.6%, 0.962 35.4%, 0.984 39.2%, 0.999 43.2%, 1.009 47.3%, 1.015 51.5%, 1.018 55.9%, 1.019 60.4%, 1.018 65%, 1.016 69.6%, 1.014 74.4%, 1.012 79.4%, 1.009 84.4%, 1.007 89.5%, 1.005 94.7%, 1 100%);
+  --ed-muelle-vivo: linear(0 0%, 0.053 0.7%, 0.145 1.9%, 0.256 3.5%, 0.375 5.4%, 0.494 7.5%, 0.608 9.9%, 0.713 12.5%, 0.805 15.3%, 0.884 18.2%, 0.947 21.3%, 0.996 24.6%, 1.032 28.1%, 1.056 31.6%, 1.069 35.4%, 1.075 39.2%, 1.074 43.2%, 1.068 47.3%, 1.06 51.5%, 1.051 55.9%, 1.041 60.4%, 1.032 65%, 1.024 69.6%, 1.017 74.4%, 1.011 79.4%, 1.007 84.4%, 1.004 89.5%, 1.002 94.7%, 1 100%);
 }
 
 /* Lo que seleccionas en un campo (buscar, filtrar, la Redirect URI) se
@@ -138,8 +153,17 @@ body.perf-bajo::after { display: none; }
   position: fixed; inset: 0; pointer-events: none; z-index: 9000;
   background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%);
 }
+/* LAS RAYAS BAJAN POR LA GPU.
+   Antes se movían animando `background-position` (0 → 100 px en 8 s), y eso
+   NO lo puede llevar la tarjeta gráfica: el navegador repintaba esta capa
+   —la pantalla ENTERA— en cada fotograma y, peor, una animación así obliga
+   al hilo principal a producir un fotograma por cada vsync aunque la app
+   esté parada. Era el motivo de que MASTER MUSIC gastara CPU en pausa.
+   El dibujo se repite cada 4 px, así que bajar la capa 4 px y volver a
+   empezar es el mismo movimiento (12,5 px/s, 4 px en 0,32 s) sin repintar
+   un solo píxel: la capa asoma 4 px por arriba para cubrir el recorrido. */
 .scanlines {
-  position: fixed; inset: 0; pointer-events: none; z-index: 9001;
+  position: fixed; inset: -4px 0 0 0; pointer-events: none; z-index: 9001;
   background: repeating-linear-gradient(
     to bottom,
     rgba(0,0,0,0) 0,
@@ -147,11 +171,12 @@ body.perf-bajo::after { display: none; }
     rgba(0,0,0,0.08) 3px,
     rgba(0,0,0,0) 4px
   );
-  animation: scanlineMove 8s linear infinite;
+  will-change: transform;
+  animation: scanlineMove 0.32s linear infinite;
 }
 @keyframes scanlineMove {
-  from { background-position: 0 0; }
-  to { background-position: 0 100px; }
+  from { transform: translateY(0); }
+  to { transform: translateY(4px); }
 }
 
 /* ==========================================================
@@ -743,7 +768,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
   transition:
     color var(--t-media) ease-out,
     text-shadow var(--t-media) ease-out,
-    transform var(--t-lenta) var(--muelle),
+    transform var(--t-lenta) var(--ed-sale),
     opacity 0.4s ease-out,
     filter 0.5s ease-out;
   cursor: pointer;
@@ -788,7 +813,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
   opacity: 1;
   font-weight: var(--lyrics-weight-on, 700);
   letter-spacing: var(--lyrics-tracking, 0.02em);
-  animation: lyric-pop 0.55s var(--muelle);
+  animation: lyric-pop 0.5s var(--ed-sale);
   z-index: 3;
   /* La línea activa entra enfocada DE GOLPE: sin `filter` en la transición.
      Mientras se interpolaba blur(0.6px) → none, la línea tenía filtro medio
@@ -798,34 +823,23 @@ body.perf-tactil .tab-bar.se-esconde::after {
   transition:
     color var(--t-media) ease-out,
     text-shadow var(--t-media) ease-out,
-    transform var(--t-lenta) var(--muelle),
+    transform var(--t-lenta) var(--ed-sale),
     opacity 0.4s ease-out;
 }
-/* The pop animation — quick squish-then-overshoot like a music video edit */
+/* La entrada del verso activo (10-nov-2026). Antes: se encogía, se pasaba
+   de largo hasta 1.16 y volvía con un muelle de goma (curva con un 56 % de
+   sobrepaso), y además animaba text-shadow y un blur, que se repintan en
+   cada fotograma. Ahora es el gesto del modo edit: crece DESDE DONDE ESTABA
+   (el 0.95 de un verso por venir, sin saltos) hasta su tamaño con --ed-sale,
+   sin pasarse — solo transform y opacity, que lleva la tarjeta gráfica. El
+   empujón hacia arriba lo da la cascada al subir; el brillo, su transición. */
 @keyframes lyric-pop {
-  0% {
-    transform: scale(0.85) translateY(6px);
-    opacity: 0.4;
-    text-shadow: 0 0 0px transparent;
-    filter: blur(2px);
-    /* la SUBIDA sin rebote: con la curva de muelle de la regla, este tramo
-       se pasaba de su propio pico (~1.19) y el verso largo volvía a asomar
-       por la derecha. El muelle sigue en la bajada y en el asiento. */
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  from {
+    transform: scale(0.95);
+    opacity: 0.55;
   }
-  /* El pico era 1.22: en un verso largo se salía casi una cuarta parte por
-     la derecha mientras duraba. 1.16 sigue siendo un golpe claro y es el
-     tope con el que se calcula el ancho de los versos. */
-  35% {
-    transform: scale(var(--esc-pico, 1.16)) translateY(-2px);
-    opacity: 1;
-    filter: none;
-  }
-  60% {
-    transform: scale(1.08);
-  }
-  100% {
-    transform: scale(var(--esc-activo, 1.12)) translateY(0);
+  to {
+    transform: scale(var(--esc-activo, 1.12));
     opacity: 1;
   }
 }
@@ -839,11 +853,13 @@ body.perf-tactil .tab-bar.se-esconde::after {
   width: 4px;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent-glow), 0 0 16px var(--accent-glow);
-  animation: marker-bar 0.9s ease-in-out infinite;
+  /* entra creciendo desde el centro y se queda QUIETA: antes latía cada
+     0,9 s fuera del compás de la canción, un parpadeo a un lado del ojo */
+  animation: marker-entra 0.45s var(--ed-sale) both;
 }
-@keyframes marker-bar {
-  0%, 100% { opacity: 1; transform: scaleY(1); }
-  50%      { opacity: 0.6; transform: scaleY(0.7); }
+@keyframes marker-entra {
+  from { opacity: 0; transform: scaleY(0.2); }
+  to   { opacity: 1; transform: none; }
 }
 .lyrics-body .lyric-line:hover {
   color: var(--text);
@@ -858,7 +874,8 @@ body.perf-tactil .tab-bar.se-esconde::after {
    Funciona en todos los navegadores desde 2024; donde no, parte como antes. */
 .lyrics-body .lyric-line,
 .lyrics-body .lyric-trad,
-.lyrics-edit .ed-trad {
+.lyrics-edit .ed-trad,
+.lyrics-palabra .ed-trad {
   text-wrap: balance;
 }
 
@@ -929,7 +946,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
   transition:
     color var(--t-media) ease-out,
     opacity 0.4s ease-out,
-    transform var(--t-lenta) var(--muelle),
+    transform var(--t-lenta) var(--ed-sale),
     filter 0.5s ease-out;
 }
 .lyrics-body .lyric-line.past + .lyric-trad {
@@ -976,7 +993,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
   animation-duration: 0.55s;
   animation-fill-mode: both;
   animation-delay: var(--d, 0ms);
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-timing-function: var(--ed-sale, cubic-bezier(0.16, 1, 0.3, 1));
 }
 /* Revelado terminado (lyrics.js añade .done): texto fijo, sin animaciones
    ni capas de composición — ninguna letra puede quedar oculta. */
@@ -992,29 +1009,44 @@ body.perf-tactil .tab-bar.se-esconde::after {
    mete cada palabra en su .wl, también inline-block: salta de fila entera
    y solo se parte por dentro si no cabe ni sola en el verso. */
 .lyrics-body .lyric-line .wl { display: inline-block; }
+/* ══════════ LOS EFECTOS DE LA VISTA LISTA, CON EL MOVIMIENTO DE LA CASA ══════════
+   Rehechos el 10-nov-2026 con el lenguaje del modo edit (15-oct):
+   · recorridos cortos: un tercio de letra, no una letra entera;
+   · sin gomas: nada de pasarse un 20 % y volver —como mucho el 2 % del
+     muelle de la casa (--ed-muelle), que se siente pero no se ve—;
+   · nada parpadea: el neón prende de una vez y el glitch se junta en vez
+     de dar saltos;
+   · los colores de la canción (--accent, --color-2) en vez del rosa y el
+     cian fijos.
+   Mismos nombres y la misma variedad: cada verso conserva su carácter.
+   Y las reglas de siempre:
+   · solo transform, opacity y filter (text-shadow donde ES el efecto);
+   · el ÚLTIMO `filter` de cada keyframe es `none`, nunca `blur(0)`: con
+     fill-mode "both" ese valor se queda puesto y un elemento con filtro se
+     pinta recortado a su caja, lo que cortaba el resplandor de .w-big
+     (lo vigila assets/check-modulos.js);
+   · `--sx` es el signo alternante (-1/1) que reparte lyrics.js.
+   ══════════════════════════════════════════════════════════════════════════ */
 .lyric-line.fx-rise .w  { animation-name: w-rise; }
 .lyric-line.fx-slide .w { animation-name: w-slide; }
-.lyric-line.fx-wave .w  {
-  animation-name: w-wave;
-  animation-timing-function: var(--muelle);
-}
+.lyric-line.fx-wave .w  { animation-name: w-wave; }
+/* máquina de escribir: cada palabra sale casi de golpe, pero no de un tajo */
 .lyric-line.fx-type .w  {
   animation-name: w-type;
-  animation-duration: 0.12s;
-  animation-timing-function: steps(1, end);
+  animation-duration: 0.14s;
+  animation-timing-function: linear;
 }
 @keyframes w-rise {
-  from { opacity: 0; transform: translateY(0.65em); filter: blur(3px); }
-  to   { opacity: 1; transform: translateY(0);      filter: none; }
+  from { opacity: 0; transform: translateY(0.32em); filter: blur(2px); }
+  to   { opacity: 1; transform: none;               filter: none; }
 }
 @keyframes w-slide {
-  from { opacity: 0; transform: translateX(calc(var(--sx, 1) * 0.9em)) skewX(-8deg); filter: blur(3px); }
-  to   { opacity: 1; transform: translateX(0) skewX(0);                              filter: none; }
+  from { opacity: 0; transform: translateX(calc(var(--sx, 1) * 0.4em)) skewX(-5deg); filter: blur(2px); }
+  to   { opacity: 1; transform: none;                                               filter: none; }
 }
 @keyframes w-wave {
-  0%   { opacity: 0; transform: translateY(0.5em) scale(0.55) rotate(-6deg); }
-  60%  { opacity: 1; transform: translateY(-0.12em) scale(1.1) rotate(2deg); }
-  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+  from { opacity: 0; transform: translateY(0.3em) scale(0.82) rotate(calc(var(--sx, 1) * -4deg)); }
+  to   { opacity: 1; transform: none; }
 }
 @keyframes w-type {
   from { opacity: 0; }
@@ -1028,119 +1060,101 @@ body.perf-tactil .tab-bar.se-esconde::after {
 .lyric-line.fx-spin,
 .lyric-line.fx-spin .wl { perspective: 500px; }
 
-/* volteo 3D: cada palabra se levanta como una tarjeta */
+/* volteo 3D: cada palabra se levanta como una tarjeta y se posa */
 .lyric-line.fx-flip .w {
   animation-name: w-flip;
-  animation-duration: var(--t-lenta);
+  animation-duration: 0.5s;
   transform-origin: 50% 100%;
 }
 @keyframes w-flip {
-  0%   { opacity: 0; transform: rotateX(95deg) translateY(0.3em); filter: blur(2px); }
-  60%  { opacity: 1; transform: rotateX(-16deg); filter: none; }
-  100% { opacity: 1; transform: rotateX(0); }
+  from { opacity: 0; transform: rotateX(70deg) translateY(0.15em); filter: blur(2px); }
+  to   { opacity: 1; transform: none;                               filter: none; }
 }
 
-/* caída con rebote: las letras llueven desde arriba, cada una girada */
+/* caída: las letras bajan un poco giradas y se posan derechas */
 .lyric-line.fx-fall .w {
   animation-name: w-fall;
-  animation-duration: var(--t-lenta);
-  animation-timing-function: var(--muelle);
+  animation-duration: 0.55s;
+  animation-timing-function: var(--ed-muelle, cubic-bezier(0.16, 1, 0.3, 1));
 }
 @keyframes w-fall {
-  0%   { opacity: 0; transform: translateY(-1.1em) rotate(calc(var(--sx, 1) * 16deg)) scale(1.2); filter: blur(2px); }
-  65%  { opacity: 1; transform: translateY(0.08em) rotate(calc(var(--sx, 1) * -4deg)) scale(0.98); filter: none; }
-  100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+  from { opacity: 0; transform: translateY(-0.4em) rotate(calc(var(--sx, 1) * 8deg)) scale(1.06); filter: blur(2px); }
+  to   { opacity: 1; transform: none;                                                            filter: none; }
 }
 
-/* glitch: separación RGB y saltos bruscos, como señal dañada */
+/* glitch: la señal llega partida en los dos colores de la canción y se
+   junta. Antes daba saltos (steps) y parpadeaba la opacidad. */
 .lyric-line.fx-glitch .w {
   animation-name: w-glitch;
   animation-duration: 0.45s;
-  animation-timing-function: steps(2, end);
+  animation-timing-function: var(--ed-firme, cubic-bezier(0.05, 0.7, 0.1, 1));
 }
 @keyframes w-glitch {
-  0%   { opacity: 0;   transform: translate(-0.15em, 0.1em) skewX(18deg);  text-shadow: -3px 0 #ff00d4, 3px 0 #00f0ff; }
-  25%  { opacity: 1;   transform: translate(0.12em, -0.06em) skewX(-10deg); text-shadow: 3px 0 #ff00d4, -3px 0 #00f0ff; }
-  50%  { opacity: 0.55; transform: translate(-0.08em, 0.04em);              text-shadow: -4px 0 #00f0ff, 4px 0 #ff00d4; }
-  75%  { opacity: 1;   transform: translate(0.04em, 0);                     text-shadow: 2px 0 #ff00d4, -2px 0 #00f0ff; }
+  0%   { opacity: 0; transform: translateX(-0.1em) skewX(12deg);
+         text-shadow: -4px 0 var(--color-2, #00f0ff), 4px 0 color-mix(in oklab, var(--accent) 50%, #fff); }
+  55%  { opacity: 1; transform: translateX(0.02em) skewX(-2deg);
+         text-shadow: -1.5px 0 var(--color-2, #00f0ff), 1.5px 0 color-mix(in oklab, var(--accent) 50%, #fff); }
   /* sin text-shadow en el 100%: recupera el glow heredado de la línea */
-  100% { opacity: 1;   transform: none; }
+  100% { opacity: 1; transform: none; }
 }
 
-/* zoom cinematográfico: la palabra cae desde gigante y desenfocada */
+/* zoom: la palabra baja de grande y desenfocada a su sitio */
 .lyric-line.fx-zoom .w {
   animation-name: w-zoom;
   animation-duration: 0.55s;
-  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes w-zoom {
-  0%   { opacity: 0; transform: scale(2.6); filter: blur(8px); }
-  55%  { opacity: 1; transform: scale(0.94); filter: none; }
-  100% { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(1.45); filter: blur(5px); }
+  to   { opacity: 1; transform: none;        filter: none; }
 }
 
-/* neón: cada letra parpadea como tubo de neón encendiéndose */
+/* neón: el tubo prende con un fogonazo de luz que se asienta — de una
+   vez (antes se encendía y se apagaba tres veces) */
 .lyric-line.fx-neon .w {
   animation-name: w-neon;
   animation-duration: 0.7s;
-  animation-timing-function: linear;
+  animation-timing-function: var(--ed-suave, ease-out);
 }
 @keyframes w-neon {
-  0%   { opacity: 0; }
-  6%   { opacity: 1; text-shadow: 0 0 8px currentColor, 0 0 24px currentColor, 0 0 48px currentColor; }
-  12%  { opacity: 0.25; text-shadow: none; }
-  22%  { opacity: 1; text-shadow: 0 0 10px currentColor, 0 0 30px currentColor; }
-  32%  { opacity: 0.4; text-shadow: none; }
-  46%  { opacity: 1; text-shadow: 0 0 12px currentColor, 0 0 36px currentColor, 0 0 60px currentColor; }
+  0%   { opacity: 0; text-shadow: 0 0 0 transparent; }
+  35%  { opacity: 1; text-shadow: 0 0 10px currentColor, 0 0 28px currentColor, 0 0 52px currentColor; }
   /* sin text-shadow al final: queda el glow normal de la línea */
   100% { opacity: 1; }
 }
 
-/* giro de puerta: las letras rotan sobre su eje vertical */
+/* giro de puerta: las letras rotan sobre su eje hasta quedar de frente */
 .lyric-line.fx-spin .w {
   animation-name: w-spin;
-  animation-duration: 0.55s;
+  animation-duration: 0.5s;
 }
 @keyframes w-spin {
-  0%   { opacity: 0; transform: rotateY(95deg) translateX(0.2em); filter: blur(2px); }
-  60%  { opacity: 1; transform: rotateY(-20deg); filter: none; }
-  100% { opacity: 1; transform: rotateY(0); }
+  from { opacity: 0; transform: rotateY(75deg) translateX(0.12em); filter: blur(2px); }
+  to   { opacity: 1; transform: none;                              filter: none; }
 }
 
-/* elástico: la palabra entra estirada y rebota hasta su forma */
+/* elástico: la palabra entra algo estirada y recupera su forma con el
+   muelle de la casa */
 .lyric-line.fx-elastic .w {
   animation-name: w-elastic;
-  animation-duration: 0.65s;
+  animation-duration: 0.6s;
+  animation-timing-function: var(--ed-muelle, cubic-bezier(0.16, 1, 0.3, 1));
 }
 @keyframes w-elastic {
-  0%   { opacity: 0; transform: scale(0.3, 1.7); filter: blur(3px); }
-  45%  { opacity: 1; transform: scale(1.28, 0.75); filter: none; }
-  70%  { transform: scale(0.92, 1.1); }
-  100% { opacity: 1; transform: scale(1, 1); }
+  from { opacity: 0; transform: scale(0.72, 1.28); filter: blur(2px); }
+  to   { opacity: 1; transform: none;              filter: none; }
 }
 
-/* columpio: cada palabra cuelga y se balancea hasta quedar quieta */
+/* columpio: cada palabra cuelga un poco ladeada y se endereza */
 .lyric-line.fx-swing .w {
   animation-name: w-swing;
-  animation-duration: 0.7s;
+  animation-duration: 0.6s;
+  animation-timing-function: var(--ed-muelle, cubic-bezier(0.16, 1, 0.3, 1));
   transform-origin: 50% -0.35em;
 }
 @keyframes w-swing {
-  0%   { opacity: 0; transform: rotate(calc(var(--sx, 1) * 55deg)) translateY(-0.2em); }
-  45%  { opacity: 1; transform: rotate(calc(var(--sx, 1) * -18deg)) translateY(0); }
-  72%  { transform: rotate(calc(var(--sx, 1) * 7deg)); }
-  100% { opacity: 1; transform: rotate(0); }
+  from { opacity: 0; transform: rotate(calc(var(--sx, 1) * 16deg)) translateY(-0.12em); }
+  to   { opacity: 1; transform: none; }
 }
-/* ══════════ TANDA NUEVA DE EFECTOS ══════════
-   Mismas reglas que los doce de arriba:
-   · solo transform, opacity y filter — nada que dispare layout ni pintado,
-     que es justo lo que se acaba de quitar de toda la app;
-   · el ÚLTIMO `filter` de cada keyframe es `none`, nunca `blur(0)`: con
-     fill-mode "both" ese valor se queda puesto y un elemento con filtro se
-     pinta recortado a su caja, lo que cortaba el resplandor de .w-big;
-   · `--sx` es el signo alternante (-1/1) que reparte lyrics.js, para los
-     efectos que van a un lado y a otro.
-   ═════════════════════════════════════════════ */
 
 /* espejo: cada letra llega del revés y se voltea a su sitio */
 .lyric-line.fx-espejo,
@@ -1150,75 +1164,67 @@ body.perf-tactil .tab-bar.se-esconde::after {
   animation-duration: 0.5s;
 }
 @keyframes w-espejo {
-  0%   { opacity: 0; transform: scaleX(-1) translateY(0.15em); filter: blur(2px); }
-  55%  { opacity: 1; transform: scaleX(1.12) translateY(0);    filter: none; }
-  100% { opacity: 1; transform: scaleX(1); }
+  from { opacity: 0; transform: scaleX(-1) translateY(0.12em); filter: blur(2px); }
+  to   { opacity: 1; transform: none;                          filter: none; }
 }
 
 /* cortina: unas entran desde arriba y otras desde abajo, alternando */
 .lyric-line.fx-cortina .w {
   animation-name: w-cortina;
   animation-duration: 0.55s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes w-cortina {
-  0%   { opacity: 0; transform: translateY(calc(var(--sx, 1) * 1.1em)); filter: blur(4px); }
-  70%  { opacity: 1; transform: translateY(calc(var(--sx, 1) * -0.08em)); filter: none; }
-  100% { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(calc(var(--sx, 1) * 0.42em)); filter: blur(3px); }
+  to   { opacity: 1; transform: none;                                    filter: none; }
 }
 
-/* rebote: cae y bota dos veces contra su renglón, cada vez más flojo */
+/* rebote: cae y se asienta en su renglón con UN bote pequeño (el muelle
+   vivo de la casa, un 7 % de un recorrido ya corto) — antes botaba dos
+   veces aplastándose como una pelota */
 .lyric-line.fx-rebote .w {
   animation-name: w-rebote;
-  animation-duration: 0.75s;
+  animation-duration: 0.6s;
+  animation-timing-function: var(--ed-muelle-vivo, cubic-bezier(0.16, 1, 0.3, 1));
   transform-origin: bottom center;
 }
 @keyframes w-rebote {
-  0%   { opacity: 0; transform: translateY(-0.9em) scaleY(1.15); filter: blur(2px); }
-  38%  { opacity: 1; transform: translateY(0) scaleY(0.82);      filter: none; }
-  55%  { transform: translateY(-0.3em) scaleY(1.06); }
-  72%  { transform: translateY(0) scaleY(0.92); }
-  86%  { transform: translateY(-0.1em) scaleY(1.02); }
-  100% { opacity: 1; transform: translateY(0) scaleY(1); }
+  from { opacity: 0; transform: translateY(-0.38em) scaleY(1.06); filter: blur(2px); }
+  to   { opacity: 1; transform: none;                             filter: none; }
 }
 
 /* abanico: la frase entra abierta como una baraja y se cierra recta */
 .lyric-line.fx-abanico .w {
   animation-name: w-abanico;
-  animation-duration: 0.62s;
-  animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1);
+  animation-duration: 0.55s;
   transform-origin: bottom center;
 }
 @keyframes w-abanico {
-  0%   { opacity: 0; transform: rotate(calc(var(--sx, 1) * 24deg)) translateY(0.5em) scale(0.9); filter: blur(3px); }
-  60%  { opacity: 1; transform: rotate(calc(var(--sx, 1) * -6deg)) translateY(0) scale(1.04);    filter: none; }
-  100% { opacity: 1; transform: rotate(0) translateY(0) scale(1); }
+  from { opacity: 0; transform: rotate(calc(var(--sx, 1) * 12deg)) translateY(0.25em) scale(0.94); filter: blur(2px); }
+  to   { opacity: 1; transform: none;                                                               filter: none; }
 }
 
-/* estela: llega disparada de lado y frena, con desenfoque de movimiento */
+/* estela: llega disparada de lado y frena en seco, con desenfoque de movimiento */
 .lyric-line.fx-estela .w {
   animation-name: w-estela;
   animation-duration: 0.5s;
-  animation-timing-function: cubic-bezier(0.12, 0.9, 0.2, 1);
+  animation-timing-function: var(--ed-firme, cubic-bezier(0.05, 0.7, 0.1, 1));
 }
 @keyframes w-estela {
-  0%   { opacity: 0; transform: translateX(calc(var(--sx, 1) * 2.2em)) scaleX(1.6); filter: blur(6px); }
-  62%  { opacity: 1; transform: translateX(calc(var(--sx, 1) * -0.12em)) scaleX(0.96); filter: none; }
-  100% { opacity: 1; transform: translateX(0) scaleX(1); }
+  from { opacity: 0; transform: translateX(calc(var(--sx, 1) * 0.8em)) scaleX(1.25); filter: blur(4px); }
+  to   { opacity: 1; transform: none;                                                filter: none; }
 }
 
-/* latido: aparece y da dos pulsos, como si respirara */
+/* latido: aparece con un solo pulso suave, como una respiración (antes
+   eran dos pulsos de un 14 %) */
 .lyric-line.fx-latido .w {
   animation-name: w-latido;
-  animation-duration: 0.8s;
+  animation-duration: 0.7s;
+  animation-timing-function: var(--ed-suave, ease-out);
 }
 @keyframes w-latido {
-  0%   { opacity: 0; transform: scale(0.7); filter: blur(3px); }
-  30%  { opacity: 1; transform: scale(1.14); filter: none; }
-  45%  { transform: scale(0.98); }
-  60%  { transform: scale(1.09); }
-  78%  { transform: scale(0.99); }
-  100% { opacity: 1; transform: scale(1); }
+  0%   { opacity: 0; transform: scale(0.86); filter: blur(2px); }
+  45%  { opacity: 1; transform: scale(1.03); filter: none; }
+  100% { opacity: 1; transform: none; }
 }
 
 /* bloques: cada letra se coloca a saltos DUROS, como poner un bloque.
@@ -1260,7 +1266,8 @@ body.perf-tactil .tab-bar.se-esconde::after {
     0.13em 0.13em 0 rgba(0, 0, 0, 0.95);
 }
 :root[data-lyrics-font="pixel"] .lyrics-body .lyric-line,
-:root[data-lyrics-font="pixel"] .lyrics-edit {
+:root[data-lyrics-font="pixel"] .lyrics-edit,
+:root[data-lyrics-font="pixel"] .lyrics-palabra {
   /* los píxeles de la fuente se ven mejor sin suavizado de subpíxel */
   -webkit-font-smoothing: none;
 }
@@ -1280,7 +1287,8 @@ body.perf-tactil .tab-bar.se-esconde::after {
     3px 3px 0 rgba(0, 0, 0, 0.9);
 }
 :root[data-lyrics-font="mario"] .lyrics-body .lyric-line,
-:root[data-lyrics-font="mario"] .lyrics-edit {
+:root[data-lyrics-font="mario"] .lyrics-edit,
+:root[data-lyrics-font="mario"] .lyrics-palabra {
   -webkit-font-smoothing: none;
 }
 
@@ -1614,7 +1622,16 @@ body.reduce-motion .lyric-gap i { transition: none; }
   z-index: 1;
 }
 #tab-lyrics .lyrics-body,
-.lyrics-edit { position: relative; z-index: 2; }
+.lyrics-edit,
+.lyrics-palabra { position: relative; z-index: 2; }
+/* ◉ La vista palabra: su hueco existe desde el arranque, aunque su hoja
+   (css/palabra.css) llegue solo al elegirla. Llena el panel igual que las
+   otras dos, y sus avisos («buscando…», «sin tiempos») se leen igual. */
+.lyrics-palabra { flex: 1; min-height: 0; overflow: hidden; }
+.lyrics-palabra > .lyrics-empty { padding: 0 24px; }
+/* En el teléfono no cabe un botón más en la fila de vista: ◉ se esconde y
+   el botón ✦ recorre las tres vistas (js/lyrics.js). */
+body.disp-movil #palabraBtn { display: none; }
 
 /* Corchetes de esquina del panel de la letra. ANTES latían de 0.2 a 0.75 con
    un resplandor cada 3,2 s: al encenderse los cuatro a la vez se leen como un
@@ -1652,8 +1669,10 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
   animation: la-rise var(--ndur, 7s) linear forwards;
 }
 /* El glifo va dentro: .la-note ya gasta su transform en la subida, así que
-   el rebote del bombo vive en esta capa. Las variables las escribe
-   ambient.js UNA vez por frame en el contenedor y las hereda todo. */
+   el rebote del bombo vive en esta capa. ambient.js le escribe el transform
+   EN LÍNEA a cada glifo; las variables se quedan solo como valor de reposo
+   (escribirlas en el contenedor obligaba a recalcular medio panel en cada
+   fotograma: ver «el rebote de las notas» en js/ambient.js). */
 .la-note i {
   display: inline-block;
   font-style: normal;
@@ -1696,7 +1715,8 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
    `bottom` con margen de sobra: el modo edit centra sus versos alrededor del
    47% del panel (ED_TOPS en lyrics.js llega al 58%), así que abajo queda
    sitio libre y nunca se pisan. */
-.lyrics-edit .ed-trad {
+.lyrics-edit .ed-trad,
+.lyrics-palabra .ed-trad {
   position: absolute;
   left: 6%;
   right: 6%;
@@ -1714,14 +1734,15 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.75);
   pointer-events: none;
 }
-.lyrics-edit .ed-trad.entra {
+.lyrics-edit .ed-trad.entra,
+.lyrics-palabra .ed-trad.entra {
   animation: ed-trad-entra 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes ed-trad-entra {
   from { opacity: 0; transform: translateY(8px); filter: blur(3px); }
   to   { opacity: 0.62; transform: translateY(0); filter: none; }
 }
-body.reduce-motion .lyrics-edit .ed-trad.entra { animation: none; opacity: 0.62; }
+body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation: none; opacity: 0.62; }
 
 
 /* Los revelados letra a letra (.edl-*) viven en css/edit-fx.css, con el
@@ -2609,12 +2630,14 @@ body.playing .mini-eq i:nth-child(5) { animation-duration: 0.85s; animation-dela
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18%, #000 82%, transparent 100%);
   mask-image: linear-gradient(90deg, transparent 0, #000 18%, #000 82%, transparent 100%);
 }
+/* Sonando solo sube de brillo. Aquí había una animación (`filler-slide`:
+   background-position a 8 px en steps(2, jump-none)) que NO movía nada: el
+   dibujo se repite justo cada 8 px y esos dos pasos caen en 0 y en 8, o
+   sea la misma imagen las dos veces. Pero costaba como si se moviera —una
+   animación de fondo corre en el hilo principal y lo despierta en cada
+   vsync—, así que fuera: se ve idéntico. */
 body.playing .status-bar .filler {
   opacity: 0.3;
-  animation: filler-slide 0.9s steps(2, jump-none) infinite;
-}
-@keyframes filler-slide {
-  to { background-position: 8px 0; }
 }
 
 /* Reloj: acento con glow y corchetes tenues, estilo [20:16:21] */
@@ -2632,7 +2655,9 @@ body.playing .status-bar .filler {
   text-shadow: none;
 }
 /* Dos puntos que parpadean cada segundo (spans puestos por seven.js) */
-#clock .c { animation: colon-blink 1s steps(1) infinite; }
+/* `inline-block`: un <span> en línea no puede tener capa propia, y sin capa
+   su parpadeo corría en el hilo principal en cada vsync, las 24 horas. */
+#clock .c { display: inline-block; animation: colon-blink 1s steps(1) infinite; }
 @keyframes colon-blink {
   50% { opacity: 0.25; }
 }
@@ -4291,6 +4316,8 @@ body.reduce-motion .fuentes-caja { animation: none; }
 /* Segundo tono de la paleta: el acento girado 20° y más claro (seven.js).
    Hace el papel que tenía el rosa FIJO --magenta en rótulos y adornos. */
 @property --accent-2    { syntax: '<color>'; inherits: true; initial-value: #8fd3ff; }
+/* La segunda tinta de la luz de borde (js/luz.js): otro color de la carátula */
+@property --color-2     { syntax: '<color>'; inherits: true; initial-value: #8fd3ff; }
 @property --dyn-1       { syntax: '<color>'; inherits: true; initial-value: #1a1f4a; }
 @property --dyn-2       { syntax: '<color>'; inherits: true; initial-value: #0a0e2e; }
 @property --bg-window   { syntax: '<color>'; inherits: true; initial-value: #1a1f4a; }
@@ -4304,7 +4331,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
 :root {
   transition:
     --accent .45s ease, --accent-glow .45s ease, --accent-dim .45s ease,
-    --accent-2 .45s ease,
+    --accent-2 .45s ease, --color-2 .7s ease,
     --dyn-1 .7s ease, --dyn-2 .7s ease,
     --bg-window .7s ease, --bg-panel .7s ease,
     --bg-panel-2 .7s ease, --bg-frame .7s ease,
@@ -4864,8 +4891,13 @@ body.reduce-motion .lyrics-ncs:not(.live) .ncs-rad i { animation: none; }
   will-change: transform, opacity;
   /* el filtro va aquí y no en el JS: es constante, solo cambia la escala */
   filter: blur(calc(70px * var(--fondo-escala, 1)));
-  transition: opacity .12s linear;
+  /* SIN transición de opacidad en el ordenador: ambient.js escribe la
+     opacidad en cada fotograma y la transición renacía 60 veces por
+     segundo (una animación siempre viva en el hilo principal). El mismo
+     fundido de 120 ms lo hace ya el propio bucle. */
 }
+/* en el móvil se pinta a 30 fps y la transición rellena los huecos */
+body.perf-movil .amb-blob { transition: opacity .12s linear; }
 .amb-blob.b1 {                  /* graves: foco grande abajo a la izquierda */
   width: calc(46 * var(--amb-vmax)); height: calc(46 * var(--amb-vmax));
   left: -12vmax; bottom: -16vmax;
@@ -7403,6 +7435,7 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   --ico-mas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M5 2h2v1h-2zM5 3h2v1h-2zM5 4h2v1h-2zM2 5h8v1h-8zM2 6h8v1h-8zM5 7h2v1h-2zM5 8h2v1h-2zM5 9h2v1h-2z'/%3E%3C/svg%3E");
   --ico-max: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 2h8v1h-8zM2 3h8v1h-8zM2 4h1v1h-1zM9 4h1v1h-1zM2 5h1v1h-1zM9 5h1v1h-1zM2 6h1v1h-1zM9 6h1v1h-1zM2 7h1v1h-1zM9 7h1v1h-1zM2 8h1v1h-1zM9 8h1v1h-1zM2 9h8v1h-8z'/%3E%3C/svg%3E");
   --ico-min: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 8h8v1h-8zM2 9h8v1h-8z'/%3E%3C/svg%3E");
+  --ico-palabra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 1h5v1h-5zM1 3h10v1h-10zM1 4h10v1h-10zM1 5h10v1h-10zM4 7h6v1h-6zM6 9h3v1h-3z'/%3E%3C/svg%3E");
   --ico-parar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 2h8v1h-8zM2 3h8v1h-8zM2 4h8v1h-8zM2 5h8v1h-8zM2 6h8v1h-8zM2 7h8v1h-8zM2 8h8v1h-8zM2 9h8v1h-8z'/%3E%3C/svg%3E");
   --ico-pausa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M2 1h3v1h-3zM7 1h3v1h-3zM2 2h3v1h-3zM7 2h3v1h-3zM2 3h3v1h-3zM7 3h3v1h-3zM2 4h3v1h-3zM7 4h3v1h-3zM2 5h3v1h-3zM7 5h3v1h-3zM2 6h3v1h-3zM7 6h3v1h-3zM2 7h3v1h-3zM7 7h3v1h-3zM2 8h3v1h-3zM7 8h3v1h-3zM2 9h3v1h-3zM7 9h3v1h-3zM2 10h3v1h-3zM7 10h3v1h-3z'/%3E%3C/svg%3E");
   --ico-persona: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath d='M4 1h4v1h-4zM3 2h1v1h-1zM8 2h1v1h-1zM3 3h1v1h-1zM8 3h1v1h-1zM3 4h1v1h-1zM8 4h1v1h-1zM4 5h4v1h-4zM3 7h6v1h-6zM2 8h1v1h-1zM9 8h1v1h-1zM1 9h1v1h-1zM10 9h1v1h-1zM1 10h10v1h-10z'/%3E%3C/svg%3E");
@@ -7453,6 +7486,7 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
 .ico-mas { --m: var(--ico-mas); }
 .ico-max { --m: var(--ico-max); }
 .ico-min { --m: var(--ico-min); }
+.ico-palabra { --m: var(--ico-palabra); }
 .ico-parar { --m: var(--ico-parar); }
 .ico-pausa { --m: var(--ico-pausa); }
 .ico-persona { --m: var(--ico-persona); }
@@ -9104,3 +9138,133 @@ body:not(.playing) .v916 .cine-play .ico-pausa { display: none; }
 .v916.cine[data-orient="h"] .v916-t { font-size: 2.2cqh; }
 .v916.cine[data-orient="h"] .v916-riel { height: max(8px, 1.5cqh); }
 .v916.cine[data-orient="h"] .v916-marco[data-estilo="letra"] .v916-riel { height: max(6px, 0.9cqh); }
+
+
+/* ══════════════════════════════════════════════════════════
+   ✧ LUZ DE BORDE (js/luz.js) — 10-nov-2026, la idea de Lumn
+   ══════════════════════════════════════════════════════════
+   El filo de la ventana encendido con dos tintas de la carátula: el acento
+   arriba y a la izquierda, el segundo color (--color-2) abajo y a la
+   derecha, mezclándose en las esquinas. Por encima de la app y DEBAJO del
+   grano y del acabado CRT del 8 bits (z 8999-9001): la luz también pasa
+   por las líneas del tubo, como en una pantalla de verdad. En el cine
+   sube por encima de su marco (9500), que si no la tapaba entera.
+
+   Capas, todas sin clics y casi gratis:
+     · .lb-base  — las sombras interiores, pintadas una vez;
+     · .lb-mancha — cuatro manchas que viajan por los bordes (transform);
+     · .lb-pulso — la misma luz más intensa: js/luz.js solo le cambia la
+       opacidad con cada bombo («al ritmo»), o respira sola («quieta»). */
+.luz-borde {
+  position: fixed;
+  inset: 0;
+  z-index: 8998;
+  pointer-events: none;
+  overflow: hidden;
+  contain: strict;
+  --luz-c1: var(--accent);
+  --luz-c2: var(--color-2, var(--accent-2));
+  --luz-g: calc(clamp(14px, 2.6vmin, 32px) * var(--luz-k, 1));
+  transition: opacity 1.2s var(--ed-suave, ease);
+}
+body.cine-open .luz-borde { z-index: 9550; }
+body.luz-no .luz-borde,
+/* el vídeo 9:16 se graba del marco: la luz de fuera solo distraería */
+body.v916-open:not(.cine-open) .luz-borde { display: none; }
+.luz-borde > i {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.lb-base {
+  --o: calc(var(--luz-g) * 0.55);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--luz-c1) 40%, transparent),
+    inset 0 var(--o) var(--luz-g) calc(var(--o) * -1) color-mix(in oklab, var(--luz-c1) 66%, transparent),
+    inset var(--o) 0 var(--luz-g) calc(var(--o) * -1) color-mix(in oklab, var(--luz-c1) 50%, transparent),
+    inset 0 calc(var(--o) * -1) var(--luz-g) calc(var(--o) * -1) color-mix(in oklab, var(--luz-c2) 66%, transparent),
+    inset calc(var(--o) * -1) 0 var(--luz-g) calc(var(--o) * -1) color-mix(in oklab, var(--luz-c2) 50%, transparent);
+  opacity: 0.6;
+  transition: opacity 1.2s var(--ed-suave, ease);
+}
+/* sin música, la luz se queda en un rescoldo */
+body:not(.playing) .lb-base { opacity: 0.28; }
+
+.lb-pulso {
+  --o: calc(var(--luz-g) * 0.9);
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in oklab, var(--luz-c1) 70%, #fff),
+    inset 0 var(--o) calc(var(--luz-g) * 1.5) calc(var(--o) * -1) color-mix(in oklab, var(--luz-c1) 85%, transparent),
+    inset var(--o) 0 calc(var(--luz-g) * 1.5) calc(var(--o) * -1) color-mix(in oklab, var(--luz-c1) 70%, transparent),
+    inset 0 calc(var(--o) * -1) calc(var(--luz-g) * 1.5) calc(var(--o) * -1) color-mix(in oklab, var(--luz-c2) 85%, transparent),
+    inset calc(var(--o) * -1) 0 calc(var(--luz-g) * 1.5) calc(var(--o) * -1) color-mix(in oklab, var(--luz-c2) 70%, transparent);
+  opacity: 0;
+  will-change: opacity;
+}
+/* «quieta»: respira sola, despacio, sin mirar la música */
+body.luz-quieta .lb-pulso { animation: lb-respira 7s var(--ed-lento, ease-in-out) infinite alternate; }
+body.luz-quieta:not(.playing) .lb-pulso { animation-play-state: paused; }
+@keyframes lb-respira {
+  from { opacity: 0.05; }
+  to   { opacity: 0.5; }
+}
+
+/* Las manchas: luz que viaja por el filo, centradas en él (la mitad cae
+   fuera de la ventana), cada una con su tinta y su ritmo, sin repetirse
+   juntas. Solo transform: la tarjeta gráfica las mueve sola. */
+.luz-borde > .lb-mancha {
+  inset: auto;
+  --largo: 44vmax;
+  --ancho: calc(var(--luz-g) * 5);
+  opacity: 0.55;
+  will-change: transform;
+  animation-timing-function: var(--ed-lento, ease-in-out);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+.lb-m1, .lb-m2 { width: var(--largo); height: var(--ancho); }
+.lb-m3, .lb-m4 { width: var(--ancho); height: var(--largo); }
+.lb-m1 {
+  top: calc(var(--ancho) / -2);
+  left: calc(var(--largo) / -2);
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--luz-c1) 80%, transparent), transparent);
+  animation-name: lb-arriba;
+  animation-duration: 23s;
+}
+.lb-m2 {
+  bottom: calc(var(--ancho) / -2);
+  right: calc(var(--largo) / -2);
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--luz-c2) 80%, transparent), transparent);
+  animation-name: lb-abajo;
+  animation-duration: 29s;
+}
+.lb-m3 {
+  left: calc(var(--ancho) / -2);
+  bottom: calc(var(--largo) / -2);
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--luz-c2) 75%, transparent), transparent);
+  animation-name: lb-izquierda;
+  animation-duration: 31s;
+}
+.lb-m4 {
+  right: calc(var(--ancho) / -2);
+  top: calc(var(--largo) / -2);
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--luz-c1) 75%, transparent), transparent);
+  animation-name: lb-derecha;
+  animation-duration: 37s;
+}
+@keyframes lb-arriba    { from { transform: translateX(8vw); }  to { transform: translateX(92vw); } }
+@keyframes lb-abajo     { from { transform: translateX(-8vw); } to { transform: translateX(-92vw); } }
+@keyframes lb-izquierda { from { transform: translateY(-8vh); } to { transform: translateY(-92vh); } }
+@keyframes lb-derecha   { from { transform: translateY(8vh); }  to { transform: translateY(92vh); } }
+body:not(.playing) .lb-mancha { animation-play-state: paused; }
+
+/* LOS CLAROS: sobre papel, la luz de color se lee como una mancha; más
+   suave, que acompañe y no ensucie */
+html:is([data-aspecto="vinilo"], [data-aspecto="aero"], [data-aspecto="manga"], [data-aspecto="revista"]) .luz-borde { opacity: 0.7; }
+
+/* menos movimiento: el filo encendido y quieto, sin viajes ni latidos */
+body.reduce-motion .lb-mancha { animation: none; }
+body.reduce-motion .lb-pulso { animation: none; opacity: 0 !important; }
+/* equipos justos: fuera las manchas (cuatro capas más que componer) */
+body.perf-bajo .lb-mancha { display: none; }

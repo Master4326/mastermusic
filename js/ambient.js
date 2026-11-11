@@ -41,6 +41,21 @@
   const previo = ['', '', ''];
   let raf = null;
 
+  /* EL ALTO DEL PANEL, guardado. Las notas que suben y las que saltan
+     necesitan saber cuánto mide el panel, y lo preguntaban con clientHeight
+     en cada golpe: a media canción eso es un layout forzado cuatro o cinco
+     veces por segundo, justo cuando el fotograma ya va cargado. El alto solo
+     cambia cuando cambia el panel, y de eso avisa el ResizeObserver. */
+  let altoPanel = 0;
+  const medirPanel = () => { altoPanel = laAmbiente ? laAmbiente.clientHeight : 0; };
+  if (laAmbiente && window.ResizeObserver) new ResizeObserver(medirPanel).observe(laAmbiente);
+  const alto = () => { if (!altoPanel) medirPanel(); return altoPanel; };
+
+  /* Las notas vivas, en una colección que el navegador mantiene al día sola:
+     ni querySelectorAll por golpe (una lista nueva cada vez) ni variables
+     heredadas (ver «el rebote de las notas», más abajo). */
+  const notasVivas = laAmbiente ? laAmbiente.getElementsByClassName('la-note') : [];
+
   /* Cuántos elementos vivos, según el aparato (ver js/perf.js). En un
      teléfono estos tres corros sumaban 84 escrituras de estilo por frame
      a 60 fps: 5.040 por segundo solo para el fondo de la letra. */
@@ -160,7 +175,7 @@
     if (laSaltarinas.children.length >= aforo) return;
     ultimoSalto = ahora;
 
-    const alto = laSaltarinas.clientHeight || 260;
+    const altoSalto = alto() || 260;
     const base = (1.5 + energia * 4 + fuerza * 2.5) * (enMovil() ? 0.5 : 1);
     const cuantas = Math.max(1, Math.min(aforo - laSaltarinas.children.length,
       Math.round(base * (0.6 + Math.random() * 0.8))));
@@ -174,7 +189,7 @@
 
       // la altura del brinco la manda el golpe: un bombo flojo apenas
       // los levanta, un drop los manda arriba del todo
-      const subida = alto * (0.22 + energia * 0.2 + fuerza * 0.25 + Math.random() * 0.12);
+      const subida = altoSalto * (0.22 + energia * 0.2 + fuerza * 0.25 + Math.random() * 0.12);
       const deriva = (Math.random() * 2 - 1) * 46;
       const giro = (Math.random() * 2 - 1) * 40;
       const dur = 1500 - energia * 450 + Math.random() * 260;
@@ -216,7 +231,7 @@
   /* ---------- Chispas: notas que suben, disparadas por el golpe ---------- */
   const chispas = (n, energia) => {
     if (!laAmbiente) return;
-    if (laAmbiente.querySelectorAll('.la-note').length > 26) return;
+    if (notasVivas.length > 26) return;
     for (let k = 0; k < n; k++) {
       const s = document.createElement('span');
       s.className = 'la-note';
@@ -232,7 +247,7 @@
       s.style.setProperty('--nx', x.toFixed(1) + '%');
       s.style.setProperty('--nfs', (12 + Math.random() * 16).toFixed(0) + 'px');
       s.style.setProperty('--ndur', (2.2 + (1 - energia) * 5).toFixed(1) + 's');
-      s.style.setProperty('--nh', ((laAmbiente.clientHeight || 300) + 50) + 'px');
+      s.style.setProperty('--nh', ((alto() || 300) + 50) + 'px');
       s.style.setProperty('--ndx', (Math.random() * 70 - 35).toFixed(0) + 'px');
       s.style.setProperty('--nrot', (Math.random() * 60 - 30).toFixed(0) + 'deg');
       s.style.setProperty('--nop', (0.2 + energia * 0.4).toFixed(2));
@@ -285,14 +300,25 @@
     const boom = m.boom * m.boomFuerza;      // envolvente YA pesada por la fuerza
     const bri = m.brillo * m.brilloFuerza;
 
-    /* Rebote de las notas flotantes. Se escriben DOS variables en el
-       contenedor y las heredan todas: una sola escritura por frame en vez
-       de una por nota. */
+    /* EL REBOTE DE LAS NOTAS, directo al glifo de cada una.
+
+       Antes eran dos variables (--pulso y --meneo) escritas en el contenedor
+       para que las heredaran todas: «una escritura por frame en vez de una
+       por nota». Sonaba bien y MEDIDO era lo más caro de toda la app: una
+       variable heredada que cambia obliga al navegador a recalcular el
+       estilo de TODO lo que cuelga del contenedor —no solo las notas:
+       también el ecualizador, los destellos, las ondas, el lienzo…, ~116
+       elementos por fotograma—, y eran 290 ms de cada segundo solo en eso.
+       Escribiendo el transform en el <i> de cada nota se tocan las notas
+       que hay (una docena) y nada más. Se ve exactamente igual. */
     if (laAmbiente) {
       const pulso = 1 + boom * 0.4 + graves * 0.18 + bri * 0.08;
       if (Math.abs(pulso - pulsoPrev) > 0.004) {
-        laAmbiente.style.setProperty('--pulso', pulso.toFixed(3));
-        laAmbiente.style.setProperty('--meneo', (boom * 10 * ladoMeneo).toFixed(2) + 'deg');
+        const t = 'scale(' + pulso.toFixed(3) + ') rotate(' + (boom * 10 * ladoMeneo).toFixed(2) + 'deg)';
+        for (let k = 0; k < notasVivas.length; k++) {
+          const g = notasVivas[k].firstElementChild;
+          if (g) g.style.transform = t;
+        }
         pulsoPrev = pulso;
       }
     }
@@ -345,8 +371,14 @@
       escribir(laSuelo, 'opacity', (Math.max(0, e - 0.28) * 0.4 + boom * 0.06).toFixed(2));
     }
 
+    /* Con el ambiente de «ondas» (el de fábrica) el ecualizador circular y
+       el de barras están en display:none: seguir escribiéndoles 50
+       transforms por fotograma era trabajo para nadie. */
+    const sinBarras = document.body.classList.contains('fondo-ondas') ||
+      document.body.classList.contains('fondo-liso');
+
     // ecualizador circular: envuelve la letra sin taparla
-    if (laCircular) {
+    if (laCircular && !sinBarras) {
       escribir(laCircular, 'opacity', (Math.max(0, e - 0.22) * 0.45 + bri * 0.09).toFixed(2));
       for (let k = 0; k < NCIRC; k++) {
         const b = bandaDe(m, Math.abs(NCIRC / 2 - k) / (NCIRC / 2));
@@ -389,7 +421,7 @@
       escribir(laCover, 'opacity', ((quieta ? 0.17 : 0.1) + graves * 0.1).toFixed(2));
     }
     // ecualizador fantasma: una barra por banda, solo scaleY
-    if (barras.length) {
+    if (barras.length && !sinBarras) {
       for (let k = 0; k < NBARRAS; k++) {
         const v = bandaDe(m, k / (NBARRAS - 1));
         alturas[k] += (v - alturas[k]) * (v > alturas[k] ? K(0.5) : K(0.12));
@@ -411,9 +443,26 @@
     return a + (b - a) * f;
   };
 
+  /* La opacidad de los focos llevaba `transition: opacity .12s linear` en el
+     CSS… y se reescribía en cada fotograma, o sea que cada fotograma
+     cancelaba una transición y arrancaba otra: tres animaciones naciendo y
+     muriendo 60 veces por segundo, y —lo caro— una animación SIEMPRE viva
+     en el hilo principal, que obliga al navegador a producir un fotograma
+     en cada vsync aunque nadie se lo pida. El mismo fundido se hace aquí:
+     una transición lineal de 120 ms reiniciada cada 16,7 ms es un suavizado
+     de 16,7/120 = 0,139 por fotograma. En el móvil se pinta a 30 fps y ahí
+     la transición del CSS sí rellena los huecos: se queda. */
+  const opFoco = [0, 0, 0];
   const pintar = (el, k, escala, opacidad) => {
     if (!el) return;                    // puede no haber focos de fondo
     const t = `translate3d(0,0,0) scale(${escala.toFixed(3)})`;
+    if (!enMovil()) {
+      opFoco[k] += (opacidad - opFoco[k]) * K(0.139);
+      if (opFoco[k] < 0.0008 && opacidad === 0) opFoco[k] = 0;
+      opacidad = opFoco[k];
+    } else {
+      opFoco[k] = opacidad;
+    }
     const o = opacidad.toFixed(3);
     // escribir solo si cambió de verdad: evita trabajo de estilo por frame
     const firma = t + '|' + o;
@@ -423,7 +472,10 @@
     el.style.opacity = o;
   };
 
-  const apagar = () => { focos.forEach((f, k) => pintar(f, k, 1, 0)); };
+  /* `yaMismo`: sin fundido (se tapan con el cine, se para el módulo). */
+  const apagar = (yaMismo) => {
+    focos.forEach((f, k) => { if (yaMismo) opFoco[k] = 0; pintar(f, k, 1, 0); });
+  };
 
   /* ---------- Bucle ---------- */
   /* En el móvil pinta a 30 fps. Se sigue pidiendo el frame (así el ritmo lo
@@ -431,8 +483,6 @@
      de cada dos se salta: la mitad de trabajo y en luces de fondo no se
      distingue. Los GOLPES no se pierden — beat.js los detecta en su propio
      bucle y lo que aquí llega es la envolvente ya calculada. */
-  const relojPintado = { ultimo: 0 };
-
   let ultimoPintado = 0;
 
   /* Con el MODO CINE o el VÍDEO 9:16 abiertos (`body.v916-open`), el panel
@@ -444,29 +494,43 @@
      siguiente sin tener que arrancar nada. */
   let focosTapados = false;
 
-  const bucle = () => {
-    raf = requestAnimationFrame(bucle);
-    if (document.hidden) return;
-    const ahoraMs = performance.now();
-    if (window.MMPerf && window.MMPerf.salta(relojPintado, ahoraMs)) return;
+  /* ¿Queda algo encendido? Lo dicen las propias luces: cuando todo lo que
+     este módulo pinta está ya a cero, el bucle puede dormir. */
+  let apagado = false;
+  const todoApagado = () => {
+    apagar(); apagarPanel();
+    apagado = opFoco[0] === 0 && opFoco[1] === 0 && opFoco[2] === 0;
+  };
+  const enSilencio = () => {
+    const M = window.BeatModule;
+    const m = M && M.get ? M.get() : null;
+    return !m || (m.fuente === 'silencio' && m.nivel < 0.005 && m.boom < 0.01);
+  };
+  // sonando hay trabajo siempre; en silencio, hasta que se termine de apagar
+  const hayTrabajo = () => !apagado || !enSilencio() ||
+    document.body.classList.contains('playing');
+
+  const bucle = (ahoraMs) => {
+    if (!(ahoraMs > 0)) ahoraMs = performance.now();
     /* Tiempo desde el frame que SÍ se pintó: con el tope de 30 fps del
        móvil, medir contra el frame anterior a secas daría la mitad. */
-    dtAmb = ultimoPintado ? ahoraMs - ultimoPintado : 1000 / 60;
+    dtAmb = ultimoPintado && ahoraMs - ultimoPintado < 250 ? ahoraMs - ultimoPintado : 1000 / 60;
     ultimoPintado = ahoraMs;
 
     // el ajuste de movimiento manda: si el usuario (o su sistema) pide
     // menos movimiento, las luces se quedan quietas
-    if (window.MMSettings && window.MMSettings.reduceMotion()) { apagar(); apagarPanel(); return; }
+    if (window.MMSettings && window.MMSettings.reduceMotion()) { todoApagado(); return; }
 
     const M = window.BeatModule;
     const m = M && M.get ? M.get() : null;
-    if (!m) { apagar(); apagarPanel(); return; }
+    if (!m) { todoApagado(); return; }
 
     const ahora = Date.now();
 
     if (m.fuente === 'silencio' && m.nivel < 0.005 && m.boom < 0.01) {
-      apagar(); apagarPanel(); return;
+      todoApagado(); return;
     }
+    apagado = false;
 
     // recicla los destellos cuyo turno ya pasó
     for (let k = 0; k < destellos.length; k++) {
@@ -498,7 +562,7 @@
 
     /* ---- focos del fondo de la app (tapados con el cine o el 9:16) ---- */
     if (document.body.classList.contains('v916-open')) {
-      if (!focosTapados) { focosTapados = true; apagar(); }
+      if (!focosTapados) { focosTapados = true; apagar(true); }
     } else {
       focosTapados = false;
       pintar(focos[0], 0, 1 + m.graves * 0.38 + m.boom * m.boomFuerza * 0.1, 0.1 + m.graves * 0.48);
@@ -509,13 +573,29 @@
     pintarPanel(m);
   };
 
-  const arrancar = () => { if (!raf) bucle(); };
-  const parar = () => { if (raf) { cancelAnimationFrame(raf); raf = null; } apagar(); };
-
-  // en segundo plano no gastamos frames
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) parar(); else arrancar();
-  });
+  /* El fotograma lo pide el reloj de la app (js/perf.js): trae el tope de
+     fps (30 en el móvil), no corre en segundo plano y deja de pedir
+     fotogramas cuando `hayTrabajo()` dice que no queda nada encendido. */
+  let mando = null;
+  const arrancar = () => {
+    if (mando) { mando.despertar(); return; }
+    if (window.MMPerf && window.MMPerf.bucle) {
+      mando = window.MMPerf.bucle(bucle, { ms: () => window.MMPerf.msFrame(), activo: hayTrabajo });
+      return;
+    }
+    // sin js/perf.js: el bucle de siempre
+    if (raf) return;
+    const propio = (t) => {
+      raf = requestAnimationFrame(propio);
+      if (!document.hidden) bucle(t);
+    };
+    raf = requestAnimationFrame(propio);
+  };
+  const parar = () => {
+    if (mando) { mando.parar(); mando = null; }
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    apagar(true);
+  };
 
   arrancar();
 

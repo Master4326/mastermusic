@@ -193,45 +193,100 @@
     for (const f of oyentes) { try { f(NIVELES[nivel]); } catch (_) {} }
   };
 
-  /* El vigilante. Un solo rAF propio, cortísimo: cuenta frames y no toca el
-     DOM. Lo que cuesta esto es despreciable al lado de lo que evita. */
+  /* ==========================================================
+     EL RELOJ DE TODOS · un solo requestAnimationFrame para la app
+
+     Medido (v130, Chrome, canción sonando): el hilo principal iba ocupado
+     600 ms de cada segundo, y 260 de ellos eran recalcular estilos. No por
+     un bucle torpe, sino por CÓMO se pedían los fotogramas: había siete
+     bucles (letra, Spotify, espectro, detector, ambiente, onda, vigilante)
+     y cada uno hacía su `requestAnimationFrame` en cada vsync, sonara algo
+     o no. Dos consecuencias que no se veían leyendo el código:
+
+       · PARADA la música, la app seguía produciendo un fotograma por cada
+         vsync de la pantalla — 60, 120 o 165 por segundo — para no pintar
+         nada. Eso es CPU, GPU y batería tirados, para siempre.
+       · Cada fotograma del hilo principal le pasa revista a TODAS las
+         animaciones vivas del documento (las notas, las ondas, el reloj…),
+         aunque vayan por la GPU. Los bucles se saltaban su trabajo con el
+         tope de 13 ms, pero el fotograma ya estaba pedido: en un monitor de
+         144 Hz el navegador hacía esa revista 144 veces por segundo para
+         pintar 72.
+
+     Ahora los fotogramas se piden en UN sitio, y solo cuando alguien tiene
+     algo que pintar:
+
+       1) Cada módulo se da de alta con `MMPerf.bucle(fn, { ms, activo })`.
+          `ms` es cada cuánto quiere correr como mínimo y `activo()` dice si
+          ahora mismo tiene trabajo. Si nadie lo tiene, NO se pide fotograma:
+          la app en pausa deja el hilo principal dormido de verdad.
+       2) En pantallas de más de ~95 Hz, el siguiente fotograma no se pide en
+          el acto sino con un temporizador que lo deja caer en el vsync que
+          toca (el primero a ≥ 13 ms): 60 clavados en 120 Hz, 72 en 144 Hz.
+          Es lo mismo que ya hacían los topes de cada bucle, pero ahora el
+          navegador tampoco hace su parte de más.
+       3) Si esos temporizadores llegan tarde (un equipo en ahorro de
+          energía los redondea), se nota al medir y la compuerta se quita
+          sola: se vuelve a pedir en cada vsync, que es lo de siempre.
+
+     Y el vigilante de calidad ya no necesita su propio bucle: mira los
+     mismos fotogramas.
+     ========================================================== */
   const OBJETIVO = 50;      // fps por debajo de los cuales se considera que sufre
   const HOLGADO = 58;       // y por encima de los cuales va sobrado
-  let marca = 0, frames = 0, malos = 0, buenos = 0, arranque = 0;
+  const MS_TOPE = 13;       // 13 y no 16,67: ver msFrame(), arriba
 
-  /* Los hercios REALES de la pantalla, que no se pueden preguntar: se
-     deducen del mejor segundo visto. Empieza suponiendo 60 y sube solo.
-     Hace falta porque el listón tiene que ser relativo a lo que la pantalla
-     puede dar: pedirle 58 fps a un móvil de 60 Hz es pedirle la perfección
-     (cualquier hipo lo baja de escalón para siempre), y en uno de 165 Hz
-     los mismos 58 los pasa un equipo que va a un tercio de gas. */
-  let refresco = 60;
+  const subs = [];
+  let rafId = 0, timerId = 0;
+  let periodo = 1000 / 60;      // lo que tarda la pantalla entre dos fotogramas (se mide)
+  let llanos = [];              // intervalos entre fotogramas pedidos seguidos: de ahí sale el periodo
+  let ultimoTick = 0, fueLlano = false;
+  let compuerta = true;         // ¿se saltan vsyncs con temporizador?
+  let avisos = 0, tardes = [], objetivoT = 0, vetoHasta = 0, timerPara = 0;
+  let tardeN = 0, tardeDe = 0;  // para MMPerf.diag(): cuántos fotogramas con compuerta perdieron su vsync
 
-  const vigilar = (t) => {
-    requestAnimationFrame(vigilar);
+  const esActivo = (s) => {
+    if (!s.vivo) return false;
+    if (s.hasta && s.hasta > performance.now()) return true;   // lo pidió con despertar(ms)
+    if (!s.activo) return true;
+    try { return !!s.activo(); } catch (_) { return true; }
+  };
+  const msDe = (s) => {
+    const v = typeof s.ms === 'function' ? s.ms() : s.ms;
+    return v > 0 ? v : MS_TOPE;
+  };
+
+  /* Vigilante de calidad: cuenta los fotogramas en los que corrió algún
+     bucle de 60 fps y los compara con los que ESTA pantalla puede dar con
+     el tope puesto (60 en 60 y 120 Hz, 72 en 144, 55 en 165). */
+  let marca = 0, frames = 0, malos = 0, buenos = 0, arranque = 0, graciaHasta = 0;
+  const vigilar = (t, corrio) => {
     if (!arranque) { arranque = t; marca = t; return; }
-    frames++;
+    if (t - marca > 2500) { marca = t; frames = 0; return; }   // venía de dormir: ventana nueva
+    if (corrio) frames++;
     const dt = t - marca;
     if (dt < 1000) return;               // se juzga por ventanas de un segundo
     const fps = (frames * 1000) / dt;
     frames = 0; marca = t;
 
     if (t - arranque < 3000) return;                        // regla 3
-    if (fps > refresco) refresco = Math.min(250, fps);      // hercios de la pantalla
     if (document.hidden || !document.body.classList.contains('playing')) {
       malos = buenos = 0;                                   // regla 2
       return;
     }
-    /* El listón, relativo a los hercios de la pantalla y NO al nivel.
-
-       Antes bajaba con el nivel (suelo 26 / techo 30 a partir de `medio`)
-       dando por hecho que en el móvil el propio rAF iba a 30. No va: el tope
-       de 30 fps está DENTRO de los bucles de pintado, rAF sigue llamando a
-       los hercios de la pantalla. Así que en cualquier monitor de 120 Hz un
-       equipo en `medio` medía 120, veía «va sobrado», subía a `alto`, se
-       atragantaba, volvía a bajar... un vaivén cada catorce segundos. */
-    const suelo = Math.min(OBJETIVO, refresco * 0.80);
-    const techo = Math.min(HOLGADO, refresco * 0.92);
+    /* Regla 3 bis: los primeros segundos de cada play tampoco. Arrancar una
+       canción es descodificar el audio, sacar el color de la carátula, pedir
+       y maquetar la letra: un par de segundos espesos en CUALQUIER equipo.
+       Juzgarlos bajaba de escalón un ordenador sobrado y lo dejaba doce
+       segundos con los adornos a 30 fps en cada arranque. */
+    if (t < graciaHasta) { malos = buenos = 0; return; }
+    /* El listón es relativo a lo que la pantalla puede dar con el tope: en
+       165 Hz salen 55 (cada tres vsyncs), y pedirle 58 sería bajarlo de
+       escalón para siempre. */
+    const cada = Math.max(1, Math.ceil(MS_TOPE / periodo - 0.1));
+    const posible = 1000 / (cada * periodo);
+    const suelo = Math.min(OBJETIVO, posible * 0.80);
+    const techo = Math.min(HOLGADO, posible * 0.92);
 
     if (fps < suelo) { malos++; buenos = 0; } else if (fps >= techo) { buenos++; malos = 0; }
     else { malos = buenos = 0; }
@@ -239,9 +294,178 @@
     if (malos >= 2) { malos = 0; cambiar(nivel + 1); }       // regla 1: bajar rápido
     else if (buenos >= 12) { buenos = 0; cambiar(nivel - 1); }   // subir despacio
   };
-  requestAnimationFrame(vigilar);
+
+  const mediana = (a) => { const o = a.slice().sort((x, y) => x - y); return o[o.length >> 1]; };
+
+  let hayBajas = false;
+  const barrer = () => {
+    hayBajas = false;
+    for (let i = subs.length - 1; i >= 0; i--) if (!subs[i].vivo) subs.splice(i, 1);
+  };
+
+  const programar = () => {
+    if (hayBajas) barrer();
+    if (rafId) return;
+    if (document.hidden) return;
+    const ahora = performance.now();
+    let falta = Infinity;
+    for (let i = 0; i < subs.length; i++) {
+      const s = subs[i];
+      if (!esActivo(s)) continue;
+      const f = s.ultimo + msDe(s) - ahora;
+      if (f < falta) falta = f;
+    }
+    if (timerId) {
+      /* Ya hay un fotograma apalabrado. Solo se deshace si alguien necesita
+         pintar bastante ANTES (le dieron al play mientras el único bucle
+         vivo era uno lento de reposo): si no, ese alguien esperaría hasta un
+         cuarto de segundo para arrancar. */
+      if (ahora + falta > timerPara - periodo) return;
+      clearTimeout(timerId); timerId = 0;
+    }
+    if (falta === Infinity) { ultimoTick = 0; return; }   // nadie tiene nada que pintar: a dormir
+
+    const pedir = (llano) => { fueLlano = llano; rafId = requestAnimationFrame(tick); };
+    if (!compuerta || ahora < vetoHasta || !ultimoTick) { objetivoT = 0; pedir(true); return; }
+
+    /* ¿Cuántos vsyncs después del último fotograma toca el siguiente? Se
+       cuenta desde el VSYNC de aquel fotograma (`ultimoTick`, la hora que da
+       el propio rAF) y no desde ahora: los vsyncs caen en múltiplos del
+       periodo a partir de ahí, y «ahora» ya lleva encima lo que tardó en
+       pintarse. Contando desde ahora, un fotograma cargado apuntaba tarde
+       y perdía su vsync. Con 1 no hay nada que saltar (60 Hz): se pide en
+       el acto, como siempre. */
+    const n = Math.max(1, Math.ceil((falta + (ahora - ultimoTick)) / periodo - 0.1));
+    if (n === 1) { objetivoT = 0; pedir(true); return; }
+    objetivoT = ultimoTick + n * periodo;
+    /* Se pide a 0,75 periodos del vsync que toca. Pedir pronto sale casi
+       gratis (cae un fotograma vacío y el bueno se pide en el acto); pedir
+       tarde es perder el vsync, que sí se ve: por eso el margen va hacia
+       delante. */
+    const espera = objetivoT - periodo * 0.75 - ahora;
+    if (espera < 1) { pedir(false); return; }
+    fueLlano = false;
+    timerPara = ahora + espera;
+    timerId = setTimeout(() => {
+      timerId = 0;
+      if (document.hidden) return;
+      rafId = requestAnimationFrame(tick);
+    }, espera);
+  };
+
+  function tick(t) {
+    rafId = 0;
+    /* La pantalla, medida: solo valen los fotogramas pedidos uno detrás de
+       otro sin temporizador por medio (esos caen en vsyncs seguidos). */
+    if (ultimoTick && fueLlano) {
+      const d = t - ultimoTick;
+      if (d > 2 && d < 50) {
+        llanos.push(d);
+        if (llanos.length > 40) llanos.shift();
+        if (llanos.length >= 12) periodo = Math.max(3.5, Math.min(40, mediana(llanos)));
+      }
+    } else if (ultimoTick && !fueLlano && objetivoT) {
+      /* Con compuerta: ¿llegó al vsync previsto? Si falla a menudo —más de
+         6 de cada 40— es que en este equipo saltar vsyncs sale mal (los
+         temporizadores no dan la precisión, o el hilo anda tan cargado que
+         llegan tarde): fuera, y se pide en cada vsync como siempre. El
+         listón es bajo a propósito: un fotograma que llega tarde SE VE, y
+         lo que ahorra la compuerta no; ante la duda, fluidez. */
+      const tarde = t - objetivoT > periodo * 0.5 ? 1 : 0;
+      tardes.push(tarde); tardeN += tarde; tardeDe++;
+      if (tardes.length >= 40) {
+        const perdidos = tardes.reduce((a, b) => a + b, 0);
+        tardes = [];
+        if (perdidos > 6) {
+          avisos++;
+          vetoHasta = performance.now() + 30000;       // medio minuto sin compuerta
+          if (avisos >= 3) compuerta = false;          // y a la tercera, para toda la sesión
+        }
+      }
+    }
+    ultimoTick = t;
+
+    let corrio = false;
+    for (let i = 0; i < subs.length; i++) {
+      const s = subs[i];
+      if (!esActivo(s)) continue;
+      const ms = msDe(s);
+      const pasado = t - s.ultimo;
+      // medio vsync de manga: el fotograma que llega un pelo antes también vale
+      if (pasado < ms - Math.min(periodo * 0.5, ms * 0.3)) continue;
+      const dt = (s.ultimo && pasado < 250) ? pasado : DT60;
+      s.ultimo = t;
+      if (ms <= 17) corrio = true;
+      try { s.fn(t, dt); } catch (e) { console.error('[perf] falló un bucle:', e); }
+    }
+    vigilar(t, corrio);
+    programar();
+  }
+
+  /* Alta de un bucle. Devuelve su mando:
+       · `despertar()` cuando el módulo sabe que vuelve a tener trabajo (le
+         dieron al play, cambió de pestaña); con milisegundos —`despertar(600)`—
+         se le da cuerda ese rato aunque su `activo()` diga que no: es para
+         el fotograma suelto que hace falta en reposo (cambió el tamaño del
+         lienzo, cambió el color) y para dejar que algo se apague con calma;
+       · `parar()` para darlo de baja. */
+  const bucle = (fn, opc) => {
+    const s = { fn, ms: (opc && opc.ms) || MS_TOPE, activo: opc && opc.activo, ultimo: 0, vivo: true, hasta: 0 };
+    subs.push(s);
+    programar();
+    return {
+      despertar: (durante) => {
+        if (durante > 0) s.hasta = Math.max(s.hasta, performance.now() + durante);
+        programar();
+      },
+      /* Solo se MARCA: quitarlo de la lista en el acto, si quien lo pide es
+         un bucle en plena pasada (o su `activo()`), haría saltarse al
+         siguiente de la fila ese fotograma. Lo barre el reloj al programar. */
+      parar: () => { s.vivo = false; hayBajas = true; },
+    };
+  };
+
+  /* Quién despierta al reloj cuando duerme:
+       · `body.playing` — la señal de toda la app de que suena algo. Se
+         vigila aquí (un observador de la clase, que solo salta cuando
+         cambia) y se anuncia como `mm:playing` para quien lo quiera.
+       · volver a la pestaña;
+       · y un latido lento de respaldo, por si a algún módulo se le pasa
+         avisar: dos vueltas por segundo que no pintan nada. */
+  let sonando = false;
+  const mirarPlaying = () => {
+    const s = !!(document.body && document.body.classList.contains('playing'));
+    if (s === sonando) return;
+    sonando = s;
+    if (s) graciaHasta = performance.now() + 3500;
+    try { window.dispatchEvent(new CustomEvent('mm:playing', { detail: s })); } catch (_) {}
+    programar();
+  };
+  const vigilarBody = () => {
+    if (!document.body || !window.MutationObserver) return;
+    new MutationObserver(mirarPlaying).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    mirarPlaying();
+  };
+  if (document.body) vigilarBody();
+  else document.addEventListener('DOMContentLoaded', vigilarBody);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      if (timerId) { clearTimeout(timerId); timerId = 0; }
+      ultimoTick = 0;
+    } else {
+      programar();
+    }
+  });
+  setInterval(() => { if (!document.hidden) programar(); }, 500);
 
   window.MMPerf = {
+    bucle,
+    /* Para quien sabe que acaba de tener trabajo y no quiere esperar al
+       latido: cuesta lo que una comparación si ya hay fotograma pedido. */
+    despertar: programar,
+    sonando: () => sonando,
     k,
     /* Nivel actual: 'alto' | 'medio' | 'bajo'. `medio` es lo que antes se
        llamaba «móvil» y `bajo` lo que se llamaba «móvil modesto». */
@@ -265,7 +489,15 @@
        en cada frame salga caro? Lo consulta ambient.js para dejar quieta
        la carátula de fondo en vez de reescalarla. */
     fondoFijo: () => nivel >= 1 || superficie > BASE_MPX * 1.25,
-    hercios: () => Math.round(refresco),
+    hercios: () => Math.round(1000 / periodo),
+    /* Para medir desde fuera (assets/…) y para mirar en la consola qué está
+       haciendo el reloj: `MMPerf.diag()`. */
+    diag: () => ({
+      nivel: NIVELES[nivel], hz: Math.round(1000 / periodo), bucles: subs.length,
+      activos: subs.filter(esActivo).length,
+      compuerta: compuerta && performance.now() >= vetoHasta, avisos,
+      tarde: tardeDe ? Math.round((tardeN / tardeDe) * 100) + '% de ' + tardeDe : '—',
+    }),
     cuantos,
     msFrame,
     /* Reloj propio para cada bucle: le pasas dónde guardas el último

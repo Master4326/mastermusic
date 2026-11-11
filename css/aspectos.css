@@ -95,6 +95,7 @@ html.moderno {
   --ico-lab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2' /%3E%3Cpath d='M6.453 15h11.094' /%3E%3Cpath d='M8.5 2h7' /%3E%3C/svg%3E");
   --ico-letra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='m11 7.601-5.994 8.19a1 1 0 0 0 .1 1.298l.817.818a1 1 0 0 0 1.314.087L15.09 12' /%3E%3Cpath d='M16.5 21.174C15.5 20.5 14.372 20 13 20c-2.058 0-3.928 2.356-6 2-2.072-.356-2.775-3.369-1.5-4.5' /%3E%3Ccircle cx='16' cy='7' r='5' /%3E%3C/svg%3E");
   --ico-lista: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M3 5h.01' /%3E%3Cpath d='M3 12h.01' /%3E%3Cpath d='M3 19h.01' /%3E%3Cpath d='M8 5h13' /%3E%3Cpath d='M8 12h13' /%3E%3Cpath d='M8 19h13' /%3E%3C/svg%3E");
+  --ico-palabra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M6 4h8' /%3E%3Crect width='18' height='7' x='3' y='8.5' rx='2' /%3E%3Cpath d='M7.5 12h9' /%3E%3Cpath d='M9 20h9' /%3E%3C/svg%3E");
   --ico-listas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Crect width='8' height='18' x='3' y='3' rx='1' /%3E%3Cpath d='M7 3v18' /%3E%3Cpath d='M20.4 18.9c.2.5-.1 1.1-.6 1.3l-1.9.7c-.5.2-1.1-.1-1.3-.6L11.1 5.1c-.2-.5.1-1.1.6-1.3l1.9-.7c.5-.2 1.1.1 1.3.6Z' /%3E%3C/svg%3E");
   --ico-mas: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M5 12h14' /%3E%3Cpath d='M12 5v14' /%3E%3C/svg%3E");
   --ico-max: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Crect width='18' height='18' x='3' y='3' rx='2' /%3E%3C/svg%3E");
@@ -129,7 +130,7 @@ html.moderno body {
 
 /* La letra de la canción y las muestras de tipografía se quedan como
    están: ni su tamaño se ajusta, ni se les quita el brillo o el interletraje. */
-html.moderno :is(.lyrics-body, .lyrics-edit, .font-preview, .fc-muestra, #fontActual) {
+html.moderno :is(.lyrics-body, .lyrics-edit, .lyrics-palabra, .font-preview, .fc-muestra, #fontActual) {
   font-size-adjust: none;
 }
 
@@ -139,8 +140,8 @@ html.moderno :is(.lyrics-body, .lyrics-edit, .font-preview, .fc-muestra, #fontAc
    Va dentro de :where() para que no sume especificidad: el #fontActual de
    la lista le daba la de un id y ganaba a cualquier !important de aquí
    (el interletraje del título no se aplicaba nunca). */
-html.moderno body :where(:not(:is(.lyrics-body, .lyrics-edit, .font-preview, .fc-muestra, #fontActual),
-    :is(.lyrics-body, .lyrics-edit, .font-preview, .fc-muestra, #fontActual) *)) {
+html.moderno body :where(:not(:is(.lyrics-body, .lyrics-edit, .lyrics-palabra, .font-preview, .fc-muestra, #fontActual),
+    :is(.lyrics-body, .lyrics-edit, .lyrics-palabra, .font-preview, .fc-muestra, #fontActual) *)) {
   text-shadow: none !important;
   letter-spacing: normal !important;
 }

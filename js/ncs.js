@@ -121,12 +121,8 @@
     !document.hidden &&
     !!(tabLyrics && tabLyrics.classList.contains('active'));
 
-  const relojPintado = { ultimo: 0 };
-
   const paso = () => {
-    raf = requestAnimationFrame(paso);
     if (!aLaVista()) return;
-    if (window.MMPerf && window.MMPerf.salta(relojPintado, performance.now())) return;
 
     // la carátula y el título se comprueban de vez en cuando: cambiar de
     // canción no dispara ningún evento que llegue hasta aquí
@@ -174,8 +170,27 @@
     escribir(discoWrap, 'transform', `scale(${(1 + graves * 0.035 + golpe * 0.075).toFixed(3)})`);
   };
 
-  const arrancar = () => { if (!raf) paso(); };
-  const parar = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } };
+  /* El fotograma lo pide el reloj de la app (js/perf.js). Sonando, a los
+     fps de siempre; en pausa la escena sigue ahí —el anillo de progreso es
+     información— pero se repasa cuatro veces por segundo, no sesenta. */
+  let mando = null;
+  const suena = () => document.body.classList.contains('playing');
+  const arrancar = () => {
+    if (mando) { mando.despertar(); return; }
+    const P = window.MMPerf;
+    if (P && P.bucle) {
+      mando = P.bucle(paso, { ms: () => (suena() ? P.msFrame() : 250), activo: aLaVista });
+      return;
+    }
+    // sin js/perf.js: el bucle de siempre
+    if (raf) return;
+    const propio = () => { raf = requestAnimationFrame(propio); paso(); };
+    propio();
+  };
+  const parar = () => {
+    if (mando) { mando.parar(); mando = null; }
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+  };
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) parar(); else if (!panel.hidden) arrancar();

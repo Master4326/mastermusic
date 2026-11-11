@@ -257,8 +257,19 @@
       ico: 'vertical',
       hacer: () => window.MMVertical.abrir(),
     }] : []),
+    /* Las tres vistas de la letra, cada una por su nombre. Por ponerVista y
+       no pulsando ✦: en el teléfono ese botón recorre las tres y «modo
+       edit» acababa en la vista palabra (js/lyrics.js). */
     { n: 'modo edit (letra animada)', alias: 'efectos tiktok', ico: 'edit',
-      hacer: () => { const b = document.getElementById('lyricsModeBtn'); if (b) b.click(); } },
+      hacer: () => {
+        const L = window.LyricsModule;
+        if (L && L.ponerVista) { L.ponerVista(L.vistaElegida && L.vistaElegida() === 'edit' ? 'lista' : 'edit'); return; }
+        const b = document.getElementById('lyricsModeBtn'); if (b) b.click();
+      } },
+    { n: 'vista palabra (palabra a palabra)', alias: 'verci pila 3d iconos palabra por palabra lente tambor', ico: 'palabra',
+      hacer: () => { const L = window.LyricsModule; if (L && L.ponerVista) L.ponerVista('palabra'); } },
+    { n: 'vista lista (la letra entera)', alias: 'karaoke normal todos los versos', ico: 'lista',
+      hacer: () => { const L = window.LyricsModule; if (L && L.ponerVista) L.ponerVista('lista'); } },
     { n: 'letra ancha', alias: 'esconder caratula portada ancho completo w', ico: 'ancha',
       hacer: () => { const b = document.getElementById('anchoBtn'); if (b) b.click(); } },
     { n: 'silenciar', alias: 'mute volumen cero', ico: 'vol-mudo',

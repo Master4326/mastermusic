@@ -4,7 +4,7 @@
    y se pueda instalar en celular y PC.
    Sube el número de CACHE cuando cambies archivos del shell.
    ========================================================== */
-const CACHE = 'mastermusic-v130';
+const CACHE = 'mastermusic-v132';
 
 // Archivos locales que forman la app. Las pistas de música del
 // usuario NO se cachean aquí: viven en IndexedDB (ver js/db.js).
@@ -23,6 +23,10 @@ const SHELL = [
   './css/aspecto-aero.css',
   './css/aspecto-manga.css',
   './css/aspecto-revista.css',
+  // la vista palabra ◉: igual que los aspectos, solo se USA si se elige
+  // (js/lyrics.js la pide entonces), pero se guarda para que abra sin conexión
+  './css/palabra.css',
+  './js/palabra.js',
   './css/fuentes/DSEG7ClassicMini-Italic.woff2',
   './js/perf.js',
   './js/teclas.js',
@@ -49,6 +53,7 @@ const SHELL = [
   './js/compartir.js',
   './js/fonts.js',
   './js/ambient.js',
+  './js/luz.js',
   './js/beat.js',
   './js/vertical.js',
   './js/colors.js',
@@ -94,7 +99,9 @@ self.addEventListener('fetch', (event) => {
   // Cachear una traducción aquí además sería tirar el dinero dos veces —
   // js/traductor.js ya guarda lo suyo en localStorage, por canción y sin
   // repetir versos; y js/similares.js guarda sus MBID por su cuenta.
-  const isApi = /spotify\.com|lrclib\.net|scdn\.co|listenbrainz\.org|translate\.googleapis\.com|mymemory\.translated\.net/.test(url.hostname);
+  // (raw.githubusercontent.com: la letra palabra a palabra de AMLL, que
+  // js/lyrics.js ya guarda en localStorage — aquí sería guardarla dos veces)
+  const isApi = /spotify\.com|lrclib\.net|scdn\.co|listenbrainz\.org|translate\.googleapis\.com|mymemory\.translated\.net|raw\.githubusercontent\.com/.test(url.hostname);
   if (isApi) return;
 
   // App shell propio -> network-first (siempre lo último cuando hay red,

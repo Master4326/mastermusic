@@ -627,10 +627,6 @@
   // ---- Bucle de render ----
   let ultimoFrame = 0;
   const draw = (ts) => {
-    requestAnimationFrame(draw);
-
-    if (document.hidden) return;   // en segundo plano no hay nada que hacer
-
     const live = isLive();
     let vals = live ? computeSpectrum() : null;
     const playing = !!(live && vals);
@@ -647,7 +643,9 @@
        y suave y a 30 fps no se distingue. */
     const tope = window.MMPerf ? window.MMPerf.msFrame() : (playing ? 0 : 33);
     const minMs = playing ? tope : Math.max(33, tope);
-    if (t0 - ultimoFrame < minMs) return;
+    // 2 ms de manga: el reloj común ya afina el fotograma, y uno que llega
+    // un pelo antes de la cuenta no se tira
+    if (t0 - ultimoFrame < minMs - 2) return;
     /* Tiempo real transcurrido desde el frame que SÍ se pintó (no desde el
        anterior sin más): con el tope de 30 fps del móvil, contar mal aquí
        haría que el suavizado se aplicara a medias. */
@@ -782,7 +780,35 @@
     }
     if (hayPico) { ctx.fillStyle = R.pico; ctx.fill(); }
   };
-  draw();
+
+  /* QUIÉN PIDE EL FOTOGRAMA: el reloj de la app (js/perf.js).
+     Antes este bucle se pedía a sí mismo un fotograma en cada vsync, hubiera
+     música o no. Ahora corre mientras suena algo —o entra audio por ◈—, y
+     en pausa la onda de respaldo se asienta un par de segundos y se queda
+     quieta, como el vinilo: una pantalla encendida, no una animación sin
+     fin. Lo que sí repinta en reposo es lo que cambia la imagen: el tamaño
+     del lienzo, el color de la canción o el aspecto. */
+  const conMusica = () => !!(document.body && document.body.classList.contains('playing')) || isLive();
+  let mandoViz = null;
+  const repintarViz = (ms) => { if (mandoViz) mandoViz.despertar(ms || 500); };
+  if (window.MMPerf && window.MMPerf.bucle) {
+    mandoViz = window.MMPerf.bucle(draw, {
+      ms: () => (haySenal ? window.MMPerf.msFrame() : Math.max(33, window.MMPerf.msFrame())),
+      activo: conMusica,
+    });
+    mandoViz.despertar(1500);                       // el primer pintado, aunque no suene nada
+    window.addEventListener('mm:playing', () => repintarViz(2200));   // al pausar: que se asiente
+    window.addEventListener('resize', () => repintarViz(500), { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(() => repintarViz(500)).observe(canvas);
+    if (window.MutationObserver) {
+      new MutationObserver(() => repintarViz(900)).observe(document.documentElement,
+        { attributes: true, attributeFilter: ['style', 'class', 'data-aspecto'] });
+    }
+  } else {
+    // sin js/perf.js: el bucle de siempre
+    const propio = (t) => { requestAnimationFrame(propio); if (!document.hidden) draw(t); };
+    propio();
+  }
 
   /* ---------- El tiempo, con sus «8» apagados detrás ----------
      A juego con el espectro: el tiempo va en 7 segmentos (DSEG7, ver .time
@@ -947,6 +973,16 @@
       return a;
     },
     getSampleRate: () => (audioCtx ? audioCtx.sampleRate : 44100),
+    /* Lo que tarda en SONAR lo que el <audio> ya entregó al grafo (segundos).
+       Lo resta js/lyrics.js para que la letra de la música importada caiga
+       con lo que se oye — con auriculares Bluetooth son 150-250 ms. Sin
+       grafo montado, o con un dato raro, 0: se queda como estaba. */
+    latencia: () => {
+      if (!connected || !audioCtx) return 0;
+      const o = +audioCtx.outputLatency, b = +audioCtx.baseLatency;
+      const l = (isFinite(o) ? o : 0) + (isFinite(b) ? b : 0);
+      return l > 0 && l < 0.6 ? l : 0;
+    },
     /* El vídeo 9:16 (js/vertical.js): el contexto en marcha DENTRO del clic
        de grabar (un AudioContext nace suspendido si no hay gesto), el sonido
        de la pestaña para que el fondo baile, y la pista que va al vídeo. */

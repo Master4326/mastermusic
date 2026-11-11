@@ -318,8 +318,29 @@
       muted:  mutedRgb,
     };
 
+    /* SEGUNDO COLOR · la segunda tinta de la luz de borde (js/luz.js): otro
+       color de verdad de la portada, a 45° de tono o más del acento, con
+       algo de superficie (2 %); mismo criterio de puntos que el acento. Si
+       la portada no tiene otro, el acento girado 35°, para que el borde no
+       quede de un solo color plano. Mismo brillo que el acento: las dos
+       tintas tienen que pesar lo mismo en el filo de la ventana. */
+    let otro = null, otroS = -1;
+    if (cro) {
+      for (const c of paleta) {
+        if (c === cro || c.C < CHROMA_FLOOR || c.L < 0.12 || c.L > 0.95 || c.cov < 0.02) continue;
+        const dh = Math.abs(Math.atan2(Math.sin(c.h - cro.h), Math.cos(c.h - cro.h)));
+        if (dh < Math.PI / 4) continue;
+        const s = Math.min(1, c.C / 0.13) * Math.pow(c.cov, 0.32);
+        if (s > otroS) { otroS = s; otro = c; }
+      }
+    }
+    const segundo = otro
+      ? lchToRgb(accent.L, Math.max(0.075, Math.min(0.150, 0.055 + otro.C * 0.65)), otro.h)
+      : lchToRgb(accent.L, accent.C, accent.h + (35 * Math.PI) / 180);
+
     return {
       accent: aRgb,
+      segundo,
       deep:  lchToRgb(deep.L,  deep.C,  deep.h),
       upper: lchToRgb(upper.L, upper.C, upper.h),
       panel: panelRgb,
@@ -342,7 +363,7 @@
     }
 
     // Acento y texto van por su cuenta: seven.js decide si están en auto
-    if (mc.applyAccentFromCover) mc.applyAccentFromCover(rgbToHex(p.accent));
+    if (mc.applyAccentFromCover) mc.applyAccentFromCover(rgbToHex(p.accent), rgbToHex(p.segundo));
     if (mc.applyTextFromCover) {
       mc.applyTextFromCover(rgbToHex(p.texto.text), rgbToHex(p.texto.dim), rgbToHex(p.texto.muted));
     }

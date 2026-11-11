@@ -49,6 +49,16 @@
        «estudio» o «noche». Lo aplica js/aspecto.js; al abrir ya lo puso el
        guion del <head> de index.html, que lee esta misma clave. */
     aspecto: { key: 'mm_aspecto', def: '8bits' },
+    /* ◉ VISTA PALABRA · su forma («pila»: las palabras apiladas en 3D;
+       «lente»: en un tambor que gira) y si llevan iconos. Las lee
+       js/lyrics.js por MMSettings.get cada vez que pinta un verso. */
+    palabra:    { key: 'mm_palabra', def: 'pila' },
+    palabraIco: { key: 'mm_palabra_ico', def: 'si' },
+    /* LUZ DE BORDE · el filo de la ventana encendido con los colores de la
+       carátula: «ritmo» late con la música, «quieta» respira despacio y
+       «no» la apaga. El grosor, aparte. Las aplica js/luz.js. */
+    luz:       { key: 'mm_luz', def: 'ritmo' },
+    luzGrosor: { key: 'mm_luz_grosor', def: 'media' },
     // La intensidad del modo edit NO es un ajuste: lyrics.js la deduce sola
     // del ritmo de cada línea y de los graves (ver intensidadAuto).
   };
@@ -113,6 +123,11 @@
       /* Al arrancar no hace nada nuevo (el <head> ya lo puso); al elegir
          otro, aspecto.js pide su CSS si hace falta y cambia cuando llega. */
       if (window.MMAspecto && window.MMAspecto.actual() !== v) window.MMAspecto.poner(v);
+    } else if (id === 'palabra' || id === 'palabraIco') {
+      // el verso que se ve, otra vez con la forma o los iconos nuevos
+      if (window.MMPalabra && window.MMPalabra.montado && window.MMPalabra.montado()) window.MMPalabra.repintar();
+    } else if (id === 'luz' || id === 'luzGrosor') {
+      if (window.MMLuz) window.MMLuz.aplicar();
     } else if (id === 'vinilo') {
       /* La clase del <body> es lo que hace girar la carátula; el ◉ de
          encima de ella se marca igual, para que los dos digan lo mismo. */
@@ -173,6 +188,10 @@
     trad:     'traducción',
     vinilo:   'vinilo',
     aspecto:  'aspecto',
+    palabra:  'vista palabra',
+    palabraIco: 'iconos de la vista palabra',
+    luz:      'luz de borde',
+    luzGrosor: 'grosor de la luz',
   };
 
   const elegir = (id, val, conFoco) => {
@@ -235,9 +254,13 @@
     try { n = Object.keys(JSON.parse(raw || '{}')).length; } catch (_) {}
     // las traducciones son parte de lo mismo: se guardan y se tiran juntas
     const t = (window.Traductor && window.Traductor.tam) ? window.Traductor.tam() : { n: 0, bytes: 0 };
-    const total = raw.length + t.bytes;
+    // y las palabra a palabra de AMLL (js/lyrics.js), igual
+    let rawP = '', nP = 0;
+    try { rawP = localStorage.getItem('mm_ttml') || ''; } catch (_) {}
+    try { const o = JSON.parse(rawP || '{}'); nP = Object.keys(o).filter((k) => o[k] && !o[k].nf).length; } catch (_) {}
+    const total = raw.length + t.bytes + rawP.length;
     if (!total) { el.textContent = 'vacía'; return; }
-    el.textContent = `${n} letras${t.n ? ` · ${t.n} traducidas` : ''} · ${kb(total)}`;
+    el.textContent = `${n} letras${nP ? ` · ${nP} palabra a palabra` : ''}${t.n ? ` · ${t.n} traducidas` : ''} · ${kb(total)}`;
   };
 
   const pintarTamLib = async () => {
@@ -263,6 +286,7 @@
   if (btnCache) btnCache.addEventListener('click', () => {
     try {
       localStorage.removeItem('mm_lyrics_cache');
+      localStorage.removeItem('mm_ttml');
       if (window.LyricsModule && window.LyricsModule.clearCache) window.LyricsModule.clearCache();
       if (window.Traductor && window.Traductor.limpiar) window.Traductor.limpiar();
     } catch (_) {}

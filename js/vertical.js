@@ -124,8 +124,8 @@
   // ---------- Opciones (se recuerdan) ----------
   const OPC = {
     estilo:  { key: 'mm_916_estilo',  def: 'app',  vals: ['app', 'vinilo', 'letra'] },
-    // sin elegir todavía: la vista que la app tenga puesta (✦ o ≡)
-    vista:   { key: 'mm_916_vista',   def: '',     vals: ['lista', 'edit'] },
+    // sin elegir todavía: la vista que la app tenga puesta (≡, ✦ o ◉)
+    vista:   { key: 'mm_916_vista',   def: '',     vals: ['lista', 'edit', 'palabra'] },
     empieza: { key: 'mm_916_empieza', def: 'aqui', vals: ['aqui', 'inicio', 'estribillo'] },
     dura:    { key: 'mm_916_dura',    def: 'mano', vals: ['15', '30', '60', 'cancion', 'mano'] },
     /* 1080p = el vídeo sale a 1080×1920 DE VERDAD (en una pantalla 1080p el
@@ -138,14 +138,18 @@
     // las del cine, aparte: el vinilo es lo que siempre fue el cine, y el
     // cine siempre fue la letra animada
     cineEstilo: { key: 'mm_cine_estilo', def: 'vinilo', vals: ['app', 'vinilo', 'letra'] },
-    cineVista:  { key: 'mm_cine_vista',  def: 'edit',   vals: ['lista', 'edit'] },
+    cineVista:  { key: 'mm_cine_vista',  def: 'edit',   vals: ['lista', 'edit', 'palabra'] },
   };
   const pref = (id) => {
     const o = OPC[id];
     let v = null;
     try { v = localStorage.getItem(o.key); } catch (e) { /* privado o bloqueado */ }
     if (o.vals.includes(v)) return v;
-    if (id === 'vista') return LY() && LY().isEditMode && LY().isEditMode() ? 'edit' : 'lista';
+    if (id === 'vista') {
+      const L = LY();
+      if (L && L.vistaElegida) return L.vistaElegida();
+      return L && L.isEditMode && L.isEditMode() ? 'edit' : 'lista';
+    }
     return o.def;
   };
   const guardarPref = (id, v) => { try { localStorage.setItem(OPC[id].key, v); } catch (e) {} };
@@ -274,6 +278,7 @@
             <div class="seg cine-seg" data-v916="cineVista" role="radiogroup" aria-label="Vista de la letra (E)">
               <button class="seg-btn" type="button" data-val="lista" title="La letra entera, a lo karaoke (E)">lista</button>
               <button class="seg-btn" type="button" data-val="edit" title="Verso a verso, con efectos (E)">edit</button>
+              <button class="seg-btn" type="button" data-val="palabra" title="Palabra a palabra, apiladas en 3D (E)">palabra</button>
             </div>
           </div>
           <div class="cine-trans">
@@ -294,7 +299,7 @@
         </div>
         <div class="v916-opts">
           ${grupo('estilo', 'estilo', [['app', 'app'], ['vinilo', 'vinilo'], ['letra', 'letra']])}
-          ${grupo('vista', 'letra', [['lista', 'lista'], ['edit', 'edit']])}
+          ${grupo('vista', 'letra', [['lista', 'lista'], ['edit', 'edit'], ['palabra', 'palabra']])}
           ${grupo('empieza', 'empieza', [['aqui', 'aquí'], ['inicio', 'inicio'], ['estribillo', 'estribillo']])}
           ${grupo('dura', 'dura', [['15', '15 s'], ['30', '30 s'], ['60', '60 s'], ['cancion', 'canción'], ['mano', 'a mano']])}
           ${grupo('calidad', 'calidad', [['hd', '1080p · 60'], ['pantalla', 'pantalla']])}
@@ -743,15 +748,17 @@
   };
 
   /* La vista de la letra dentro del marco. Una letra SIN tiempos no puede ir
-     en edit (el edit necesita saber cuándo entra cada verso): ahí va la
-     lista, sin decir nada. Mientras la letra llega, se respeta la elegida. */
+     en edit ni en palabra (las dos necesitan saber cuándo entra cada verso):
+     ahí va la lista, sin decir nada. Mientras la letra llega, se respeta la
+     elegida. */
   const aplicarVista = (forzar) => {
     const L = LY();
     if (!L || !L.forzarVista) return;
     const s = L.getSync ? L.getSync() : null;
     const lines = (s && s.lines) || [];
     const sinTiempos = lines.length > 0 && !(lines[0].time >= 0);
-    const v = prefVista() === 'edit' && !sinTiempos ? 'edit' : 'lista';
+    const p = prefVista();
+    const v = (p === 'edit' || p === 'palabra') && !sinTiempos ? p : 'lista';
     if (!forzar && v === vistaPuesta) return;
     vistaPuesta = v;
     L.forzarVista(v);
@@ -900,12 +907,8 @@
   // ---------- El bucle ----------
   let raf = 0, lentoT = 0, relojT = '';
   const reloj = { ultimo: 0 };
-  const bucle = () => {
-    if (!abierto) { raf = 0; return; }
-    raf = requestAnimationFrame(bucle);
-    if (document.hidden) return;
+  const fotograma = () => {
     const ahora = performance.now();
-    if (window.MMPerf && window.MMPerf.salta(reloj, ahora)) return;
     const P = PC();
     if (!P || !P.state) return;
     pintarPista(P.state.currentTrack);
@@ -915,7 +918,33 @@
     if (ahora - lentoT > 300) { lentoT = ahora; pintarLento(P); }
     vigilarGrabacion(P, ahora);
   };
-  const arrancarBucle = () => { if (!raf) raf = requestAnimationFrame(bucle); };
+  /* El fotograma lo pide el reloj de la app (js/perf.js) mientras el
+     escenario esté abierto. Sonando —o contando, o grabando— va al tope de
+     siempre; en pausa y sin grabar basta con 15 pasadas por segundo: nada
+     se mueve y solo hay que enterarse de un cambio de canción o de mando. */
+  let mandoV = null;
+  const enReposo = () => (fase === 'listo' || fase === 'hecho') &&
+    !document.body.classList.contains('playing');
+  const bucle = () => {            // solo sin js/perf.js
+    if (!abierto) { raf = 0; return; }
+    raf = requestAnimationFrame(bucle);
+    if (document.hidden) return;
+    if (window.MMPerf && window.MMPerf.salta(reloj, performance.now())) return;
+    fotograma();
+  };
+  const arrancarBucle = () => {
+    const M = window.MMPerf;
+    if (M && M.bucle) {
+      if (!mandoV) {
+        mandoV = M.bucle(fotograma, {
+          ms: () => (enReposo() ? 66 : M.msFrame()),
+          activo: () => abierto,
+        });
+      } else mandoV.despertar();
+      return;
+    }
+    if (!raf) raf = requestAnimationFrame(bucle);
+  };
   const pararBucle = () => { if (raf) cancelAnimationFrame(raf); raf = 0; };
 
   const pintarLento = (P) => {
@@ -1654,7 +1683,9 @@
         if (e.code === 'KeyE') {
           e.preventDefault();
           e.stopPropagation();
-          elegir('cineVista', pref('cineVista') === 'edit' ? 'lista' : 'edit');
+          // E recorre las tres: lista → edit → palabra → lista
+          const ya = pref('cineVista');
+          elegir('cineVista', ya === 'lista' ? 'edit' : ya === 'edit' ? 'palabra' : 'lista');
           return;
         }
       }

@@ -111,6 +111,10 @@
       if (destino === 'library' && window.LibraryModule && window.LibraryModule.irA) {
         window.LibraryModule.irA('mine');
       }
+      // los de la vista palabra ◉ te llevan a la letra Y a esa vista
+      if (b.dataset.vista && window.LyricsModule && window.LyricsModule.ponerVista) {
+        window.LyricsModule.ponerVista(b.dataset.vista);
+      }
       estado('▸ ' + nav().nombre(destino));
     });
   });

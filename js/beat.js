@@ -427,6 +427,7 @@
 
   /* ---------- Bucle ---------- */
   let raf = null;
+  let quieto = true;      // sin música y con todo ya apagado: no hay nada que calcular
 
   const apagar = () => {
     marco.fuente = 'silencio';
@@ -443,6 +444,10 @@
     confianza *= 0.97;
     marco.confianza = confianza;
     marco.anticipo = 0;
+    /* ¿Ya no queda nada apagándose? Entonces el bucle puede dormir hasta
+       que vuelva a sonar algo (lo decide `activo`, más abajo). */
+    quieto = marco.nivel < 0.003 && marco.boom < 0.003 && marco.caja < 0.003 &&
+      marco.brillo < 0.003 && porId.bombo.suave < 0.003 && porId.brillo.suave < 0.003;
   };
 
   const paso = () => {
@@ -455,6 +460,7 @@
       return;
     }
 
+    quieto = false;
     const V = window.VisualizerModule;
     const an = V && V.getDetector ? V.getDetector() : null;
     const vivo = an ? conAudio(an, ahora) : false;
@@ -497,21 +503,35 @@
 
      Se queda en 60 incluso en el móvil (no usa msFrame(), que baja a 30):
      esto no pinta nada, y bajarlo empeoraría la detección. */
+  /* El fotograma lo pide el reloj de la app (js/perf.js), con su tope de
+     13 ms. Y solo mientras hay algo que escuchar o algo apagándose: en
+     pausa, cuando las envolventes llegan a cero, este bucle deja de correr. */
+  const hayTrabajo = () => !quieto ||
+    !!(document.body && document.body.classList.contains('playing'));
+  let mando = null;
   const relojBeat = { ultimo: 0 };
-  const bucle = () => {
-    raf = requestAnimationFrame(bucle);
-    if (document.hidden) return;
-    const ahora = performance.now();
-    if (ahora - relojBeat.ultimo < 13) return;   // 13 y no 16,67: ver msFrame() en perf.js
-    relojBeat.ultimo = ahora;
-    paso();
+  const arrancar = () => {
+    if (mando) { mando.despertar(); return; }
+    if (window.MMPerf && window.MMPerf.bucle) {
+      mando = window.MMPerf.bucle(paso, { ms: 13, activo: hayTrabajo });
+      return;
+    }
+    // sin js/perf.js: el bucle de siempre
+    if (raf) return;
+    const propio = () => {
+      raf = requestAnimationFrame(propio);
+      if (document.hidden) return;
+      const ahora = performance.now();
+      if (ahora - relojBeat.ultimo < 13) return;   // 13 y no 16,67: ver msFrame() en perf.js
+      relojBeat.ultimo = ahora;
+      paso();
+    };
+    propio();
   };
-  const arrancar = () => { if (!raf) bucle(); };
-  const parar = () => { if (raf) { cancelAnimationFrame(raf); raf = null; } };
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) parar(); else arrancar();
-  });
+  const parar = () => {
+    if (mando) { mando.parar(); mando = null; }
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+  };
   arrancar();
 
   window.BeatModule = {

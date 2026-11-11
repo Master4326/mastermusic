@@ -59,22 +59,14 @@
    · Ningún efecto declara font-family: la letra es la elegida en ajustes.
    ========================================================== */
 
-/* ══════ TOKENS · curvas y piel ══════
+/* ══════ TOKENS · la piel ══════
    En .lyrics-edit y no en :root: las sombras usan --accent-glow, y en los
    aspectos claros el panel de la letra redefine el acento. Declaradas aquí
    se resuelven con el acento de su panel (y en el cine, con el de siempre). */
 .lyrics-edit {
-  --ed-sale:  cubic-bezier(0.16, 1, 0.3, 1);      /* entra decidido y se posa largo */
-  --ed-suave: cubic-bezier(0.25, 1, 0.5, 1);      /* lo tranquilo */
-  --ed-firme: cubic-bezier(0.05, 0.7, 0.1, 1);    /* frena en seco: los golpes */
-  --ed-cruza: cubic-bezier(0.83, 0, 0.17, 1);     /* barridos y máscaras */
-  --ed-va:    cubic-bezier(0.55, 0, 0.8, 0.3);    /* las salidas: acelera al irse */
-  --ed-lento: cubic-bezier(0.45, 0.05, 0.3, 1);   /* las cámaras */
-  /* Muelles de verdad: oscilador amortiguado con velocidad de salida, uno
-     con un 2 % de rebote (no se ve, se siente) y otro con un 7 %. Calculados
-     con scratchpad/muelle2.js; los navegadores sin linear() caen a `ease`. */
-  --ed-muelle: linear(0 0%, 0.04 0.7%, 0.11 1.9%, 0.195 3.5%, 0.288 5.4%, 0.384 7.5%, 0.479 9.9%, 0.569 12.5%, 0.653 15.3%, 0.728 18.2%, 0.793 21.3%, 0.849 24.6%, 0.896 28.1%, 0.933 31.6%, 0.962 35.4%, 0.984 39.2%, 0.999 43.2%, 1.009 47.3%, 1.015 51.5%, 1.018 55.9%, 1.019 60.4%, 1.018 65%, 1.016 69.6%, 1.014 74.4%, 1.012 79.4%, 1.009 84.4%, 1.007 89.5%, 1.005 94.7%, 1 100%);
-  --ed-muelle-vivo: linear(0 0%, 0.053 0.7%, 0.145 1.9%, 0.256 3.5%, 0.375 5.4%, 0.494 7.5%, 0.608 9.9%, 0.713 12.5%, 0.805 15.3%, 0.884 18.2%, 0.947 21.3%, 0.996 24.6%, 1.032 28.1%, 1.056 31.6%, 1.069 35.4%, 1.075 39.2%, 1.074 43.2%, 1.068 47.3%, 1.06 51.5%, 1.051 55.9%, 1.041 60.4%, 1.032 65%, 1.024 69.6%, 1.017 74.4%, 1.011 79.4%, 1.007 84.4%, 1.004 89.5%, 1.002 94.7%, 1 100%);
+  /* Las curvas (--ed-sale, --ed-muelle…) viven en :root (css/style.css)
+     desde el 10-nov-2026: la vista lista y la vista palabra se mueven con
+     ellas también. Aquí queda la piel, que depende del acento del panel. */
 
   /* La piel. Antes: doble halo de neón (10 + 30 px del acento A TOPE, porque
      --accent-glow es el acento opaco) y una sombra dura de 3 px. Ahora una

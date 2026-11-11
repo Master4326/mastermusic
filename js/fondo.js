@@ -54,6 +54,7 @@
   const tabLyrics = document.getElementById('tab-lyrics');
   const lyricsBody = document.getElementById('lyricsBody');
   const lyricsEdit = document.getElementById('lyricsEdit');
+  const lyricsPalabra = document.getElementById('lyricsPalabra');
 
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const P = () => window.MMPerf;
@@ -90,7 +91,15 @@
     W = w; H = h;
     degradado = null;               // el gradiente va en píxeles del lienzo
     cvCaja = null;                  // y la caja guardada del lienzo, a la basura
+    /* Cambiar el tamaño de un lienzo lo BORRA. Sonando da igual (se repinta
+       en el fotograma siguiente), pero en pausa la onda está quieta: hay que
+       pedir ese fotograma, o el panel se quedaría sin onda hasta el play. */
+    lienzoBorrado();
   };
+  // (declaración `function`: medir() se define antes que el bucle de abajo)
+  function lienzoBorrado() {
+    try { limpio = true; if (mando) mando.despertar(900); } catch (_) { /* aún arrancando */ }
+  }
 
   if (window.ResizeObserver) new ResizeObserver(medir).observe(canvas);
   window.addEventListener('resize', medir, { passive: true });
@@ -281,6 +290,13 @@
       return null;
     }
     if (vivo(lyricsBody)) return lyricsBody.querySelector('.lyric-line.active');
+    /* Vista palabra ◉: la palabra que suena (js/palabra.js la presta). La
+       onda rodea lo que se está cantando —aquí, una palabra— y viaja con la
+       pila cuando sube a la siguiente. */
+    if (vivo(lyricsPalabra)) {
+      const P = window.MMPalabra;
+      return P && P.ancla ? P.ancla() : null;
+    }
     return null;
   };
 
@@ -645,7 +661,6 @@
      ========================================================== */
   let raf = null;
   let ultimo = 0;
-  const relojPintado = { ultimo: 0 };
   let limpio = true;
 
   const limpiar = () => {
@@ -659,16 +674,13 @@
     !!(tabLyrics && tabLyrics.classList.contains('active')) &&
     !(window.MMSettings && window.MMSettings.reduceMotion());
 
-  const bucle = () => {
-    raf = requestAnimationFrame(bucle);
-    if (document.hidden) return;
+  /* Un fotograma de la onda. Lo llama el reloj de la app (js/perf.js), que
+     ya trae el tope de fps y no lo pide en segundo plano. */
+  const fotograma = (ahora) => {
     if (!activo()) { limpiar(); return; }
-
-    const ahora = performance.now();
-    if (window.MMPerf && window.MMPerf.salta(relojPintado, ahora)) return;
     if (!W || !H) { medir(); if (!W || !H) return; }
 
-    const dt = ultimo ? Math.min(100, ahora - ultimo) : 16.7;
+    const dt = ultimo && ahora - ultimo < 250 ? ahora - ultimo : 16.7;
     ultimo = ahora;
 
     revisarColor(ahora);
@@ -679,14 +691,59 @@
     limpio = false;
   };
 
-  const arrancar = () => { if (!raf) bucle(); };
-  const parar = () => { if (raf) { cancelAnimationFrame(raf); raf = null; } limpiar(); };
+  /* ¿Hay algo que pintar AHORA?
+     Sonando, siempre. En pausa la onda se calma unos segundos (los niveles
+     bajan despacio) y se queda quieta, como el vinilo y las esquinas del
+     panel: una onda que sigue corriendo sin música eran 60 fotogramas por
+     segundo —y todo lo que el navegador hace con cada uno— para siempre.
+     Al volver a sonar sigue desde donde estaba. Si el panel no está
+     delante solo queda borrar el lienzo una vez. */
+  const CALMA_MS = 3200;
+  let desdePausa = 0;
+  const suena = () => body.classList.contains('playing');
+  const hayQuePintar = () => {
+    if (!activo()) return !limpio;
+    if (suena()) { desdePausa = 0; return true; }
+    const ahora = performance.now();
+    if (!desdePausa) desdePausa = ahora;
+    return limpio || ahora - desdePausa < CALMA_MS;
+  };
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) parar(); else arrancar();
-  });
+  let mando = null;           // el del reloj común
+  const arrancar = () => {
+    if (mando) { mando.despertar(); return; }
+    if (window.MMPerf && window.MMPerf.bucle) {
+      mando = window.MMPerf.bucle(fotograma, { ms: () => window.MMPerf.msFrame(), activo: hayQuePintar });
+      return;
+    }
+    // sin js/perf.js: el bucle de siempre
+    if (raf) return;
+    const propio = (t) => {
+      raf = requestAnimationFrame(propio);
+      if (!document.hidden && hayQuePintar()) fotograma(t || performance.now());
+    };
+    raf = requestAnimationFrame(propio);
+  };
+  const parar = () => {
+    if (mando) { mando.parar(); mando = null; }
+    if (raf) { cancelAnimationFrame(raf); raf = null; }
+    limpiar();
+  };
+
+  /* En reposo la onda está quieta, pero hay tres cosas que piden repintarla:
+     que cambie el tamaño del lienzo (al redimensionarlo se borra), que
+     cambie el color de la canción o el aspecto, y que cambie el verso o la
+     pestaña. Se le da cuerda un momento y vuelve a dormir. */
+  const repintar = (ms) => { if (mando) mando.despertar(ms || 700); };
+  if (window.MutationObserver) {
+    new MutationObserver(() => repintar(900)).observe(document.documentElement,
+      { attributes: true, attributeFilter: ['style', 'class', 'data-aspecto'] });
+    new MutationObserver(() => repintar(900)).observe(body, { attributes: true, attributeFilter: ['class'] });
+  }
+  window.addEventListener('mm:tab', () => repintar(900));
+  window.addEventListener('resize', () => repintar(900), { passive: true });
 
   arrancar();
 
-  window.FondoModule = { arrancar, parar, medir };
+  window.FondoModule = { arrancar, parar, medir, repintar };
 })();
