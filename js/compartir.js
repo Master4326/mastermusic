@@ -180,9 +180,12 @@
   };
 
   const pintarFondo = (img, W, H) => {
-    const deep = css('--bg-deep', '#0a0e2e');
+    /* El tono hondo de la carátula que suena (lo pone colors.js). El fondo
+       «liso» se pintaba con `--bg-deep`, un azul marino fijo: la tarjeta de
+       una canción rosa salía marina. Sin carátula, --dyn-2 ya es ese azul. */
     const d1 = css('--dyn-1', css('--bg-window', '#1a1f4a'));
-    const d2 = css('--dyn-2', deep);
+    const d2 = css('--dyn-2', '#0a0e2e');
+    const deep = d2;
 
     if (fondo === 'caratula' && img) {
       /* La carátula desenfocada y ampliada un 20%: el desenfoque de

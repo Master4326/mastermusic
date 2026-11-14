@@ -82,7 +82,9 @@ html[data-aspecto="aero"] .paleta-btn {
 html[data-aspecto="aero"] .tb-btn { border-radius: 4px; color: #24506d; }
 html[data-aspecto="aero"] .tb-btn:hover { background: var(--ae-gel); color: #0b4b70; }
 html[data-aspecto="aero"] .tb-close:hover { background: linear-gradient(180deg, #f6a08a 0%, #e8573b 50%, #c8301a 51%, #e9654a 100%); color: #fff; }
-html[data-aspecto="aero"] .main-grid { gap: 14px; padding: 10px 14px 10px; }
+/* `--tumbado-resto`: teléfono tumbado, lo que no es carátula a lo alto de
+   la columna (ver style.css); medido con la ficha y las barras de aero */
+html[data-aspecto="aero"] .main-grid { gap: 14px; padding: 10px 14px 10px; --tumbado-resto: 224px; }
 html[data-aspecto="aero"] .left-panel {
   padding: 14px;
   border-radius: 12px;

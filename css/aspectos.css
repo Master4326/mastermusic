@@ -235,6 +235,10 @@ html.moderno .main-grid {
   background: transparent;
   gap: 18px;
   padding: 4px 18px 14px;
+  /* teléfono tumbado: lo que no es carátula a lo alto de la columna (ver
+     `--tumbado-resto` en style.css). 233 px es la medida de cristal; cada
+     aspecto con otra ficha u otras barras pone la suya. */
+  --tumbado-resto: 233px;
 }
 
 /* ══════════ 3. LA COLUMNA DE LA IZQUIERDA ══════════ */
@@ -442,6 +446,36 @@ html.moderno .cfg-chip {
   border-radius: var(--r-pill);
   border: 0;
   box-shadow: none;
+}
+/* LOS CLAROS (vinilo, aero, manga, revista). La pastilla del índice traía el
+   fondo oscuro de la paleta (`--bg-panel`): los claros cambian las tintas
+   dentro de su panel, pero no ese fondo, así que sobre el papel quedaba un
+   borrón granate con la letra en tinta y casi no se leía. Aquí va sobre su
+   papel, con el mismo velo que «volver» y el buscador de al lado
+   (`--m-hover`, que cada claro define dentro de `.right-panel`); la que
+   está puesta, con el acento y su aro. En los oscuros no cambia nada. */
+html:is([data-aspecto="vinilo"], [data-aspecto="aero"], [data-aspecto="manga"], [data-aspecto="revista"]) .right-panel .cfg-chip {
+  background: var(--m-hover);
+  color: var(--text-dim);
+}
+html:is([data-aspecto="vinilo"], [data-aspecto="aero"], [data-aspecto="manga"], [data-aspecto="revista"]) .right-panel .cfg-chip:hover {
+  background: var(--m-activo);
+  color: var(--text);
+}
+html:is([data-aspecto="vinilo"], [data-aspecto="aero"], [data-aspecto="manga"], [data-aspecto="revista"]) .right-panel .cfg-chip.on {
+  background: var(--m-activo);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  text-shadow: none;
+}
+/* Lo mismo les pasaba a otras tres cajas de ajustes pintadas con el fondo
+   oscuro de la paleta (`--bg-panel-2`): el botón de la tipografía, su
+   muestra de la letra y las teclas de la lista de atajos. Salían negras
+   sobre el papel con la letra en tinta (las encontró una sonda que busca
+   fondos oscuros dentro del panel en los cuatro claros, 12-nov-2026). */
+html:is([data-aspecto="vinilo"], [data-aspecto="aero"], [data-aspecto="manga"], [data-aspecto="revista"]) .right-panel :is(.font-abrir, .font-preview, .keys-grid kbd, .sp-empty-tip kbd) {
+  background: var(--m-hover);
+  border-color: var(--m-linea);
 }
 html.moderno .settings-block h3 {
   background: var(--m-cabecera, transparent);
@@ -899,7 +933,7 @@ html[data-aspecto="estudio"] .paleta-btn:hover,
 html[data-aspecto="estudio"] .paleta-btn:focus-visible { background: rgb(255 255 255 / 0.12); color: #fff; }
 
 /* ---- la columna de la carátula ---- */
-html[data-aspecto="estudio"] .main-grid { gap: clamp(18px, 2.4cqw, 44px); padding: 4px var(--e-margen) 10px; }
+html[data-aspecto="estudio"] .main-grid { gap: clamp(18px, 2.4cqw, 44px); padding: 4px var(--e-margen) 10px; --tumbado-resto: 216px; }
 html[data-aspecto="estudio"] .cover-frame,
 html[data-aspecto="estudio"] .cover-inner { border-radius: var(--r-s); }
 html[data-aspecto="estudio"] .cover-frame { box-shadow: 0 28px 70px rgb(0 0 0 / 0.6); }
@@ -1125,7 +1159,7 @@ html[data-aspecto="noche"] .paleta-btn:focus-visible {
 }
 
 /* ---- las islas ---- */
-html[data-aspecto="noche"] .main-grid { gap: 8px; padding: 0 8px; }
+html[data-aspecto="noche"] .main-grid { gap: 8px; padding: 0 8px; --tumbado-resto: 200px; }
 html[data-aspecto="noche"] .left-panel {
   background: var(--n-tarjeta);
   border-radius: var(--r-l);

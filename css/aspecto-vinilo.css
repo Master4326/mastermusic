@@ -88,7 +88,9 @@ html[data-aspecto="vinilo"] .paleta-btn:hover,
 html[data-aspecto="vinilo"] .paleta-btn:focus-visible { background: rgb(28 24 20 / 0.05); color: var(--vn-tinta); }
 html[data-aspecto="vinilo"] .tb-btn { color: var(--vn-tinta); }
 html[data-aspecto="vinilo"] .tb-btn:hover { background: rgb(28 24 20 / 0.08); color: var(--vn-tinta); }
-html[data-aspecto="vinilo"] .main-grid { gap: 24px; padding: 14px 22px 12px; }
+/* `--tumbado-resto`: teléfono tumbado, lo que no es carátula a lo alto de
+   la columna (ver style.css); medido con la ficha y las barras de vinilo */
+html[data-aspecto="vinilo"] .main-grid { gap: 24px; padding: 14px 22px 12px; --tumbado-resto: 224px; }
 html[data-aspecto="vinilo"] .cover-frame {
   padding: 10px;
   border-radius: 1px;

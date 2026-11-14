@@ -306,9 +306,18 @@
        las secciones, las ayudas y los vacíos. Misma red que el acento: sube
        la L hasta leerse (4,5 : 1 contra el panel), con techo por debajo del
        --text-dim (L 0,74) para que la escalera siga siendo escalera. */
+    /* Se mide contra el panel QUE SE PINTA, no contra el de la paleta:
+       seven.js (applyPanelsFromBase) lo aclara un 4 % hacia el blanco al
+       ponerlo en --bg-panel. Comparando con el de la paleta, el tono apagado
+       pasaba la vara aquí (4,5) y se quedaba en 4,3 en pantalla. */
+    const panelPintado = {
+      r: panelRgb.r + (255 - panelRgb.r) * 0.04,
+      g: panelRgb.g + (255 - panelRgb.g) * 0.04,
+      b: panelRgb.b + (255 - panelRgb.b) * 0.04,
+    };
     let mutedL = 0.550;
     let mutedRgb = lchToRgb(mutedL, cText, accent.h);
-    while (mutedL < 0.70 && contraste(mutedRgb, panelRgb) < CONTRAST_MIN) {
+    while (mutedL < 0.70 && contraste(mutedRgb, panelPintado) < CONTRAST_MIN) {
       mutedL += 0.01;
       mutedRgb = lchToRgb(mutedL, cText, accent.h);
     }

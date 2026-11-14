@@ -68,7 +68,9 @@ html[data-aspecto="manga"] .paleta-btn {
 }
 html[data-aspecto="manga"] .tb-btn { color: var(--mg-tinta); border-radius: 0; }
 html[data-aspecto="manga"] .tb-btn:hover { background: var(--mg-tinta); color: #fff; }
-html[data-aspecto="manga"] .main-grid { gap: 12px; padding: 12px 14px 12px; }
+/* `--tumbado-resto`: teléfono tumbado, lo que no es carátula a lo alto de
+   la columna (ver style.css); medido con la ficha y las barras de manga */
+html[data-aspecto="manga"] .main-grid { gap: 12px; padding: 12px 14px 12px; --tumbado-resto: 240px; }
 html[data-aspecto="manga"] .left-panel {
   position: relative;
   overflow: hidden;

@@ -98,7 +98,9 @@ html[data-aspecto="hifi"] .tb-btn {
   box-shadow: 0 1px 0 #111, inset 0 1px 0 rgb(255 255 255 / 0.15);
   color: #c8cdd3;
 }
-html[data-aspecto="hifi"] .main-grid { gap: 14px; padding: 6px 16px 8px; }
+/* `--tumbado-resto`: teléfono tumbado, lo que no es carátula a lo alto de
+   la columna (ver style.css); medido con la ficha y las barras de hi-fi */
+html[data-aspecto="hifi"] .main-grid { gap: 14px; padding: 6px 16px 8px; --tumbado-resto: 222px; }
 html[data-aspecto="hifi"] .cover-frame {
   padding: 7px;
   border-radius: 6px;
@@ -327,3 +329,7 @@ html[data-aspecto="hifi"] .track-info { min-width: 0; overflow: hidden; }
 /* en el teléfono, los nombres de las pestañas y de la vista sin el
    espaciado de los rótulos: si no, «historial» o «compartir» se cortan */
 html[data-aspecto="hifi"] body.disp-movil :is(.window > .tab-bar .tab-txt, .ctl-vista .sb-txt) { letter-spacing: 0 !important; font-size: 11px; }
+/* y el rótulo de la barra de título, a la medida que ya lleva tumbado: con
+   15 px y 0.32em «MASTER MUSIC» se quedaba con casi toda la barra y el
+   buscador de al lado decía «BUSC…» (medido a 390 px, 12-nov-2026) */
+html[data-aspecto="hifi"] body.disp-movil .title-text { font-size: 13px; letter-spacing: 0.24em !important; }

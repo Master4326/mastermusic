@@ -13,6 +13,14 @@
   --bg-panel: #161a3e;
   --bg-panel-2: #0f1330;
   --bg-frame: #2a2f5e;
+  /* EL POZO: el fondo más hondo de la interfaz (el globo del minuto, el
+     botón ▶ de una tarjeta, el lienzo de compartir, el marco del 9:16).
+     Esos sitios se pintaban con `--bg-deep`, que es un azul marino FIJO:
+     nadie lo cambia con la carátula, así que con una canción rosa o ámbar
+     seguían saliendo recuadros marinos. Este sale del panel, que sí viene
+     de la carátula, un 28 % más oscuro. `--bg-deep` se queda para lo que
+     hace bien: la tinta oscura que va ENCIMA del acento (▶, botones). */
+  --bg-pozo: color-mix(in srgb, var(--bg-panel-2) 72%, #000);
   --border-hi: #6878e0;
   --border-light: #5a6ad9;
   --border-pixel: #4a55a8;
@@ -20,6 +28,14 @@
   --accent: #5ce1e6;
   --accent-glow: #5ce1e6;
   --accent-dim: #3a8b8e;
+  /* EL ACENTO SOBRE UN BOTÓN EN RELIEVE. La red de contraste de colors.js
+     garantiza el acento contra el fondo de la letra, pero los botones en
+     relieve (`--bg-frame`) son la superficie MÁS CLARA de la ventana, y ahí
+     «[ importar música ]», «◂ volver» o la canción que suena en una lista
+     se quedaban en 3,8 : 1 (medido sobre los píxeles de la captura, con la
+     carátula rosa de la auditoría del 12-nov-2026; hacen falta 4,5). Mismo
+     tono, un punto más de luz: solo para el texto que va sobre ese relieve. */
+  --accent-marco: color-mix(in oklab, var(--accent) 75%, #fff);
   --accent-2: #8fd3ff;
   --text: #e8ecff;
   --text-dim: #8b94d8;
@@ -1819,7 +1835,7 @@ body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation
 .fx-chip {
   background: var(--bg-frame);
   border: calc(1px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
-  color: var(--accent);
+  color: var(--accent-marco);
   font-family: inherit;
   font-size: 13px;
   line-height: 1.2;
@@ -1842,7 +1858,7 @@ body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation
   background: var(--bg-frame);
   border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
-  color: var(--accent);
+  color: var(--accent-marco);
   font-family: inherit;
   font-size: 14px;
   padding: 4px 6px;
@@ -1877,7 +1893,7 @@ body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation
   background: var(--bg-frame);
   border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
-  color: var(--accent);
+  color: var(--accent-marco);
   padding: 6px 10px;
   font-size: 16px;
   cursor: pointer;
@@ -1992,12 +2008,12 @@ body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation
 .track-row:hover {
   background: var(--bg-frame);
   border: calc(1px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
-  color: var(--accent);
+  color: var(--accent-marco);
 }
 .track-row.playing {
   background: var(--bg-frame);
   border: 1px solid var(--accent);
-  color: var(--accent);
+  color: var(--accent-marco);
   text-shadow: 0 0 4px var(--accent-glow);
 }
 
@@ -2339,10 +2355,21 @@ body.barra-agarrada .prog-tip { opacity: 1; }
    centro exacto aunque a un lado haya cuatro botones y al otro tres. Antes
    el volumen y ◧ ✦ ❝ ⛶ flotaban en `position: absolute` encima de la fila:
    en cuanto la ventana estrechaba se montaban sobre «siguiente».
+
+   LA VISTA NUNCA MIDE MENOS QUE SUS BOTONES (`max-content`). Con
+   `minmax(0, 1fr)` su columna podía quedarse más estrecha que lo que lleva
+   dentro, y lo que sobraba se pintaba ENCIMA de la música: la fila se hizo
+   para cuatro botones y fue ganando ◉ palabra, ⚗ lab y ▯ 9:16. Medido el
+   12-nov-2026: en la copia local el «9:16» quedaba 22 px debajo de ⤮ a
+   1366×768 (y a cualquier ancho de PC), y con el teléfono tumbado ⛶ se
+   metía 32 px bajo ⤮ a 640×360, también en la publicada. Ahora, si la vista
+   no cabe en su mitad, la música se corre a la derecha lo justo; cuando
+   cabe —lo normal— sigue en el centro exacto. La derecha sí puede encoger:
+   su chip de «dónde suena» recorta el nombre (ver `.ctl-sonido .dev-chip`).
    ========================================================== */
 .controls-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
@@ -2354,7 +2381,11 @@ body.barra-agarrada .prog-tip { opacity: 1; }
   min-width: 0;
 }
 .ctl-musica { justify-content: center; gap: 8px; }
-.ctl-sonido { justify-self: end; gap: clamp(6px, 0.8cqw, 14px); }
+/* `max-width: 100%`: la zona no puede medir más que su columna. Sin él, al
+   ir pegada a la derecha se ensanchaba hasta lo que pedía su contenido y lo
+   que no cabía se pintaba encima de ↻; con él, cede el chip de «dónde suena»
+   (recorta el nombre), que es para lo que se le dejó encoger. */
+.ctl-sonido { justify-self: end; max-width: 100%; gap: clamp(6px, 0.8cqw, 14px); }
 /* La vista va TRANSPARENTE, sin bandeja: botones fantasma sobre la propia
    barra, como fueron siempre ✦ y ⛶. Se probó una bandeja hundida (fondo
    más oscuro con borde) y el usuario la rechazó el 22-sep-2026: «que sean
@@ -2813,7 +2844,7 @@ body.playing .status-bar .filler {
   cursor: pointer;
 }
 .dev-item:hover:not(:disabled),
-.dev-item:focus-visible { background: var(--bg-frame); color: var(--accent); }
+.dev-item:focus-visible { background: var(--bg-frame); color: var(--accent-marco); }
 .dev-item:disabled { color: var(--text-muted); cursor: not-allowed; }
 .dev-item.activo { color: var(--accent); }
 .dev-item-ico { flex-shrink: 0; color: var(--text-dim); }
@@ -3014,6 +3045,46 @@ body[data-theme="white"]  { --accent: #ffffff; --accent-glow: #ffffff; --accent-
 /* --- Visualizador: rellena el espacio libre del panel izquierdo
        (antes tenía un tope de 110px que dejaba un hueco al agrandar) --- */
 .visualizer-frame { min-height: clamp(70px, 9cqh, 260px); max-height: none; }
+
+/* --- 8 BITS, VENTANA BAJA: la carátula cede y el espectro se ve entero ---
+   El tope `52cqh` de la rejilla da por hecho que lo demás ocupa menos de
+   media ventana, y en el 8 bits no es así: barra de título + mandos + barra
+   de estado + la ficha de la canción suman 310-340 px FIJOS, que no encogen
+   con el alto. Medido el 12-nov-2026: a 1366×768 la columna pedía 574 px y
+   tenía 525; a 1280×720, 542 para 484. Lo que no cabía era el espectro, que
+   salía cortado por la barra de reproducción (y en un navegador con sus
+   barras, unos 650 px de alto, ni asomaba: se cortaba ya la ficha).
+
+   Por eso aquí el tope se saca al revés: el alto de la ventana MENOS lo que
+   no es carátula. `--col-resto` es esa suma (todo salvo carátula y espectro);
+   crece con el ANCHO porque sus letras van en cqw. Medida en 16 tamaños de
+   ventana, con unos 6 px de holgura por si una fuente tarda en llegar:
+       860 → 269 · 1240 → 312 · 1326 → 326 · 1440 → 343 · 1920 → 393 px
+   Lo que sobre se lo queda el espectro, que estira.
+
+   `--espectro-min` es el mínimo del espectro, el mismo de justo encima
+   (70 px, o el 9 % del alto en ventanas grandes) salvo en ventanas BAJAS:
+   por debajo de 680 px baja poco a poco hasta los 46 px que mide en el
+   teléfono. Un portátil de 768 con el navegador y sus barras deja unos
+   600-640 px: con 70 fijos la carátula se quedaba en nada. La rejilla y el
+   espectro leen la misma variable, así que no pueden descuadrarse.
+
+   El suelo de 180 px es para ventanas bajísimas: ahí ya no cabe todo y vale
+   más una carátula que se vea que una columna de 30 px.
+
+   Solo el 8 bits: los demás aspectos tienen barras más bajas y su propia
+   medida. Con `:where()` las reglas pesan lo mismo que `.main-grid` y
+   `.visualizer-frame`, así que las consultas de teléfono de más abajo (una
+   columna, tumbado) les siguen ganando por orden, y «letra ancha» por peso. */
+:where(html:not(.moderno)) .main-grid {
+  --col-resto: clamp(276px, calc(140px + 14.6cqw), 406px);
+  --espectro-min: min(260px, max(9cqh, clamp(46px, calc(20cqh - 66px), 70px)));
+  grid-template-columns:
+    max(180px, min(clamp(280px, 31cqw, 520px), 52cqh,
+                   calc(100cqh - var(--col-resto) - var(--espectro-min))))
+    1fr;
+}
+:where(html:not(.moderno)) .visualizer-frame { min-height: var(--espectro-min); }
 
 /* --- Pestañas --- */
 .tab-bar { font-size: clamp(15px, 1.7cqw, 28px); }
@@ -3524,7 +3595,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
   width: 30px;
   height: 30px;
   border: 2px solid var(--accent);
-  background: var(--bg-deep);
+  background: var(--bg-pozo);
   color: var(--accent);
   font-size: 13px;
   cursor: pointer;
@@ -4358,7 +4429,7 @@ body.reduce-motion .tab-content.active { animation: none; }
   bottom: calc(100% + 8px);
   transform: translateX(-50%);
   padding: 1px 7px;
-  background: var(--bg-deep);
+  background: var(--bg-pozo);
   border: 2px solid var(--accent);
   color: var(--accent);
   font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
@@ -5440,10 +5511,20 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
     resize: none;                 /* el tirador de la esquina estorba al dedo */
   }
 
-  /* --- 2) reparto del sitio: dos columnas estrechas para que la letra se lea --- */
+  /* --- 2) reparto del sitio: dos columnas estrechas para que la letra se lea ---
+     La de la carátula mide un quinto del ancho, pero NUNCA más de lo que
+     deja el alto: la carátula es cuadrada y debajo va la ficha de la canción.
+     Con solo `20vw`, a 740-844 px de ancho la carátula salía de 148-169 px y
+     la ficha ya no cabía en los ~216 px que quedan entre la barra de título
+     y los mandos: se cortaba 10-23 px por abajo (medido el 12-nov-2026; en
+     los aspectos modernos, hasta 45).
+     `--tumbado-resto` es lo que NO es carátula a lo alto de esa columna
+     (barras, márgenes y la ficha), contado sobre el alto de la ventana
+     (100cqh): 213 px en el 8 bits. Cada aspecto moderno trae el suyo en su
+     hoja, porque sus barras y su ficha miden distinto. */
   .main-grid {
     display: grid;
-    grid-template-columns: clamp(96px, 20vw, 170px) 1fr;
+    grid-template-columns: clamp(96px, min(20vw, calc(100cqh - var(--tumbado-resto, 213px))), 170px) 1fr;
     gap: 8px;
     padding: 8px;
     overflow: hidden;
@@ -5464,6 +5545,14 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
   /* Las tres zonas en un solo renglón (vista · música · dónde y cuánto):
      tumbado sobra ancho y falta alto, justo al revés que en vertical. */
   .controls-row { gap: 8px; }
+  /* Tumbado Y estrecho (640-700 px) con Spotify conectado: cinco botones de
+     vista, la música y ♡ ◎ bocina suman unos 626 px y hay 608. Se aprietan los
+     huecos, no los botones: el dedo sigue teniendo sus 38-46 px. */
+  @container win (max-width: 700px) {
+    .ctl-musica { gap: 4px; }
+    .ctl-sonido { gap: 4px; }
+    .ctl-sonido .dev-chip { padding: 0 6px; }
+  }
   /* En el móvil el volumen se controla con los botones físicos. La barra y
      la bocina se van (en horizontal sobra menos sitio aún que en vertical:
      `@media (hover: none)` las dejaba fijas en 90 px). */
@@ -6235,7 +6324,7 @@ body.reduce-motion .la-ncs { display: none; }
   font-family: var(--f-ui, 'VT323', monospace); font-size-adjust: var(--f-ui-aj, none);
   font-size: 17px;
   letter-spacing: 1px;
-  color: var(--accent);
+  color: var(--accent-marco);
   background: var(--bg-frame);
   border: calc(2px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-hi), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
@@ -6258,8 +6347,11 @@ body.reduce-motion .cv-flecha { transition: none; }
   align-items: center;
   gap: 6px;
   padding: 2px 8px;
-  background: var(--bg-deep);
-  border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
+  /* Transparente, como el «buscar» de la barra de título: era una caja azul
+     marino fija (`--bg-deep`), justo el buscador más oscuro que su barra que
+     el usuario pidió quitar. Lo dibuja su borde, del color del marco vivo. */
+  background: transparent;
+  border: calc(2px * var(--marco-g, 1)) solid var(--marco-pixel, var(--border-pixel));
   transition: border-color var(--t-rapida), box-shadow var(--t-rapida);
 }
 .cfg-buscar:focus-within {
@@ -6570,7 +6662,7 @@ body.reduce-motion .comp-caja { animation: none; }
   height: auto;
   border: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
-  background: var(--bg-deep);
+  background: var(--bg-pozo);
 }
 
 /* ----- La columna de mandos ----- */
@@ -6708,6 +6800,11 @@ body.reduce-motion .comp-caja { animation: none; }
   min-height: clamp(30px, 2.6cqw, 40px);
   padding: 0 10px;
   font-size: clamp(14px, 1.3cqw, 20px);
+  /* Es lo único de la fila que puede ceder sin perder nada: si la zona se
+     queda sin sitio, el nombre del aparato se recorta con «…» (sigue entero
+     en su menú). Con el `flex-shrink: 0` de fábrica se montaba sobre ↻. */
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 /* ---------- Ventanas estrechas (de escritorio, o un teléfono tumbado) ----------
@@ -6721,7 +6818,8 @@ body.reduce-motion .comp-caja { animation: none; }
    sube al suyo, arriba y en el centro, y vista y sonido comparten el de
    abajo. (El teléfono en vertical tiene su propia disposición, más abajo.) */
 @container win (max-width: 600px) {
-  .controls-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 6px; }
+  /* la vista, igual que arriba: nunca más estrecha que sus botones */
+  .controls-row { grid-template-columns: minmax(max-content, 1fr) minmax(0, 1fr); row-gap: 6px; }
   .ctl-musica { grid-column: 1 / -1; grid-row: 1; }
   .ctl-vista { grid-row: 2; }
   .ctl-sonido { grid-row: 2; }
@@ -7322,7 +7420,7 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
   flex: 0 0 auto;
   font-size: 18px;
   padding: 2px 8px;
-  color: var(--accent);
+  color: var(--accent-marco);
   background: var(--bg-frame);
   border: calc(1px * var(--marco-g, 1)) solid var(--marco-light, var(--border-light));
   box-shadow: inset calc(1px * var(--bisel, 1)) calc(1px * var(--bisel, 1)) 0 var(--border-light), inset calc(-1px * var(--bisel, 1)) calc(-1px * var(--bisel, 1)) 0 var(--border-dark);
@@ -7650,7 +7748,7 @@ body.reduce-motion .v916 { transition: none; }
   container: v916 / size;
   contain: paint;           /* lo de dentro no se sale ni se mezcla con nada */
   isolation: isolate;
-  background: var(--bg-deep);
+  background: var(--bg-pozo);
   --v916-letra: 5.4cqw;     /* tamaño de la vista lista, por estilo */
 }
 /* Grabando: el ratón no existe para el marco (ni hovers en el vídeo). */
@@ -7663,7 +7761,7 @@ body.reduce-motion .v916 { transition: none; }
   z-index: 0;
   overflow: hidden;
   background: radial-gradient(ellipse at 50% 16%,
-    var(--dyn-1, var(--bg-window)) 0%, var(--dyn-2, var(--bg-deep)) 58%, #000 100%);
+    var(--dyn-1, var(--bg-window)) 0%, var(--dyn-2, var(--bg-pozo)) 58%, #000 100%);
 }
 .v916-bg-img {
   position: absolute;
