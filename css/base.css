@@ -1,3 +1,9 @@
+/* css/base/01-cimientos.css · hoja 1 de 23 de la base de la app (lo que fue css/style.css)
+   Los cimientos: variables (colores, fuentes, medidas, curvas), el atributo
+   hidden, el grano y el CRT, la ventana, la barra de título y la rejilla
+   principal.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
+
 /* ==========================================================
    SEVEN.FM — retro-futuristic pixel music player
    ========================================================== */
@@ -57,7 +63,7 @@
   --t-lenta: 0.6s;
   --muelle: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* LAS CURVAS DEL MOVIMIENTO (10-nov-2026). Nacieron en el modo edit
-     (css/edit-fx.css, 15-oct) y ahora las usa toda la letra —lista,
+     (css/edit/, 15-oct) y ahora las usa toda la letra —lista,
      palabra, la luz del borde—: la misma familia de movimiento en todas
      partes. Nada de goma: --muelle queda para los botones. */
   --ed-sale:  cubic-bezier(0.16, 1, 0.3, 1);      /* entra decidido y se posa largo */
@@ -204,7 +210,7 @@ body.perf-bajo::after { display: none; }
    ancho: la app abría como una cajita en medio de una pantalla negra, con
    la letra en una columna estrecha y la carátula del tamaño de un sello.
    Se resolvía a mano con el ▢ … en cada visita, porque tampoco se guardaba
-   (ahora sí, ver `mm_window_max` en js/seven.js).
+   (ahora sí, ver `mm_window_max` en js/seven/).
 
    Con `min()` el tope solo manda cuando la pantalla da para tanto, así que
    esto no le quita sitio a nadie: en pantallas pequeñas sigue ganando el
@@ -387,6 +393,11 @@ body:has(.window.maximized) { padding: 0; }
   overflow: hidden;
   min-height: 0;
 }
+/* css/base/02-paneles.css · hoja 2 de 23 de la base de la app (lo que fue css/style.css)
+   Los dos paneles: a la izquierda la carátula, la ficha de la canción, el
+   espectro y la marquesina; a la derecha las pestañas (y su tirador en
+   táctil).
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    LEFT PANEL — Cover, info, visualizer
@@ -533,7 +544,7 @@ body.reduce-motion .ti-eq i { animation: none; transform: scaleY(0.55); }
   min-width: 0;
 }
 
-/* ----- Marquesina (seven.js): lo que no cabe rueda, espera y vuelve -----
+/* ----- Marquesina (js/seven/): lo que no cabe rueda, espera y vuelve -----
    El span interior se desliza --ti-desp px; el elemento guarda el recorte.
    Mientras rueda, fuera el ellipsis (taparía el texto en movimiento) y
    desvanecido en los bordes para que entre y salga con suavidad. */
@@ -641,7 +652,7 @@ body.perf-bajo #visualizer { filter: none; }
   background: var(--bg-panel-2);
   border-bottom: calc(2px * var(--marco-g, 1)) solid var(--marco-dark, var(--border-dark));
   font-size: 18px;
-  /* La barra se esconde sola en la pestaña de letras (seven.js), como los
+  /* La barra se esconde sola en la pestaña de letras (js/seven/), como los
      controles del cine. Colapsa DE VERDAD (max-height) para que la letra
      gane el sitio, no un simple fundido. Es una transición de un disparo
      al ocultar/mostrar, no una animación por frame. El tope de 90px cubre
@@ -742,7 +753,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
 .tab-content.active { display: block; }
 
 /* Lyrics tab: make .lyrics-body the actual scroll container (bounded height)
-   instead of .tab-content, so the auto-center scroll in lyrics.js works. */
+   instead of .tab-content, so the auto-center scroll in js/letra/ works. */
 #tab-lyrics.active {
   display: flex;
   flex-direction: column;
@@ -753,6 +764,10 @@ body.perf-tactil .tab-bar.se-esconde::after {
   flex: 1;
   min-height: 0;           /* allow it to shrink below content height so it scrolls */
 }
+/* css/base/03-letra.css · hoja 3 de 23 de la base de la app (lo que fue css/style.css)
+   La letra en lista: los versos, la profundidad por distancia, la traducción
+   y el revelado palabra a palabra del verso que suena.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ----- Lyrics — music-edit style: pop animation on active line ----- */
 .lyrics-body {
@@ -886,7 +901,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
 /* ----- Versos que se parten en mitades parecidas -----
    Sin esto, un verso largo partía donde caía y dejaba una palabra sola en
    el segundo renglón. `balance` reparte el texto en renglones de largo
-   parecido sin cambiar cuántos hay (el centrado de lyrics.js no nota nada).
+   parecido sin cambiar cuántos hay (el centrado de js/letra/ no nota nada).
    Funciona en todos los navegadores desde 2024; donde no, parte como antes. */
 .lyrics-body .lyric-line,
 .lyrics-body .lyric-trad,
@@ -898,7 +913,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
 /* ----- Profundidad por distancia (como Apple Music) -----
    Antes todas las líneas que venían iban a 0,6 px de desenfoque y todas
    las pasadas a 1,5 px. Ahora la siguiente se lee casi nítida y cada una
-   más lejos se apaga y se desenfoca un poco más. lyrics.js pone data-d en
+   más lejos se apaga y se desenfoca un poco más. js/letra/ pone data-d en
    las ±3 vecinas del verso activo; las demás cogen el valor «lejos».
    Solo con letra sincronizada (.sync): una letra sin tiempos no tiene
    verso activo y se quedaría toda al fondo. Ninguna regla toca la activa. */
@@ -934,7 +949,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
    — lo que se canta arriba, lo que quiere decir abajo — porque el que está
    cantando sigue la de arriba y solo baja la vista cuando le hace falta.
 
-   Es HERMANA de .lyric-line, nunca hija (lyrics.js rehace el innerHTML de la
+   Es HERMANA de .lyric-line, nunca hija (js/letra/ rehace el innerHTML de la
    línea activa en cada verso), así que se ilumina con el selector de
    hermano adyacente: la activa manda sobre la suya.
 
@@ -984,7 +999,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
 }
 
 /* ----- Revelado palabra a palabra en la línea activa (estilo edit) -----
-   lyrics.js parte la línea activa en spans .w con --d (delay escalonado)
+   js/letra/ parte la línea activa en spans .w con --d (delay escalonado)
    y --sx (signo alternante -1/1 para efectos con dirección).
    Cada línea trae uno de 12 efectos deterministas: rise / slide / wave /
    type / flip / fall / glitch / zoom / neon / spin / elastic / swing.
@@ -1011,7 +1026,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
   animation-delay: var(--d, 0ms);
   animation-timing-function: var(--ed-sale, cubic-bezier(0.16, 1, 0.3, 1));
 }
-/* Revelado terminado (lyrics.js añade .done): texto fijo, sin animaciones
+/* Revelado terminado (js/letra/ añade .done): texto fijo, sin animaciones
    ni capas de composición — ninguna letra puede quedar oculta. */
 .lyrics-body .lyric-line.done .w {
   animation: none !important;
@@ -1021,7 +1036,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
 }
 /* En los efectos letra a letra cada letra es un inline-block, y entre dos
    inline-blocks pegados el navegador PUEDE partir el renglón: las palabras
-   se cortaban por la mitad al cambiar de fila («cr | uzando»). lyrics.js
+   se cortaban por la mitad al cambiar de fila («cr | uzando»). js/letra/
    mete cada palabra en su .wl, también inline-block: salta de fila entera
    y solo se parte por dentro si no cabe ni sola en el verso. */
 .lyrics-body .lyric-line .wl { display: inline-block; }
@@ -1041,7 +1056,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
      fill-mode "both" ese valor se queda puesto y un elemento con filtro se
      pinta recortado a su caja, lo que cortaba el resplandor de .w-big
      (lo vigila assets/check-modulos.js);
-   · `--sx` es el signo alternante (-1/1) que reparte lyrics.js.
+   · `--sx` es el signo alternante (-1/1) que reparte js/letra/.
    ══════════════════════════════════════════════════════════════════════════ */
 .lyric-line.fx-rise .w  { animation-name: w-rise; }
 .lyric-line.fx-slide .w { animation-name: w-slide; }
@@ -1255,6 +1270,10 @@ body.perf-tactil .tab-bar.se-esconde::after {
   0%   { opacity: 0; transform: translateY(-0.8em) scale(1.35); filter: none; }
   100% { opacity: 1; transform: translateY(0) scale(1);         filter: none; }
 }
+/* css/base/04-letra-tipografias.css · hoja 4 de 23 de la base de la app (lo que fue css/style.css)
+   La letra según su tipografía: los estilos Minecraft, Mario, Halo y VT323,
+   el remate de cada fuente, el karaoke y los huecos instrumentales.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    ESTILO MINECRAFT (ajustes → letras → tipografía → Pixelify)
@@ -1508,7 +1527,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
 }
 
 /* ----- KARAOKE: el verso activo se tiñe palabra a palabra -----
-   El LRC solo marca el arranque de cada línea, así que lyrics.js reparte el
+   El LRC solo marca el arranque de cada línea, así que js/letra/ reparte el
    verso por sílabas y va poniendo .sung / .cantando. Aquí solo se anima
    color y text-shadow: nada que dispare layout, y ni una sola capa nueva de
    composición sobre las que ya monta el revelado. */
@@ -1533,9 +1552,9 @@ body.perf-tactil .tab-bar.se-esconde::after {
    se quedaba quieta hasta la siguiente. Ahora va como en Apple Music Sing:
    debajo, la palabra en el tono de lo que falta por cantar, con el brillo
    de las ya cantadas; encima, una copia de sí misma en el acento (el texto
-   lo deja lyrics.js en data-t) que se destapa con clip-path hasta --p,
-   que lyrics.js mueve en cada fotograma con el mismo reparto por sílabas.
-   Lleva también .sung (lyrics.js la pone al empezar), así que esta regla
+   lo deja js/letra/ en data-t) que se destapa con clip-path hasta --p,
+   que js/letra/ mueve en cada fotograma con el mismo reparto por sílabas.
+   Lleva también .sung (js/letra/ la pone al empezar), así que esta regla
    tiene que ir DESPUÉS. El recorte va de −12 % a 112 % para no dejar sin
    pintar el vuelo de la cursiva de la palabra destacada. */
 .lyrics-body.sync .lyric-line.active .w.cantando {
@@ -1561,7 +1580,7 @@ body.perf-tactil .tab-bar.se-esconde::after {
    compone gratis y sigue funcionando con «menos movimiento». */
 
 /* ----- HUECO INSTRUMENTAL: intro, solo o puente -----
-   Tres puntos que se encienden con el avance (--gp, 0→1 desde lyrics.js).
+   Tres puntos que se encienden con el avance (--gp, 0→1 desde js/letra/).
    Sin esto la letra se congela y parece que la app se colgó. */
 .lyric-gap {
   display: flex;
@@ -1621,7 +1640,7 @@ body.reduce-motion .lyric-gap i { transition: none; }
 }
 
 /* ═══════ MODO EDIT · una línea gigante estilo edit de TikTok ═══════
-   lyrics.js arma por línea un .ed-stack con posición (--top),
+   js/letra/ arma por línea un .ed-stack con posición (--top),
    inclinación (--tilt) y movimiento de cámara (clase edcam-*).
    Títulos ≤3 palabras salen GIGANTES en Bodoni; frases en Poppins
    palabra a palabra. La línea anterior colapsa con blur. */
@@ -1646,7 +1665,7 @@ body.reduce-motion .lyric-gap i { transition: none; }
 .lyrics-palabra { flex: 1; min-height: 0; overflow: hidden; }
 .lyrics-palabra > .lyrics-empty { padding: 0 24px; }
 /* En el teléfono no cabe un botón más en la fila de vista: ◉ se esconde y
-   el botón ✦ recorre las tres vistas (js/lyrics.js). */
+   el botón ✦ recorre las tres vistas (js/letra/). */
 body.disp-movil #palabraBtn { display: none; }
 
 /* Corchetes de esquina del panel de la letra. ANTES latían de 0.2 a 0.75 con
@@ -1729,7 +1748,7 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
    Al pie y quieto, siempre en el mismo sitio.
 
    `bottom` con margen de sobra: el modo edit centra sus versos alrededor del
-   47% del panel (ED_TOPS en lyrics.js llega al 58%), así que abajo queda
+   47% del panel (ED_TOPS en js/letra/ llega al 58%), así que abajo queda
    sitio libre y nunca se pisan. */
 .lyrics-edit .ed-trad,
 .lyrics-palabra .ed-trad {
@@ -1761,7 +1780,7 @@ body:not(.playing) .la-corner { animation-play-state: paused; }
 body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation: none; opacity: 0.62; }
 
 
-/* Los revelados letra a letra (.edl-*) viven en css/edit-fx.css, con el
+/* Los revelados letra a letra (.edl-*) viven en css/edit/, con el
    resto del catálogo del modo edit (antes estaban repartidos aquí). */
 
 
@@ -1770,6 +1789,10 @@ body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation
    contorno neón · v18: inversión de color y palabra doble con cursiva ·
    v19: cortes secos elegantes. */
 
+/* css/base/05-lab.css · hoja 5 de 23 de la base de la app (lo que fue css/style.css)
+   El ⚗ laboratorio de efectos (solo sale en la copia local) y la regla que
+   hace que `hidden` esconda cualquier botón de la fila de mandos.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ═══ ⚗ LABORATORIO DE EFECTOS · panel para probar animaciones sin música ═══ */
 .fx-lab {
@@ -1881,6 +1904,9 @@ body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation
   .fx-lab { width: 156px; font-size: 13px; }
 }
 
+/* css/base/06-listas-y-ajustes.css · hoja 6 de 23 de la base de la app (lo que fue css/style.css)
+   La pestaña de listas y la de ajustes, en su forma base.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ----- Library tab ----- */
 .library-actions {
@@ -1906,7 +1932,7 @@ body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation
   transform: translate(1px, 1px);
 }
 /* Los corchetes «[ … ]» iban en --magenta, un rosa fijo: ahora en el segundo
-   tono de la paleta (--accent-2, lo saca seven.js del acento). */
+   tono de la paleta (--accent-2, lo saca js/seven/ del acento). */
 .retro-btn .bracket { color: var(--accent-2); }
 .retro-btn.small { padding: 4px 8px; font-size: 13px; }
 
@@ -2163,6 +2189,11 @@ body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation
   line-height: 1.6;
   font-style: italic;
 }
+/* css/base/07-reproduccion.css · hoja 7 de 23 de la base de la app (lo que fue css/style.css)
+   La barra de reproducción: el tiempo en 7 segmentos, el progreso, la fila
+   de mandos, el volumen, la barra de estado, el historial y el chip «dónde
+   suena».
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    PLAYBACK BAR
@@ -2186,7 +2217,7 @@ body.reduce-motion :is(.lyrics-edit, .lyrics-palabra) .ed-trad.entra { animation
    css/fuentes/DSEG-LICENSE.txt), la variante «Mini» en cursiva: solo trae
    números y signos, 5 KB. Detrás de cada cifra se ven sus segmentos
    APAGADOS, como en un display de verdad: es un ::before con el mismo
-   texto hecho todo «8» (lo escribe js/visualizer.js en data-g cada vez que
+   texto hecho todo «8» (lo escribe js/espectro/ en data-g cada vez que
    cambia el tiempo). En DSEG el «-» ocupa lo mismo que una cifra, así que
    el «-1:12» del tiempo restante también cuadra con su «88:88». */
 @font-face {
@@ -2328,7 +2359,7 @@ body.barra-agarrada .progress-bg {
     0 1px 0 var(--border-hi),
     0 0 12px var(--accent-glow);
 }
-/* El globito del minuto se queda puesto mientras se arrastra (seven.js lo
+/* El globito del minuto se queda puesto mientras se arrastra (js/seven/ lo
    mueve con el ratón; con el dedo no hay hover que lo encienda). */
 body.barra-agarrada .prog-tip { opacity: 1; }
 
@@ -2546,7 +2577,7 @@ body.barra-agarrada .prog-tip { opacity: 1; }
 /* Suena en un aparato que NO deja cambiar su volumen desde fuera (Spotify
    dice `supports_volume: false`: iPhones por Spotify Connect, algunos
    altavoces). La barra seguía moviéndose sin cambiar nada; ahora se ve
-   apagada y js/spotify.js lo dice una vez. La pone y la quita él. */
+   apagada y js/spotify/ lo dice una vez. La pone y la quita él. */
 body.vol-ajeno .volume-ctl,
 body.vol-ajeno .dev-vol { opacity: 0.4; }
 
@@ -2602,7 +2633,7 @@ body.vol-ajeno .dev-vol { opacity: 0.4; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Flicker retro cada vez que cambia el mensaje (clase puesta por seven.js) */
+/* Flicker retro cada vez que cambia el mensaje (clase puesta por js/seven/) */
 #statusText.flash { animation: status-in 0.4s steps(4, jump-none); }
 @keyframes status-in {
   0% { opacity: 0; }
@@ -2633,7 +2664,7 @@ body.vol-ajeno .dev-vol { opacity: 0.4; }
   background: var(--accent);
   box-shadow: 0 0 3px var(--accent-glow);
 }
-/* Con espectro real (clase .live puesta por visualizer.js) manda el FFT;
+/* Con espectro real (clase .live puesta por js/espectro/) manda el FFT;
    la animación decorativa queda solo como respaldo sin señal */
 .mini-eq.live i { animation: none !important; }
 body.playing .mini-eq i { animation: eq-dance 0.9s steps(3, jump-none) infinite; }
@@ -2685,7 +2716,7 @@ body.playing .status-bar .filler {
   color: var(--text-muted);
   text-shadow: none;
 }
-/* Dos puntos que parpadean cada segundo (spans puestos por seven.js) */
+/* Dos puntos que parpadean cada segundo (spans puestos por js/seven/) */
 /* `inline-block`: un <span> en línea no puede tener capa propia, y sin capa
    su parpadeo corría en el hilo principal en cada vsync, las 24 horas. */
 #clock .c { display: inline-block; animation: colon-blink 1s steps(1) infinite; }
@@ -2812,7 +2843,7 @@ body.playing .status-bar .filler {
 .dev-chip.dev-aqui .dev-ico { color: var(--accent); }
 .dev-item.es-aqui .dev-item-ico { color: var(--accent); }
 
-/* El menú es hijo de <body> (lo cuelga spotify.js): así ningún ancestro con
+/* El menú es hijo de <body> (lo cuelga js/spotify/): así ningún ancestro con
    `transform` puede robarle el anclaje del position:fixed — la trampa que ya
    mordió cinco veces en este proyecto — ni lo recorta el overflow de nadie. */
 .dev-menu {
@@ -2874,6 +2905,11 @@ body.playing .status-bar .filler {
   color: var(--text-dim);
   font-size: 0.92em;
 }
+/* css/base/08-escalado.css · hoja 8 de 23 de la base de la app (lo que fue css/style.css)
+   Los botones de vista, soltar archivos encima, las barras de
+   desplazamiento, el escalado fluido con la ventana, la tableta y el móvil,
+   y el modo vinilo.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    MODO CINE — letra gigante sobre la carátula (opcional)
@@ -3370,6 +3406,10 @@ body.vinyl-mode .cover-inner::after {
 }
 
 @keyframes vinyl-spin { to { transform: rotate(360deg); } }
+/* css/base/09-spotify-biblioteca.css · hoja 9 de 23 de la base de la app (lo que fue css/style.css)
+   Buscar en Spotify y su biblioteca: la rejilla de portadas, la cabecera de
+   la lista abierta, las filas y la marca de la que suena.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    Spotify search inside the library tab
@@ -3666,7 +3706,7 @@ body.perf-tactil .sp-queue { opacity: 1; }
 /* ----- La que suena: tres barritas en el sitio del número -----
    Era un ▶ quieto, sonara o no. Ahora, tres barras VFD del mismo corte que
    el mini-EQ de la barra de estado: con audio que medir las mueve
-   visualizer.js (clase .live, pasos de 3/6/9/12 px); sin él, la animación de
+   js/espectro/ (clase .live, pasos de 3/6/9/12 px); sin él, la animación de
    respaldo mientras suena; en pausa, bajitas y quietas. Pequeñas a
    propósito: en una lista, lo que se mueve distrae enseguida. */
 .sp-eq {
@@ -3792,6 +3832,11 @@ body.reduce-motion .sp-eq i { animation: none !important; transform: scaleY(0.5)
   margin: 12px auto 4px;
 }
 .lib-more[disabled] { opacity: 0.5; cursor: default; }
+/* css/base/10-ajustes.css · hoja 10 de 23 de la base de la app (lo que fue css/style.css)
+   Accesibilidad, menos movimiento, intensidad del CRT, tamaño y densidad,
+   los controles segmentados, la galería de tipografías, las filas de ajustes
+   y los deslizadores.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    ACCESIBILIDAD
@@ -4276,8 +4321,8 @@ body.reduce-motion .fuentes-caja { animation: none; }
    Eran los del sistema: bolita redonda y riel gris (en claro, además, hasta
    que la raíz dijo color-scheme). Ahora, el riel de celdas de la barra de
    progreso con lo recorrido en el acento y un tirador cuadrado biselado.
-   Lo recorrido lo dice --v (0-100 %), que escriben seven.js (sincronía) y
-   spotify.js (volumen del aparato): WebKit no tiene pseudo-elemento para la
+   Lo recorrido lo dice --v (0-100 %), que escriben js/seven/ (sincronía) y
+   js/spotify/ (volumen del aparato): WebKit no tiene pseudo-elemento para la
    parte llena (Firefox sí: ::-moz-range-progress). */
 .offset-ctl input[type="range"],
 .dev-vol-rango {
@@ -4363,6 +4408,10 @@ body.reduce-motion .fuentes-caja { animation: none; }
   white-space: nowrap;
   justify-self: start;
 }
+/* css/base/11-pulido.css · hoja 11 de 23 de la base de la app (lo que fue css/style.css)
+   El pulido visual (v118–v120): detalles de acabado y los vacíos con el
+   dibujo de su pestaña.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    PULIDO VISUAL
@@ -4384,7 +4433,7 @@ body.reduce-motion .fuentes-caja { animation: none; }
   initial-value: #5ce1e6;
 }
 @property --accent-dim  { syntax: '<color>'; inherits: true; initial-value: #3a8b8e; }
-/* Segundo tono de la paleta: el acento girado 20° y más claro (seven.js).
+/* Segundo tono de la paleta: el acento girado 20° y más claro (js/seven/).
    Hace el papel que tenía el rosa FIJO --magenta en rótulos y adornos. */
 @property --accent-2    { syntax: '<color>'; inherits: true; initial-value: #8fd3ff; }
 /* La segunda tinta de la luz de borde (js/luz.js): otro color de la carátula */
@@ -4697,7 +4746,7 @@ body.reduce-motion .li-way:active { transform: none; }
   color: var(--text-muted);
 }
 
-/* consejo que rota cada ~6.5 s (lyrics.js) */
+/* consejo que rota cada ~6.5 s (js/letra/) */
 .li-tip {
   margin-top: 8px;
   min-height: 1.4em;
@@ -4725,6 +4774,10 @@ body.reduce-motion .li-way::after { opacity: 0; }
 /* (El viejo .first-run vivía dentro de #lyricsBody, que el modo edit oculta:
    por eso el panel salía en blanco sin canción. Lo sustituye .lyrics-idle,
    más arriba en este archivo, que va fuera de las dos vistas.) */
+/* css/base/12-fondos.css · hoja 12 de 23 de la base de la app (lo que fue css/style.css)
+   Lo que se mueve detrás: la escena sin letra (NCS), el ambiente reactivo,
+   el fondo del panel de la letra y los recortes de rendimiento del móvil.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    ESCENA SIN LETRA — estilo NCS  (js/ncs.js)
@@ -5290,6 +5343,10 @@ body.reduce-motion .lyrics-ambient.golpetazo::after { content: none; }
 }
 
 
+/* css/base/13-movil.css · hoja 13 de 23 de la base de la app (lo que fue css/style.css)
+   La búsqueda rediseñada, el repaso del móvil en vertical y la tanda de
+   comodidad (buscar, poner una lista, saber qué suena después).
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    TANDA 8 · lo que queda: la búsqueda rediseñada
@@ -5753,6 +5810,10 @@ body.perf-tactil .sp-del { opacity: 1; }
   .pb-txt { display: none; }
   .paleta-btn { flex: 0 0 auto; width: 40px; padding: 0; justify-content: center; }
 }
+/* css/base/14-buscador.css · hoja 14 de 23 de la base de la app (lo que fue css/style.css)
+   El buscador universal, la letra ancha, la onda de la letra y las filas de
+   lista en el móvil.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    EL BUSCADOR UNIVERSAL (Ctrl+K)
@@ -6149,7 +6210,7 @@ body.letra-ancha .title-bar { height: clamp(36px, 4cqh, 48px); }
    El botón que sincroniza el espectro con el audio del sistema vive
    dentro del marco del visualizador, así que con la letra ancha se iría
    con él — y es justo el botón que necesita quien oye por Spotify
-   Connect. seven.js lo muda a la fila de mandos mientras dure el modo:
+   Connect. js/seven/ lo muda a la fila de mandos mientras dure el modo:
    ahí es un botón más, como ✦ o ⛶, y no hace falta salir de la vista
    para encenderlo. */
 .viz-sync.en-mandos {
@@ -6259,6 +6320,10 @@ body.reduce-motion .la-ncs { display: none; }
   #queueList .q-now .sp-name,
   #libList .sp-now .sp-name { color: var(--accent); }
 }
+/* css/base/15-configuracion.css · hoja 15 de 23 de la base de la app (lo que fue css/style.css)
+   Configuración: la cabecera con volver y buscar, el índice de secciones y
+   las explicaciones del «?».
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    ══════════════════════════════════════════════════════════
@@ -6571,6 +6636,9 @@ body.reduce-motion .set-row-late {
   .cfg-chip { padding: 5px 11px; }
   .set-ver { padding: 5px 9px; }
 }
+/* css/base/16-compartir.css · hoja 16 de 23 de la base de la app (lo que fue css/style.css)
+   ❝ Compartir la letra: el panel de la tarjeta.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    ══════════════════════════════════════════════════════════
@@ -6760,6 +6828,11 @@ body.reduce-motion .comp-caja { animation: none; }
   .comp-lienzo { max-height: 62vh; }
   .comp-versos { min-height: 80px; max-height: 110px; }
 }
+/* css/base/17-mandos-y-telefono.css · hoja 17 de 23 de la base de la app (lo que fue css/style.css)
+   El rediseño del 22-sep-2026: la fila de mandos en tres zonas y el teléfono
+   (franja «ahora suena», pestañas al pie, fila de vista que se esconde
+   sola).
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ══════════════════════════════════════════════════════════════════
    REDISEÑO DE LA FILA DE MANDOS Y DEL TELÉFONO (22-sep-2026)
@@ -6962,7 +7035,7 @@ body.disp-movil .ti-title  { font-size: 23px; line-height: 1; }
 body.disp-movil .ti-artist { font-size: 18px; line-height: 1; }
 body.disp-movil .ti-album  { font-size: 15px; line-height: 1; margin-top: 0; }
 /* El espectro deja de ocupar una fila: pasa a ser el fondo tenue de la
-   franja. Es el mismo lienzo (visualizer.js lo redimensiona solo); lo que
+   franja. Es el mismo lienzo (js/espectro/ lo redimensiona solo); lo que
    cambia es que ya no roba 60 px de alto a la letra. */
 body.disp-movil .visualizer-frame {
   position: absolute;
@@ -6995,7 +7068,7 @@ body.disp-movil .left-panel > .like-btn {
   font-size: 27px;
 }
 /* Los avisos de la barra de estado salen en el renglón del disco durante
-   sus 4 s (seven.js marca `.aviso`); el resto del tiempo, el disco. */
+   sus 4 s (js/seven/ marca `.aviso`); el resto del tiempo, el disco. */
 body.disp-movil .track-info #statusText {
   display: block;
   font-size: 15px;
@@ -7271,7 +7344,7 @@ body.disp-movil .dev-vol {
    22-sep-2026: «que sea como ajustes, que si después de un tiempo no le
    das se quite, para que esté más limpio».
 
-   Mismo reloj y mismo gesto que la barra de pestañas (js/seven.js): se va
+   Mismo reloj y mismo gesto que la barra de pestañas (js/seven/): se va
    cuando ella lleva `.se-esconde` —solo en la letra, tras 2,5 s con ratón
    o 4 s con el dedo— y vuelve con ella: al mover el ratón o con el
    tirador. No tiene temporizador propio, así que no puede desacompasarse.
@@ -7301,10 +7374,14 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
 /* El anillo del teclado, por dentro: en el teléfono la fila recorta lo que
    se sale (para poder plegarse) y el anillo de fuera quedaba cortado. */
 .ctl-vista > :focus-visible { outline-offset: -2px; }
+/* css/base/18-conectar-e-instalada.css · hoja 18 de 23 de la base de la app (lo que fue css/style.css)
+   La ventana «conectar con Spotify» (la que pide el Client ID) y la app
+   instalada en el PC, donde la barra de la app es la de la ventana.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ==========================================================
    «CONECTAR CON SPOTIFY» · la ventana que pide el Client ID
-   (la monta js/spotify.js → askClientId). Antes llevaba el gris, las
+   (la monta js/spotify/ → askClientId). Antes llevaba el gris, las
    esquinas y las píldoras verdes de Spotify escritas a mano y la VT323 a
    13 px: parecía de otro programa. Ahora es una ventana de la casa, con
    la paleta viva y los campos transparentes con borde.
@@ -7503,6 +7580,10 @@ body.reduce-motion .controls-row .ctl-vista { transition: none; }
     app-region: no-drag;
   }
 }
+/* css/base/19-iconos.css · hoja 19 de 23 de la base de la app (lo que fue css/style.css)
+   Los iconos pixel: el bloque que genera assets/iconos-pixel.js (no se toca
+   a mano) y dónde va cada uno y a qué tamaño.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ICONOS-PIXEL:INICIO — lo genera assets/iconos-pixel.js; no tocar a mano:
    se cambia el dibujo allí y se vuelve a correr `node assets/iconos-pixel.js`. */
@@ -7640,7 +7721,7 @@ body.disp-movil .tb-cfg.active .ico {
 .vol-btn.low .ico-vol { --m: var(--ico-vol-bajo); }
 .vol-btn.muted .ico-vol { --m: var(--ico-vol-mudo); }
 
-/* ◈ sync del espectro: el icono lo pone el CSS, porque visualizer.js
+/* ◈ sync del espectro: el icono lo pone el CSS, porque js/espectro/
    reescribe el texto del botón («sync» / «oír») y se lo llevaría. */
 .viz-sync::before {
   content: '';
@@ -7653,10 +7734,14 @@ body.disp-movil .tb-cfg.active .ico {
   -webkit-mask: var(--ico-sync) center / 100% 100% no-repeat;
   mask: var(--ico-sync) center / 100% 100% no-repeat;
 }
+/* css/base/20-video-916.css · hoja 20 de 23 de la base de la app (lo que fue css/style.css)
+   El ▯ vídeo 9:16 y el escenario que comparte con el cine: el marco, la
+   letra dentro y los tres estilos (app, vinilo, letra).
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ══════════════════════════════════════════════════════════════════
    ▯ VÍDEO 9:16 · la app en formato de móvil, para grabar TikToks
-   (js/vertical.js)
+   (js/cine/)
 
    Un escenario negro a pantalla completa, el MARCO vertical en el centro
    —de ahí sale el vídeo, recortado al píxel— y el panel al lado, FUERA del
@@ -7680,7 +7765,7 @@ body.disp-movil .cfg-chip[data-destino="cfg-video"] { display: none; }
 
 /* …y en la página PUBLICADA no existe: grabar el audio de Spotify es
    «stream ripping» para sus términos, así que el vídeo 9:16 se queda en la
-   copia local (29-sep-2026). Escondido SIEMPRE, y js/vertical.js lo
+   copia local (29-sep-2026). Escondido SIEMPRE, y js/cine/ lo
    destapa con html.con-916 solo abriendo la app en 127.0.0.1 / localhost /
    archivo suelto. Al revés no valdría: el botón asomaría un instante en la
    web mientras carga el script. `!important` porque js/ajustes-ui.js pone y
@@ -8240,7 +8325,7 @@ body.reduce-motion .v916-disco,
 body.reduce-motion .v916-brillo,
 body.reduce-motion .v916-bg-img { animation: none; }
 /* El brazo: misma geometría que el del cine (pivote en 102 %/10 %, largo
-   62 %, de -77,8° a -51,6°). El ángulo lo escribe vertical.js en --br-ang. */
+   62 %, de -77,8° a -51,6°). El ángulo lo escribe js/cine/ en --br-ang. */
 .v916-brazo {
   position: absolute;
   inset: 0;
@@ -8394,6 +8479,10 @@ body.reduce-motion .v916-bg-img { animation: none; }
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 86%, transparent 100%);
   mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 86%, transparent 100%);
 }
+/* css/base/21-video-916-panel.css · hoja 21 de 23 de la base de la app (lo que fue css/style.css)
+   El ▯ vídeo 9:16, lo que NO sale en el vídeo: las guías de TikTok, la
+   cuenta atrás, el vídeo grabado y el panel de mandos.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ---- Guías de TikTok: dónde cae su interfaz. Nunca salen en el vídeo
    (se esconden al grabar), así que pueden ser blancas: son luz, no marca. */
@@ -8743,7 +8832,7 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
 .v916-soltar:hover { color: var(--peligro); border-bottom-color: currentColor; }
 .v916 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ---- 1080p: el marco TUMBADO mientras graba (ver js/vertical.js) ----
+/* ---- 1080p: el marco TUMBADO mientras graba (ver js/cine/) ----
    Girado sobre su centro, ocupa la pantalla a lo ancho y el canal de
    grabación lo endereza. El panel no cabe: a la derecha queda la franja
    de «rec» (76 px, fuera del marco, no sale en el vídeo). */
@@ -8823,10 +8912,14 @@ body.reduce-motion .v916-cuenta.late b { animation: none; }
   z-index: 4;                /* encima de la franja: un vídeo tapado puede dejar de avisar */
   pointer-events: none;
 }
+/* css/base/22-cine.css · hoja 22 de 23 de la base de la app (lo que fue css/style.css)
+   El ⛶ modo cine: el mismo escenario a pantalla entera, con su composición
+   en horizontal y en vertical.
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ══════════════════════════════════════════════════════════════════
    ⛶ MODO CINE · el escenario del 9:16, a pantalla ENTERA
-   (js/vertical.js, `modo = 'cine'` → `.v916.cine`)
+   (js/cine/, `modo = 'cine'` → `.v916.cine`)
 
    El cine de antes (su vinilo, su aura, su onda de progreso) se fue: el
    cine AHORA es el marco del vídeo 9:16 ocupando la pantalla, con los
@@ -9152,7 +9245,7 @@ body:not(.playing) .v916 .cine-play .ico-pausa { display: none; }
 /* ════════ TUMBADO · VINILO — el tocadiscos a la izquierda ════════
    Disco de lado `--D` centrado en (`--cx`, `--cy`); su aro de espectro es
    un lienzo cuadrado 1/0,64 veces el disco (la cuenta de aro() en
-   vertical.js), centrado en el mismo punto. */
+   js/cine/), centrado en el mismo punto. */
 .v916.cine[data-orient="h"] .v916-marco[data-estilo="vinilo"] {
   --D: min(58cqh, 36cqw);
   --cx: 26cqw;
@@ -9237,6 +9330,9 @@ body:not(.playing) .v916 .cine-play .ico-pausa { display: none; }
 .v916.cine[data-orient="h"] .v916-riel { height: max(8px, 1.5cqh); }
 .v916.cine[data-orient="h"] .v916-marco[data-estilo="letra"] .v916-riel { height: max(6px, 0.9cqh); }
 
+/* css/base/23-luz.css · hoja 23 de 23 de la base de la app (lo que fue css/style.css)
+   La ✧ luz de borde (js/luz.js).
+   El orden de las hojas ES la cascada: index.html las carga seguidas. */
 
 /* ══════════════════════════════════════════════════════════
    ✧ LUZ DE BORDE (js/luz.js) — 10-nov-2026, la idea de Lumn

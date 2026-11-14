@@ -1,16 +1,54 @@
 /* ==========================================================
-   Módulo de letras sincronizadas (LRClib — sin auth, gratis)
+   LA LETRA SINCRONIZADA · el núcleo (LRClib — sin cuenta, gratis)
+
    https://lrclib.net/docs
+
+   Lo que fue js/lyrics.js (4.000 líneas) vive ahora en js/letra/, en
+   diez archivos que se cargan seguidos y en este orden:
+
+   nucleo.js — el estado, leer el LRC, el reposo, la escena sin letra,
+   pintar la lista y la traducción.
+   red.js — el freno ante el 429, la caché y la letra palabra a palabra
+   de AMLL.
+   emparejado.js — de la canción que suena a la ficha de LRClib, y pedir
+   la letra.
+   efectos.js — el catálogo de efectos del verso activo y cómo se eligen.
+   edit-piezas.js — las medidas y las piezas con que se monta el modo
+   edit.
+   edit-pintar.js — pintar un verso en el modo edit.
+   vistas.js — las tres vistas (lista, edit, palabra), el ⚗ lab y el
+   cambio de verso.
+   karaoke.js — la letra que sube en cascada y el teñido palabra a
+   palabra.
+   seguir.js — los huecos instrumentales, el vigilante del edit y el
+   tick.
+   arranque.js — los oyentes y la API pública (window.LyricsModule).
+
+   Comparten el estado por la bolsa `comun` (window.MMInterno.letra): lo
+   que cambia y usan varios archivos se lee y se escribe como `comun.x`;
+   las funciones y constantes de un archivo anterior se recogen arriba de
+   cada archivo y se usan por su nombre. Todo lo que se pone en marcha
+   solo (oyentes, primer pintado) va en arranque.js, el último, para que
+   nada corra antes de que exista lo que necesita.
    ========================================================== */
 (() => {
   'use strict';
 
-  const lyricsBody = document.getElementById('lyricsBody');
-  const lyricsEdit = document.getElementById('lyricsEdit');
+  /* Lo que comparten entre sí los archivos de js/letra/. Uso interno: desde
+     fuera se habla con window.LyricsModule (lo arma js/letra/arranque.js). */
+  window.MMInterno = window.MMInterno || {};
+  const comun = window.MMInterno.letra = {};
+  // funciones de este archivo que usan los demás
+  comun.vistaAhora = vistaAhora; comun.vistaEdit = vistaEdit;
+  comun.vistaPalabra = vistaPalabra; comun.repintarAhora = repintarAhora;
+  comun.repartirHidden = repartirHidden; comun.palabraLimpiar = palabraLimpiar;
+
+  const lyricsBody = comun.lyricsBody = document.getElementById('lyricsBody');
+  const lyricsEdit = comun.lyricsEdit = document.getElementById('lyricsEdit');
   const lyricsIdle = document.getElementById('lyricsIdle');
-  const modeBtn = document.getElementById('lyricsModeBtn');
-  const lyricsPalabra = document.getElementById('lyricsPalabra');
-  const palabraBtn = document.getElementById('palabraBtn');
+  const modeBtn = comun.modeBtn = document.getElementById('lyricsModeBtn');
+  const lyricsPalabra = comun.lyricsPalabra = document.getElementById('lyricsPalabra');
+  const palabraBtn = comun.palabraBtn = document.getElementById('palabraBtn');
   /* LAS TRES VISTAS: ≡ 'lista', ✦ 'edit' y ◉ 'palabra' (10-nov-2026, la
      letra palabra a palabra de js/palabra.js). Se guarda en mm_lyrics_mode
      con los valores de siempre ('list' / 'edit') más 'palabra'. */
@@ -18,60 +56,60 @@
     const v = localStorage.getItem('mm_lyrics_mode');
     return v === 'edit' || (v === 'palabra' && lyricsPalabra) ? v : 'lista';
   };
-  let vistaPref = leerVista();
+  comun.vistaPref = leerVista();
   /* La última de las dos de siempre: el botón ◉ vuelve a ella al quitar la
      vista palabra. */
-  let vistaAntes = vistaPref === 'palabra'
+  comun.vistaAntes = comun.vistaPref === 'palabra'
     ? (localStorage.getItem('mm_lyrics_antes') === 'edit' ? 'edit' : 'lista')
-    : vistaPref;
+    : comun.vistaPref;
   /* Vista impuesta desde fuera SIN tocar la preferencia: el modo cine ⛶ y
-     el vídeo 9:16 (js/vertical.js) piden 'edit', 'lista' o 'palabra',
+     el vídeo 9:16 (js/cine/) piden 'edit', 'lista' o 'palabra',
      según lo que se elija allí. null = manda la preferencia de siempre. */
-  let forzado = null;
+  comun.forzado = null;
   /* ¿Qué vista se pinta AHORA? Declaraciones `function` por lo mismo que
      repintarAhora(): las llama repartirHidden(), que corre al arrancar el
      módulo, antes de que existan las const de más abajo. */
-  function vistaAhora() { return forzado || vistaPref; }
+  function vistaAhora() { return comun.forzado || comun.vistaPref; }
   function vistaEdit() { return vistaAhora() === 'edit'; }
   function vistaPalabra() { return vistaAhora() === 'palabra'; }
-  let parsedLines = [];       // [{ time, text }]
-  let activeIdx = -1;
+  comun.parsedLines = [];       // [{ time, text }]
+  comun.activeIdx = -1;
   /* Último segundo que vio tick(). Quien necesita repintar «lo de ahora»
      (cambiar de modo, cerrar el cine, terminar de bajar una tipografía) lo
      usa en vez de audio.currentTime: con Spotify Connect la música NO suena
      en el <audio> de la página, así que ahí currentTime es 0 y repintar
      mostraba el primer verso de la canción en lugar del que va sonando. */
-  let ultimoT = 0;
+  comun.ultimoT = 0;
   /* Repinta la vista con el segundo que va sonando. Declaración `function` a
      propósito: se llama desde applyMode(), que corre al arrancar el módulo,
      antes de que estén definidas las const de más abajo. */
   function repintarAhora() {
-    if (!parsedLines.length) return;   // sin letra no hay nada que repintar (y tick aún no existe)
-    tick(ultimoT);
+    if (!comun.parsedLines.length) return;   // sin letra no hay nada que repintar (y tick aún no existe)
+    comun.tick(comun.ultimoT);
   }
-  let lastTrackKey = null;
+  comun.lastTrackKey = null;
   /* TRADUCCIÓN AL ESPAÑOL (config ⚙ → letras → traducción).
      `tradLines` va alineada con `parsedLines`: cadena vacía = ese verso no
      tiene traducción (todavía, o nunca: los ♪ y lo que el traductor no supo).
      El trabajo sucio —red, caché, que cuadren las líneas— vive en
      js/traductor.js; aquí solo se pide y se pinta. */
-  let tradLines = [];
+  comun.tradLines = [];
   let tradReq = 0;            // token: solo la última petición puede pintar
   let tradCtrl = null;        // AbortController de la traducción en curso
-  let userScrolledRecently = false;
-  let scrollTimer = null;
-  let autoScrolling = false;   // true while our own smooth-scroll is animating
-  let autoScrollTimer = null;
+  comun.userScrolledRecently = false;
+  comun.scrollTimer = null;
+  comun.autoScrolling = false;   // true while our own smooth-scroll is animating
+  comun.autoScrollTimer = null;
   // Offset por canción: cada pista guarda su propio ajuste; el valor viejo
   // global (mm_lyrics_offset) queda como valor por defecto para pistas nuevas.
-  const defaultOffset = parseFloat(localStorage.getItem('mm_lyrics_offset') || '0') || 0;
-  let offsets = {};
-  try { offsets = JSON.parse(localStorage.getItem('mm_lyrics_offsets') || '{}') || {}; } catch (_) { offsets = {}; }
-  let offset = defaultOffset;
+  const defaultOffset = comun.defaultOffset = parseFloat(localStorage.getItem('mm_lyrics_offset') || '0') || 0;
+  comun.offsets = {};
+  try { comun.offsets = JSON.parse(localStorage.getItem('mm_lyrics_offsets') || '{}') || {}; } catch (_) { comun.offsets = {}; }
+  comun.offset = defaultOffset;
 
-  let reqSeq = 0;             // se incrementa por petición; solo la última puede tocar la UI
-  let activeController = null; // AbortController de la petición en curso
-  let retryTimer = null;      // reintento diferido ante fallos de red
+  comun.reqSeq = 0;             // se incrementa por petición; solo la última puede tocar la UI
+  comun.activeController = null; // AbortController de la petición en curso
+  comun.retryTimer = null;      // reintento diferido ante fallos de red
 
   /* Parse LRC format: "[mm:ss.xx] text"
      Y también el LRC «mejorado»: algunas letras traen además el tiempo de
@@ -122,6 +160,7 @@
     }
     return result.sort((a, b) => a.time - b.time);
   };
+  comun.parseLRC = parseLRC;
 
   /* Reparte el `hidden` entre las dos vistas (lista y edit) según quién
      manda ahora en el panel. Lo llama TODO el que enciende o apaga una de
@@ -141,7 +180,7 @@
   function repartirHidden() {
     /* Ni lista ni edit cuando manda una escena de las que van por fuera:
        el reposo (sin canción) o la escena NCS (canción sin letra). */
-    const fuera = idleOn || ncsOn;
+    const fuera = comun.idleOn || comun.ncsOn;
     /* La vista impuesta cuenta igual que la preferencia, como en tick(): el
        modo cine pinta en #lyricsEdit sin tocar `vistaPref`, así que sin esto
        un cambio de canción con el cine abierto y la vista lista elegida
@@ -155,32 +194,34 @@
   /* ---- Estado en reposo (sin canción) ----
      Se muestra en los DOS modos: antes vivía dentro de #lyricsBody, que el
      modo edit oculta, y el panel quedaba en blanco. */
-  let idleOn = true;
+  comun.idleOn = true;
   const setIdle = (on) => {
     if (!lyricsIdle) return;
-    idleOn = !!on;
-    lyricsIdle.hidden = !idleOn;
+    comun.idleOn = !!on;
+    lyricsIdle.hidden = !comun.idleOn;
     // mientras el reposo manda, ninguna de las dos vistas ocupa sitio
-    if (idleOn) setNcs(false);
+    if (comun.idleOn) setNcs(false);
     repartirHidden();
   };
+  comun.setIdle = setIdle;
 
   /* ---- Escena de las canciones sin letra (estilo NCS, js/ncs.js) ----
      Vive fuera de las dos vistas por la misma razón que el reposo. Devuelve
      false si el módulo no cargó, y entonces se cae al cartel de texto de
      siempre: una canción sin letra nunca debe dejar el panel en blanco. */
-  let ncsOn = false;
+  comun.ncsOn = false;
   const setNcs = (on) => {
     const S = window.NcsScene;
     if (on && !S) return false;
-    ncsOn = !!on;
-    if (S) { if (ncsOn) S.mostrar(); else S.ocultar(); }
+    comun.ncsOn = !!on;
+    if (S) { if (comun.ncsOn) S.mostrar(); else S.ocultar(); }
     /* Encenderla tapa las dos vistas y apagarla las devuelve: el reparto va
        AQUÍ, pegado al cambio de estado, y no en el que llame de turno —
        apagarla y olvidarse de destapar es justo el bug que hubo. */
     repartirHidden();
     return true;
   };
+  comun.setNcs = setNcs;
 
   setIdle(true);   // arranque: aún no hay canción
 
@@ -274,7 +315,7 @@
       pinta();
       // solo gasta ciclos mientras el reposo está a la vista
       setInterval(() => {
-        if (idleOn && !document.hidden && !lyricsIdle.hidden) pinta();
+        if (comun.idleOn && !document.hidden && !lyricsIdle.hidden) pinta();
       }, 6500);
     }
   }
@@ -285,28 +326,29 @@
      locales llamadas `esc` en este archivo, de ahí el nombre largo. */
   const escHtml = (s) => String(s == null ? '' : s)
     .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  comun.escHtml = escHtml;
 
   /* Huecos instrumentales: si entre dos versos hay más de GAP_MIN segundos
      (intro, solo, puente) se cuela un contador de tres puntos que se llena
      mientras esperas. Sin esto la letra se queda congelada y parece que la
      app se colgó justo en la parte más bonita del tema. */
   const GAP_MIN = 6;
-  const GAP_LEAD = 1.8;        // respiro tras el verso anterior antes de contar
+  const GAP_LEAD = comun.GAP_LEAD = 1.8;        // respiro tras el verso anterior antes de contar
 
-  let lineNodes = [];          // .lyric-line, alineado con parsedLines
-  let listaIdx = -1;           // el verso que la vista lista tiene encendido (ver tick)
-  let gapMap = new Map();      // idx de la línea anterior → nodo contador
-  let gapAct = null;
+  comun.lineNodes = [];          // .lyric-line, alineado con parsedLines
+  comun.listaIdx = -1;           // el verso que la vista lista tiene encendido (ver tick)
+  comun.gapMap = new Map();      // idx de la línea anterior → nodo contador
+  comun.gapAct = null;
 
   const limpiarLetra = () => {
-    parsedLines = [];
-    activeIdx = -1;
+    comun.parsedLines = [];
+    comun.activeIdx = -1;
     // el innerHTML de quien llame desconecta los nodos: suelta las cachés
-    lineNodes = [];
-    listaIdx = -1;
-    gapMap = new Map();
-    gapAct = null;
-    karaokeOlvidar();
+    comun.lineNodes = [];
+    comun.listaIdx = -1;
+    comun.gapMap = new Map();
+    comun.gapAct = null;
+    comun.karaokeOlvidar();
     tradReset();
     palabraLimpiar();
   };
@@ -325,6 +367,7 @@
     }
     p.textContent = msg;
   };
+  comun.avisoPalabra = avisoPalabra;
   function palabraLimpiar() {
     const P = window.MMPalabra;
     if (P && P.montado && P.montado()) P.limpiar();
@@ -340,6 +383,7 @@
     lyricsEdit.innerHTML = `<p class="lyrics-empty">${msg}</p>`;
     avisoPalabra(msg);
   };
+  comun.setEmpty = setEmpty;
 
   /* Canción sin letra en LRClib. Antes se quedaba un cartel de texto plano
      en medio del panel; ahora se enciende la escena NCS: la carátula en
@@ -350,36 +394,37 @@
     lyricsBody.innerHTML = '';
     lyricsEdit.innerHTML = '';
     lyricsBody.classList.remove('sync');
-    applyMode();          // reparte el hidden: con la escena encendida, ninguna vista ocupa sitio
+    comun.applyMode();          // reparte el hidden: con la escena encendida, ninguna vista ocupa sitio
   };
+  comun.setSinLetra = setSinLetra;
 
   const renderLines = () => {
-    if (!parsedLines.length) {
+    if (!comun.parsedLines.length) {
       setSinLetra();
       return;
     }
     setNcs(false);          // hay letra: la escena NCS se retira
-    const conTiempos = parsedLines[0].time >= 0;
+    const conTiempos = comun.parsedLines[0].time >= 0;
     // sin tiempos no hay karaoke posible: la clase apaga el teñido palabra a
     // palabra para que la letra plana no se quede toda apagada
     lyricsBody.classList.toggle('sync', conTiempos);
     const hueco = (i) => `<div class="lyric-gap" data-gap="${i}" aria-hidden="true"><i></i><i></i><i></i></div>`;
     let html = '';
     // intro larga: el contador arranca antes del primer verso
-    if (conTiempos && parsedLines[0].time > GAP_MIN) html += hueco(-1);
-    for (let i = 0; i < parsedLines.length; i++) {
-      const l = parsedLines[i];
+    if (conTiempos && comun.parsedLines[0].time > GAP_MIN) html += hueco(-1);
+    for (let i = 0; i < comun.parsedLines.length; i++) {
+      const l = comun.parsedLines[i];
       html += `<div class="lyric-line" data-idx="${i}" data-time="${l.time}">${escHtml(l.text) || '♪'}</div>`;
-      const sig = parsedLines[i + 1];
+      const sig = comun.parsedLines[i + 1];
       if (conTiempos && sig && sig.time - l.time > GAP_MIN) html += hueco(i);
     }
     lyricsBody.innerHTML = html;
     // cacheado: el tick ya no vuelve a consultar el DOM en cada cambio de línea
-    lineNodes = Array.prototype.slice.call(lyricsBody.querySelectorAll('.lyric-line'));
-    listaIdx = -1;
-    gapMap = new Map();
-    gapAct = null;
-    lyricsBody.querySelectorAll('.lyric-gap').forEach((g) => gapMap.set(+g.dataset.gap, g));
+    comun.lineNodes = Array.prototype.slice.call(lyricsBody.querySelectorAll('.lyric-line'));
+    comun.listaIdx = -1;
+    comun.gapMap = new Map();
+    comun.gapAct = null;
+    lyricsBody.querySelectorAll('.lyric-gap').forEach((g) => comun.gapMap.set(+g.dataset.gap, g));
     /* El modo edit se repinta en el próximo tick, pero SOLO si el índice
        cambia — y al llegar una letra nueva puede coincidir con el que ya
        había (canción encadenada desde la caché de la precarga, letra que
@@ -387,11 +432,12 @@
        siguiente. Estos dos valores imposibles obligan a repintar. */
     lyricsEdit.innerHTML = '';
     palabraLimpiar();
-    activeIdx = -2;
-    edIdx = -3;
-    karaokeOlvidar();
+    comun.activeIdx = -2;
+    comun.edIdx = -3;
+    comun.karaokeOlvidar();
     pedirTraduccion();
   };
+  comun.renderLines = renderLines;
 
   /* ══════════ TRADUCCIÓN AL ESPAÑOL ══════════
      La letra en su idioma manda y la traducción va DEBAJO, pequeña: es un
@@ -408,17 +454,19 @@
      reescribe verso a verso — y como vive dentro de #lyricsEdit, se muda al
      cine con él sin tener que enterarse. */
   const tradActiva = () => !!(window.Traductor && window.Traductor.activa());
+  comun.tradActiva = tradActiva;
 
   const tradReset = () => {
-    tradLines = [];
+    comun.tradLines = [];
     tradReq++;
     if (tradCtrl) { try { tradCtrl.abort(); } catch (_) {} tradCtrl = null; }
     lyricsBody.querySelectorAll('.lyric-trad').forEach((n) => n.remove());
     lyricsEdit.querySelectorAll('.ed-trad').forEach((n) => n.remove());
     if (lyricsPalabra) lyricsPalabra.querySelectorAll('.ed-trad').forEach((n) => n.remove());
   };
+  comun.tradReset = tradReset;
 
-  const tradNodos = () => (lineNodes.length ? lineNodes
+  const tradNodos = () => (comun.lineNodes.length ? comun.lineNodes
     : Array.prototype.slice.call(lyricsBody.querySelectorAll('.lyric-line')));
 
   const pintarTrad = () => {
@@ -426,7 +474,7 @@
     for (let i = 0; i < nodos.length; i++) {
       const ln = nodos[i];
       if (!ln) continue;
-      const txt = tradLines[i] || '';
+      const txt = comun.tradLines[i] || '';
       let nodo = ln.nextElementSibling;
       if (!nodo || !nodo.classList.contains('lyric-trad')) nodo = null;
       if (!txt) { if (nodo) nodo.remove(); continue; }
@@ -438,8 +486,8 @@
       }
       if (nodo.textContent !== txt) nodo.textContent = txt;
     }
-    if (vistaEdit()) pintarTradEdit(edIdx);
-    else if (vistaPalabra()) pintarTradEdit(activeIdx, lyricsPalabra);
+    if (vistaEdit()) pintarTradEdit(comun.edIdx);
+    else if (vistaPalabra()) pintarTradEdit(comun.activeIdx, lyricsPalabra);
   };
 
   /* El subtítulo único al pie: el del modo edit y, con `caja`, el de la
@@ -447,7 +495,7 @@
   const pintarTradEdit = (i, caja) => {
     const donde = caja || lyricsEdit;
     if (!donde) return;
-    const txt = (i >= 0 && tradLines[i]) || '';
+    const txt = (i >= 0 && comun.tradLines[i]) || '';
     let nodo = donde.querySelector(':scope > .ed-trad');
     if (!txt) { if (nodo) nodo.remove(); return; }
     if (!nodo) {
@@ -464,15 +512,16 @@
     void nodo.offsetWidth;
     nodo.classList.add('entra');
   };
+  comun.pintarTradEdit = pintarTradEdit;
 
   const pedirTraduccion = () => {
     tradReset();
     if (!tradActiva() || !window.Traductor) return;
-    if (!parsedLines.length) return;
+    if (!comun.parsedLines.length) return;
     const mio = tradReq;
-    const key = lastTrackKey;
+    const key = comun.lastTrackKey;
     tradCtrl = new AbortController();
-    const textos = parsedLines.map((l) => l.text);
+    const textos = comun.parsedLines.map((l) => l.text);
     /* El `onAvance` es lo que hace que esto se note rápido: la traducción va
        apareciendo bloque a bloque (y lo que ya estaba en caché, de golpe) en
        vez de saltar entera cuando termina la canción entera de traducirse. */
@@ -481,14 +530,14 @@
       signal: tradCtrl.signal,
       onAvance: (lineas) => {
         if (mio !== tradReq) return;
-        tradLines = lineas;
+        comun.tradLines = lineas;
         pintarTrad();
       },
     }).then((res) => {
       if (mio !== tradReq) return;
       tradCtrl = null;
       if (!res) return;              // ya estaba en español: no hay nada que enseñar
-      tradLines = res.lineas;
+      comun.tradLines = res.lineas;
       pintarTrad();
     }).catch(() => {
       /* Se calla a propósito. Sin traducción la letra se ve igual de bien:
@@ -496,6 +545,18 @@
       if (mio === tradReq) tradCtrl = null;
     });
   };
+  comun.pedirTraduccion = pedirTraduccion;
+})();
+/* ==========================================================
+   LA LETRA · lo que se habla con la red (js/letra/red.js)
+
+   El freno ante el 429 de LRClib, la caché de letras en localStorage y
+   la letra palabra a palabra de AMLL (TTML). Reparto de js/letra/: ver
+   nucleo.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.letra;
 
   // GET con reintentos suaves ante fallos transitorios (cortes de red, 429,
   // 5xx). Cada intento tiene un tope de tiempo: una petición colgada se corta
@@ -517,12 +578,13 @@
      cuando el servidor dice «para», se para. `frenoHasta` es del módulo
      entero a propósito — si LRClib frena, frena para TODAS las canciones, no
      solo para la que se llevó el 429. */
-  let frenoHasta = 0;
+  comun.frenoHasta = 0;
   const FRENO_DEF = 20;          // segundos, si el servidor no dice otra cosa
-  const RETRY_MIN = 3000;
-  const RETRY_MAX = 60000;
-  let esperaRetry = RETRY_MIN;   // reintento de red normal: 3s, 6, 12, 24, 48, 60…
-  const frenado = () => Date.now() < frenoHasta;
+  const RETRY_MIN = comun.RETRY_MIN = 3000;
+  const RETRY_MAX = comun.RETRY_MAX = 60000;
+  comun.esperaRetry = RETRY_MIN;   // reintento de red normal: 3s, 6, 12, 24, 48, 60…
+  const frenado = () => Date.now() < comun.frenoHasta;
+  comun.frenado = frenado;
 
   const fetchJSON = async (url, { signal, retries = 2, timeout = 12000 } = {}) => {
     let lastErr = null;
@@ -540,7 +602,7 @@
              precisamente lo que lo mantiene encendido. `Retry-After` viene en
              segundos cuando viene; si no, se esperan 20. */
           const cab = parseInt(res.headers.get('Retry-After'), 10);
-          frenoHasta = Date.now() + Math.max(5000, (Number.isFinite(cab) ? cab : FRENO_DEF) * 1000);
+          comun.frenoHasta = Date.now() + Math.max(5000, (Number.isFinite(cab) ? cab : FRENO_DEF) * 1000);
           const err = new Error('HTTP 429');
           err.frenado = true;
           throw err;
@@ -568,6 +630,7 @@
     }
     throw lastErr || new Error('fetch failed');
   };
+  comun.fetchJSON = fetchJSON;
 
   /* ---- Caché de letras (localStorage) ----
      Cada canción se busca UNA vez; las siguientes reproducciones salen al
@@ -576,17 +639,17 @@
   const CACHE_KEY = 'mm_lyrics_cache';
   const CACHE_MAX = 120;
   const NF_TTL = 24 * 60 * 60 * 1000;
-  let cache = {};
-  try { cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}; } catch (_) { cache = {}; }
+  comun.cache = {};
+  try { comun.cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}; } catch (_) { comun.cache = {}; }
 
   const cacheSave = () => {
     try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+      localStorage.setItem(CACHE_KEY, JSON.stringify(comun.cache));
     } catch (_) {
       // cuota llena: suelta la mitad más vieja y reintenta una vez
-      const keys = Object.keys(cache).sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
-      keys.slice(0, Math.ceil(keys.length / 2)).forEach(k => delete cache[k]);
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (_) {}
+      const keys = Object.keys(comun.cache).sort((a, b) => (comun.cache[a].ts || 0) - (comun.cache[b].ts || 0));
+      keys.slice(0, Math.ceil(keys.length / 2)).forEach(k => delete comun.cache[k]);
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(comun.cache)); } catch (_) {}
     }
   };
 
@@ -612,30 +675,33 @@
   const CACHE_V = 3;
 
   const cacheGet = (key) => {
-    const e = cache[key];
+    const e = comun.cache[key];
     if (!e) return null;
     if (e.nf) {
-      if (Date.now() - (e.ts || 0) > NF_TTL) { delete cache[key]; return null; }
+      if (Date.now() - (e.ts || 0) > NF_TTL) { delete comun.cache[key]; return null; }
       return { notFound: true };
     }
-    if (e.v !== CACHE_V) { delete cache[key]; return null; }   // ver CACHE_V
+    if (e.v !== CACHE_V) { delete comun.cache[key]; return null; }   // ver CACHE_V
     e.ts = Date.now();   // toque LRU; se persiste en el próximo cacheSave
     return { syncedLyrics: e.s || null, plainLyrics: e.p || null };
   };
+  comun.cacheGet = cacheGet;
 
   const cachePut = (key, data) => {
-    cache[key] = data
+    comun.cache[key] = data
       ? { s: data.syncedLyrics || '', p: data.plainLyrics || '', ts: Date.now(), v: CACHE_V }
       : { nf: 1, ts: Date.now() };
-    const keys = Object.keys(cache);
+    const keys = Object.keys(comun.cache);
     if (keys.length > CACHE_MAX) {
-      keys.sort((a, b) => (cache[a].ts || 0) - (cache[b].ts || 0));
-      keys.slice(0, keys.length - CACHE_MAX).forEach(k => delete cache[k]);
+      keys.sort((a, b) => (comun.cache[a].ts || 0) - (comun.cache[b].ts || 0));
+      keys.slice(0, keys.length - CACHE_MAX).forEach(k => delete comun.cache[k]);
     }
     cacheSave();
   };
+  comun.cachePut = cachePut;
 
   const trackKey = (track) => `${track.artist}|||${track.name}`;
+  comun.trackKey = trackKey;
 
   /* ==========================================================
      LA LETRA PALABRA A PALABRA DE AMLL (10-nov-2026)
@@ -657,12 +723,13 @@
   const TTML_KEY = 'mm_ttml';
   const TTML_MAX = 40;                         // letras guardadas (~5-10 KB cada una)
   const TTML_NF_TTL = 14 * 24 * 60 * 60 * 1000;
-  let ttmlCache = {};
-  try { ttmlCache = JSON.parse(localStorage.getItem(TTML_KEY) || '{}') || {}; } catch (_) { ttmlCache = {}; }
+  comun.ttmlCache = {};
+  try { comun.ttmlCache = JSON.parse(localStorage.getItem(TTML_KEY) || '{}') || {}; } catch (_) { comun.ttmlCache = {}; }
   const ttmlId = (track) => {
     const m = /^spotify:track:([A-Za-z0-9]{22})$/.exec((track && track.uri) || '');
     return m ? m[1] : null;
   };
+  comun.ttmlId = ttmlId;
   // «00:23.212», «1:02:03.5» o «12.5s» → segundos
   const segTTML = (s) => {
     s = String(s == null ? '' : s).trim();
@@ -726,10 +793,10 @@
   // guardada en milésimas: la mitad de sitio que con decimales
   const ms = (v) => Math.round(v * 1000);
   const ttmlGet = (id) => {
-    const e = ttmlCache[id];
+    const e = comun.ttmlCache[id];
     if (!e) return null;
     if (e.nf) {
-      if (Date.now() - (e.ts || 0) > TTML_NF_TTL) { delete ttmlCache[id]; return null; }
+      if (Date.now() - (e.ts || 0) > TTML_NF_TTL) { delete comun.ttmlCache[id]; return null; }
       return { nf: true };
     }
     e.ts = Date.now();
@@ -738,25 +805,27 @@
         time: a[0] / 1000, text: a[1],
         words: a[2].map((x) => x / 1000), ends: a[3].map((x) => x / 1000), fin: a[4] / 1000,
       })) };
-    } catch (_) { delete ttmlCache[id]; return null; }
+    } catch (_) { delete comun.ttmlCache[id]; return null; }
   };
+  comun.ttmlGet = ttmlGet;
   const ttmlPut = (id, lines) => {
-    ttmlCache[id] = lines
+    comun.ttmlCache[id] = lines
       ? { l: lines.map((l) => [ms(l.time), l.text, l.words.map(ms), l.ends.map(ms), ms(l.fin)]), ts: Date.now() }
       : { nf: 1, ts: Date.now() };
     // tope: 40 letras y 400 «no la tiene»; se van las más viejas
-    const viejas = (filtro) => Object.keys(ttmlCache).filter(filtro)
-      .sort((a, b) => (ttmlCache[a].ts || 0) - (ttmlCache[b].ts || 0));
-    const llenas = viejas((k) => !ttmlCache[k].nf);
-    llenas.slice(0, Math.max(0, llenas.length - TTML_MAX)).forEach((k) => delete ttmlCache[k]);
-    const vacias = viejas((k) => ttmlCache[k].nf);
-    vacias.slice(0, Math.max(0, vacias.length - 400)).forEach((k) => delete ttmlCache[k]);
-    try { localStorage.setItem(TTML_KEY, JSON.stringify(ttmlCache)); } catch (_) {
+    const viejas = (filtro) => Object.keys(comun.ttmlCache).filter(filtro)
+      .sort((a, b) => (comun.ttmlCache[a].ts || 0) - (comun.ttmlCache[b].ts || 0));
+    const llenas = viejas((k) => !comun.ttmlCache[k].nf);
+    llenas.slice(0, Math.max(0, llenas.length - TTML_MAX)).forEach((k) => delete comun.ttmlCache[k]);
+    const vacias = viejas((k) => comun.ttmlCache[k].nf);
+    vacias.slice(0, Math.max(0, vacias.length - 400)).forEach((k) => delete comun.ttmlCache[k]);
+    try { localStorage.setItem(TTML_KEY, JSON.stringify(comun.ttmlCache)); } catch (_) {
       // sin sitio: fuera la mitad de las letras guardadas y otra vez
-      llenas.slice(0, Math.ceil(llenas.length / 2)).forEach((k) => delete ttmlCache[k]);
-      try { localStorage.setItem(TTML_KEY, JSON.stringify(ttmlCache)); } catch (_) {}
+      llenas.slice(0, Math.ceil(llenas.length / 2)).forEach((k) => delete comun.ttmlCache[k]);
+      try { localStorage.setItem(TTML_KEY, JSON.stringify(comun.ttmlCache)); } catch (_) {}
     }
   };
+  comun.ttmlPut = ttmlPut;
   /* { lines } si la tiene, { nf } si no la tiene, null si no se pudo saber
      (sin red, GitHub lento): eso no se guarda, se volverá a preguntar. */
   const pedirTTML = async (id, signal) => {
@@ -778,6 +847,23 @@
       if (signal) signal.removeEventListener('abort', corta);
     }
   };
+  comun.pedirTTML = pedirTTML;
+})();
+/* ==========================================================
+   LA LETRA · el emparejado (js/letra/emparejado.js)
+
+   De la canción que suena a la ficha de LRClib: limpiar el título,
+   puntuar las candidatas (duración, versión, idioma), precargar la
+   siguiente y pedir la letra. Reparto de js/letra/: ver nucleo.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.letra;
+  const {
+    lyricsBody, defaultOffset, parseLRC, setIdle, setNcs, escHtml, setEmpty, setSinLetra,
+    renderLines, pedirTraduccion, RETRY_MIN, RETRY_MAX, frenado, fetchJSON, cacheGet, cachePut,
+    trackKey, ttmlId, ttmlGet, ttmlPut, pedirTTML
+  } = comun;
 
   /* ==========================================================
      EMPAREJADO: de la canción que suena a la ficha de LRClib
@@ -1068,6 +1154,7 @@
       .then((d) => cachePut(key, d))
       .catch(() => {});
   };
+  comun.precargar = precargar;
 
   // Precarga la letra de la SIGUIENTE canción de la cola local, para que al
   // cambiar de pista aparezca al instante.
@@ -1093,23 +1180,23 @@
      su desfase. El desfase por canción se ajustó a mano para la ficha de
      LRClib, que puede ir adelantada o atrasada; la de AMLL va clavada y lleva
      el suyo propio (de entrada, el general). */
-  let fuente = 'lrclib';
-  let desfaseKey = null;
+  comun.fuente = 'lrclib';
+  comun.desfaseKey = null;
   const cargarDesfase = (k) => {
-    desfaseKey = k;
-    offset = (k in offsets) ? offsets[k] : defaultOffset;
-    window.dispatchEvent(new CustomEvent('mm:lyrics-offset', { detail: offset }));
+    comun.desfaseKey = k;
+    comun.offset = (k in comun.offsets) ? comun.offsets[k] : defaultOffset;
+    window.dispatchEvent(new CustomEvent('mm:lyrics-offset', { detail: comun.offset }));
   };
   const aplicarTTML = (lines, key) => {
-    fuente = 'amll';
+    comun.fuente = 'amll';
     cargarDesfase(key + '|||amll');
-    parsedLines = lines;
+    comun.parsedLines = lines;
     renderLines();
   };
 
   /* `forzar` lo usa SOLO el reintento programado de aquí abajo. Antes, para
      poder reintentar la misma canción, se ponía `lastTrackKey = null`… y eso
-     abría la puerta de par en par: spotify.js pregunta por la canción actual
+     abría la puerta de par en par: js/spotify/ pregunta por la canción actual
      cada 2 s, así que con la clave borrada cada sondeo lanzaba una búsqueda
      entera (6 peticiones) además del reintento. Con la clave intacta, el
      único que puede reintentar es el temporizador, y manda el backoff. */
@@ -1117,23 +1204,23 @@
     const key = trackKey(track);
     // hay canción: se acabó el reposo (antes del corte por clave repetida,
     // para que reentrar en la misma pista también apague el panel de reposo)
-    if (idleOn) { setIdle(false); applyMode(); }
-    if (key === lastTrackKey && !forzar) return;   // misma canción ya resuelta: no parpadear
-    lastTrackKey = key;
-    songSalt = hashStr(key);   // secuencia de efectos propia de esta canción
-    fuente = 'lrclib';
+    if (comun.idleOn) { setIdle(false); comun.applyMode(); }
+    if (key === comun.lastTrackKey && !forzar) return;   // misma canción ya resuelta: no parpadear
+    comun.lastTrackKey = key;
+    comun.songSalt = comun.hashStr(key);   // secuencia de efectos propia de esta canción
+    comun.fuente = 'lrclib';
 
     // carga el offset guardado de ESTA canción y avisa a la UI del slider
     cargarDesfase(key);
 
     // Cancela cualquier búsqueda anterior y reclama este número de secuencia.
     // Así una respuesta tardía de la canción anterior NO borra la letra actual.
-    clearTimeout(retryTimer);
-    const myReq = ++reqSeq;
-    if (activeController) { try { activeController.abort(); } catch (_) {} }
+    clearTimeout(comun.retryTimer);
+    const myReq = ++comun.reqSeq;
+    if (comun.activeController) { try { comun.activeController.abort(); } catch (_) {} }
     const controller = new AbortController();
-    activeController = controller;
-    const isCurrent = () => myReq === reqSeq;
+    comun.activeController = controller;
+    const isCurrent = () => myReq === comun.reqSeq;
 
     /* AMLL, si la canción es de Spotify (ver «LA LETRA PALABRA A PALABRA DE
        AMLL»): si ya está guardada se pinta al instante y a LRClib ni se le
@@ -1148,7 +1235,7 @@
           if (!r) return;                    // sin red: ni se guarda ni se toca nada
           ttmlPut(idSp, r.lines || null);
           if (!r.lines || !isCurrent()) return;
-          clearTimeout(retryTimer);          // si LRClib estaba reintentando, ya no hace falta
+          clearTimeout(comun.retryTimer);          // si LRClib estaba reintentando, ya no hace falta
           aplicarTTML(r.lines, key);
           if (window.SevenStatus) window.SevenStatus('◉ letra con el tiempo exacto de cada palabra (AMLL)');
         });
@@ -1168,7 +1255,7 @@
        castigo — ni siquiera de otra canción. Se dice en pantalla (mejor eso
        que un «buscando…» eterno) y se programa un único reintento. */
     if (frenado()) {
-      reintentarLuego(key, myReq, frenoHasta - Date.now(), true);
+      reintentarLuego(key, myReq, comun.frenoHasta - Date.now(), true);
       return;
     }
 
@@ -1177,28 +1264,29 @@
     try {
       const lyricsData = await resolveLyrics(track, controller.signal);
       if (!isCurrent()) return;
-      esperaRetry = RETRY_MIN;       // salió bien: la espera vuelve a empezar
+      comun.esperaRetry = RETRY_MIN;       // salió bien: la espera vuelve a empezar
       cachePut(key, lyricsData);
       // si ya llegó la de AMLL, manda esa: esta solo se guarda
-      if (fuente !== 'amll') {
+      if (comun.fuente !== 'amll') {
         if (lyricsData) apply(lyricsData);
         else setSinLetra();
       }
       prefetchNext();
     } catch (e) {
       if (e && e.name === 'AbortError') return;   // reemplazada por otra canción: no tocar nada
-      if (!isCurrent() || fuente === 'amll') return;
+      if (!isCurrent() || comun.fuente === 'amll') return;
       if (e && e.frenado) {
-        reintentarLuego(key, myReq, Math.max(1000, frenoHasta - Date.now()), true);
+        reintentarLuego(key, myReq, Math.max(1000, comun.frenoHasta - Date.now()), true);
         return;
       }
       /* Fallo persistente de red. Se reintenta, pero cada vez más espaciado:
          a 3 s fijos, una caída larga son 20 rondas por minuto contra un
          servidor que no está. */
-      reintentarLuego(key, myReq, esperaRetry, false);
-      esperaRetry = Math.min(RETRY_MAX, esperaRetry * 2);
+      reintentarLuego(key, myReq, comun.esperaRetry, false);
+      comun.esperaRetry = Math.min(RETRY_MAX, comun.esperaRetry * 2);
     }
   };
+  comun.fetchLyrics = fetchLyrics;
 
   /* Un único reintento programado, con su aviso en pantalla. Nadie más vuelve
      a pedir esta canción mientras tanto: la clave sigue puesta y el reintento
@@ -1208,10 +1296,10 @@
     setEmpty(esFreno
       ? `LRClib nos está frenando (demasiadas búsquedas) · reintento en ${seg} s`
       : `Sin conexión para buscar letra · reintento en ${seg} s`);
-    clearTimeout(retryTimer);
-    retryTimer = setTimeout(() => {
+    clearTimeout(comun.retryTimer);
+    comun.retryTimer = setTimeout(() => {
       const cur = window.PlayerCore && window.PlayerCore.state && window.PlayerCore.state.currentTrack;
-      if (myReq === reqSeq && cur && `${cur.artist}|||${cur.name}` === key) {
+      if (myReq === comun.reqSeq && cur && `${cur.artist}|||${cur.name}` === key) {
         fetchLyrics(cur, true);
       }
     }, espera);
@@ -1220,20 +1308,31 @@
   const apply = (data) => {
     if (!data) return setSinLetra();
     if (data.syncedLyrics) {
-      parsedLines = parseLRC(data.syncedLyrics);
+      comun.parsedLines = parseLRC(data.syncedLyrics);
       renderLines();
     } else if (data.plainLyrics) {
       setNcs(false);        // hay letra (aunque sin tiempos): la escena se retira
-      parsedLines = data.plainLyrics.split(/\r?\n/).map(t => ({ time: -1, text: t }));
-      lyricsBody.innerHTML = parsedLines
+      comun.parsedLines = data.plainLyrics.split(/\r?\n/).map(t => ({ time: -1, text: t }));
+      lyricsBody.innerHTML = comun.parsedLines
         .map(l => `<div class="lyric-line">${escHtml(l.text) || '♪'}</div>`)
         .join('');
-      applyMode();          // la escena podía estar encendida: reparte el hidden (y pone los avisos de «sin tiempos»)
+      comun.applyMode();          // la escena podía estar encendida: reparte el hidden (y pone los avisos de «sin tiempos»)
       pedirTraduccion();    // sin tiempos también se traduce: es la misma letra
     } else {
       setSinLetra();
     }
   };
+})();
+/* ==========================================================
+   LA LETRA · los efectos del verso activo (js/letra/efectos.js)
+
+   El catálogo: efectos de la lista, duración de cada verso, el
+   manifiesto del modo edit (títulos, frases, cámaras) y cómo se elige
+   cada uno según la canción. Reparto de js/letra/: ver nucleo.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.letra;
 
   /* ---- Efectos de la línea activa (estilo edit, como el regalo) ----
      Cada línea recibe su combinación determinista por índice:
@@ -1271,29 +1370,32 @@
   // pero cada canción tiene SU propia secuencia. El mezclado avalancha
   // (imul + xorshift) evita el patrón cíclico del hash lineal anterior,
   // que hacía que los efectos salieran siempre en el mismo orden.
-  let songSalt = 0;
+  comun.songSalt = 0;
   const hashStr = (s) => {
     let h = 5381;
     for (let k = 0; k < s.length; k++) h = (Math.imul(h, 33) ^ s.charCodeAt(k)) | 0;
     return h | 0;
   };
+  comun.hashStr = hashStr;
   const semilla = (i, salt, mod) => {
-    let h = (Math.imul(i + 1, 2654435761) ^ Math.imul(salt, 340573321) ^ songSalt) | 0;
+    let h = (Math.imul(i + 1, 2654435761) ^ Math.imul(salt, 340573321) ^ comun.songSalt) | 0;
     h = Math.imul(h ^ (h >>> 15), 2246822519);
     h = Math.imul(h ^ (h >>> 13), 3266489917);
     h = (h ^ (h >>> 16)) >>> 0;
     return h % mod;
   };
+  comun.semilla = semilla;
 
   /* Presupuesto de ANIMACIÓN de la línea i: cuánto tiempo tienen los efectos
      de entrada para desplegar el verso. Topado a 7 s a propósito — un verso
      antes de un puente de 40 s no puede tardar 40 s en aparecer. Para el
      KARAOKE no sirve: eso es duracionCantada(). */
   const duracionLinea = (i) => {
-    const cur = parsedLines[i], next = parsedLines[i + 1];
+    const cur = comun.parsedLines[i], next = comun.parsedLines[i + 1];
     if (!cur || !next || cur.time < 0) return 3;
     return Math.min(7, Math.max(1.2, next.time - cur.time));
   };
+  comun.duracionLinea = duracionLinea;
 
   /* Sílabas aproximadas: grupos de vocales. Es el mejor predictor simple de
      lo que tarda en cantarse una palabra, y bastante mejor que el número de
@@ -1310,6 +1412,7 @@
     if (n > 1 && /[^aeiouáéíóú]e$/.test(s)) n--;
     return Math.max(1, n);
   };
+  comun.silabas = silabas;
 
   const silabasLinea = (txt) => (String(txt || '').trim().split(/\s+/)
     .filter(Boolean).reduce((s, w) => s + silabas(w), 0)) || 1;
@@ -1340,16 +1443,16 @@
      pone el techo de los demás. Se calcula una vez por canción. */
   let ritmoDe = null, ritmoVal = 0;
   const ritmoCancion = () => {
-    if (ritmoDe === parsedLines) return ritmoVal;
-    ritmoDe = parsedLines;
+    if (ritmoDe === comun.parsedLines) return ritmoVal;
+    ritmoDe = comun.parsedLines;
     ritmoVal = 0;
     const pasos = [];
-    for (let i = 0; i < parsedLines.length - 1; i++) {
-      const cur = parsedLines[i];
+    for (let i = 0; i < comun.parsedLines.length - 1; i++) {
+      const cur = comun.parsedLines[i];
       if (cur.time < 0) return 0;
       const txt = (cur.text || '').trim();
       if (!txt || /^[♪♫♩♬\s·.…*\-]+$/.test(txt)) continue;      // instrumental o vacío
-      const hueco = parsedLines[i + 1].time - cur.time;
+      const hueco = comun.parsedLines[i + 1].time - cur.time;
       const sil = silabasLinea(txt);
       if (hueco < 0.35 || hueco > 14 || sil < 3) continue;
       pasos.push(hueco / sil);
@@ -1361,12 +1464,12 @@
   };
 
   const duracionCantada = (i) => {
-    const cur = parsedLines[i];
+    const cur = comun.parsedLines[i];
     if (!cur || cur.time < 0) return 3;
     /* La base palabra a palabra (AMLL) trae también cuándo ACABA el verso:
        ahí no hay nada que estimar. */
     if (cur.fin && cur.fin > cur.time) return Math.max(0.25, cur.fin - cur.time);
-    const next = parsedLines[i + 1];
+    const next = comun.parsedLines[i + 1];
     /* El hueco entero hasta el siguiente verso (antes, un 94 %). Medido el
        10-nov-2026 contra 80 canciones con el tiempo REAL de cada palabra
        (base AMLL, ver PESO más abajo): recortarlo adelantaba las palabras. */
@@ -1390,6 +1493,7 @@
     const techo = ritmo ? sil * ritmo * 1.1 + 0.5 : sil * 0.62 + 0.35;
     return Math.max(0.8, Math.min(Math.max(hueco, 0.8), techo));
   };
+  comun.duracionCantada = duracionCantada;
 
   let revSeq = 0;   // token por revelado: invalida timers de revelados viejos
 
@@ -1399,13 +1503,14 @@
     delete ln.dataset.fx;
     delete ln.dataset.rev;
     ln._kw = null;               // los spans mueren aquí: invalida el karaoke
-    ln.textContent = (parsedLines[i] && parsedLines[i].text) || '♪';
+    ln.textContent = (comun.parsedLines[i] && comun.parsedLines[i].text) || '♪';
   };
+  comun.restoreLine = restoreLine;
 
   let listPrevFx = '';
   const decorateLine = (ln, i) => {
     if (ln.dataset.fx) return;                    // ya decorada: no re-animar
-    const text = (parsedLines[i] && parsedLines[i].text) || '♪';
+    const text = (comun.parsedLines[i] && comun.parsedLines[i].text) || '♪';
     const words = text.split(/\s+/).filter(Boolean);
     if (!words.length) return;
 
@@ -1475,6 +1580,7 @@
       if (ln.dataset.rev === token && ln.dataset.fx) ln.classList.add('done');
     }, d + 800);
   };
+  comun.decorateLine = decorateLine;
 
   /* ═══ MODO EDIT · una sola línea gigante, estilo edit de TikTok ═══
      Motor portado del regalo: cada línea recibe su combinación
@@ -1636,15 +1742,15 @@
      sale del orden del manifiesto. En las demás solo cuenta la pertenencia:
      se consultan con includes(). */
   const soloNombres = (f) => f[0];
-  const ED_TITLE_FX  = FX.filter((f) => f[1].includes('T')).map(soloNombres);
-  const ED_PHRASE_FX = FX.filter((f) => f[1].includes('F')).map(soloNombres);
-  const ED_STRONG    = FX.filter((f) => f[4]).map(soloNombres);
+  const ED_TITLE_FX  = comun.ED_TITLE_FX = FX.filter((f) => f[1].includes('T')).map(soloNombres);
+  const ED_PHRASE_FX = comun.ED_PHRASE_FX = FX.filter((f) => f[1].includes('F')).map(soloNombres);
+  const ED_STRONG    = comun.ED_STRONG = FX.filter((f) => f[4]).map(soloNombres);
   const ED_PHRASE_HYPE = FX.filter((f) => f[1].includes('F') && f[2] === 'h').map(soloNombres);
   const ED_PHRASE_CALM = FX.filter((f) => f[1].includes('F') && f[2] === 'c').map(soloNombres);
-  const ED_LETTER_FX = {};
+  const ED_LETTER_FX = comun.ED_LETTER_FX = {};
   for (const f of FX) if (f[3]) ED_LETTER_FX[f[0]] = f[3];
 
-  const ED_CAMS = ['edcam-zin', 'edcam-zout', 'edcam-izq', 'edcam-der',
+  const ED_CAMS = comun.ED_CAMS = ['edcam-zin', 'edcam-zout', 'edcam-izq', 'edcam-der',
                    'edcam-giro', 'edcam-sube', 'edcam-baja', 'edcam-late',
                    'edcam-dolly',    // acercamiento con leve giro, muy cine
                    'edcam-tiembla',  // cámara en mano: micro-sacudidas
@@ -1671,9 +1777,10 @@
   /* Altura del verso. Iba del 36 % al 58 %: cada verso saltaba a otra
      altura y el ojo tenía que ir a buscarlo. Ahora se mueve poco alrededor
      del centro óptico, lo justo para que no parezca clavado. */
-  const ED_TOPS = [45, 47, 49, 46, 48];
+  const ED_TOPS = comun.ED_TOPS = [45, 47, 49, 46, 48];
 
   const edLargo = (s) => s.replace(/[^\wáéíóúñ' ]/gi, '').length;
+  comun.edLargo = edLargo;
 
   /* ══════ FIRMA DEL ESTRIBILLO ══════
      Hasta ahora el efecto de cada verso salía de su ÍNDICE, así que el mismo
@@ -1686,12 +1793,12 @@
      posición, inclinación y cámara idénticos en cada repetición. */
   let canonMapa = null, canonDe = null;
   const edCanon = (i) => {
-    if (canonDe !== lastTrackKey || !canonMapa) {
-      canonDe = lastTrackKey;
+    if (canonDe !== comun.lastTrackKey || !canonMapa) {
+      canonDe = comun.lastTrackKey;
       canonMapa = new Map();
       const primero = new Map();
-      for (let k = 0; k < parsedLines.length; k++) {
-        const clave = ((parsedLines[k] && parsedLines[k].text) || '')
+      for (let k = 0; k < comun.parsedLines.length; k++) {
+        const clave = ((comun.parsedLines[k] && comun.parsedLines[k].text) || '')
           .toLowerCase().replace(/[^\wáéíóúñ ]/gi, '').replace(/\s+/g, ' ').trim();
         if (!clave) { canonMapa.set(k, k); continue; }
         if (!primero.has(clave)) primero.set(clave, k);
@@ -1701,6 +1808,7 @@
     const c = canonMapa.get(i);
     return c === undefined ? i : c;
   };
+  comun.edCanon = edCanon;
 
   // Elige un efecto de la lista evitando repetir el de la línea anterior:
   // dos líneas seguidas con la misma animación matan la sensación de "edit".
@@ -1708,8 +1816,8 @@
   let edPrevCam = '';
   /* Laboratorio de efectos (⚗): cuando demoFx/demoCam están puestos, el motor
      usa exactamente ese efecto/cámara en vez del pseudo-azar. */
-  let demoFx = null;
-  let demoCam = '';
+  comun.demoFx = null;
+  comun.demoCam = '';
   /* Intensidad AUTOMÁTICA: la decide la propia canción, línea por línea.
      Dos señales, la segunda solo si existe:
        1. ritmo de la letra — palabras por segundo de esta línea (siempre
@@ -1744,7 +1852,7 @@
 
   /* Devuelve 'soft' | 'normal' | 'hype' para la línea i. */
   const intensidadAuto = (i) => {
-    const cur = parsedLines[i];
+    const cur = comun.parsedLines[i];
     if (!cur) return 'normal';
 
     /* ── cadencia: cada cuánto se suceden las líneas ──
@@ -1753,8 +1861,8 @@
        largas siempre puntúan alto. Lo que marca la intensidad es el ritmo
        al que van cayendo las líneas: 1.5s = estribillo apretado, 4.6s = balada. */
     let hueco = 3.2;
-    for (let k = i + 1; k < parsedLines.length; k++) {
-      if (parsedLines[k].time > cur.time) { hueco = parsedLines[k].time - cur.time; break; }
+    for (let k = i + 1; k < comun.parsedLines.length; k++) {
+      if (comun.parsedLines[k].time > cur.time) { hueco = comun.parsedLines[k].time - cur.time; break; }
     }
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
     let e = clamp((4.6 - hueco) / 3.1, 0, 1);
@@ -1772,6 +1880,7 @@
     // repertorio COMPLETO, y los extremos solo saltan con cadencias claras.
     return e < 0.32 ? 'soft' : e > 0.68 ? 'hype' : 'normal';
   };
+  comun.intensidadAuto = intensidadAuto;
 
   const filtrarIntensidad = (lista, i) => {
     const modo = intensidadAuto(i);
@@ -1794,19 +1903,21 @@
        la línea de prueba (6 s, tranquila) lo hubiera descartado: antes se
        miraba en la lista YA filtrada y los efectos de golpe caían en otro
        sin avisar (pedías ed-terremoto y salía un ed-lockup). */
-    if (demoFx && listaOriginal.includes(demoFx)) { edPrevFx = demoFx; return demoFx; }
+    if (comun.demoFx && listaOriginal.includes(comun.demoFx)) { edPrevFx = comun.demoFx; return comun.demoFx; }
     let k = semilla(i, salt, lista.length);
     if (lista[k] === edPrevFx) k = (k + 1 + semilla(i, salt + 50, lista.length - 1)) % lista.length;
     edPrevFx = lista[k];
     return lista[k];
   };
+  comun.elegirFx = elegirFx;
   const elegirCam = (i) => {
-    if (demoCam) { edPrevCam = demoCam; return demoCam; }
+    if (comun.demoCam) { edPrevCam = comun.demoCam; return comun.demoCam; }
     let k = semilla(i, 5, ED_CAMS.length);
     if (ED_CAMS[k] === edPrevCam) k = (k + 1) % ED_CAMS.length;
     edPrevCam = ED_CAMS[k];
     return ED_CAMS[k];
   };
+  comun.elegirCam = elegirCam;
 
   // juntar palabras cortas en una misma fila ("OUT OF", "MY HEAD")
   const edFilas = (palabras) => {
@@ -1821,6 +1932,22 @@
     if (fila) filas.push(fila);
     return filas;
   };
+  comun.edFilas = edFilas;
+})();
+/* ==========================================================
+   LA LETRA · las piezas del modo edit (js/letra/edit-piezas.js)
+
+   Medir el panel, ajustar el ancho y montar cada pieza: el impulso de
+   cámara, los trozos, las filas apiladas, el lockup, el hueco
+   instrumental, las salidas y «escribe». Reparto de js/letra/: ver
+   nucleo.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.letra;
+  const {
+    lyricsEdit, semilla, silabas, duracionCantada, edLargo, intensidadAuto
+  } = comun;
 
   /* ── Medidas del panel, con respaldo ──
      #lyricsEdit vive dentro de #tab-lyrics y las pestañas inactivas son
@@ -1838,11 +1965,13 @@
     if (v) edPW = v;
     return v || edPW || 600;
   };
+  comun.panelW = panelW;
   const panelH = () => {
     const v = lyricsEdit.clientHeight;
     if (v) edPH = v;
     return v || edPH || 400;
   };
+  comun.panelH = panelH;
 
   // tamaño de fuente para que cada fila llene el panel sin desbordar
   const edTamanos = (filas) => {
@@ -1856,6 +1985,7 @@
     const esc = total > disponible ? disponible / total : 1;
     return tam.map(t => Math.max(20, t * esc));
   };
+  comun.edTamanos = edTamanos;
 
   /* Ajuste MEDIDO del ancho. `edTamanos` estima con un ancho de carácter fijo
      (0.58em): no sabe que la palabra destacada va a 1,55em, ni que va en
@@ -1936,12 +2066,13 @@
       }
     });
   };
+  comun.ajustarAncho = ajustarAncho;
 
   // Con «menos movimiento» el golpe se queda fuera; el texto no.
   const calma = () => !!(window.MMSettings && window.MMSettings.reduceMotion());
 
   /* EL GOLPE de los efectos fuertes: un empujón de cámara de un 3 % que se
-     recoge enseguida (ed-impulso, en edit-fx.css). Sustituye al kit de
+     recoge enseguida (ed-impulso, en css/edit/). Sustituye al kit de
      antes —destello blanco a panel entero, sacudida, aro expansivo y doce
      chispas de píxel—, que era lo más «de plantilla» del modo edit; y el
      usuario ya había rechazado tres veces que el fondo parpadee con el golpe. */
@@ -1951,6 +2082,7 @@
     void lyricsEdit.offsetWidth;   // reinicia la animación
     lyricsEdit.classList.add('ed-impulso');
   };
+  comun.edImpulso = edImpulso;
 
   // marquesina: banda con la frase repetida en bucle (edit ámbar de referencia)
   const edBanda = (texto, dir) => {
@@ -1964,6 +2096,7 @@
     banda.appendChild(track);
     return banda;
   };
+  comun.edBanda = edBanda;
 
   // carátula actual como textura (el div coverArt guarda url(...) en su estilo)
   const edCover = () => {
@@ -1971,6 +2104,7 @@
     const bg = el && el.style.backgroundImage;
     return (bg && bg !== 'none') ? bg : null;
   };
+  comun.edCover = edCover;
 
   // composición tipo lockup: palabra más larga ENORME, el resto en mini filas
   // con tracking ancho arriba/abajo (como "you KNOW than this / YOU BETTER")
@@ -2062,6 +2196,7 @@
     caja.style.fontSize = Math.max(22, fs).toFixed(1) + 'px';
     stack.appendChild(caja);
   };
+  comun.edTrozos = edTrozos;
 
   const edApila = (stack, words, durMs) => {
     const filas = edApilaFilas(words);
@@ -2094,6 +2229,7 @@
     });
     stack.appendChild(bloque);
   };
+  comun.edApila = edApila;
 
   const edLockup = (stack, words) => {
     let giant, arriba, abajo;
@@ -2132,6 +2268,7 @@
     stack.appendChild(g);
     mkMini(abajo);
   };
+  comun.edLockup = edLockup;
 
   // decode/hacker: las letras muestran caracteres aleatorios hasta asentarse
   const ED_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&/=+*<>';
@@ -2159,6 +2296,7 @@
       if (!vivos) clearInterval(iv);
     }, 50);
   };
+  comun.edScramble = edScramble;
 
   /* ═══ ESCENA INSTRUMENTAL ═══
      Cuando la línea es solo "♪" (intro, solo, puente), en vez de un título
@@ -2290,6 +2428,7 @@
       raf = requestAnimationFrame(paso);
     }
   };
+  comun.renderInstrumental = renderInstrumental;
 
   // salidas variadas: la línea anterior no siempre se va igual (más "edit")
   /* Salidas. Eran 3 contra 105 entradas: cada verso se despedía casi siempre
@@ -2326,15 +2465,16 @@
                 : ED_SALIDAS;
     return lista[semilla(ci, 61, lista.length)];
   };
+  comun.elegirSalida = elegirSalida;
 
   /* ── Lo que hay pintado AHORA en el modo edit ──
      El panel se pinta UNA vez por verso y hasta ahora nadie comprobaba que
      esa única pintada siguiera ahí. Estas tres variables son lo que mira el
      vigilante de tick(): qué verso se pintó, con qué nodo, y si el panel
      tenía tamaño al medirlo. */
-  let edStack = null;      // el .ed-stack vivo
-  let edIdx = -3;          // índice de la línea que pintó (nunca coincide al arrancar)
-  let edMedidoVacio = false;   // se midió con el panel oculto: hay que repetirlo
+  comun.edStack = null;      // el .ed-stack vivo
+  comun.edIdx = -3;          // índice de la línea que pintó (nunca coincide al arrancar)
+  comun.edMedidoVacio = false;   // se midió con el panel oculto: hay que repetirlo
 
   /* ══════ ✎ «ESCRIBE» · EL EDIT DE TIKTOK, DENTRO DEL MODO EDIT ══════
      Lo del vídeo que trajo el usuario (30-sep-2026): el verso se ESCRIBE
@@ -2368,6 +2508,7 @@
   let escPrevCarta = -9;     // índice del último verso que cortó a carta
 
   const escToca = (ci, words) => words.length <= 12 && semilla(ci, 97, 100) < ESC_PROB;
+  comun.escToca = escToca;
 
   const escCarta = (i, ci, words) => {
     if (escPrevCarta === i - 1) return '';
@@ -2415,8 +2556,8 @@
     const cantado = duracionCantada(i) * 1000 * 0.92;
     const pesos = words.map((w) => silabas(w) + 0.4);
     const total = pesos.reduce((s, x) => s + x, 0) || 1;
-    const linea = parsedLines[i];
-    const yaVa = linea && linea.time >= 0 ? Math.max(0, (aLetra(ultimoT) - linea.time) * 1000) : 0;
+    const linea = comun.parsedLines[i];
+    const yaVa = linea && linea.time >= 0 ? Math.max(0, (comun.aLetra(comun.ultimoT) - linea.time) * 1000) : 0;
 
     const p = document.createElement('div');
     p.className = 'esc-texto';
@@ -2449,6 +2590,23 @@
     // por si la tipografía o el tamaño del panel todavía se estaban asentando
     requestAnimationFrame(() => escEncajar(p));
   };
+  comun.edEscribe = edEscribe;
+})();
+/* ==========================================================
+   LA LETRA · pintar un verso en el modo edit (js/letra/edit-pintar.js)
+
+   renderEdit: de un verso a su pintada, con el efecto, la cámara y la
+   salida que le tocan. Reparto de js/letra/: ver nucleo.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.letra;
+  const {
+    lyricsEdit, semilla, duracionLinea, ED_TITLE_FX, ED_PHRASE_FX, ED_STRONG, ED_LETTER_FX,
+    ED_TOPS, edLargo, edCanon, elegirFx, elegirCam, edFilas, panelW, panelH, edTamanos,
+    ajustarAncho, edImpulso, edBanda, edCover, edTrozos, edApila, edLockup, edScramble,
+    renderInstrumental, elegirSalida, escToca, edEscribe
+  } = comun;
 
   const renderEdit = (i) => {
     /* TODAS las semillas del render usan el índice canónico, no el de la
@@ -2456,8 +2614,8 @@
     const ci = edCanon(i);
     // se apunta ANTES de pintar: si una rama fallara, el vigilante no
     // entraría en bucle intentando repintar la misma línea cada frame
-    edIdx = i;
-    edStack = null;
+    comun.edIdx = i;
+    comun.edStack = null;
 
     // la línea anterior se va con una salida elegida por línea y por ritmo
     // (.ed-fondo del invertido vive fuera del stack: se despide igual)
@@ -2472,7 +2630,7 @@
     });
     lyricsEdit.querySelectorAll('.lyrics-empty').forEach(v => v.remove());
 
-    const text = ((parsedLines[i] && parsedLines[i].text) || '').trim() || '♪';
+    const text = ((comun.parsedLines[i] && comun.parsedLines[i].text) || '').trim() || '♪';
     const words = text.split(/\s+/).filter(Boolean);
     const durMs = duracionLinea(i) * 1000;
 
@@ -2484,10 +2642,10 @@
        inclinación, si la hay, la decide el efecto (ed-sello, ed-duo…). */
     stack.style.setProperty('--tilt', '0deg');
     lyricsEdit.appendChild(stack);
-    edStack = stack;
+    comun.edStack = stack;
     // ¿el panel estaba tapado (otra pestaña) al calcular los tamaños? Entonces
     // esta pintada no vale y el vigilante la repite en cuanto se vea.
-    edMedidoVacio = !lyricsEdit.clientHeight;
+    comun.edMedidoVacio = !lyricsEdit.clientHeight;
     // El stack todavía está vacío: se mide cuando las ramas lo hayan llenado.
     requestAnimationFrame(() => ajustarAncho(stack));
 
@@ -2500,15 +2658,15 @@
     }
 
     // ✎ uno de cada cinco versos se escribe con la voz (en el ⚗ lab, no)
-    if (!demoFx && escToca(ci, words)) { edEscribe(stack, i, ci, words); return; }
+    if (!comun.demoFx && escToca(ci, words)) { edEscribe(stack, i, ci, words); return; }
 
     let delay = 100;
     // ¿Sale como TÍTULO GIGANTE? Antes solo con ≤3 palabras (casi nunca en
     // letras reales). Ahora frases medianas también salen gigantes en filas
     // apiladas — la mayoría de las líneas alterna entre gigante y frase.
     const lenTxt = edLargo(text);
-    const caps = demoFx
-      ? ED_TITLE_FX.includes(demoFx)   // en el lab manda el efecto elegido
+    const caps = comun.demoFx
+      ? ED_TITLE_FX.includes(comun.demoFx)   // en el lab manda el efecto elegido
       : (words.length <= 3
         || (words.length <= 5 && lenTxt <= 30 && semilla(ci, 41, 10) < 7)
         || (words.length <= 7 && lenTxt <= 44 && semilla(ci, 41, 10) < 4));
@@ -2837,6 +2995,23 @@
       if (fx === 'ed-impacto') edImpulso();
     }
   };
+  comun.renderEdit = renderEdit;
+})();
+/* ==========================================================
+   LA LETRA · las tres vistas (js/letra/vistas.js)
+
+   Lista ≡, edit ✦ y palabra ◉ (esta se descarga solo si se elige), sus
+   botones, el ⚗ lab de la copia local y el cambio de verso en la lista.
+   Reparto de js/letra/: ver nucleo.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.letra;
+  const {
+    lyricsBody, lyricsEdit, modeBtn, lyricsPalabra, palabraBtn, vistaEdit, vistaPalabra,
+    repintarAhora, repartirHidden, avisoPalabra, palabraLimpiar, duracionCantada, restoreLine,
+    decorateLine, ED_TITLE_FX, ED_PHRASE_FX, ED_CAMS, renderEdit
+  } = comun;
 
   /* ══════ ◉ LA VISTA PALABRA: el motor se pide la primera vez ══════
      js/palabra.js y css/palabra.css no van en el <head>: quien no usa esta
@@ -2846,15 +3021,16 @@
   let palabraCargando = null;
   let palabraFallo = -1e9;
   const palabraLista = () => !!(window.MMPalabra && window.MMPalabra.montado && window.MMPalabra.montado());
+  comun.palabraLista = palabraLista;
   const ajuste = (id, def) => {
     const S = window.MMSettings;
     const v = S && S.get ? S.get(id) : null;
     return v == null ? def : v;
   };
   const apiPalabra = {
-    lineas: () => parsedLines,
-    tiempos: (i) => tiemposPalabras(i),
-    fin: (i) => (parsedLines[i] ? parsedLines[i].time + duracionCantada(i) : 0),
+    lineas: () => comun.parsedLines,
+    tiempos: (i) => comun.tiemposPalabras(i),
+    fin: (i) => (comun.parsedLines[i] ? comun.parsedLines[i].time + duracionCantada(i) : 0),
     calma: () => !!(window.MMSettings && window.MMSettings.reduceMotion && window.MMSettings.reduceMotion()),
     estilo: () => ajuste('palabra', 'pila'),
     iconos: () => ajuste('palabraIco', 'si') !== 'no',
@@ -2886,7 +3062,7 @@
       if (!M) throw new Error('MMPalabra');
       M.montar(lyricsPalabra, apiPalabra);
       avisoPalabra('');
-      activeIdx = -2;                  // pinta ya el verso de ahora
+      comun.activeIdx = -2;                  // pinta ya el verso de ahora
       repintarAhora();
       return M;
     }).catch((e) => {
@@ -2903,20 +3079,22 @@
     if (palabraLista()) { window.MMPalabra.tick(t, idx); return; }
     if (!palabraCargando && performance.now() - palabraFallo > 10000) cargarPalabra().catch(() => {});
   };
+  comun.palabraTick = palabraTick;
 
   /* ══════ LAS TRES VISTAS: ≡ lista · ✦ edit · ◉ palabra ══════
      En el ordenador el botón ✦ alterna lista ↔ edit (desde palabra, lleva a
      edit) y la vista palabra tiene su botón ◉ al lado. En el teléfono no
      cabe uno más en la fila de vista —medido: a 360 px «compartir» ya entra
-     justo—, así que ◉ se esconde (style.css) y ✦ recorre las tres:
+     justo—, así que ◉ se esconde (css/base/) y ✦ recorre las tres:
      lista → edit → palabra → lista. Cada botón enseña ADÓNDE lleva. */
   const enMovil = () => document.body.classList.contains('disp-movil');
   const siguienteVista = () => {
     if (enMovil() && lyricsPalabra) {
-      return vistaPref === 'lista' ? 'edit' : vistaPref === 'edit' ? 'palabra' : 'lista';
+      return comun.vistaPref === 'lista' ? 'edit' : comun.vistaPref === 'edit' ? 'palabra' : 'lista';
     }
-    return vistaPref === 'edit' ? 'lista' : 'edit';
+    return comun.vistaPref === 'edit' ? 'lista' : 'edit';
   };
+  comun.siguienteVista = siguienteVista;
   const VISTA_UI = {
     lista:   { ico: 'ico-lista',   txt: 'lista',   sim: '≡', titulo: 'Volver a vista lista',
                aviso: '≡ vista lista · la letra entera' },
@@ -2943,17 +3121,17 @@
       else modeBtn.textContent = ui.sim;
       if (modeTxt) modeTxt.textContent = ui.txt;
       // encendido mientras lleva puesta una vista que no es la lista
-      const on = enMovil() ? vistaPref !== 'lista' : vistaPref === 'edit';
+      const on = enMovil() ? comun.vistaPref !== 'lista' : comun.vistaPref === 'edit';
       modeBtn.title = ui.titulo;
       modeBtn.classList.toggle('on', on);
       modeBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
       modeBtn.setAttribute('aria-label', modeBtn.title);
     }
     if (palabraBtn) {
-      const on = vistaPref === 'palabra';
+      const on = comun.vistaPref === 'palabra';
       palabraBtn.classList.toggle('on', on);
       palabraBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      palabraBtn.title = on ? VISTA_UI[vistaAntes].titulo.replace('Modo edit', 'Volver al modo edit')
+      palabraBtn.title = on ? VISTA_UI[comun.vistaAntes].titulo.replace('Modo edit', 'Volver al modo edit')
                             : VISTA_UI.palabra.titulo;
       palabraBtn.setAttribute('aria-label', palabraBtn.title);
     }
@@ -2964,7 +3142,7 @@
   const prepararVistas = () => {
     repartirHidden();   // la regla de quién ocupa el panel vive en un solo sitio
     lyricsEdit.innerHTML = '';
-    const sinTiempos = parsedLines.length > 0 && parsedLines[0].time < 0;
+    const sinTiempos = comun.parsedLines.length > 0 && comun.parsedLines[0].time < 0;
     if (vistaEdit() && sinTiempos) {
       lyricsEdit.innerHTML = '<p class="lyrics-empty">Esta letra no está sincronizada — el modo edit necesita tiempos. Usa la vista ≡ lista.</p>';
     }
@@ -2973,24 +3151,26 @@
       if (vistaPalabra()) {
         if (sinTiempos) avisoPalabra('Esta letra no está sincronizada — la vista palabra necesita tiempos. Usa la vista ≡ lista.');
         // sin letra aún (arranque, reposo) no se pide: lo hará el primer verso
-        else if (!palabraLista() && parsedLines.length) cargarPalabra().catch(() => {});
+        else if (!palabraLista() && comun.parsedLines.length) cargarPalabra().catch(() => {});
       }
     }
-    activeIdx = -2;   // fuerza repintado inmediato de la vista elegida
-    edIdx = -3;
+    comun.activeIdx = -2;   // fuerza repintado inmediato de la vista elegida
+    comun.edIdx = -3;
     repintarAhora();
   };
+  comun.prepararVistas = prepararVistas;
   const applyMode = () => {
     pintarBotonesVista();
     prepararVistas();
   };
+  comun.applyMode = applyMode;
   const ponerVista = (v) => {
     if (v === 'palabra' && !lyricsPalabra) v = 'edit';
-    if (v !== 'palabra') vistaAntes = v;
-    vistaPref = v;
+    if (v !== 'palabra') comun.vistaAntes = v;
+    comun.vistaPref = v;
     try {
       localStorage.setItem('mm_lyrics_mode', v === 'lista' ? 'list' : v);
-      localStorage.setItem('mm_lyrics_antes', vistaAntes);
+      localStorage.setItem('mm_lyrics_antes', comun.vistaAntes);
     } catch (_) { /* sin almacenamiento: vale para esta sesión */ }
     applyMode();
     /* Y te LLEVA a la letra. Estos botones viven en la barra de abajo, que
@@ -3003,13 +3183,7 @@
     if (window.SevenStatus) window.SevenStatus(VISTA_UI[v].aviso);
     window.dispatchEvent(new CustomEvent('mm:vista-letra', { detail: v }));
   };
-  if (modeBtn) {
-    modeBtn.addEventListener('click', () => ponerVista(siguienteVista()));
-    applyMode();
-  }
-  if (palabraBtn) {
-    palabraBtn.addEventListener('click', () => ponerVista(vistaPref === 'palabra' ? vistaAntes : 'palabra'));
-  }
+  comun.ponerVista = ponerVista;
   // el teléfono se gira o la ventana cruza el ancho del móvil: el botón ✦
   // pasa de alternar dos vistas a recorrer tres (y al revés)
   document.addEventListener('mm:disposicion', pintarBotonesVista);
@@ -3018,8 +3192,8 @@
      Panel para probar cualquier animación del modo edit sin música:
      elige efecto + cámara, escribe tu texto, o lanza el desfile automático.
      Mientras está abierto, tick() no pisa la demo. */
-  let labOpen = false;
-  let labEl = null, labText = null, labBtn = document.getElementById('fxLabBtn');
+  comun.labOpen = false;
+  let labEl = null, labText = null, labBtn = comun.labBtn = document.getElementById('fxLabBtn');
   let labLastFx = 'ed-golpe';
   let labAutoTimer = null;
   let labPrevVista = 'lista';
@@ -3033,14 +3207,14 @@
       ? 'MASTER MUSIC'
       : 'y esta frase de prueba baila palabra por palabra contigo');
     // línea falsa temporal: renderEdit lee parsedLines[i] y la duración
-    const save = parsedLines;
-    demoFx = fx;
-    parsedLines = [];
-    parsedLines[demoSeed] = { time: 0, text: txt };
-    parsedLines[demoSeed + 1] = { time: 6, text: txt };
+    const save = comun.parsedLines;
+    comun.demoFx = fx;
+    comun.parsedLines = [];
+    comun.parsedLines[demoSeed] = { time: 0, text: txt };
+    comun.parsedLines[demoSeed + 1] = { time: 6, text: txt };
     try { renderEdit(demoSeed); } finally {
-      parsedLines = save;
-      demoFx = null;
+      comun.parsedLines = save;
+      comun.demoFx = null;
       demoSeed += 1;   // posición/inclinación distinta en cada pasada
     }
     // marca el chip activo
@@ -3082,9 +3256,9 @@
       const chip = e.target.closest('.fx-chip');
       if (chip && chip.dataset.fx) { labAutoStop(); labDemo(chip.dataset.fx); return; }
       if (chip && chip.dataset.cam !== undefined) {
-        demoCam = chip.dataset.cam;
+        comun.demoCam = chip.dataset.cam;
         labEl.querySelectorAll('.fx-cam').forEach(c =>
-          c.classList.toggle('on', c.dataset.cam === demoCam));
+          c.classList.toggle('on', c.dataset.cam === comun.demoCam));
         labDemo(labLastFx);
         return;
       }
@@ -3111,15 +3285,15 @@
   };
 
   const labToggle = (on) => {
-    const next = on === undefined ? !labOpen : !!on;
-    if (next === labOpen) return;
-    labOpen = next;
-    if (labOpen) {
+    const next = on === undefined ? !comun.labOpen : !!on;
+    if (next === comun.labOpen) return;
+    comun.labOpen = next;
+    if (comun.labOpen) {
       if (!labEl) labBuild();
       const tab = document.querySelector('.tab[data-tab="lyrics"]');
       if (tab) tab.click();
-      labPrevVista = vistaPref;
-      if (vistaPref !== 'edit') { vistaPref = 'edit'; applyMode(); }   // sin tocar la preferencia guardada
+      labPrevVista = comun.vistaPref;
+      if (comun.vistaPref !== 'edit') { comun.vistaPref = 'edit'; applyMode(); }   // sin tocar la preferencia guardada
       /* SIN CANCIÓN el lab no servía para nada: applyMode() deja mandando al
          panel de reposo (o a la escena sin letra) y esconde #lyricsEdit, así
          que la demo se pintaba dentro de un elemento oculto y no se veía
@@ -3139,13 +3313,14 @@
       labDemo(labLastFx);
     } else {
       labAutoStop();
-      demoCam = '';
+      comun.demoCam = '';
       if (labEl) labEl.hidden = true;
       if (labBtn) labBtn.classList.remove('on');
-      vistaPref = labPrevVista;
+      comun.vistaPref = labPrevVista;
       applyMode();   // repinta la letra real (o limpia si no hay canción)
     }
   };
+  comun.labToggle = labToggle;
 
   /* El ⚗ lab estaba escrito entero —panel, chips de los 123 efectos, texto
      propio, desfile automático— y no había forma de llegar a él: su botón
@@ -3160,46 +3335,16 @@
     || location.protocol === 'file:';
   if (labBtn && enLocal) labBtn.hidden = false;
 
-  if (labBtn) labBtn.addEventListener('click', () => labToggle());
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && labOpen) labToggle(false);
-  });
-
-  // al cambiar el tamaño del panel, recalcular la línea del modo edit
-  let edResizeTimer = null;
-  window.addEventListener('resize', () => {
-    clearTimeout(edResizeTimer);
-    edResizeTimer = setTimeout(() => {
-      if (vistaEdit() && activeIdx >= 0 && !labOpen) pintarEdit(activeIdx);
-    }, 250);
-  });
-
-  /* El panel cambia de tamaño también al VOLVER a la pestaña de letras: las
-     pestañas inactivas son display:none, o sea 0×0, y lo que se pintó
-     mientras estabas en buscar o en la cola salió con medidas de cero. El
-     vigilante de tick() lo arregla en cuanto suena el siguiente frame, pero
-     con la música en pausa no hay frames — de ahí este observador. */
-  if (window.ResizeObserver) {
-    let obsTimer = null;
-    new ResizeObserver(() => {
-      clearTimeout(obsTimer);
-      obsTimer = setTimeout(() => {
-        if (labOpen || !lyricsEdit.clientHeight) return;
-        if (!vistaEdit() || activeIdx < 0) return;
-        if (edPerdido(activeIdx)) pintarEdit(activeIdx);
-      }, 120);
-    }).observe(lyricsEdit);
-  }
-
   // Búsqueda binaria: antes se recorrían TODAS las líneas en cada frame.
   const buscarIdx = (t) => {
-    let lo = 0, hi = parsedLines.length - 1, r = -1;
+    let lo = 0, hi = comun.parsedLines.length - 1, r = -1;
     while (lo <= hi) {
       const m = (lo + hi) >> 1;
-      if (parsedLines[m].time <= t) { r = m; lo = m + 1; } else { hi = m - 1; }
+      if (comun.parsedLines[m].time <= t) { r = m; lo = m + 1; } else { hi = m - 1; }
     }
     return r;
   };
+  comun.buscarIdx = buscarIdx;
 
   /* Profundidad por distancia, como Apple Music: la línea que viene casi
      nítida y cada una más lejos, un poco más apagada y desenfocada (antes
@@ -3212,7 +3357,7 @@
     conDistancia = [];
     if (idx < 0) return;
     for (let d = -3; d <= 3; d++) {
-      const n = d ? lineNodes[idx + d] : null;
+      const n = d ? comun.lineNodes[idx + d] : null;
       if (n) { n.dataset.d = String(d); conDistancia.push(n); }
     }
   };
@@ -3222,31 +3367,31 @@
      invalidaba el estilo de toda la letra. Ahora, en la reproducción normal,
      se tocan exactamente dos nodos: el que sale y el que entra. */
   const cambiarLinea = (prev, idx) => {
-    if (prev >= 0 && lineNodes[prev]) {
-      lineNodes[prev].classList.remove('active');
-      restoreLine(lineNodes[prev], prev);
+    if (prev >= 0 && comun.lineNodes[prev]) {
+      comun.lineNodes[prev].classList.remove('active');
+      restoreLine(comun.lineNodes[prev], prev);
     }
     if (idx > prev) {
       for (let i = Math.max(0, prev); i < idx; i++) {
-        if (lineNodes[i]) lineNodes[i].classList.add('past');
+        if (comun.lineNodes[i]) comun.lineNodes[i].classList.add('past');
       }
     } else {
       // el usuario saltó atrás: lo que ya no es pasado vuelve a su sitio
-      for (let i = idx + 1; i <= prev && i < lineNodes.length; i++) {
-        if (!lineNodes[i]) continue;
-        lineNodes[i].classList.remove('past', 'active');
-        restoreLine(lineNodes[i], i);
+      for (let i = idx + 1; i <= prev && i < comun.lineNodes.length; i++) {
+        if (!comun.lineNodes[i]) continue;
+        comun.lineNodes[i].classList.remove('past', 'active');
+        restoreLine(comun.lineNodes[i], i);
       }
     }
 
     marcarDistancias(idx);
-    const active = idx >= 0 ? lineNodes[idx] : null;
+    const active = idx >= 0 ? comun.lineNodes[idx] : null;
     if (!active) return;
     active.classList.remove('past');
     active.classList.add('active');
     decorateLine(active, idx);
 
-    if (userScrolledRecently) return;
+    if (comun.userScrolledRecently) return;
     // Manual VERTICAL-only scroll. Avoids scrollIntoView, which would
     // also scroll horizontally to chase a transform-scaled line and crop
     // the start/end of the text.
@@ -3255,11 +3400,26 @@
     // Flag this as a programmatic scroll so the 'scroll' listener below
     // doesn't mistake it for the user scrolling (which would disable
     // auto-centering and leave the lyrics drifting off-center).
-    autoScrolling = true;
-    clearTimeout(autoScrollTimer);
-    autoScrollTimer = setTimeout(() => { autoScrolling = false; }, 700);
-    subirEnCascada(Math.max(0, targetTop), idx);
+    comun.autoScrolling = true;
+    clearTimeout(comun.autoScrollTimer);
+    comun.autoScrollTimer = setTimeout(() => { comun.autoScrolling = false; }, 700);
+    comun.subirEnCascada(Math.max(0, targetTop), idx);
   };
+  comun.cambiarLinea = cambiarLinea;
+})();
+/* ==========================================================
+   LA LETRA · cascada y karaoke (js/letra/karaoke.js)
+
+   La letra que sube en cascada al cambiar de verso y el teñido palabra a
+   palabra del verso que suena, en la lista y en el edit. Reparto de
+   js/letra/: ver nucleo.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.letra;
+  const {
+    lyricsBody, lyricsEdit, silabas, duracionCantada
+  } = comun;
 
   /* ---- LA LETRA SUBE EN CASCADA (v120) ----
      Antes: lyricsBody.scrollTo({ behavior: 'smooth' }), o sea el bloque
@@ -3306,8 +3466,8 @@
       curvaCascada = ok ? MUELLE_LETRA : 'cubic-bezier(0.16, 1, 0.3, 1)';
     }
     // el tramo que se ve, con margen: de 6 versos arriba a 10 abajo
-    const primero = lineNodes[Math.max(0, idx - 6)];
-    const ultimo = lineNodes[Math.min(lineNodes.length - 1, idx + 10)];
+    const primero = comun.lineNodes[Math.max(0, idx - 6)];
+    const ultimo = comun.lineNodes[Math.min(comun.lineNodes.length - 1, idx + 10)];
     if (!primero || !ultimo) { lyricsBody.scrollTop = targetTop; return; }
     const tramo = [];
     let verso = Math.max(0, idx - 6) - 1;
@@ -3336,6 +3496,7 @@
       a.onfinish = () => { if (enCascada.get(t.el) === a) enCascada.delete(t.el); };
     }
   };
+  comun.subirEnCascada = subirEnCascada;
 
   /* ---- Karaoke: la línea activa se va tiñendo palabra a palabra ----
      La palabra que suena AHORA lleva .cantando; las ya cantadas, .sung.
@@ -3394,7 +3555,7 @@
   };
 
   const tiemposPalabras = (i) => {
-    const l = parsedLines[i];
+    const l = comun.parsedLines[i];
     if (!l || l.time < 0) return [];
     const pal = String(l.text || '').split(/\s+/).filter(Boolean);
     const n = pal.length;
@@ -3440,6 +3601,7 @@
     }
     return out;
   };
+  comun.tiemposPalabras = tiemposPalabras;
 
   /* Para el teñido: [{ el, s }] con s = fracción del verso en la que entra
      cada elemento. Los elementos pueden ser palabras (lo normal), LETRAS
@@ -3449,7 +3611,7 @@
      palabra suena en cualquier vista. */
   const repartir = (els, idx) => {
     if (!els.length) return [];
-    const linea = idx >= 0 ? parsedLines[idx] : null;
+    const linea = idx >= 0 ? comun.parsedLines[idx] : null;
     const out = new Array(els.length);
     const pal = linea && linea.time >= 0 ? tiemposPalabras(idx) : [];
     if (pal.length) {
@@ -3536,6 +3698,7 @@
      activo pero sin teñirse nada, y no se recuperaba hasta que el índice daba
      la casualidad de cambiar a otro valor. */
   const karaokeOlvidar = () => { kIdx = -1; kSpans = null; kNext = 0; kLleno = -1; };
+  comun.karaokeOlvidar = karaokeOlvidar;
 
   const karaokeReset = () => {
     if (kSpans) {
@@ -3545,8 +3708,8 @@
     kLleno = -1;
   };
   const karaoke = (t, idx) => {
-    if (idx < 0 || !lineNodes[idx]) { kIdx = -1; kSpans = null; return; }
-    const ln = lineNodes[idx];
+    if (idx < 0 || !comun.lineNodes[idx]) { kIdx = -1; kSpans = null; return; }
+    const ln = comun.lineNodes[idx];
     if (kIdx !== idx) { kIdx = idx; kSpans = null; kNext = 0; kLleno = -1; }
     if (!kSpans) {
       // _kw puede ser [] (línea sin palabras): también vale como caché, así
@@ -3559,7 +3722,7 @@
     }
     if (!kSpans.length) return;
 
-    const ini = parsedLines[idx].time;
+    const ini = comun.parsedLines[idx].time;
     const p = (t - ini) / duracionCantada(idx);
     if (p < 0) return;
     if (kNext && p < kSpans[kNext - 1].s) karaokeReset();   // saltó hacia atrás
@@ -3580,7 +3743,7 @@
     /* EL BARRIDO: la palabra que suena se llena de izquierda a derecha
        mientras dura, como en Apple Music Sing. Encima lleva una copia de sí
        misma en el acento (::after con su data-t) destapada con clip-path
-       hasta --p (style.css, «KARAOKE»). Sus tiempos son los mismos del
+       hasta --p (css/base/, «KARAOKE»). Sus tiempos son los mismos del
        reparto por sílabas: de su arranque al de la siguiente, o al final
        de lo cantado si es la última. Aquí solo se escribe --p, y solo
        cuando cambia una décima: nada de layout, y el `animation` del
@@ -3597,6 +3760,7 @@
       kSpans[k].el.style.setProperty('--p', lleno + '%');
     }
   };
+  comun.karaoke = karaoke;
 
   /* ══════ KARAOKE EN MODO EDIT ══════
      La técnica que hoy es estándar en los lyric edits: la palabra que suena
@@ -3614,7 +3778,7 @@
      Buscando el stack vivo desde fuera, TODOS los montajes reciben karaoke
      sin tocar ninguna de sus ramas. */
   const karaokeEdit = (t, idx) => {
-    if (idx < 0 || !parsedLines[idx]) return;
+    if (idx < 0 || !comun.parsedLines[idx]) return;
     const stack = lyricsEdit.querySelector('.ed-stack:not([data-out])');
     if (!stack) return;
     // ed-trozos ya lleva su propio ritmo: los trozos SON la sincronía, y
@@ -3635,7 +3799,7 @@
     // con una sola palabra/fila no hay karaoke que valga: se queda encendida
     if (ks.length < 2) return;
 
-    const p = (t - parsedLines[idx].time) / duracionCantada(idx);
+    const p = (t - comun.parsedLines[idx].time) / duracionCantada(idx);
     if (p < 0) return;
     if (stack._kn && p < ks[stack._kn - 1].s) {
       for (let i = 0; i < ks.length; i++) ks[i].el.classList.remove('sung', 'cantando');
@@ -3653,26 +3817,42 @@
       ks[i].el.classList.toggle('cantando', i === stack._kn - 1);
     }
   };
+  comun.karaokeEdit = karaokeEdit;
+})();
+/* ==========================================================
+   LA LETRA · seguir la canción (js/letra/seguir.js)
+
+   El contador de los huecos instrumentales, el vigilante que repinta el
+   edit si se pierde, y el tick que decide qué verso suena (con su
+   adelanto y su histéresis). Reparto de js/letra/: ver nucleo.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.letra;
+  const {
+    lyricsEdit, lyricsPalabra, vistaAhora, GAP_LEAD, pintarTradEdit, panelW, panelH, renderEdit,
+    palabraTick, buscarIdx, cambiarLinea, karaoke, karaokeEdit
+  } = comun;
 
   // ---- Contador de los huecos instrumentales ----
   let gapUltimo = -1;
   const interludio = (t, idx) => {
-    const g = gapMap.get(idx);
-    if (gapAct && gapAct !== g) {
-      gapAct.classList.remove('on');
-      gapAct = null;
+    const g = comun.gapMap.get(idx);
+    if (comun.gapAct && comun.gapAct !== g) {
+      comun.gapAct.classList.remove('on');
+      comun.gapAct = null;
       gapUltimo = -1;
     }
     if (!g) return;
-    const sig = parsedLines[idx + 1];
+    const sig = comun.parsedLines[idx + 1];
     if (!sig) return;
-    const ini = (idx < 0 ? 0 : parsedLines[idx].time) + (idx < 0 ? 0 : GAP_LEAD);
+    const ini = (idx < 0 ? 0 : comun.parsedLines[idx].time) + (idx < 0 ? 0 : GAP_LEAD);
     if (t < ini || t >= sig.time) {
-      if (gapAct === g) { g.classList.remove('on'); gapAct = null; gapUltimo = -1; }
+      if (comun.gapAct === g) { g.classList.remove('on'); comun.gapAct = null; gapUltimo = -1; }
       return;
     }
     const p = (t - ini) / Math.max(0.1, sig.time - ini);
-    if (gapAct !== g) { g.classList.add('on'); gapAct = g; }
+    if (comun.gapAct !== g) { g.classList.add('on'); comun.gapAct = g; }
     // redondeo a centésimas: recorta ~60 escrituras de estilo por segundo a las que de verdad cambian
     const q = Math.round(p * 100);
     if (q !== gapUltimo) {
@@ -3694,14 +3874,14 @@
      DOM, y únicamente mide el panel si la última pintada se hizo a ciegas. */
   let edChequeo = 0;   // último sondeo de la comprobación que mide (ver abajo)
   const edPerdido = (idx) => {
-    if (edIdx !== idx) return true;                       // lo pintado es de otra línea
-    if (!edStack || !edStack.isConnected) return true;    // ya no está en el documento
-    if (edStack.parentNode !== lyricsEdit) return true;   // el cine se lo llevó
-    if (edStack.dataset.out) return true;                 // marcado para irse, sin relevo
+    if (comun.edIdx !== idx) return true;                       // lo pintado es de otra línea
+    if (!comun.edStack || !comun.edStack.isConnected) return true;    // ya no está en el documento
+    if (comun.edStack.parentNode !== lyricsEdit) return true;   // el cine se lo llevó
+    if (comun.edStack.dataset.out) return true;                 // marcado para irse, sin relevo
     /* ¿vuelve a haber panel tras una pintada a ciegas? Esta es la ÚNICA
        comprobación que mide, y medir obliga al navegador a rehacer el layout:
        se sondea 4 veces por segundo, no 60. */
-    if (edMedidoVacio) {
+    if (comun.edMedidoVacio) {
       const ahora = performance.now();
       if (ahora - edChequeo > 250) {
         edChequeo = ahora;
@@ -3710,6 +3890,7 @@
     }
     return false;
   };
+  comun.edPerdido = edPerdido;
 
   /* Si una rama del motor de efectos falla, el verso NO puede desaparecer:
      se pone el texto pelado y la canción sigue. */
@@ -3720,12 +3901,12 @@
     const p = document.createElement('div');
     p.className = 'ed-frase';
     p.style.fontSize = Math.max(18, Math.min(panelH() * 0.075, panelW() / 15)).toFixed(1) + 'px';
-    p.textContent = ((parsedLines[i] && parsedLines[i].text) || '').trim() || '♪';
+    p.textContent = ((comun.parsedLines[i] && comun.parsedLines[i].text) || '').trim() || '♪';
     stack.appendChild(p);
     lyricsEdit.appendChild(stack);
-    edStack = stack;
-    edIdx = i;
-    edMedidoVacio = !lyricsEdit.clientHeight;
+    comun.edStack = stack;
+    comun.edIdx = i;
+    comun.edMedidoVacio = !lyricsEdit.clientHeight;
   };
 
   const pintarEdit = (i) => {
@@ -3737,6 +3918,7 @@
        adorno y no puede, ni fallando, mandar el verso al respaldo pelado. */
     try { pintarTradEdit(i); } catch (_) {}
   };
+  comun.pintarEdit = pintarEdit;
 
   /* ══════════ A QUÉ SEGUNDO VA LA LETRA ══════════
      Tres correcciones sobre el segundo que da el reproductor, y ninguna se
@@ -3761,7 +3943,7 @@
         reproductor ya da la posición de lo que suena.
 
      3) HISTÉRESIS. El reloj de Spotify se corrige a sí mismo (ver
-        js/spotify.js) y una corrección de unas centésimas hacia atrás,
+        js/spotify/) y una corrección de unas centésimas hacia atrás,
         justo en el cambio de verso, hacía volver al verso anterior y
         re-animar el nuevo: el parpadeo de siempre. Un verso que ya entró
         no se suelta por menos de 0,2 s. */
@@ -3775,24 +3957,26 @@
     return V.latencia();
   };
   // del segundo del reproductor al segundo de la letra, y al revés
-  const aLetra = (seg) => seg + offset + ADELANTO - latenciaSalida();
-  const aAudio = (segLetra) => segLetra - offset - ADELANTO + latenciaSalida();
+  const aLetra = (seg) => seg + comun.offset + ADELANTO - latenciaSalida();
+  comun.aLetra = aLetra;
+  const aAudio = (segLetra) => segLetra - comun.offset - ADELANTO + latenciaSalida();
+  comun.aAudio = aAudio;
 
   const tick = (currentTime) => {
-    if (labOpen) return;   // el lab manda: la canción no pisa la demo
-    ultimoT = currentTime;   // la guardan applyMode / repintar / forzarVista
-    if (!parsedLines.length || parsedLines[0].time < 0) return;
+    if (comun.labOpen) return;   // el lab manda: la canción no pisa la demo
+    comun.ultimoT = currentTime;   // la guardan applyMode / repintar / forzarVista
+    if (!comun.parsedLines.length || comun.parsedLines[0].time < 0) return;
     // el desfase del usuario (positivo = la letra se adelanta) + lo de arriba
     const t = aLetra(currentTime);
     let idx = buscarIdx(t);
-    if (idx === activeIdx - 1 && parsedLines[activeIdx] &&
-        parsedLines[activeIdx].time - t < HISTERESIS) idx = activeIdx;
+    if (idx === comun.activeIdx - 1 && comun.parsedLines[comun.activeIdx] &&
+        comun.parsedLines[comun.activeIdx].time - t < HISTERESIS) idx = comun.activeIdx;
     const vista = vistaAhora();
     const modoEdit = vista === 'edit';
     const modoPalabra = vista === 'palabra' && !!lyricsPalabra;
 
-    if (idx !== activeIdx) {
-      activeIdx = idx;
+    if (idx !== comun.activeIdx) {
+      comun.activeIdx = idx;
       /* MODO EDIT: solo la línea actual, gigante y con efectos
          (vistaEdit() cuenta la vista que imponen el cine o el vídeo 9:16) */
       if (modoEdit) {
@@ -3808,15 +3992,15 @@
         }
       } else if (modoPalabra) {
         // el subtítulo de la traducción, al pie, verso a verso (como en edit)
-        if (tradLines.length) pintarTradEdit(idx, lyricsPalabra);
+        if (comun.tradLines.length) pintarTradEdit(idx, lyricsPalabra);
       } else {
         /* Desde donde la dejó la lista la ÚLTIMA vez, no desde activeIdx: en
            edit o en palabra la lista no se mueve, y al volver a ella
            cambiarLinea() tiene que deshacer SU verso activo. Con activeIdx
            (forzado a -2 al cambiar de vista) se quedaban dos versos
            encendidos: el de antes de irse y el de ahora. */
-        cambiarLinea(listaIdx, idx);
-        listaIdx = idx;
+        cambiarLinea(comun.listaIdx, idx);
+        comun.listaIdx = idx;
       }
     } else if (modoEdit && idx >= 0 && edPerdido(idx)) {
       pintarEdit(idx);   // el vigilante: la pintada de esta línea se perdió
@@ -3832,6 +4016,7 @@
       interludio(t, idx);
     }
   };
+  comun.tick = tick;
 
   // ---- 60fps auto-tick from rAF loop, reading audio.currentTime directly.
   // This replaces the slow 4Hz 'timeupdate' polling and removes the
@@ -3846,7 +4031,7 @@
 
        El fotograma lo pide el reloj de la app (js/perf.js) y SOLO mientras
        suena la música importada: con Spotify el segundo lo trae el reloj de
-       js/spotify.js, y en pausa no hay nada que teñir. Antes este bucle se
+       js/spotify/, y en pausa no hay nada que teñir. Antes este bucle se
        pedía un fotograma en cada vsync toda la vida de la pestaña. */
     const audio = window.PlayerCore && window.PlayerCore.audio;
     const suenaLocal = () => !!(audio && !audio.paused);
@@ -3871,27 +4056,81 @@
   };
   if (window.PlayerCore) startLoop();
   else window.addEventListener('load', startLoop);
+})();
+/* ==========================================================
+   LA LETRA · el arranque (js/letra/arranque.js)
+
+   Va el ÚLTIMO de js/letra/: aquí se cablean los oyentes, se hace el
+   primer pintado y se publica la API (window.LyricsModule,
+   window.LyricsOffset). Así nada se pone en marcha antes de que estén
+   cargados los nueve archivos de antes. Reparto: ver nucleo.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.letra;
+  const {
+    lyricsBody, lyricsEdit, modeBtn, lyricsPalabra, palabraBtn, vistaAhora, vistaEdit,
+    repintarAhora, tradActiva, tradReset, pedirTraduccion, frenado, ttmlId, ttmlGet, ttmlPut,
+    pedirTTML, precargar, fetchLyrics, palabraLista, siguienteVista, prepararVistas, applyMode,
+    ponerVista, labBtn, labToggle, edPerdido, pintarEdit, aAudio, tick
+  } = comun;
+
+  if (modeBtn) {
+    modeBtn.addEventListener('click', () => ponerVista(siguienteVista()));
+    applyMode();
+  }
+  if (palabraBtn) {
+    palabraBtn.addEventListener('click', () => ponerVista(comun.vistaPref === 'palabra' ? comun.vistaAntes : 'palabra'));
+  }
+  if (labBtn) labBtn.addEventListener('click', () => labToggle());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && comun.labOpen) labToggle(false);
+  });
+  // al cambiar el tamaño del panel, recalcular la línea del modo edit
+  let edResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(edResizeTimer);
+    edResizeTimer = setTimeout(() => {
+      if (vistaEdit() && comun.activeIdx >= 0 && !comun.labOpen) pintarEdit(comun.activeIdx);
+    }, 250);
+  });
+  /* El panel cambia de tamaño también al VOLVER a la pestaña de letras: las
+     pestañas inactivas son display:none, o sea 0×0, y lo que se pintó
+     mientras estabas en buscar o en la cola salió con medidas de cero. El
+     vigilante de tick() lo arregla en cuanto suena el siguiente frame, pero
+     con la música en pausa no hay frames — de ahí este observador. */
+  if (window.ResizeObserver) {
+    let obsTimer = null;
+    new ResizeObserver(() => {
+      clearTimeout(obsTimer);
+      obsTimer = setTimeout(() => {
+        if (comun.labOpen || !lyricsEdit.clientHeight) return;
+        if (!vistaEdit() || comun.activeIdx < 0) return;
+        if (edPerdido(comun.activeIdx)) pintarEdit(comun.activeIdx);
+      }, 120);
+    }).observe(lyricsEdit);
+  }
 
   // ---- Public offset control (set from settings UI) ----
   window.LyricsOffset = {
-    get: () => offset,
+    get: () => comun.offset,
     set: (sec) => {
-      offset = Math.max(-10, Math.min(10, +sec || 0));
-      if (desfaseKey) {
-        offsets[desfaseKey] = offset;
-        localStorage.setItem('mm_lyrics_offsets', JSON.stringify(offsets));
+      comun.offset = Math.max(-10, Math.min(10, +sec || 0));
+      if (comun.desfaseKey) {
+        comun.offsets[comun.desfaseKey] = comun.offset;
+        localStorage.setItem('mm_lyrics_offsets', JSON.stringify(comun.offsets));
       } else {
-        localStorage.setItem('mm_lyrics_offset', String(offset));
+        localStorage.setItem('mm_lyrics_offset', String(comun.offset));
       }
       // que el cambio se vea YA, sin esperar al próximo verso
-      activeIdx = -2;
+      comun.activeIdx = -2;
       /* Con el segundo que vio el último tick, NO con audio.currentTime: en
          Spotify Connect la música no suena en el <audio> de la página, así
          que ahí currentTime es 0 y ajustar la sincronía saltaba al primer
          verso de la canción. Misma trampa que ya documenta `ultimoT`. */
       repintarAhora();
-      // la UI del ajuste de config vive en seven.js: que se entere
-      window.dispatchEvent(new CustomEvent('mm:lyrics-offset', { detail: offset }));
+      // la UI del ajuste de config vive en js/seven/: que se entere
+      window.dispatchEvent(new CustomEvent('mm:lyrics-offset', { detail: comun.offset }));
     },
   };
 
@@ -3919,15 +4158,15 @@
   // 'scroll' event, because our own smooth auto-scroll also fires 'scroll' and
   // would otherwise disable auto-centering in a feedback loop.
   const markUserScroll = () => {
-    userScrolledRecently = true;
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(() => { userScrolledRecently = false; }, 2500);
+    comun.userScrolledRecently = true;
+    clearTimeout(comun.scrollTimer);
+    comun.scrollTimer = setTimeout(() => { comun.userScrolledRecently = false; }, 2500);
   };
   lyricsBody.addEventListener('wheel', markUserScroll, { passive: true });
   lyricsBody.addEventListener('touchmove', markUserScroll, { passive: true });
   // Safety net: if a 'scroll' fires that we did NOT initiate, treat it as the user.
   lyricsBody.addEventListener('scroll', () => {
-    if (autoScrolling) return;
+    if (comun.autoScrolling) return;
     markUserScroll();
   });
 
@@ -3938,7 +4177,7 @@
        solo sabe mirar la cola local y además descarta las de Spotify a
        propósito, porque hasta ahora no había forma de saber qué canción venía
        detrás en Spotify Connect. Con el Web Playback SDK sí la hay
-       (`track_window.next_tracks`), así que spotify.js llama aquí con esa
+       (`track_window.next_tracks`), así que js/spotify/ llama aquí con esa
        pista mientras suena la actual: al cambiar de canción la letra ya está
        en la caché y sale sola, en vez de esperar los ~6-7 s de LRClib.
        No toca la UI ni la pista actual, y cualquier fallo se ignora: si la
@@ -3953,22 +4192,22 @@
     },
     // ajustes → datos → limpiar caché (localStorage ya lo borra settings.js;
     // esto tira además la copia que este módulo tiene en memoria)
-    clearCache: () => { cache = {}; ttmlCache = {}; },
+    clearCache: () => { comun.cache = {}; comun.ttmlCache = {}; },
     // de dónde salió la letra que se ve: 'lrclib' o 'amll' (palabra a palabra exacta)
-    fuente: () => fuente,
+    fuente: () => comun.fuente,
 
     /* Estado de sincronización. Lo consume el modo cine (lines + idx) y
        la tarjeta de compartir, que además necesita `trad`: los versos ya
        traducidos, en el mismo orden que `lines`, para poder ofrecer la
        tarjeta con subtítulo sin volver a pedirle nada a nadie. */
-    getSync: () => ({ lines: parsedLines, idx: activeIdx, trad: tradLines }),
-    isEditMode: () => vistaPref === 'edit',
+    getSync: () => ({ lines: comun.parsedLines, idx: comun.activeIdx, trad: comun.tradLines }),
+    isEditMode: () => comun.vistaPref === 'edit',
     // la vista elegida en la app ('lista' | 'edit' | 'palabra'), sin contar la del cine
-    vistaElegida: () => vistaPref,
+    vistaElegida: () => comun.vistaPref,
     // elegir vista desde fuera (los [ver ▸] de ajustes): como pulsar su botón
     ponerVista: (v) => ponerVista(v === 'edit' || v === 'palabra' ? v : 'lista'),
     // ¿está puesta la escena de canción sin letra? (la consulta el cine)
-    sinLetra: () => ncsOn,
+    sinLetra: () => comun.ncsOn,
     /* Reparte otra vez el hidden de las dos vistas. Existe para que el cine
        no tenga que re-deducir la regla al cerrarse: la condición (reposo,
        escena NCS, modo elegido) vive en un solo sitio. */
@@ -3986,28 +4225,23 @@
        ya no vale. Si no suena nada no hace falta: lo pintará el próximo tick. */
     repintar: () => {
       lyricsEdit.innerHTML = '';
-      activeIdx = -2;
-      edIdx = -3;
+      comun.activeIdx = -2;
+      comun.edIdx = -3;
       // la vista palabra también mide sus palabras: que vuelva a medir
       if (palabraLista()) window.MMPalabra.repintar();
       repintarAhora();
     },
 
-    /* El cine y el vídeo 9:16 (js/vertical.js) eligen vista por su cuenta
+    /* El cine y el vídeo 9:16 (js/cine/) eligen vista por su cuenta
        —'edit', 'lista', 'palabra' o null para volver a la preferencia— sin tocar la
        preferencia y sin ocuparse de los `hidden`: que los reparta quien
        sabe (el reposo y la escena sin letra también cuentan). Repinta el
        verso de ahora en la vista nueva. */
     forzarVista: (v) => {
-      forzado = v === 'edit' || v === 'lista' || (v === 'palabra' && lyricsPalabra) ? v : null;
+      comun.forzado = v === 'edit' || v === 'lista' || (v === 'palabra' && lyricsPalabra) ? v : null;
       prepararVistas();
     },
     // qué vista se está pintando de verdad (la impuesta o la preferencia)
     vistaActual: () => vistaAhora(),
   };
-
-
-
-
-
 })();

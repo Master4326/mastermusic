@@ -3,7 +3,7 @@
    ==========================================================
 
    Tres sitios escuchan el teclado de la app: los mandos del reproductor
-   (js/app.js), las pestañas (js/seven.js) y el buscador universal
+   (js/app.js), las pestañas (js/seven/) y el buscador universal
    (js/buscador.js). Los dos primeros solo miraban `e.target.tagName ===
    'INPUT'`, y por ahí se colaban tres cosas que se sienten como una app
    rota:

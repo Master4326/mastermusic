@@ -27,7 +27,7 @@
    al arrancar (arranque en frío) y los de `launchQueue` (ventana ya viva).
 
    ---- LO QUE NO HACE ----
-   No toca la vuelta de Spotify (`?code=…`): esa es de js/spotify.js y se
+   No toca la vuelta de Spotify (`?code=…`): esa es de js/spotify/ y se
    reconoce por sus propios parámetros. Si están, este módulo se aparta.
    ========================================================== */
 (() => {

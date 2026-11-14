@@ -69,7 +69,7 @@ html[data-aspecto="manga"] .paleta-btn {
 html[data-aspecto="manga"] .tb-btn { color: var(--mg-tinta); border-radius: 0; }
 html[data-aspecto="manga"] .tb-btn:hover { background: var(--mg-tinta); color: #fff; }
 /* `--tumbado-resto`: teléfono tumbado, lo que no es carátula a lo alto de
-   la columna (ver style.css); medido con la ficha y las barras de manga */
+   la columna (ver css/base/); medido con la ficha y las barras de manga */
 html[data-aspecto="manga"] .main-grid { gap: 12px; padding: 12px 14px 12px; --tumbado-resto: 240px; }
 html[data-aspecto="manga"] .left-panel {
   position: relative;
@@ -247,7 +247,7 @@ html[data-aspecto="manga"] body.disp-movil :is(.window > .tab-bar .tab-txt, .ctl
    de la canción oscurecido, para que se lea sobre claro), el karaoke, el
    modo edit, las listas y ajustes. La onda que rodea el verso pasa a
    pintarse en tinta (js/fondo.js lee --onda-tinta) y el espectro también
-   (js/visualizer.js lee --viz-tinta), sin su franja.
+   (js/espectro/ lee --viz-tinta), sin su franja.
    --acento-cancion guarda el color de la canción tal cual: dentro del panel
    --accent se oscurece, y lo que necesita el vivo (la carta del invertido)
    tira de él. En el cine la letra se muda fuera del panel y vuelve a su

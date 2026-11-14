@@ -9,9 +9,9 @@
    sola fila de 28 a 44 px de ancho.
 
    Este módulo SOLO muda nodos: qué va a qué sitio. Cómo se ve cada uno lo
-   dice style.css bajo `body.disp-movil`. Y muda los nodos DE VERDAD, sin
-   copias: el mismo botón con sus mismos oyentes. Así spotify.js sigue
-   pintando el ♡ y el ◎ por su id, seven.js sigue escribiendo los avisos en
+   dice css/base/ bajo `body.disp-movil`. Y muda los nodos DE VERDAD, sin
+   copias: el mismo botón con sus mismos oyentes. Así js/spotify/ sigue
+   pintando el ♡ y el ◎ por su id, js/seven/ sigue escribiendo los avisos en
    #statusText y la barra de pestañas sigue siendo la misma barra, con su
    tirador y su «se esconde sola». Nadie tiene que enterarse de dónde vive
    cada cosa.
@@ -23,14 +23,14 @@
 
    Con la LETRA ANCHA la franja se esconde entera —para eso está—, así que
    el ♡ pasa a la fila de vista y los avisos vuelven a su barra de estado
-   (que en ese caso se enseña). seven.js avisa con `mm:ancho`.
+   (que en ese caso se enseña). js/seven/ avisa con `mm:ancho`.
 
    Cada nodo mudado deja una marca (un comentario) en su sitio de siempre:
    al girar el teléfono o ensanchar la ventana, vuelve exactamente ahí.
    Es la misma idea que usa el modo cine para llevarse #lyricsEdit.
 
-   El ◈ del espectro NO se muda aquí: ya lo muda seven.js con la letra
-   ancha, y dos módulos moviendo el mismo nodo acaban peleándose. seven.js
+   El ◈ del espectro NO se muda aquí: ya lo muda js/seven/ con la letra
+   ancha, y dos módulos moviendo el mismo nodo acaban peleándose. js/seven/
    escucha `mm:disposicion` y lo coloca él.
 
    Va de los primeros en index.html: cuanto antes corra, menos se ve la
@@ -42,7 +42,7 @@
   const $ = (id) => document.getElementById(id);
   const body = document.body;
 
-  /* La MISMA condición que el bloque «MÓVIL VERTICAL» de style.css. Un
+  /* La MISMA condición que el bloque «MÓVIL VERTICAL» de css/base/. Un
      teléfono tumbado no entra (ahí la pantalla es baja y las pestañas se
      quedan arriba, en su panel), y una ventana estrecha de escritorio sí:
      cabe lo mismo que en un teléfono, solo que se maneja con ratón. */
@@ -111,7 +111,7 @@
 
   if (mq.addEventListener) mq.addEventListener('change', aplicar);
   else if (mq.addListener) mq.addListener(aplicar);
-  // seven.js avisa cuando se pone o se quita la letra ancha
+  // js/seven/ avisa cuando se pone o se quita la letra ancha
   document.addEventListener('mm:ancho', aplicar);
   aplicar();
 

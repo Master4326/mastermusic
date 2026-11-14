@@ -1,3 +1,8 @@
+/* css/edit/01-escena.css · hoja 1 de 4 del catálogo del modo edit (lo que fue css/edit-fx.css)
+   El escenario del modo edit: las reglas de la casa, las variables, el
+   golpe, las cámaras y las salidas.
+   Van DESPUÉS de css/base/ y seguidas, en este orden. */
+
 /* ==========================================================
    MASTER MUSIC · CATÁLOGO DE EFECTOS DEL MODO EDIT
    ==========================================================
@@ -5,11 +10,11 @@
    y frases, los revelados letra a letra (edl-*), los movimientos de cámara
    (edcam-*), las salidas (sal-*) y sus @keyframes.
 
-   Se carga DESPUÉS de style.css y ninguna regla de style.css toca estas
+   Se carga DESPUÉS de css/base/ y ninguna regla de css/base/ toca estas
    clases (las de los revelados edl-* vivían allí repartidas en tres sitios;
    ahora están aquí, con las demás).
 
-   El catálogo se declara en js/lyrics.js, en la tabla FX: una fila por
+   El catálogo se declara en js/letra/, en la tabla FX: una fila por
    efecto. Añadir uno = una fila allí + su regla y su keyframe aquí.
 
    ── EL LENGUAJE DE MOVIMIENTO (oct-2026) ──
@@ -64,7 +69,7 @@
    aspectos claros el panel de la letra redefine el acento. Declaradas aquí
    se resuelven con el acento de su panel (y en el cine, con el de siempre). */
 .lyrics-edit {
-  /* Las curvas (--ed-sale, --ed-muelle…) viven en :root (css/style.css)
+  /* Las curvas (--ed-sale, --ed-muelle…) viven en :root (css/base/)
      desde el 10-nov-2026: la vista lista y la vista palabra se mueven con
      ellas también. Aquí queda la piel, que depende del acento del panel. */
 
@@ -271,6 +276,9 @@ body.reduce-motion .ed-stack[class*="edcam-"] { animation: none !important; }
 /* se sobreexpone y se funde (era un estrobo a cuatro saltos) */
 @keyframes sal-flash   { to { opacity: 0; filter: brightness(1.8) blur(6px); transform: scale(1.02); } }
 @keyframes sal-encoge  { to { opacity: 0; filter: blur(4px); transform: scale(0.9) translateY(0.06em); } }
+/* css/edit/02-titulos.css · hoja 2 de 4 del catálogo del modo edit (lo que fue css/edit-fx.css)
+   Los títulos gigantes y sus revelados letra a letra (edl-*).
+   Van DESPUÉS de css/base/ y seguidas, en este orden. */
 
 /* ══════ TÍTULO GIGANTE ══════ */
 .ed-titulo {
@@ -609,7 +617,7 @@ body.reduce-motion .ed-stack[class*="edcam-"] { animation: none !important; }
   line-height: 1;
   color: var(--accent);
   text-shadow: var(--ed-sombra-titulo);
-  /* la duración la pone lyrics.js (--dur = el paso): cada letra se ha ido
+  /* la duración la pone js/letra/ (--dur = el paso): cada letra se ha ido
      justo cuando entra la siguiente, y ese relevo limpio ES el efecto */
   animation: ed-letrona var(--dur, 300ms) linear var(--d, 0ms) both;
   pointer-events: none;
@@ -632,7 +640,7 @@ body.reduce-motion .ed-stack[class*="edcam-"] { animation: none !important; }
 /* marco: cuatro esquinas que se cierran sobre el título. Iban pegadas a los
    bordes del STACK, que ocupa el ancho del panel: quedaban lejísimos de la
    letra, del tamaño de un icono, y parecían un fallo. Ahora el stack se
-   ajusta al título (lyrics.js le pone .ed-stack-ajustado) y las esquinas
+   ajusta al título (js/letra/ le pone .ed-stack-ajustado) y las esquinas
    lo abrazan. */
 .ed-stack.ed-stack-ajustado {
   left: 50%;
@@ -1016,7 +1024,7 @@ body.reduce-motion .ed-stack[class*="edcam-"] { animation: none !important; }
 }
 
 /* ══════ TÍTULOS LETRA A LETRA (edl-*) ══════
-   lyrics.js pone a cada letra su --d (cuándo) y --lc (dónde está respecto
+   js/letra/ pone a cada letra su --d (cuándo) y --lc (dónde está respecto
    al centro de su fila: -3, -2 … 2, 3). Con --lc el interletraje que se
    aprieta es de verdad —cada letra viaja hacia el centro— sin tocar el
    letter-spacing. */
@@ -1074,7 +1082,7 @@ body.reduce-motion .ed-stack[class*="edcam-"] { animation: none !important; }
   100% { opacity: 1; transform: none; filter: none; }
 }
 
-/* descifrado: lyrics.js baraja la letra; aquí asoma tenue mientras se
+/* descifrado: js/letra/ baraja la letra; aquí asoma tenue mientras se
    baraja y al fijarse da un pequeño brillo (sin el fogonazo de 40 px) */
 .edl-descifra { animation-name: edl-descifra; animation-duration: 0.55s; }
 @keyframes edl-descifra {
@@ -1156,6 +1164,10 @@ body.reduce-motion .ed-stack[class*="edcam-"] { animation: none !important; }
   60%  { opacity: 1; }
   100% { opacity: 1; transform: none; filter: none; }
 }
+/* css/edit/03-frases.css · hoja 3 de 4 del catálogo del modo edit (lo que fue css/edit-fx.css)
+   Las frases palabra a palabra, el karaoke del modo edit, el verso en trozos
+   que se relevan y los efectos de frase.
+   Van DESPUÉS de css/base/ y seguidas, en este orden. */
 
 /* ══════ FRASE palabra a palabra ══════ */
 .ed-frase {
@@ -1188,7 +1200,7 @@ body.reduce-motion .ed-stack[class*="edcam-"] { animation: none !important; }
 
 /* ══════ KARAOKE DEL MODO EDIT ══════
    La palabra que suena se enciende; lo que falta espera a media luz.
-   lyrics.js pone .ed-kara en el stack solo cuando hay algo que repartir.
+   js/letra/ pone .ed-kara en el stack solo cuando hay algo que repartir.
 
    REGLA DURA: aquí únicamente `color` y `text-shadow`. Los efectos de
    entrada son dueños de transform, animation y opacity. Ni un color fijo.
@@ -1847,6 +1859,10 @@ body.reduce-motion .ed-trozo { animation-timing-function: linear; }
   text-transform: uppercase;
   pointer-events: none;
 }
+/* css/edit/04-montajes.css · hoja 4 de 4 del catálogo del modo edit (lo que fue css/edit-fx.css)
+   Los montajes con forma propia: la carta de color (ed-invertido), las filas
+   que se apilan (ed-apila) y «escribe».
+   Van DESPUÉS de css/base/ y seguidas, en este orden. */
 
 /* ══════ ed-invertido · la carta de color ══════
    El fondo vive como hermano del stack (la cámara no lo arrastra): en el
@@ -1999,14 +2015,14 @@ body.reduce-motion .ed-trozo { animation-timing-function: linear; }
   to   { transform: scaleY(1.4); }
 }
 
-/* ══════ ✎ «ESCRIBE» · el edit de TikTok (edEscribe en lyrics.js) ══════
+/* ══════ ✎ «ESCRIBE» · el edit de TikTok (edEscribe en js/letra/) ══════
    La letra no se anima: APARECE. Cada letra está en su sitio desde el
    principio, invisible, y se enciende de golpe a su hora (--d, que puede ser
    negativo: lo ya cantado sale escrito). En pausa se para el tecleo, igual
    que la voz. Blanco cálido con una sombra blanda para leerse sobre
    cualquier fondo; en las cartas, tinta lisa sin sombra.
    La tipografía es la elegida (hereda de .lyrics-edit): aquí solo peso,
-   mayúsculas (las pone lyrics.js) e interlineado. */
+   mayúsculas (las pone js/letra/) e interlineado. */
 .esc-stack { left: 5%; right: 5%; }
 .esc-texto {
   font-weight: 800;

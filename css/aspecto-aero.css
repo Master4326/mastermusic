@@ -83,7 +83,7 @@ html[data-aspecto="aero"] .tb-btn { border-radius: 4px; color: #24506d; }
 html[data-aspecto="aero"] .tb-btn:hover { background: var(--ae-gel); color: #0b4b70; }
 html[data-aspecto="aero"] .tb-close:hover { background: linear-gradient(180deg, #f6a08a 0%, #e8573b 50%, #c8301a 51%, #e9654a 100%); color: #fff; }
 /* `--tumbado-resto`: teléfono tumbado, lo que no es carátula a lo alto de
-   la columna (ver style.css); medido con la ficha y las barras de aero */
+   la columna (ver css/base/); medido con la ficha y las barras de aero */
 html[data-aspecto="aero"] .main-grid { gap: 14px; padding: 10px 14px 10px; --tumbado-resto: 224px; }
 html[data-aspecto="aero"] .left-panel {
   padding: 14px;
@@ -221,7 +221,7 @@ html[data-aspecto="aero"] .track-info { min-width: 0; overflow: hidden; }
    de la canción oscurecido, para que se lea sobre claro), el karaoke, el
    modo edit, las listas y ajustes. La onda que rodea el verso pasa a
    pintarse en tinta (js/fondo.js lee --onda-tinta) y el espectro también
-   (js/visualizer.js lee --viz-tinta), sin su franja.
+   (js/espectro/ lee --viz-tinta), sin su franja.
    --acento-cancion guarda el color de la canción tal cual: dentro del panel
    --accent se oscurece, y lo que necesita el vivo (la carta del invertido)
    tira de él. En el cine la letra se muda fuera del panel y vuelve a su

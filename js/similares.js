@@ -14,7 +14,7 @@
    PLAYLIST NUESTRA dentro de la cuenta del usuario, porque el autoplay de
    Spotify solo se enciende con playlist o disco. Funcionaba, pero le dejaba
    una lista puesta en su cuenta a quien solo quería oír una canción. Se
-   retiró: ver `limpiarListaPuente` en js/spotify.js, que además la borra.
+   retiró: ver `limpiarListaPuente` en js/spotify/, que además la borra.
 
    Esto es la tercera y la buena: preguntarle a quien SÍ tiene los datos.
 
@@ -51,7 +51,7 @@
    ---- LO QUE ESTE ARCHIVO NO SABE ----
    Nada de Spotify, salvo pedir los ids prestados. No tiene su token, no usa
    su cuota y no hereda su 429. Entra un título y un artista, salen canciones.
-   Quien las reproduce es js/spotify.js.
+   Quien las reproduce es js/spotify/.
 
    ---- SI FALLA ----
    Devuelve listas vacías, nunca excepciones. Sin red, con el servidor caído o
@@ -262,7 +262,7 @@
     return mapa;
   };
 
-  /* La cadena entera de una vez, que es como la usa js/spotify.js: entra la
+  /* La cadena entera de una vez, que es como la usa js/spotify/: entra la
      canción que acaba de sonar y salen las que van detrás. Las dos consultas
      de parecido van en paralelo: son independientes y así se tarda una en
      vez de dos. */

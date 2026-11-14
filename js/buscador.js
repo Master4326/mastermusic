@@ -22,7 +22,7 @@
    DÓNDE VIVE. Colgado del <body>, nunca dentro de .window: en este proyecto
    ya se ha mordido cinco veces la misma trampa — un `position: fixed` dentro
    de un ancestro con `transform` se ancla AL ANCESTRO, no a la pantalla
-   (ver el menú «dónde suena» de js/spotify.js).
+   (ver el menú «dónde suena» de js/spotify/).
    ========================================================== */
 (() => {
   'use strict';
@@ -243,14 +243,14 @@
       } },
     { n: 'modo cine', alias: 'pantalla completa fullscreen letra grande', ico: 'cine',
       hacer: () => { const b = document.getElementById('cinemaBtn'); if (b) b.click(); } },
-    // el cine ya puesto en uno de sus tres estilos (js/vertical.js)
+    // el cine ya puesto en uno de sus tres estilos (js/cine/)
     { n: 'modo cine · app', alias: 'pantalla completa cine estilo app aplicacion', ico: 'cine',
       hacer: () => { if (window.CinemaModule) window.CinemaModule.abrir('app'); } },
     { n: 'modo cine · vinilo', alias: 'pantalla completa cine estilo vinilo tocadiscos disco', ico: 'cine',
       hacer: () => { if (window.CinemaModule) window.CinemaModule.abrir('vinilo'); } },
     { n: 'modo cine · letra', alias: 'pantalla completa cine estilo letra sola edit', ico: 'cine',
       hacer: () => { if (window.CinemaModule) window.CinemaModule.abrir('letra'); } },
-    /* El vídeo 9:16 solo existe en la copia local de la app (js/vertical.js,
+    /* El vídeo 9:16 solo existe en la copia local de la app (js/cine/,
        `disponible`): en la página publicada ni se ofrece. */
     ...(window.MMVertical && window.MMVertical.disponible && window.MMVertical.disponible() ? [{
       n: 'vídeo 9:16 para tiktok', alias: 'grabar grabacion vertical reels shorts historia celular movil formato 916 video tiktok',
@@ -259,7 +259,7 @@
     }] : []),
     /* Las tres vistas de la letra, cada una por su nombre. Por ponerVista y
        no pulsando ✦: en el teléfono ese botón recorre las tres y «modo
-       edit» acababa en la vista palabra (js/lyrics.js). */
+       edit» acababa en la vista palabra (js/letra/). */
     { n: 'modo edit (letra animada)', alias: 'efectos tiktok', ico: 'edit',
       hacer: () => {
         const L = window.LyricsModule;
@@ -699,7 +699,7 @@
 
   // ---------- Pintado ----------
   /* Los iconos son los dibujos de 12 × 12 de la fila de mandos (clases
-     .ico-NOMBRE de style.css). Hasta la v119 eran símbolos de texto —⏯ ⤨ ◷
+     .ico-NOMBRE de css/base/). Hasta la v119 eran símbolos de texto —⏯ ⤨ ◷
      ⇥ ◙ ◍ ⌨…— que el sistema sacaba de las fuentes que tuviera, cada uno con
      su grosor y su altura, y el de silenciar era un emoji a color. Si algún
      día llega un símbolo suelto, se pinta como texto, como antes. */
@@ -767,7 +767,7 @@
      lista se quedaba con lo de la consulta vacía y no encontraba nada.
 
      Lo correcto es lo contrario, y es lo que ya hacen el buscador de
-     spotify.js y lyrics.js: que corran las dos y gane la ÚLTIMA. */
+     js/spotify/ y js/letra/: que corran las dos y gane la ÚLTIMA. */
   let seqRecoger = 0;
 
   const refrescar = async () => {
@@ -796,7 +796,7 @@
     if (ENLACE.test(entrada.value)) { resSpotify = []; return; }
     /* Spotify va con 320 ms de respiro. Sin él, teclear «bad bunny» son diez
        peticiones y el 429 llega en dos búsquedas: ese freno ya costó caro
-       una vez (ver el comentario del 429 en js/spotify.js). */
+       una vez (ver el comentario del 429 en js/spotify/). */
     temporizador = setTimeout(async () => {
       await buscarSpotify(q, mia);
       if (mia === seq && abierto) refrescar();
@@ -907,7 +907,7 @@
 
   /* El pestillo `_wired` es la costumbre de la casa (wireSearch, cablearLike,
      cablearChipDev…) y aquí hacía falta de verdad: este cableado puede correr
-     DOS veces —el DOMContentLoaded no siempre llega una sola vez, y spotify.js
+     DOS veces —el DOMContentLoaded no siempre llega una sola vez, y js/spotify/
      lleva años arrancando por dos caminos por lo mismo—. Con dos oyentes en el
      botón, `alternar()` se ejecutaba dos veces por clic: abría el buscador y
      lo cerraba en el mismo gesto, así que el botón parecía muerto.

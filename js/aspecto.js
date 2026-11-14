@@ -44,7 +44,7 @@
     },
   };
   /* El color de la barra del sistema (móvil, ventana instalada). En 8 bits
-     lo lleva js/seven.js, que lo saca de la carátula y lo deja apuntado en
+     lo lleva js/seven/, que lo saca de la carátula y lo deja apuntado en
      data-ocho-bits aunque haya un aspecto puesto: al volver se repone ese.
      En los claros va claro: el sistema pone sus iconos oscuros encima. */
   const BARRA = {
@@ -105,7 +105,7 @@
     const m = document.querySelector('meta[name="theme-color"]');
     if (!m) return;
     if (BARRA[a]) {
-      // lo que tenía el 8 bits se guarda (si seven.js no lo apuntó ya)
+      // lo que tenía el 8 bits se guarda (si js/seven/ no lo apuntó ya)
       if (!m.dataset.ochoBits) m.dataset.ochoBits = m.getAttribute('content') || '#0a0e2e';
       m.setAttribute('content', BARRA[a]);
     } else if (m.dataset.ochoBits) {
@@ -241,7 +241,7 @@
     espera.observe(document.body, { childList: true });
   }
 
-  // en 8 bits la barra ya es cosa de seven.js: aquí solo si hay aspecto
+  // en 8 bits la barra ya es cosa de js/seven/: aquí solo si hay aspecto
   if (actual() !== '8bits') ponerBarra(actual());
 
   window.MMAspecto = { poner, actual, lista: () => LISTA.slice() };

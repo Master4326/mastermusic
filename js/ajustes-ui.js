@@ -86,7 +86,7 @@
     if (!nav() || nav().actual() !== 'settings') return;
     if (document.body.classList.contains('paleta-abierta')) return;
     if (document.body.classList.contains('comp-abierta')) return;
-    // el cine y el vídeo 9:16 se quedan su Esc (js/vertical.js)
+    // el cine y el vídeo 9:16 se quedan su Esc (js/cine/)
     if (document.body.classList.contains('v916-open')) return;
     /* Por clase y no por id: la galería de tipografías no está en el HTML,
        la cuelga js/fonts.js del <body> al abrirla por primera vez. Un

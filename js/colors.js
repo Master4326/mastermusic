@@ -307,7 +307,7 @@
        la L hasta leerse (4,5 : 1 contra el panel), con techo por debajo del
        --text-dim (L 0,74) para que la escalera siga siendo escalera. */
     /* Se mide contra el panel QUE SE PINTA, no contra el de la paleta:
-       seven.js (applyPanelsFromBase) lo aclara un 4 % hacia el blanco al
+       js/seven/ (applyPanelsFromBase) lo aclara un 4 % hacia el blanco al
        ponerlo en --bg-panel. Comparando con el de la paleta, el tono apagado
        pasaba la vara aquí (4,5) y se quedaba en 4,3 en pantalla. */
     const panelPintado = {
@@ -371,7 +371,7 @@
       if (mc.applyPanelsFromBase) mc.applyPanelsFromBase(rgbToHex(p.panel));
     }
 
-    // Acento y texto van por su cuenta: seven.js decide si están en auto
+    // Acento y texto van por su cuenta: js/seven/ decide si están en auto
     if (mc.applyAccentFromCover) mc.applyAccentFromCover(rgbToHex(p.accent), rgbToHex(p.segundo));
     if (mc.applyTextFromCover) {
       mc.applyTextFromCover(rgbToHex(p.texto.text), rgbToHex(p.texto.dim), rgbToHex(p.texto.muted));

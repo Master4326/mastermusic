@@ -3,14 +3,39 @@
    Usa SpotifyModule.api (mismo token PKCE). Sin estado propio
    en disco: todo se cachea en memoria hasta pulsar ⟳.
    ========================================================== */
+/* ==========================================================
+   LA BIBLIOTECA · los datos (js/biblioteca/datos.js)
+
+   Lo que fue js/library.js (1.300 líneas) vive ahora en js/biblioteca/,
+   en cuatro archivos que se cargan seguidos y en este orden:
+
+   datos.js — las colecciones, traer una lista ENTERA y las peticiones a
+   Spotify.
+   pintar.js — pintar las rejillas, las cabeceras y las filas.
+   carga.js — cargar cada colección (con su sonda de diagnóstico).
+   arranque.js — poner a sonar, el cableado de la pestaña, la marca de
+   «esto es lo que suena» y la API pública.
+
+   Comparten lo que hace falta por la bolsa `comun`
+   (window.MMInterno.biblioteca): lo que cambia y usan varios archivos es
+   `comun.x`; las funciones y constantes de un archivo anterior se
+   recogen arriba de cada archivo.
+   ========================================================== */
 (() => {
   'use strict';
 
+  /* Lo que comparten entre sí los archivos de js/biblioteca/. Uso interno:
+     desde fuera se habla con window.LibraryModule (lo arma arranque.js). */
+  window.MMInterno = window.MMInterno || {};
+  const comun = window.MMInterno.biblioteca = {};
+
   const $ = (id) => document.getElementById(id);
+  comun.$ = $;
 
   const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
+  comun.escapeHtml = escapeHtml;
 
   const formatTime = (s) => {
     if (!isFinite(s) || s < 0) return '0:00';
@@ -18,13 +43,15 @@
     const sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
+  comun.formatTime = formatTime;
 
   const setStatus = (msg) => { if (window.SevenStatus) window.SevenStatus(msg); };
+  comun.setStatus = setStatus;
 
   // ---------- Colecciones ----------
   // path: endpoint base | paged: admite offset | scope: permiso que puede faltar
   // local: no es de Spotify — sale de PlayerCore, y funciona sin conexión
-  const COLS = {
+  const COLS = comun.COLS = {
     /* TU MÚSICA · la que importas tú. Va primera y es la única que no
        necesita cuenta de Spotify. Desde que el <ul id="trackList"> se cayó
        del HTML no había NINGÚN sitio donde ver los mp3 importados: se
@@ -47,8 +74,8 @@
   };
 
   // rows / next(offset) / total por colección; null = aún no cargada
-  const cache = {};
-  const view = {
+  const cache = comun.cache = {};
+  const view = comun.view = {
     col: 'mine',        // colección activa (la local abre sin pedir nada a nadie)
     detail: null,       // { id, uri, name, sub, rows, next, total } si estamos dentro de una playlist
     loading: false,
@@ -57,6 +84,7 @@
   };
 
   const conSpotify = () => !!(window.SpotifyModule && window.SpotifyModule.isLoggedIn());
+  comun.conSpotify = conSpotify;
 
   /* Tu música importada, en la misma forma de fila que todo lo demás. Se lee
      de PlayerCore en cada pintado y no se cachea: es un array que ya está en
@@ -76,6 +104,7 @@
       local: true,
     }));
   };
+  comun.filasLocales = filasLocales;
 
   /* ---------- Traer la lista ENTERA ----------
      Antes esto iba con un botón «cargar más»: en una playlist de mil
@@ -87,8 +116,8 @@
      API, un endpoint que devuelve siempre lo mismo— dejaría al navegador
      dando vueltas para siempre. Al llegar al tope reaparece el botón para
      seguir a mano, que es mejor que quedarse a medias en silencio. */
-  const MAX_PAGINAS = 60;          // 60 × 50 = 3000 canciones
-  let cargaSeq = 0;                // cancela la carga si el usuario se va a otra cosa
+  const MAX_PAGINAS = comun.MAX_PAGINAS = 60;          // 60 × 50 = 3000 canciones
+  comun.cargaSeq = 0;                // cancela la carga si el usuario se va a otra cosa
 
   // ---------- Peticiones ----------
   // Desde feb-2026 algunos endpoints rechazan limits altos en apps en
@@ -109,13 +138,14 @@
     }
     throw lastErr;
   };
+  comun.getPage = getPage;
 
   const mapTrack = (it) => ({
     id: it.id ? 'sp:' + it.id : null,
     uri: it.uri || null,
     name: it.name || '(sin título)',
     artist: (it.artists || []).map(a => a.name).filter(Boolean).join(', '),
-    // Para «sigue sonando»: de aquí saca spotify.js los géneros del artista
+    // Para «sigue sonando»: de aquí saca js/spotify/ los géneros del artista
     artistId: ((it.artists || [])[0] || {}).id || null,
     album: it.album ? it.album.name : '',
     duration: (it.duration_ms || 0) / 1000,
@@ -164,6 +194,7 @@
     }
     return { rows, stats };
   };
+  comun.sift = sift;
 
   /* Lo que se le dice al usuario cuando una playlist no lista.
 
@@ -189,6 +220,7 @@
     if (s.episodios && s.episodios >= s.recibidos - s.nulos) return 'aquí solo hay episodios de podcast';
     return 'ninguna de estas canciones se puede reproducir';
   };
+  comun.statsMsg = statsMsg;
 
   /* El diagnóstico es una herramienta de desarrollo: prueba seis variantes de
      la misma petición y escupe códigos HTTP. Igual que el ⚗ del laboratorio,
@@ -205,6 +237,7 @@
   const msgAjena = (d) => 'spotify solo deja ver por dentro tus playlists y en las que colaboras<br>'
     + '<span style="opacity:.7">' + (d && d.owner ? 'esta es de ' + escapeHtml(d.owner) + ' · ' : '')
     + 'se puede poner igual, y al sonar se ven sus canciones</span>';
+  comun.msgAjena = msgAjena;
 
   const botonesDeRescate = () =>
     '<br><button class="retro-btn small" id="libPlayQueue" style="margin-top:10px">'
@@ -213,6 +246,7 @@
         ? ' <button class="retro-btn small" id="libDiag" style="margin-top:10px">'
           + '<span class="bracket">[</span> ⚙ diagnóstico <span class="bracket">]</span></button>'
         : '');
+  comun.botonesDeRescate = botonesDeRescate;
 
   const mapAlbum = (a) => ({
     id: a.id,
@@ -223,6 +257,7 @@
     cover: (a.images && a.images[0]) ? a.images[0].url : null,
     anio: (a.release_date || '').slice(0, 4),
   });
+  comun.mapAlbum = mapAlbum;
 
   const mapArtist = (a) => ({
     id: a.id,
@@ -233,6 +268,7 @@
     total: 0,
     cover: (a.images && a.images[0]) ? a.images[0].url : null,
   });
+  comun.mapArtist = mapArtist;
 
   const mapPlaylist = (p) => {
     /* `items` desde feb-2026, `tracks` antes. Leer solo el viejo era lo que
@@ -252,6 +288,7 @@
       cover: (p.images && p.images[0]) ? p.images[0].url : null,
     };
   };
+  comun.mapPlaylist = mapPlaylist;
 
   /* ¿Es de otro? Desde feb-2026 `GET /playlists/{id}/items` SOLO funciona
      con las playlists tuyas o en las que colaboras; con las demás (las que
@@ -264,11 +301,28 @@
     const yo = window.SpotifyModule && window.SpotifyModule.yo ? window.SpotifyModule.yo() : null;
     return !!(p && yo && p.ownerId && p.ownerId !== yo && !p.colab);
   };
+  comun.esAjena = esAjena;
+})();
+/* ==========================================================
+   LA BIBLIOTECA · pintar (js/biblioteca/pintar.js)
+
+   Las rejillas de portadas, la cabecera de la lista abierta y sus filas.
+   Reparto de js/biblioteca/: ver datos.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.biblioteca;
+  const {
+    $, escapeHtml, formatTime, COLS, cache, view, conSpotify, statsMsg, msgAjena,
+    botonesDeRescate
+  } = comun;
 
   // ---------- Render ----------
   const list = () => $('libList');
+  comun.list = list;
 
   const empty = (msg) => `<li class="sp-empty" style="line-height:1.6">▒ ${msg} ▒</li>`;
+  comun.empty = empty;
 
   // Esqueletos mientras llega la respuesta: dan idea de la forma que viene
   const skeletons = (n) => Array.from({ length: n }, () => `
@@ -276,6 +330,7 @@
       <div class="skel-box"></div>
       <div class="skel-lines"><div class="skel-line"></div><div class="skel-line short"></div></div>
     </li>`).join('');
+  comun.skeletons = skeletons;
 
   /* ¿Es esta la que está sonando? Marcarla es media respuesta a «saber por
      dónde voy»: en una lista de 300, sin esto no hay forma de ver dónde
@@ -285,12 +340,13 @@
     if (!cur || !t) return false;
     return (t.uri && cur.uri === t.uri) || (t.id && cur.id === t.id);
   };
+  comun.sonando = sonando;
 
   /* La que suena lleva, en el sitio del número, tres barritas que se mueven
      con la música: las mismas bandas que el mini-EQ de la barra de estado
-     (las mueve visualizer.js; sin audio que medir, una animación de
+     (las mueve js/espectro/; sin audio que medir, una animación de
      respaldo, y en pausa quietas). Antes era un ▶ quieto, suene o no. */
-  const EQ_FILA = '<span class="sp-eq" role="img" aria-label="sonando"><i></i><i></i><i></i></span>';
+  const EQ_FILA = comun.EQ_FILA = '<span class="sp-eq" role="img" aria-label="sonando"><i></i><i></i><i></i></span>';
 
   const rowTrack = (t, i) => `
     <li class="sp-result${t.unplayable ? ' sp-unplayable' : ''}${sonando(t) ? ' sp-now' : ''}" data-idx="${i}"
@@ -349,6 +405,7 @@
 
   // Dentro de un artista las filas son sus discos; en lo demás, canciones
   const filaDetalle = (d, t, i) => (d.tipo === 'artist' ? rowAlbum(t, i) : rowTrack(t, i));
+  comun.filaDetalle = filaDetalle;
 
   /* Filtra conservando el índice REAL en `rows`: la fila lleva ese número en
      `data-idx` y es con él con el que se busca la canción al hacer clic. Con
@@ -360,16 +417,17 @@
     return conIndice.filter(([t]) =>
       (t.name || '').toLowerCase().includes(q) || (t.artist || t.owner || '').toLowerCase().includes(q));
   };
+  comun.filtradas = filtradas;
 
   /* Las filas que se ven ahora mismo, filtro aplicado, sea una lista abierta
      o una colección. Antes el filtro solo valía DENTRO de una lista: con 80
      playlists en la rejilla, encontrar una era ir mirándolas. */
-  const filasVisibles = () => filtradas(currentRows());
+  const filasVisibles = () => filtradas(comun.currentRows());
 
   const paintFiltro = () => {
     const fila = $('libFiltroFila');
     if (!fila) return;
-    const filas = currentRows();
+    const filas = comun.currentRows();
     // Con cuatro cosas el filtro estorba más de lo que ayuda
     fila.hidden = filas.length < 8 && !view.filtro.trim();
     const inp = $('libFiltro');
@@ -389,6 +447,7 @@
       ? vistas + ' de ' + total
       : (cargando ? '· trayendo la lista ·' : (total ? total + '' : ''));
   };
+  comun.paintFiltro = paintFiltro;
 
   const paintHead = () => {
     const head = $('libHead');
@@ -406,6 +465,7 @@
       cover.textContent = view.detail.cover ? '' : '♪';
     }
   };
+  comun.paintHead = paintHead;
 
   /* Scope al bloque de la biblioteca a propósito: las pestañas del historial
      usan la MISMA clase .lib-chip (con .st-chip encima), y un
@@ -431,6 +491,7 @@
     btn.textContent = view.loading ? '· cargando ·' : '[ seguir cargando ]';
     btn.disabled = view.loading;
   };
+  comun.paintMore = paintMore;
 
   const paint = () => {
     const ul = list();
@@ -464,9 +525,9 @@
       ul._pintadas = view.filtro.trim() ? -1 : d.rows.length;
     } else if (COLS[view.col].local) {
       // Tu música: ni petición, ni caché, ni esqueletos. Ya está en memoria.
-      const filas = filtradas(currentRows());
+      const filas = filtradas(comun.currentRows());
       ul.classList.remove('as-grid');
-      ul.innerHTML = currentRows().length
+      ul.innerHTML = comun.currentRows().length
         ? (filas.length ? filas.map(([t, i]) => rowTrack(t, i)).join('')
                         : empty('nada que se llame así en tu música'))
         : empty('todavía no has importado nada<br>'
@@ -504,6 +565,7 @@
     }
     paintMore();
   };
+  comun.paint = paint;
 
   // Traduce un fallo de la API a un mensaje que el usuario pueda accionar.
   const errorMsg = (e, col) => {
@@ -526,13 +588,14 @@
       return 'esta lista ya no existe, o es de las que spotify no deja abrir desde otras apps';
     }
     if (!/Spotify API/.test(msg) && !/No token/.test(msg)) console.error('[Biblioteca] fallo:', msg);
-    /* Lo demás lo cuenta spotify.js, que lee el motivo de verdad (el freno
+    /* Lo demás lo cuenta js/spotify/, que lee el motivo de verdad (el freno
        del 429 con sus segundos, la cuota agotada, un corte de red, un 5xx…)
        en vez de decir «¿sin conexión?» a todo. */
     const S = window.SpotifyModule;
     if (S && S.explicar) return escapeHtml(S.explicar(e, 'cargar esto'));
     return 'no se pudo cargar (¿sin conexión?)' + detailOf(msg);
   };
+  comun.errorMsg = errorMsg;
 
   // Saca el texto que manda la propia API para no esconder el motivo real.
   const detailOf = (msg) => {
@@ -542,6 +605,23 @@
     try { detail = JSON.parse(m[1]).error.message || ''; } catch (_) { detail = m[1].slice(0, 140); }
     return detail ? '<br><b>' + escapeHtml(detail) + '</b>' : '';
   };
+  comun.detailOf = detailOf;
+})();
+/* ==========================================================
+   LA BIBLIOTECA · la carga (js/biblioteca/carga.js)
+
+   Cargar cada colección (playlists, discos, artistas, lo guardado),
+   página a página y sin perder lo ya traído, y la sonda de diagnóstico.
+   Reparto de js/biblioteca/: ver datos.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.biblioteca;
+  const {
+    escapeHtml, COLS, cache, view, conSpotify, MAX_PAGINAS, getPage, sift, botonesDeRescate,
+    mapAlbum, mapArtist, mapPlaylist, esAjena, list, empty, skeletons, filaDetalle, paintFiltro,
+    paintHead, paintMore, paint, errorMsg, detailOf
+  } = comun;
 
   // ---------- Carga ----------
   const loadCollection = async (col, more) => {
@@ -591,6 +671,7 @@
       traerElRestoCol(col);
     }
   };
+  comun.loadCollection = loadCollection;
 
   // El objeto playlist entero suele seguir trayendo sus pistas (las primeras
   // 100, sin paginar) aunque la lista no dé ninguna. Aquí también cambió el
@@ -638,7 +719,7 @@
   const openPlaylist = async (p, more) => {
     if (view.loading) return;
     if (!more) {
-      cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
+      comun.cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
       view.detail = { id: p.id, uri: p.uri, name: p.name, cover: p.cover || null, owner: p.owner || '',
                       sub: '· cargando ·', rows: [], next: 0, total: p.total, cargando: true };
       /* La de otro: Spotify no deja listarla (403). Ni se pide —eran dos
@@ -695,6 +776,7 @@
     // recién abierta: traerse el resto de la lista por detrás, sin botones
     if (!more) traerElResto(openPlaylist);
   };
+  comun.openPlaylist = openPlaylist;
 
   /* Abrir un ÁLBUM: sus canciones. `/albums/{id}/tracks` devuelve pistas
      "simplificadas" —sin el objeto `album` dentro—, así que la portada y el
@@ -703,7 +785,7 @@
   const openAlbum = async (a, more) => {
     if (view.loading) return;
     if (!more) {
-      cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
+      comun.cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
       view.detail = { tipo: 'album', id: a.id, uri: a.uri, name: a.name, cover: a.cover || null,
                       owner: a.owner || '', sub: '· cargando ·', rows: [], next: 0, total: a.total };
       paint();
@@ -742,6 +824,7 @@
     // recién abierta: traerse el resto de la lista por detrás, sin botones
     if (!more) traerElResto(openAlbum);
   };
+  comun.openAlbum = openAlbum;
 
   /* Abrir un ARTISTA: sus discos. `/artists/{id}/top-tracks` se retiró en
      feb-2026, así que lo que se puede enseñar son los álbumes —que es, de
@@ -750,7 +833,7 @@
   const openArtist = async (a, more) => {
     if (view.loading) return;
     if (!more) {
-      cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
+      comun.cargaSeq++; view.auto = false; view.filtro = '';   // lista nueva, empezar limpio
       view.detail = { tipo: 'artist', id: a.id, uri: a.uri, name: a.name, cover: a.cover || null,
                       owner: a.owner || '', sub: '· cargando ·', rows: [], next: 0, total: 0 };
       paint();
@@ -782,6 +865,7 @@
     // recién abierta: traerse el resto de la lista por detrás, sin botones
     if (!more) traerElResto(openArtist);
   };
+  comun.openArtist = openArtist;
 
   /* Añade al final solo las filas nuevas. Repintar la lista entera en cada
      página serían, con mil canciones, veinte repintados cada vez más caros
@@ -806,12 +890,12 @@
      sola si el usuario vuelve atrás o abre otra cosa: `cargaSeq` cambia y
      esta tanda deja de ser la vigente. */
   const traerElResto = async (cargador) => {
-    const mia = ++cargaSeq;
+    const mia = ++comun.cargaSeq;
     const d0 = view.detail;
     if (!d0) return;
     view.auto = true;
     let vueltas = 0;
-    while (view.detail === d0 && d0.next != null && mia === cargaSeq) {
+    while (view.detail === d0 && d0.next != null && mia === comun.cargaSeq) {
       if (++vueltas > MAX_PAGINAS) {
         console.warn('[Biblioteca] tope de páginas: el resto queda a mano');
         break;
@@ -823,35 +907,36 @@
          seguir sería girar en el sitio hasta agotar el tope. */
       if (d0.next === antes) break;
     }
-    if (mia !== cargaSeq) return;       // se fue a otra cosa: no tocar nada
+    if (mia !== comun.cargaSeq) return;       // se fue a otra cosa: no tocar nada
     view.auto = false;
     if (view.detail === d0) paint();
   };
 
   // Lo mismo para las colecciones (playlists, guardadas, álbumes…)
   const traerElRestoCol = async (col) => {
-    const mia = ++cargaSeq;
+    const mia = ++comun.cargaSeq;
     view.auto = true;
     let vueltas = 0;
-    while (view.col === col && !view.detail && mia === cargaSeq
+    while (view.col === col && !view.detail && mia === comun.cargaSeq
            && cache[col] && cache[col].next != null && !cache[col].error) {
       if (++vueltas > MAX_PAGINAS) break;
       const antes = cache[col].next;
       await loadCollection(col, true);
       if (!cache[col] || cache[col].next === antes) break;
     }
-    if (mia !== cargaSeq) return;
+    if (mia !== comun.cargaSeq) return;
     view.auto = false;
     if (view.col === col && !view.detail) paint();
   };
 
   const back = () => {
-    cargaSeq++;              // corta la carga de la lista que estábamos viendo
+    comun.cargaSeq++;              // corta la carga de la lista que estábamos viendo
     view.auto = false;
     view.filtro = '';
     view.detail = null;
     paint();
   };
+  comun.back = back;
 
   /* ---------- Sonda de diagnóstico ----------
      Prueba variantes de la MISMA petición y enseña cuál devuelve pistas.
@@ -912,6 +997,23 @@
       + '<br><br><button class="retro-btn small" id="libPlayQueue">'
       + '<span class="bracket">[</span> ▶ reproducir y ver canciones <span class="bracket">]</span></button>');
   };
+  comun.diagnose = diagnose;
+})();
+/* ==========================================================
+   LA BIBLIOTECA · el arranque (js/biblioteca/arranque.js)
+
+   Va el ÚLTIMO de js/biblioteca/: poner a sonar, el cableado de la
+   pestaña, mover la marca de «esto es lo que suena» y la API pública
+   (window.LibraryModule). Reparto: ver datos.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.biblioteca;
+  const {
+    $, escapeHtml, setStatus, COLS, cache, view, conSpotify, filasLocales, sift, list, empty,
+    sonando, EQ_FILA, filtradas, paint, detailOf, loadCollection, openPlaylist, openAlbum,
+    openArtist, back, diagnose
+  } = comun;
 
   // ---------- Reproducción ----------
   const play = (t) => {
@@ -1024,6 +1126,7 @@
     if (COLS[view.col] && COLS[view.col].local) return filasLocales();
     return (cache[view.col] && cache[view.col].rows) || [];
   };
+  comun.currentRows = currentRows;
 
   /* El panel que hace scroll no siempre es el mismo elemento (depende de si
      la ventana está maximizada, del modo móvil…), así que se busca de verdad
@@ -1046,7 +1149,7 @@
     if (inp) {
       inp.addEventListener('input', () => { view.filtro = inp.value; paint(); });
       /* Esc limpia sin tener que borrar a mano. No hace falta cortar la
-         propagación: los atajos de teclado (app.js y seven.js) ya se guardan
+         propagación: los atajos de teclado (app.js y js/seven/) ya se guardan
          contra los INPUT, y tragarse el Escape aquí se lo quitaría a quien lo
          quiera de verdad. */
       inp.addEventListener('keydown', (e) => {
@@ -1071,7 +1174,7 @@
     block.addEventListener('click', (e) => {
       const chip = e.target.closest('.lib-chip');
       if (chip && chip.dataset.col) {
-        cargaSeq++;              // corta la carga automática de la anterior
+        comun.cargaSeq++;              // corta la carga automática de la anterior
         view.auto = false;
         view.detail = null;
         view.filtro = '';        // el filtro es de la lista que se deja atrás
@@ -1206,7 +1309,7 @@
     if (!COLS[col].local && !cache[col]) loadCollection(col, false);
   };
 
-  // Se llama al abrir la pestaña (desde seven.js)
+  // Se llama al abrir la pestaña (desde js/seven/)
   const open = () => {
     mostrarBloque();
     wire();
@@ -1223,7 +1326,7 @@
     if (!COLS[view.col].local && !cache[view.col]) loadCollection(view.col, false);
   };
 
-  // La llama spotify.js al conectar / desconectar
+  // La llama js/spotify/ al conectar / desconectar
   const onAuthChange = (connected) => {
     if (!connected) {
       Object.keys(cache).forEach(k => delete cache[k]);
@@ -1279,7 +1382,7 @@
   };
   engancharSonando();
 
-  // detailOf se comparte con la cola (seven.js) para no duplicar el parseo
+  // detailOf se comparte con la cola (js/seven/) para no duplicar el parseo
   // `abrir` / `irA` los usa el buscador universal para saltar a una lista
   // `playlistsCache` se la pide el buscador para poder buscar entre tus listas
   window.LibraryModule = {

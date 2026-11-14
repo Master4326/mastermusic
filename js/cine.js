@@ -27,7 +27,7 @@
    bandas negras ni el panel de al lado. El MediaRecorder graba MP4
    (H.264 + AAC) si el navegador sabe, o WebM si no.
 
-   EL SONIDO, de donde mejor se pueda (ver js/visualizer.js, «EL SONIDO DEL
+   EL SONIDO, de donde mejor se pueda (ver js/espectro/, «EL SONIDO DEL
    VÍDEO 9:16»):
      · tu música importada → directo del <audio>, a nivel completo aunque
        la estés oyendo bajito;
@@ -73,32 +73,66 @@
      · salir de la pantalla completa (F11, Esc del navegador, el gesto de
        atrás del teléfono) cierra el cine, como siempre hizo.
    ========================================================== */
+/* ==========================================================
+   EL CINE ⛶ Y EL VÍDEO 9:16 ▯ · el escenario (js/cine/escenario.js)
+
+   Lo que fue js/vertical.js (1.760 líneas) vive ahora en js/cine/, en
+   cuatro archivos que se cargan seguidos y en este orden:
+
+   escenario.js — las opciones que se recuerdan, el estado, montar el
+   escenario y su marco exacto, la pantalla completa, y abrir y cerrar.
+   contenido.js — los mandos de las opciones, qué suena dentro del marco,
+   el bucle, los avisos del panel y el formato del vídeo.
+   grabar.js — grabar el marco a un vídeo.
+   arranque.js — lo que enseña el panel en cada fase, el teclado y las
+   puertas (los botones y la API pública).
+
+   Comparten el estado por la bolsa `comun` (window.MMInterno.cine): lo
+   que cambia y usan varios archivos se lee y se escribe como `comun.x`;
+   las funciones y constantes de un archivo anterior se recogen arriba de
+   cada archivo y se usan por su nombre.
+   ========================================================== */
 (() => {
   'use strict';
 
+  /* Lo que comparten entre sí los archivos de js/cine/. Uso interno: desde
+     fuera se habla con window.CinemaModule y window.MMVertical (los arma
+     js/cine/arranque.js). */
+  window.MMInterno = window.MMInterno || {};
+  const comun = window.MMInterno.cine = {};
+
   const $ = (id) => document.getElementById(id);
+  comun.$ = $;
   const PC = () => window.PlayerCore;
+  comun.PC = PC;
   const LY = () => window.LyricsModule;
+  comun.LY = LY;
   const VIS = () => window.VisualizerModule;
+  comun.VIS = VIS;
   const SP = () => window.SpotifyModule;
+  comun.SP = SP;
   const calma = () => !!(window.MMSettings && window.MMSettings.reduceMotion());
+  comun.calma = calma;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-  // el mismo juez de teclas que app.js y seven.js (js/teclas.js)
+  comun.clamp = clamp;
+  // el mismo juez de teclas que app.js y js/seven/ (js/teclas.js)
   const libre = (e) => {
     const T = window.MMTeclas;
     return T ? T.libre(e) : !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
   };
+  comun.libre = libre;
   const fmt = (s) => {
     if (!isFinite(s) || s < 0) s = 0;
     const m = Math.floor(s / 60), q = Math.floor(s % 60);
     return m + ':' + (q < 10 ? '0' : '') + q;
   };
+  comun.fmt = fmt;
 
   /* ¿Puede este navegador grabar SOLO el marco? Hace falta todo junto:
      compartir pantalla, grabar vídeo y recortar la captura a un elemento
      (Region Capture: Chrome, Edge y Opera de escritorio). Sin eso el modo
      sigue sirviendo para grabarlo con otra herramienta (OBS, Recortes…). */
-  const puedeGrabar = !!(navigator.mediaDevices
+  const puedeGrabar = comun.puedeGrabar = !!(navigator.mediaDevices
     && typeof navigator.mediaDevices.getDisplayMedia === 'function'
     && typeof window.MediaRecorder === 'function'
     && window.CropTarget && typeof window.CropTarget.fromElement === 'function');
@@ -109,20 +143,20 @@
      canciones con vídeo. El usuario lo quiere para él, en su equipo, y NO en
      la página publicada: el modo solo existe abriendo la app en local
      (127.0.0.1, localhost o el archivo suelto), igual que el ⚗ laboratorio
-     de js/lyrics.js. En la web publicada no hay botón, ni sección en
+     de js/letra/. En la web publicada no hay botón, ni sección en
      ajustes, ni mando en el buscador, ni tecla V, y `abrir()` se niega a
      abrirlo. El CINE, que usa este mismo escenario, no cambia en nada.
-     Va al revés de lo que parece: style.css esconde esas puertas SIEMPRE, y
+     Va al revés de lo que parece: css/base/ esconde esas puertas SIEMPRE, y
      aquí se destapan con `html.con-916` solo en local. Así la página
      publicada no enseña el botón ni un instante mientras carga este archivo
      (los <script> van con defer y la ventana se pinta antes). */
   const enLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
     || location.protocol === 'file:';
-  const videoDisponible = enLocal;
+  const videoDisponible = comun.videoDisponible = enLocal;
   document.documentElement.classList.toggle('con-916', videoDisponible);
 
   // ---------- Opciones (se recuerdan) ----------
-  const OPC = {
+  const OPC = comun.OPC = {
     estilo:  { key: 'mm_916_estilo',  def: 'app',  vals: ['app', 'vinilo', 'letra'] },
     // sin elegir todavía: la vista que la app tenga puesta (≡, ✦ o ◉)
     vista:   { key: 'mm_916_vista',   def: '',     vals: ['lista', 'edit', 'palabra'] },
@@ -152,29 +186,34 @@
     }
     return o.def;
   };
+  comun.pref = pref;
   const guardarPref = (id, v) => { try { localStorage.setItem(OPC[id].key, v); } catch (e) {} };
+  comun.guardarPref = guardarPref;
 
   // ---------- Estado ----------
-  let raiz = null, marco = null, zona = null;
-  const el = {};
-  let abierto = false;
+  comun.raiz = null; comun.marco = null; let zona = null;
+  const el = comun.el = {};
+  comun.abierto = false;
   let modo = 'video';                     // 'video' (el 9:16 para grabar) o 'cine'
   const enCine = () => modo === 'cine';
+  comun.enCine = enCine;
   const prefEstilo = () => pref(enCine() ? 'cineEstilo' : 'estilo');
+  comun.prefEstilo = prefEstilo;
   const prefVista = () => pref(enCine() ? 'cineVista' : 'vista');
+  comun.prefVista = prefVista;
   /* listo · pidiendo (el diálogo del navegador) · cuenta (3·2·1) ·
      grabando · guardando (cerrando el archivo) · hecho (el vídeo, para verlo) */
-  let fase = 'listo';
+  comun.fase = 'listo';
   let tabLyrics = null, slot = null, devolverFoco = null;
-  let entreFull = false, congelado = false, cerrandoT = null;
-  let captura = null, pistaSonido = null, planGrabado = 'no', queriaFull = false;
-  let tumbado = false, canal = null;      // el marco girado para grabar en 1080p, y su canal
-  let rec = null, trozos = [], mimeElegido = '', dims = { w: 0, h: 0 };
-  let t0 = 0, acumPausa = 0, marcaPausa = 0, sinSonarDesde = 0, pistaAlEmpezar = null, durGrabada = 0;
-  let resultado = null;
-  let cuentaT = null, cuentaCancelar = null, guardandoT = null;
-  let vistaPuesta = null;
-  let geo = { x: 0, y: 0, w: 360, h: 640, wd: 360, hd: 640 };
+  comun.entreFull = false; comun.congelado = false; let cerrandoT = null;
+  comun.captura = null; comun.pistaSonido = null; comun.planGrabado = 'no'; comun.queriaFull = false;
+  comun.tumbado = false; comun.canal = null;      // el marco girado para grabar en 1080p, y su canal
+  comun.rec = null; comun.trozos = []; comun.mimeElegido = ''; comun.dims = { w: 0, h: 0 };
+  comun.t0 = 0; comun.acumPausa = 0; comun.marcaPausa = 0; comun.sinSonarDesde = 0; comun.pistaAlEmpezar = null; comun.durGrabada = 0;
+  comun.resultado = null;
+  comun.cuentaT = null; comun.cuentaCancelar = null; comun.guardandoT = null;
+  comun.vistaPuesta = null;
+  comun.geo = { x: 0, y: 0, w: 360, h: 640, wd: 360, hd: 640 };
 
   // ---------- El escenario ----------
   const grupo = (id, etiqueta, opciones) => `
@@ -189,14 +228,14 @@
     `<button type="button" class="v916-m${extra || ''}" data-v916-mando="${id}" tabindex="-1" aria-hidden="true">${ico}</button>`;
 
   const construir = () => {
-    if (raiz) return;
-    raiz = document.createElement('div');
-    raiz.className = 'v916';
-    raiz.hidden = true;
-    raiz.setAttribute('role', 'dialog');
-    raiz.setAttribute('aria-modal', 'true');
-    raiz.setAttribute('aria-label', 'Vídeo 9:16 para TikTok');
-    raiz.innerHTML = `
+    if (comun.raiz) return;
+    comun.raiz = document.createElement('div');
+    comun.raiz.className = 'v916';
+    comun.raiz.hidden = true;
+    comun.raiz.setAttribute('role', 'dialog');
+    comun.raiz.setAttribute('aria-modal', 'true');
+    comun.raiz.setAttribute('aria-label', 'Vídeo 9:16 para TikTok');
+    comun.raiz.innerHTML = `
       <div class="v916-fondo" aria-hidden="true"></div>
       <div class="v916-borde" aria-hidden="true"></div>
       <div class="v916-marco" data-estilo="app">
@@ -329,10 +368,10 @@
         </div>
         <button type="button" class="v916-soltar" hidden title="Deja de compartir la pestaña con la app">● pestaña compartida · soltar</button>
       </aside>`;
-    document.body.appendChild(raiz);
+    document.body.appendChild(comun.raiz);
 
-    const q = (s) => raiz.querySelector(s);
-    marco = q('.v916-marco');
+    const q = (s) => comun.raiz.querySelector(s);
+    comun.marco = q('.v916-marco');
     zona = q('.v916-zona');
     Object.assign(el, {
       panel: q('.v916-panel'),
@@ -371,21 +410,21 @@
       cineUi: q('.v916-cine-ui'),
       prog: q('.v916-prog'),
     });
-    q('.v916-tira .t-parar').addEventListener('click', () => alternarGrabar());
+    q('.v916-tira .t-parar').addEventListener('click', () => comun.alternarGrabar());
 
     // Opciones: las del panel del vídeo y las de la barra del cine, igual
-    raiz.addEventListener('click', (e) => {
+    comun.raiz.addEventListener('click', (e) => {
       const b = e.target.closest('.seg-btn');
       const g = b && b.closest('.seg[data-v916]');
       if (!g) return;
       if (e.detail > 0) b.blur();          // el espacio sigue siendo play/pausa
-      if (fase === 'pidiendo' || fase === 'cuenta' || fase === 'grabando' || fase === 'guardando') return;
-      elegir(g.dataset.v916, b.dataset.val);
+      if (comun.fase === 'pidiendo' || comun.fase === 'cuenta' || comun.fase === 'grabando' || comun.fase === 'guardando') return;
+      comun.elegir(g.dataset.v916, b.dataset.val);
     });
 
     // Los mandos del marco y los del panel pulsan los de verdad: ni una
     // línea de lógica de reproducción repetida aquí.
-    raiz.addEventListener('click', (e) => {
+    comun.raiz.addEventListener('click', (e) => {
       /* En el cine, las pestañas y el engranaje del estilo «app» llevan a
          su pantalla: se sale del cine y se va. En el vídeo son dibujo. */
       const ir = enCine() && e.target.closest('[data-ir]');
@@ -397,58 +436,58 @@
       const b = e.target.closest('[data-v916-mando]');
       if (!b) return;
       if (e.detail > 0 && document.activeElement === b) b.blur();
-      if (fase === 'cuenta' || fase === 'grabando' || fase === 'pidiendo') return;
+      if (comun.fase === 'cuenta' || comun.fase === 'grabando' || comun.fase === 'pidiendo') return;
       const real = document.getElementById(b.dataset.v916Mando);
       if (real) real.click();
     });
 
     // ⛶ el cine: salir, la barra que asoma y el progreso que se arrastra
     q('.cine-x').addEventListener('click', () => cerrar());
-    raiz.addEventListener('pointermove', despertar, { passive: true });
-    raiz.addEventListener('pointerdown', despertar, { passive: true });
+    comun.raiz.addEventListener('pointermove', comun.despertar, { passive: true });
+    comun.raiz.addEventListener('pointerdown', comun.despertar, { passive: true });
     // con el ratón ENCIMA de la barra (a punto de pulsar algo) no se va
-    el.cineUi.addEventListener('pointerenter', () => { sobreBarra = true; });
-    el.cineUi.addEventListener('pointerleave', () => { sobreBarra = false; despertar(); });
+    el.cineUi.addEventListener('pointerenter', () => { comun.sobreBarra = true; });
+    el.cineUi.addEventListener('pointerleave', () => { comun.sobreBarra = false; comun.despertar(); });
     el.prog.addEventListener('pointerdown', (e) => {
-      if (!enCine() || !rielW) return;
-      arrastre = pctRiel(e.clientX);
-      progPx = -1;
+      if (!enCine() || !comun.rielW) return;
+      comun.arrastre = comun.pctRiel(e.clientX);
+      comun.progPx = -1;
       try { el.prog.setPointerCapture(e.pointerId); } catch (err) { /* sin captura también vale */ }
     });
     el.prog.addEventListener('pointermove', (e) => {
-      if (arrastre == null) return;
-      arrastre = pctRiel(e.clientX);
-      progPx = -1;
+      if (comun.arrastre == null) return;
+      comun.arrastre = comun.pctRiel(e.clientX);
+      comun.progPx = -1;
     });
     el.prog.addEventListener('pointerup', (e) => {
-      if (arrastre == null) return;
-      const p = pctRiel(e.clientX);
-      arrastre = null;
-      progPx = -1;
+      if (comun.arrastre == null) return;
+      const p = comun.pctRiel(e.clientX);
+      comun.arrastre = null;
+      comun.progPx = -1;
       const P = PC();
       const dur = P && P.duration ? P.duration() || 0 : 0;
       if (P && P.seek && dur > 0) P.seek(p * dur);
-      despertar();
+      comun.despertar();
     });
-    el.prog.addEventListener('pointercancel', () => { arrastre = null; progPx = -1; });
+    el.prog.addEventListener('pointercancel', () => { comun.arrastre = null; comun.progPx = -1; });
 
-    el.rec.addEventListener('click', (e) => { if (e.detail > 0) el.rec.blur(); alternarGrabar(); });
+    el.rec.addEventListener('click', (e) => { if (e.detail > 0) el.rec.blur(); comun.alternarGrabar(); });
     q('.v916-x').addEventListener('click', () => cerrar());
     el.full.addEventListener('click', (e) => {
       if (e.detail > 0) el.full.blur();
       if (document.fullscreenElement) soltarPantalla(true); else pedirPantalla();
     });
-    q('.v916-guardar').addEventListener('click', guardar);
-    el.compartir.addEventListener('click', compartir);
+    q('.v916-guardar').addEventListener('click', comun.guardar);
+    el.compartir.addEventListener('click', comun.compartir);
     q('.v916-tirar').addEventListener('click', (e) => {
-      if (resultado && !resultado.guardado && !confirmado(e.currentTarget, 'no lo has guardado · pulsa «tirar» otra vez para borrarlo')) return;
-      descartar();
+      if (comun.resultado && !comun.resultado.guardado && !comun.confirmado(e.currentTarget, 'no lo has guardado · pulsa «tirar» otra vez para borrarlo')) return;
+      comun.descartar();
     });
     el.soltar.addEventListener('click', () => {
-      if (fase === 'listo' || fase === 'hecho') { soltarCaptura(); pintarFase(); }
+      if (comun.fase === 'listo' || comun.fase === 'hecho') { comun.soltarCaptura(); comun.pintarFase(); }
     });
-    el.aviso.addEventListener('click', alAviso);
-    el.vista.addEventListener('error', () => { mensaje('el navegador no sabe enseñar este vídeo, pero se guarda igual'); });
+    el.aviso.addEventListener('click', comun.alAviso);
+    el.vista.addEventListener('error', () => { comun.mensaje('el navegador no sabe enseñar este vídeo, pero se guarda igual'); });
   };
 
   // ---------- El marco: tamaño EXACTO en píxeles de pantalla ----------
@@ -472,8 +511,9 @@
   const alto = () => Math.floor(window.innerHeight * (window.devicePixelRatio || 1));
   // 1080p de verdad sin girar solo si la pantalla ya tiene 1920 de alto (4K)
   const hayQueTumbar = () => alto() < 1920;
+  comun.hayQueTumbar = hayQueTumbar;
   // sin captureStream no hay forma de enderezar ni de escalar: se graba el marco tal cual
-  const puedeHD = typeof HTMLCanvasElement !== 'undefined'
+  const puedeHD = comun.puedeHD = typeof HTMLCanvasElement !== 'undefined'
     && typeof HTMLCanvasElement.prototype.captureStream === 'function';
   const medirTumbado = (vw, vh, dpr) => {
     const libre = vw - TIRA;
@@ -487,7 +527,7 @@
     return { x: bx + h / 2 - w / 2, y: by + w / 2 - h / 2, w, h, wd, hd };
   };
   const medirMarco = () => {
-    if (!raiz || !abierto || congelado) return;
+    if (!comun.raiz || !comun.abierto || comun.congelado) return;
     const vw = window.innerWidth, vh = window.innerHeight;
     const dpr = window.devicePixelRatio || 1;
     /* En el cine el marco es la pantalla entera (lo pone el CSS) y aquí solo
@@ -495,24 +535,24 @@
        el suyo de horizontal. Al girar, el verso se vuelve a pintar: el modo
        edit elige sus tamaños midiendo el hueco, y el hueco ya es otro. */
     if (enCine()) {
-      geo = { x: 0, y: 0, w: vw, h: vh, wd: Math.round(vw * dpr), hd: Math.round(vh * dpr) };
+      comun.geo = { x: 0, y: 0, w: vw, h: vh, wd: Math.round(vw * dpr), hd: Math.round(vh * dpr) };
       const orient = vw > vh ? 'h' : 'v';
-      const giro = raiz.dataset.orient && raiz.dataset.orient !== orient;
-      raiz.dataset.orient = orient;
-      medirLienzo();
-      medirRiel();
+      const giro = comun.raiz.dataset.orient && comun.raiz.dataset.orient !== orient;
+      comun.raiz.dataset.orient = orient;
+      comun.medirLienzo();
+      comun.medirRiel();
       if (giro && LY() && LY().repintar) LY().repintar();
       return;
     }
-    if (tumbado) {
-      geo = medirTumbado(vw, vh, dpr);
-      const st = raiz.style;
-      st.setProperty('--v916-x', geo.x + 'px');
-      st.setProperty('--v916-y', geo.y + 'px');
-      st.setProperty('--v916-w', geo.w + 'px');
-      st.setProperty('--v916-h', geo.h + 'px');
-      medirLienzo();
-      medirRiel();
+    if (comun.tumbado) {
+      comun.geo = medirTumbado(vw, vh, dpr);
+      const st = comun.raiz.style;
+      st.setProperty('--v916-x', comun.geo.x + 'px');
+      st.setProperty('--v916-y', comun.geo.y + 'px');
+      st.setProperty('--v916-w', comun.geo.w + 'px');
+      st.setProperty('--v916-h', comun.geo.h + 'px');
+      comun.medirLienzo();
+      comun.medirRiel();
       return;
     }
     const pw = vw < 980 ? 272 : 340;
@@ -525,24 +565,20 @@
     if (vw - (x + w) < pw + GAP * 2) x = Math.max(GAP, vw - pw - GAP * 2 - w);
     x = Math.round(x * dpr) / dpr;
     const y = Math.round(((vh - h) / 2) * dpr) / dpr;
-    geo = { x, y, w, h, wd, hd };
-    const s = raiz.style;
+    comun.geo = { x, y, w, h, wd, hd };
+    const s = comun.raiz.style;
     s.setProperty('--v916-x', x + 'px');
     s.setProperty('--v916-y', y + 'px');
     s.setProperty('--v916-w', w + 'px');
     s.setProperty('--v916-h', h + 'px');
     s.setProperty('--v916-pw', pw + 'px');
     s.setProperty('--v916-px', Math.round(Math.min(vw - pw - GAP, x + w + GAP * 1.5)) + 'px');
-    medirLienzo();
-    medirRiel();
-    pintarInfo();
+    comun.medirLienzo();
+    comun.medirRiel();
+    comun.pintarInfo();
   };
-  let medirPendiente = false;
-  window.addEventListener('resize', () => {
-    if (!abierto || medirPendiente) return;
-    medirPendiente = true;
-    requestAnimationFrame(() => { medirPendiente = false; medirMarco(); });
-  }, { passive: true });
+  comun.medirMarco = medirMarco;
+  comun.medirPendiente = false;
 
   // ---------- Pantalla completa ----------
   const pedirPantalla = () => {
@@ -552,15 +588,16 @@
     if (!f) return;
     try {
       const r = f.call(d);
-      entreFull = true;
-      if (r && r.catch) r.catch(() => { entreFull = false; });
-    } catch (e) { entreFull = false; }
+      comun.entreFull = true;
+      if (r && r.catch) r.catch(() => { comun.entreFull = false; });
+    } catch (e) { comun.entreFull = false; }
   };
+  comun.pedirPantalla = pedirPantalla;
   // Solo se sale si ENTRÓ el modo (o si lo pide el botón): si ya estabas a
   // pantalla completa por tu cuenta, cerrar esto no te la quita.
   const soltarPantalla = (aMano) => {
-    if (!document.fullscreenElement || (!entreFull && !aMano)) return;
-    entreFull = false;
+    if (!document.fullscreenElement || (!comun.entreFull && !aMano)) return;
+    comun.entreFull = false;
     const f = document.exitFullscreen || document.webkitExitFullscreen;
     if (f) { try { const r = f.call(document); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
   };
@@ -572,22 +609,14 @@
      atrás del teléfono, quedarse como capa dentro de la ventana sería lo
      peor de los dos mundos. Solo si llegó a entrar: en un navegador que no
      la da (el iPhone) el cine vive como capa desde el principio. */
-  let cineFull = false;
-  document.addEventListener('fullscreenchange', () => {
-    if (!abierto) return;
-    if (!document.fullscreenElement) entreFull = false;
-    if (el.full) el.full.classList.toggle('on', !!document.fullscreenElement);
-    if (!enCine()) return;
-    if (document.fullscreenElement) cineFull = true;
-    else if (cineFull) { cineFull = false; cerrar(); }
-  });
+  comun.cineFull = false;
 
   // ---------- Abrir y cerrar ----------
   /* `que` = 'cine' abre el modo cine; cualquier otra cosa (o nada: los
      botones pasan su evento) abre el vídeo 9:16. Uno cada vez: los dos se
      quieren llevar la misma letra. */
   const abrir = (que) => {
-    if (abierto) return;
+    if (comun.abierto) return;
     // el vídeo 9:16 no existe en la página publicada (ver `videoDisponible`)
     if (que !== 'cine' && !videoDisponible) return;
     construir();
@@ -597,91 +626,109 @@
     if (window.MMNav) window.MMNav.ir('lyrics');
 
     modo = que === 'cine' ? 'cine' : 'video';
-    abierto = true;
+    comun.abierto = true;
     clearTimeout(cerrandoT);
     devolverFoco = document.activeElement;
     slot = document.createComment('tab-lyrics-slot');
     tabLyrics.parentNode.insertBefore(slot, tabLyrics);
     zona.appendChild(tabLyrics);
 
-    raiz.classList.toggle('cine', enCine());
-    raiz.setAttribute('aria-label', enCine() ? 'Modo cine' : 'Vídeo 9:16 para TikTok');
-    if (!enCine()) delete raiz.dataset.orient;
+    comun.raiz.classList.toggle('cine', enCine());
+    comun.raiz.setAttribute('aria-label', enCine() ? 'Modo cine' : 'Vídeo 9:16 para TikTok');
+    if (!enCine()) delete comun.raiz.dataset.orient;
     document.body.classList.add('v916-open');
     // el cine, además, a pantalla ENTERA: js/ambient.js no respira la letra
     document.body.classList.toggle('cine-open', enCine());
-    raiz.hidden = false;
-    raiz.classList.remove('saliendo', 'quieto');
-    void raiz.offsetWidth;                 // la transición de entrada arranca desde 0
-    raiz.classList.add('entrando');
-    cineFull = false;
+    comun.raiz.hidden = false;
+    comun.raiz.classList.remove('saliendo', 'quieto');
+    void comun.raiz.offsetWidth;                 // la transición de entrada arranca desde 0
+    comun.raiz.classList.add('entrando');
+    comun.cineFull = false;
     pedirPantalla();
-    fase = !enCine() && resultado ? 'hecho' : 'listo';
-    marco.dataset.estilo = prefEstilo();
-    raiz.classList.toggle('sin-firma', !enCine() && pref('firma') === 'no');
+    comun.fase = !enCine() && comun.resultado ? 'hecho' : 'listo';
+    comun.marco.dataset.estilo = prefEstilo();
+    comun.raiz.classList.toggle('sin-firma', !enCine() && pref('firma') === 'no');
     medirMarco();
-    pintarSegs();
-    firmaPista = null;
-    vistaPuesta = null;
-    aplicarVista(true);                    // y de paso repinta el verso en su sitio nuevo
-    pintarFase();
-    avisoSonido();
-    arrancarBucle();
-    sobreBarra = false;
-    despertar();                           // la barra del cine se deja ver al entrar
+    comun.pintarSegs();
+    comun.firmaPista = null;
+    comun.vistaPuesta = null;
+    comun.aplicarVista(true);                    // y de paso repinta el verso en su sitio nuevo
+    comun.pintarFase();
+    comun.avisoSonido();
+    comun.arrancarBucle();
+    comun.sobreBarra = false;
+    comun.despertar();                           // la barra del cine se deja ver al entrar
     // la pantalla completa asienta el tamaño un frame después
     requestAnimationFrame(() => requestAnimationFrame(medirMarco));
     /* El foco va al PANEL, no a un botón: con el foco en «grabar», el
        espacio —que aquí sigue siendo play/pausa— pulsaría grabar. En el
        cine, a su barra, por lo mismo. */
     setTimeout(() => {
-      if (abierto) (enCine() ? el.cineUi : el.panel).focus({ preventScroll: true });
+      if (comun.abierto) (enCine() ? el.cineUi : el.panel).focus({ preventScroll: true });
     }, 30);
   };
+  comun.abrir = abrir;
 
   let avisoCerrarT = 0;
   const cerrar = () => {
-    if (!abierto) return;
+    if (!comun.abierto) return;
     // grabando, primero se para (y el vídeo se queda para verlo)
-    if (fase === 'grabando') { parar(); return; }
-    if (fase === 'cuenta') { cancelarCuenta(); return; }
-    if (fase === 'pidiendo' || fase === 'guardando') return;
-    if (resultado && !resultado.guardado && Date.now() - avisoCerrarT > 5000) {
+    if (comun.fase === 'grabando') { comun.parar(); return; }
+    if (comun.fase === 'cuenta') { comun.cancelarCuenta(); return; }
+    if (comun.fase === 'pidiendo' || comun.fase === 'guardando') return;
+    if (comun.resultado && !comun.resultado.guardado && Date.now() - avisoCerrarT > 5000) {
       avisoCerrarT = Date.now();
-      mensaje('el vídeo no está guardado · sal otra vez para tirarlo, o dale a «guardar»');
+      comun.mensaje('el vídeo no está guardado · sal otra vez para tirarlo, o dale a «guardar»');
       return;
     }
     avisoCerrarT = 0;
-    abierto = false;
-    descartar(true);
-    soltarCaptura();
-    pararBucle();
+    comun.abierto = false;
+    comun.descartar(true);
+    comun.soltarCaptura();
+    comun.pararBucle();
     if (slot && slot.parentNode) {
       slot.parentNode.insertBefore(tabLyrics, slot);
       slot.remove();
     }
     slot = null;
-    vistaPuesta = null;
+    comun.vistaPuesta = null;
     // vuelve la vista que tengas elegida en la app, con el verso de ahora
     if (LY() && LY().forzarVista) LY().forzarVista(null);
     document.body.classList.remove('v916-open', 'cine-open');
-    clearTimeout(quietoT);
-    arrastre = null;
-    raiz.classList.remove('entrando', 'quieto');
-    raiz.classList.add('saliendo');
+    clearTimeout(comun.quietoT);
+    comun.arrastre = null;
+    comun.raiz.classList.remove('entrando', 'quieto');
+    comun.raiz.classList.add('saliendo');
     soltarPantalla(false);
     clearTimeout(cerrandoT);
     cerrandoT = setTimeout(() => {
-      if (!abierto) { raiz.hidden = true; raiz.classList.remove('saliendo'); }
+      if (!comun.abierto) { comun.raiz.hidden = true; comun.raiz.classList.remove('saliendo'); }
     }, calma() ? 0 : 260);
     const f = devolverFoco;
     devolverFoco = null;
     if (f && f.focus && document.contains(f)) f.focus({ preventScroll: true });
   };
+  comun.cerrar = cerrar;
+})();
+/* ==========================================================
+   EL CINE Y EL VÍDEO 9:16 · lo que va dentro (js/cine/contenido.js)
+
+   Los mandos de las opciones, qué suena en el marco (ficha, carátula,
+   progreso), el bucle que lo mantiene al día, los avisos del panel, el
+   formato del vídeo y dónde empieza. Reparto de js/cine/: ver
+   escenario.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.cine;
+  const {
+    $, PC, LY, VIS, SP, calma, clamp, fmt, puedeGrabar, OPC, pref, guardarPref, el, enCine,
+    prefEstilo, prefVista, puedeHD
+  } = comun;
 
   // ---------- Opciones ----------
   const pintarSegs = () => {
-    raiz.querySelectorAll('.seg[data-v916]').forEach((g) => {
+    comun.raiz.querySelectorAll('.seg[data-v916]').forEach((g) => {
       const v = pref(g.dataset.v916);
       g.querySelectorAll('.seg-btn').forEach((b) => {
         const on = b.dataset.val === v;
@@ -691,11 +738,13 @@
       });
     });
   };
+  comun.pintarSegs = pintarSegs;
 
   // las guías de TikTok son cosa del vídeo: en el cine no hay TikTok encima
   const pintarGuias = () => {
-    if (el.guias) el.guias.hidden = !(!enCine() && pref('guias') === 'si' && fase === 'listo');
+    if (el.guias) el.guias.hidden = !(!enCine() && pref('guias') === 'si' && comun.fase === 'listo');
   };
+  comun.pintarGuias = pintarGuias;
 
   const elegir = (id, v) => {
     if (!OPC[id] || !OPC[id].vals.includes(v) || pref(id) === v) return;
@@ -707,38 +756,40 @@
     avisoSonido();
     pintarInfo();
   };
+  comun.elegir = elegir;
 
   /* ══════ La barra del cine: asoma y se va ══════
      Como en cualquier reproductor de vídeo: al mover el ratón o tocar la
      pantalla salen la barra y el cursor, y a los 2,5 s quietos se van. No
      se va con el ratón encima de la barra ni arrastrando el progreso. */
-  let quietoT = null, sobreBarra = false;
+  comun.quietoT = null; comun.sobreBarra = false;
   const despertar = () => {
-    if (!abierto || !enCine()) return;
+    if (!comun.abierto || !enCine()) return;
     // llega con cada movimiento del ratón: la clase solo se toca si cambia
-    if (raiz.classList.contains('quieto')) raiz.classList.remove('quieto');
-    clearTimeout(quietoT);
-    quietoT = setTimeout(() => {
-      if (!abierto || !enCine()) return;
-      if (sobreBarra || arrastre != null) { despertar(); return; }
-      raiz.classList.add('quieto');
+    if (comun.raiz.classList.contains('quieto')) comun.raiz.classList.remove('quieto');
+    clearTimeout(comun.quietoT);
+    comun.quietoT = setTimeout(() => {
+      if (!comun.abierto || !enCine()) return;
+      if (comun.sobreBarra || comun.arrastre != null) { despertar(); return; }
+      comun.raiz.classList.add('quieto');
       // el foco no se queda en un botón escondido (el espacio lo pulsaría)
       if (el.cineUi.contains(document.activeElement) && document.activeElement !== el.cineUi) {
         el.cineUi.focus({ preventScroll: true });
       }
     }, 2500);
   };
+  comun.despertar = despertar;
 
   // Otro estilo = otra geometría: se re-mide y el verso se vuelve a pintar
   // en su sitio nuevo (el edit mide su contenedor para elegir tamaños).
   const cambiarEstilo = () => {
-    marco.dataset.estilo = prefEstilo();
-    raiz.classList.toggle('sin-firma', !enCine() && pref('firma') === 'no');
+    comun.marco.dataset.estilo = prefEstilo();
+    comun.raiz.classList.toggle('sin-firma', !enCine() && pref('firma') === 'no');
     // en el cine, el estilo nuevo entra fundido (una vez por cambio, no por frame)
     if (enCine() && !calma()) {
-      marco.classList.remove('cambia');
-      void marco.offsetWidth;
-      marco.classList.add('cambia');
+      comun.marco.classList.remove('cambia');
+      void comun.marco.offsetWidth;
+      comun.marco.classList.add('cambia');
     }
     requestAnimationFrame(() => {
       medirLienzo();
@@ -759,17 +810,18 @@
     const sinTiempos = lines.length > 0 && !(lines[0].time >= 0);
     const p = prefVista();
     const v = (p === 'edit' || p === 'palabra') && !sinTiempos ? p : 'lista';
-    if (!forzar && v === vistaPuesta) return;
-    vistaPuesta = v;
+    if (!forzar && v === comun.vistaPuesta) return;
+    comun.vistaPuesta = v;
     L.forzarVista(v);
   };
+  comun.aplicarVista = aplicarVista;
 
   // ---------- Qué suena en el marco ----------
-  let firmaPista = null;
+  comun.firmaPista = null;
   const pintarPista = (t) => {
     const firma = t ? (t.id || '') + '|' + (t.name || '') + '|' + (t.cover || '') : '';
-    if (firma === firmaPista) return;
-    firmaPista = firma;
+    if (firma === comun.firmaPista) return;
+    comun.firmaPista = firma;
     el.titulo.textContent = t ? (t.name || t.title || 'Sin título') : 'Sin canción';
     el.artista.textContent = t ? (t.artist || '') : 'pon algo para empezar';
     el.album.textContent = t ? (t.album || '') : '';
@@ -777,29 +829,31 @@
     el.portada.style.backgroundImage = img;
     el.etiqueta.style.backgroundImage = img;
     el.bgImg.style.backgroundImage = img;
-    marco.classList.toggle('sin-portada', !img);
+    comun.marco.classList.toggle('sin-portada', !img);
   };
 
   /* Progreso: el relleno se recorta con clip-path (así sus celdas pixel no se
      estiran, que es lo que haría un scaleX) y la cabeza va por transform. Se
      escribe solo cuando cambia un píxel: en una canción de tres minutos son
      unas pocas escrituras por segundo, no sesenta. */
-  let rielW = 0, progPx = -1, tCurTxt = '', tTotTxt = '';
+  comun.rielW = 0; comun.progPx = -1; let tCurTxt = ''; let tTotTxt = '';
   // en el cine el progreso se arrastra: mientras, manda el dedo (0…1) y no la canción
-  let arrastre = null;
-  const medirRiel = () => { rielW = el.riel ? el.riel.clientWidth : 0; progPx = -1; };
+  comun.arrastre = null;
+  const medirRiel = () => { comun.rielW = el.riel ? el.riel.clientWidth : 0; comun.progPx = -1; };
+  comun.medirRiel = medirRiel;
   const pctRiel = (x) => {
     const r = el.riel.getBoundingClientRect();
     return r.width > 0 ? clamp((x - r.left) / r.width, 0, 1) : 0;
   };
+  comun.pctRiel = pctRiel;
   const fantasma = (n, txt) => { n.textContent = txt; n.dataset.g = txt.replace(/\d/g, '8'); };
   const pintarProgreso = (P) => {
     const dur = P.duration ? P.duration() || 0 : 0;
-    const pos = arrastre != null ? arrastre * dur : Math.max(0, P.position ? P.position() || 0 : 0);
+    const pos = comun.arrastre != null ? comun.arrastre * dur : Math.max(0, P.position ? P.position() || 0 : 0);
     const p = dur > 0 ? clamp(pos / dur, 0, 1) : 0;
-    const px = Math.round(p * rielW);
-    if (px !== progPx) {
-      progPx = px;
+    const px = Math.round(p * comun.rielW);
+    if (px !== comun.progPx) {
+      comun.progPx = px;
       el.riel.style.setProperty('--p', p.toFixed(4));
       el.cabeza.style.transform = 'translateX(' + px + 'px)';
     }
@@ -814,7 +868,7 @@
   const BR_FUERA = -77.8, BR_DENTRO = -51.6, BR_PARADO = -90;
   let brAng = '', brApoyado = null;
   const pintarBrazo = (P) => {
-    if (marco.dataset.estilo !== 'vinilo') return;
+    if (comun.marco.dataset.estilo !== 'vinilo') return;
     const sonando = !!(P.playing && P.playing());
     const dur = P.duration ? P.duration() : 0;
     let ang = BR_PARADO;
@@ -840,6 +894,7 @@
     if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     eW = W; eH = H;
   };
+  comun.medirLienzo = medirLienzo;
   let acento = '#5ce1e6', acentoT = 0;
   const leerAcento = (ahora) => {
     if (ahora - acentoT < 300) return acento;
@@ -891,7 +946,7 @@
     c.globalAlpha = 1;
   };
   const pintarEspectro = (ahora) => {
-    const estilo = marco.dataset.estilo;
+    const estilo = comun.marco.dataset.estilo;
     if (estilo === 'letra' || !eW) return;
     if (!ctxE) ctxE = el.espectro.getContext('2d');
     const V = VIS();
@@ -905,7 +960,7 @@
   };
 
   // ---------- El bucle ----------
-  let raf = 0, lentoT = 0, relojT = '';
+  let raf = 0; let lentoT = 0; comun.relojT = '';
   const reloj = { ultimo: 0 };
   const fotograma = () => {
     const ahora = performance.now();
@@ -916,17 +971,17 @@
     pintarBrazo(P);
     pintarEspectro(ahora);
     if (ahora - lentoT > 300) { lentoT = ahora; pintarLento(P); }
-    vigilarGrabacion(P, ahora);
+    comun.vigilarGrabacion(P, ahora);
   };
   /* El fotograma lo pide el reloj de la app (js/perf.js) mientras el
      escenario esté abierto. Sonando —o contando, o grabando— va al tope de
      siempre; en pausa y sin grabar basta con 15 pasadas por segundo: nada
      se mueve y solo hay que enterarse de un cambio de canción o de mando. */
   let mandoV = null;
-  const enReposo = () => (fase === 'listo' || fase === 'hecho') &&
+  const enReposo = () => (comun.fase === 'listo' || comun.fase === 'hecho') &&
     !document.body.classList.contains('playing');
   const bucle = () => {            // solo sin js/perf.js
-    if (!abierto) { raf = 0; return; }
+    if (!comun.abierto) { raf = 0; return; }
     raf = requestAnimationFrame(bucle);
     if (document.hidden) return;
     if (window.MMPerf && window.MMPerf.salta(reloj, performance.now())) return;
@@ -938,14 +993,16 @@
       if (!mandoV) {
         mandoV = M.bucle(fotograma, {
           ms: () => (enReposo() ? 66 : M.msFrame()),
-          activo: () => abierto,
+          activo: () => comun.abierto,
         });
       } else mandoV.despertar();
       return;
     }
     if (!raf) raf = requestAnimationFrame(bucle);
   };
+  comun.arrancarBucle = arrancarBucle;
   const pararBucle = () => { if (raf) cancelAnimationFrame(raf); raf = 0; };
+  comun.pararBucle = pararBucle;
 
   const pintarLento = (P) => {
     if (el.mShuffle) el.mShuffle.classList.toggle('on', !!P.state.shuffle);
@@ -954,7 +1011,7 @@
       el.mRepeat.classList.toggle('uno', P.state.repeat === 'one');
     }
     aplicarVista(false);
-    if (fase === 'listo' && !enCine()) {
+    if (comun.fase === 'listo' && !enCine()) {
       el.rec.disabled = !puedeGrabar || !P.state.currentTrack;
       avisoSonido();
       pintarInfo();
@@ -970,6 +1027,7 @@
     el.msg.hidden = !txt;
     if (txt) msgT = setTimeout(() => { el.msg.hidden = true; }, 7000);
   };
+  comun.mensaje = mensaje;
 
   let confirmarBtn = null, confirmarHasta = 0;
   const confirmado = (btn, txt) => {
@@ -980,6 +1038,7 @@
     mensaje(txt);
     return false;
   };
+  comun.confirmado = confirmado;
 
   /* De dónde saldría el sonido si se grabara ahora mismo. */
   const planSonido = () => {
@@ -993,6 +1052,7 @@
     if (VIS() && VIS().haySync && VIS().haySync()) return 'sync';
     return 'lejos';
   };
+  comun.planSonido = planSonido;
 
   let avisoFirma = '';
   const avisoSonido = () => {
@@ -1018,6 +1078,7 @@
     el.aviso.innerHTML = html;
     el.aviso.hidden = !html;
   };
+  comun.avisoSonido = avisoSonido;
 
   const alAviso = async (e) => {
     const b = e.target.closest('[data-aviso]');
@@ -1041,6 +1102,7 @@
     avisoFirma = null;
     setTimeout(() => { avisoSonido(); pintarInfo(); }, 400);
   };
+  comun.alAviso = alAviso;
 
   const escapar = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -1066,21 +1128,23 @@
     }
     return '';
   };
+  comun.elegirMime = elegirMime;
 
   const pintarInfo = () => {
     if (!el.info) return;
-    el.soltar.hidden = !(captura && (fase === 'listo' || fase === 'hecho'));
+    el.soltar.hidden = !(comun.captura && (comun.fase === 'listo' || comun.fase === 'hecho'));
     if (!puedeGrabar) {
       el.info.textContent = 'este navegador no puede grabar solo el marco · prueba en chrome o edge';
       return;
     }
-    if (fase !== 'listo') return;
+    if (comun.fase !== 'listo') return;
     const plan = planSonido();
     const conSon = plan !== 'no' && plan !== 'lejos';
     const ext = /mp4/.test(elegirMime(conSon)) ? 'mp4' : 'webm';
-    const tam = pref('calidad') === 'hd' && puedeHD ? SALIDA_W + '×' + SALIDA_H : geo.wd + '×' + geo.hd;
+    const tam = pref('calidad') === 'hd' && puedeHD ? comun.SALIDA_W + '×' + comun.SALIDA_H : comun.geo.wd + '×' + comun.geo.hd;
     el.info.textContent = `${tam} · 60 fps · ${ext} · ${conSon ? 'con sonido' : 'sin sonido'}`;
   };
+  comun.pintarInfo = pintarInfo;
 
   // ---------- Dónde empieza el vídeo ----------
   /* El estribillo: el verso que MÁS se repite (con dos palabras o más, para
@@ -1109,6 +1173,7 @@
     }
     return lines[i].time;
   };
+  comun.buscarEstribillo = buscarEstribillo;
   const puntoDeInicio = () => {
     const e = pref('empieza');
     if (e === 'inicio') return 0;
@@ -1122,6 +1187,23 @@
     const off = window.LyricsOffset && window.LyricsOffset.get ? window.LyricsOffset.get() : 0;
     return Math.max(0, t - off - 1.2);
   };
+  comun.puntoDeInicio = puntoDeInicio;
+})();
+/* ==========================================================
+   EL VÍDEO 9:16 · grabar (js/cine/grabar.js)
+
+   Compartir la pestaña, recortar la captura al marco, la cuenta atrás,
+   el grabador y el vídeo que queda. Solo existe en la copia local.
+   Reparto de js/cine/: ver escenario.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.cine;
+  const {
+    PC, LY, VIS, clamp, fmt, puedeGrabar, pref, el, enCine, hayQueTumbar, puedeHD, medirMarco,
+    pedirPantalla, medirRiel, medirLienzo, mensaje, confirmado, planSonido, avisoSonido,
+    elegirMime, pintarInfo, puntoDeInicio
+  } = comun;
 
   // ---------- Grabar ----------
   const pedirCaptura = (conAudio) => navigator.mediaDevices.getDisplayMedia({
@@ -1138,41 +1220,43 @@
 
   const alTerminarCaptura = () => {
     // «dejar de compartir» desde la barra del navegador
-    captura = null;
+    comun.captura = null;
     if (VIS() && VIS().soltarFlujo) VIS().soltarFlujo();
-    if (fase === 'grabando') parar();
-    else if (fase === 'cuenta') cancelarCuenta();
+    if (comun.fase === 'grabando') parar();
+    else if (comun.fase === 'cuenta') cancelarCuenta();
     avisoSonido();
     pintarInfo();
   };
 
   const soltarCaptura = () => {
-    if (captura) {
-      captura.getTracks().forEach((t) => { t.removeEventListener('ended', alTerminarCaptura); t.stop(); });
+    if (comun.captura) {
+      comun.captura.getTracks().forEach((t) => { t.removeEventListener('ended', alTerminarCaptura); t.stop(); });
     }
-    captura = null;
+    comun.captura = null;
     if (VIS() && VIS().soltarFlujo) VIS().soltarFlujo();
     if (el.soltar) el.soltar.hidden = true;
   };
+  comun.soltarCaptura = soltarCaptura;
 
   let preparando = false;
   const alternarGrabar = () => {
     if (enCine()) return;                  // el cine se mira, no se graba
-    if (fase === 'grabando') { parar(); return; }
-    if (fase === 'cuenta') { cancelarCuenta(); return; }
-    if (fase === 'pidiendo' || fase === 'guardando') return;
+    if (comun.fase === 'grabando') { parar(); return; }
+    if (comun.fase === 'cuenta') { cancelarCuenta(); return; }
+    if (comun.fase === 'pidiendo' || comun.fase === 'guardando') return;
     /* Mientras se prepara (el sonido, volver a pantalla completa) la fase
        sigue en «listo»: sin este cerrojo, un doble clic —o la R y un clic—
        arrancaba dos grabaciones a la vez. */
     if (preparando) return;
-    if (fase === 'hecho') {
-      if (resultado && !resultado.guardado && !confirmado(el.rec, 'el de antes no está guardado · pulsa otra vez para tirarlo y grabar otro')) return;
+    if (comun.fase === 'hecho') {
+      if (comun.resultado && !comun.resultado.guardado && !confirmado(el.rec, 'el de antes no está guardado · pulsa otra vez para tirarlo y grabar otro')) return;
       descartar();
     }
     preparando = true;
     grabar().catch((e) => { console.warn('[9:16] no se pudo grabar:', e); sinVideo('✕ no se pudo grabar'); })
       .finally(() => { preparando = false; });
   };
+  comun.alternarGrabar = alternarGrabar;
 
   const grabar = async () => {
     const P = PC();
@@ -1186,53 +1270,53 @@
     /* Se compartió la pestaña SIN su audio (sonaba tu música, que va directa)
        y ahora suena Spotify aquí, que solo se oye por ese audio: se vuelve a
        pedir, esta vez con él, en vez de grabar un vídeo mudo. */
-    if (captura && captura.active && plan === 'pestana' && !captura.getAudioTracks().length) soltarCaptura();
+    if (comun.captura && comun.captura.active && plan === 'pestana' && !comun.captura.getAudioTracks().length) soltarCaptura();
 
     /* Segundo clic tras perder la pantalla completa (ver más abajo): este
        clic SÍ es un gesto, así que ya se puede volver a ella. Se espera a
        que asiente el tamaño, porque la cuenta atrás lo congela. */
-    if (captura && captura.active && queriaFull && !document.fullscreenElement) {
-      queriaFull = false;
+    if (comun.captura && comun.captura.active && comun.queriaFull && !document.fullscreenElement) {
+      comun.queriaFull = false;
       pedirPantalla();
       await dormir(450);
-      if (!abierto) return;                 // se cerró mientras tanto
+      if (!comun.abierto) return;                 // se cerró mientras tanto
       medirMarco();
     }
-    queriaFull = false;
+    comun.queriaFull = false;
 
-    if (!captura || !captura.active) {
-      if (!abierto) return;
-      captura = null;
+    if (!comun.captura || !comun.captura.active) {
+      if (!comun.abierto) return;
+      comun.captura = null;
       const eraFull = !!document.fullscreenElement;
-      fase = 'pidiendo';
-      pintarFase();
+      comun.fase = 'pidiendo';
+      comun.pintarFase();
       mensaje(plan === 'pestana'
         ? 'dile que sí al navegador · y deja marcado «compartir el audio de la pestaña»'
         : 'dile que sí al navegador: se graba solo este marco');
       let flujo = null;
       try { flujo = await pedirCaptura(plan === 'pestana'); }
       catch (e) {
-        fase = 'listo';
-        pintarFase();
+        comun.fase = 'listo';
+        comun.pintarFase();
         mensaje(e && e.name === 'NotAllowedError' ? '' : '✕ el navegador no dejó grabar la pestaña' + (e && e.name ? ' (' + e.name + ')' : ''));
         return;
       }
-      if (!abierto) { flujo.getTracks().forEach((t) => t.stop()); return; }
+      if (!comun.abierto) { flujo.getTracks().forEach((t) => t.stop()); return; }
       const vt = flujo.getVideoTracks()[0];
       try {
-        const objetivo = await window.CropTarget.fromElement(marco);
+        const objetivo = await window.CropTarget.fromElement(comun.marco);
         await vt.cropTo(objetivo);
       } catch (e) {
         flujo.getTracks().forEach((t) => t.stop());
-        fase = 'listo';
-        pintarFase();
+        comun.fase = 'listo';
+        comun.pintarFase();
         mensaje('✕ hay que elegir «esta pestaña» para grabar solo el marco');
         return;
       }
-      captura = flujo;
-      captura.getTracks().forEach((t) => t.addEventListener('ended', alTerminarCaptura));
+      comun.captura = flujo;
+      comun.captura.getTracks().forEach((t) => t.addEventListener('ended', alTerminarCaptura));
       // el sonido de la pestaña también mueve el fondo (Spotify por fin baila)
-      if (captura.getAudioTracks().length && VIS() && VIS().oirFlujo) VIS().oirFlujo(captura);
+      if (comun.captura.getAudioTracks().length && VIS() && VIS().oirFlujo) VIS().oirFlujo(comun.captura);
       mensaje('');
       /* El diálogo de «compartir esta pestaña» puede SACAR al navegador de
          la pantalla completa, y entonces el marco —y el vídeo— salen más
@@ -1240,27 +1324,27 @@
          diálogo del navegador no cuenta como gesto de la página: se para
          aquí y el siguiente clic la recupera antes de la cuenta atrás. */
       if (eraFull && !document.fullscreenElement) {
-        queriaFull = true;
-        fase = 'listo';
-        pintarFase();
+        comun.queriaFull = true;
+        comun.fase = 'listo';
+        comun.pintarFase();
         mensaje('listo · pulsa ● otra vez y empieza a pantalla completa');
         return;
       }
     }
 
-    planGrabado = plan;
-    pistaSonido = null;
+    comun.planGrabado = plan;
+    comun.pistaSonido = null;
     if (plan === 'local' || plan === 'sync' || plan === 'pestana') {
-      try { pistaSonido = VIS() && VIS().sonidoParaGrabar ? await VIS().sonidoParaGrabar(plan === 'pestana') : null; }
-      catch (e) { pistaSonido = null; }
-      if (!pistaSonido) {
-        planGrabado = 'no';
+      try { comun.pistaSonido = VIS() && VIS().sonidoParaGrabar ? await VIS().sonidoParaGrabar(plan === 'pestana') : null; }
+      catch (e) { comun.pistaSonido = null; }
+      if (!comun.pistaSonido) {
+        comun.planGrabado = 'no';
         mensaje(plan === 'pestana'
           ? 'no llegó el audio de la pestaña: saldrá sin sonido · «soltar» y graba otra vez marcando el audio'
           : 'no se pudo coger el sonido: saldrá sin sonido');
       }
-    } else planGrabado = 'no';
-    if (!abierto) return;
+    } else comun.planGrabado = 'no';
+    if (!comun.abierto) return;
     await cuentaYGrabar();
   };
 
@@ -1280,8 +1364,8 @@
     let k = n;
     el.cuenta.hidden = false;
     const paso = () => {
-      if (fase !== 'cuenta') { res(false); return; }
-      if (k === 0) { cuentaCancelar = null; res(true); return; }
+      if (comun.fase !== 'cuenta') { res(false); return; }
+      if (k === 0) { comun.cuentaCancelar = null; res(true); return; }
       el.cuentaNum.textContent = String(k);
       el.cuenta.classList.remove('late');
       void el.cuenta.offsetWidth;          // una vez por segundo: reinicia el latido
@@ -1289,9 +1373,9 @@
       el.recTxt.textContent = 'cancelar · ' + k;
       if (el.tReloj) el.tReloj.textContent = String(k);
       k--;
-      cuentaT = setTimeout(paso, 1000);
+      comun.cuentaT = setTimeout(paso, 1000);
     };
-    cuentaCancelar = () => { clearTimeout(cuentaT); cuentaCancelar = null; res(false); };
+    comun.cuentaCancelar = () => { clearTimeout(comun.cuentaT); comun.cuentaCancelar = null; res(false); };
     paso();
   });
 
@@ -1303,7 +1387,7 @@
      60 entran y 60 salen, sin repetir ni saltarse ninguno. El <video> que
      hace de fuente va en el DOM, en una esquina FUERA del marco: uno suelto
      no avisa de sus fotogramas. */
-  const SALIDA_W = 1080, SALIDA_H = 1920;
+  const SALIDA_W = comun.SALIDA_W = 1080, SALIDA_H = comun.SALIDA_H = 1920;
   const montarCanal = async (vt, girar) => {
     if (!vt || !puedeHD) return null;
     const lienzo = document.createElement('canvas');
@@ -1321,7 +1405,7 @@
     v.muted = true;
     v.playsInline = true;
     v.srcObject = new MediaStream([vt]);
-    raiz.appendChild(v);
+    comun.raiz.appendChild(v);
     const k = { vivo: true, pista, v, pintados: 0, ult: 0 };
     try { await v.play(); }
     catch (e) { v.remove(); try { pista.stop(); } catch (e2) {} return null; }
@@ -1344,25 +1428,25 @@
     return k;
   };
   const desmontarCanal = () => {
-    if (!canal) return;
-    canal.vivo = false;
-    try { canal.pista.stop(); } catch (e) {}
-    try { canal.v.pause(); } catch (e) {}
-    canal.v.srcObject = null;              // soltar la fuente NO para la captura
-    canal.v.remove();
-    canal = null;
+    if (!comun.canal) return;
+    comun.canal.vivo = false;
+    try { comun.canal.pista.stop(); } catch (e) {}
+    try { comun.canal.v.pause(); } catch (e) {}
+    comun.canal.v.srcObject = null;              // soltar la fuente NO para la captura
+    comun.canal.v.remove();
+    comun.canal = null;
   };
 
   // Tumbar o enderezar el marco (con el tamaño que le toca a cada postura)
   const tumbar = (on) => {
-    if (tumbado === on) return;
-    tumbado = on;
-    raiz.classList.toggle('tumbado', on);
+    if (comun.tumbado === on) return;
+    comun.tumbado = on;
+    comun.raiz.classList.toggle('tumbado', on);
     el.tira.hidden = !on;
-    const antes = congelado;
-    congelado = false;
+    const antes = comun.congelado;
+    comun.congelado = false;
     medirMarco();
-    congelado = antes;
+    comun.congelado = antes;
     // el edit elige tamaños midiendo su hueco: con otro hueco, otro verso
     requestAnimationFrame(() => {
       medirLienzo();
@@ -1374,12 +1458,12 @@
   let estabaSonando = false;
   const cuentaYGrabar = async () => {
     const P = PC();
-    fase = 'cuenta';
-    congelado = true;                       // el marco ya no cambia de tamaño
-    marco.classList.add('rodando');
+    comun.fase = 'cuenta';
+    comun.congelado = true;                       // el marco ya no cambia de tamaño
+    comun.marco.classList.add('rodando');
     const hd = pref('calidad') === 'hd' && puedeHD;
     if (hd && hayQueTumbar()) tumbar(true);
-    pintarFase();
+    comun.pintarFase();
     // la canción, en su sitio y quieta durante la cuenta
     estabaSonando = !!P.playing();
     if (estabaSonando) P.togglePlay();
@@ -1390,103 +1474,104 @@
       if (LY() && LY().tick) { try { LY().tick(desde); } catch (e) {} }
     }
     if (hd) {
-      canal = await montarCanal(captura && captura.getVideoTracks()[0], tumbado);
-      if (fase !== 'cuenta') { desmontarCanal(); return; }   // cancelado mientras tanto
-      if (!canal && tumbado) {
+      comun.canal = await montarCanal(comun.captura && comun.captura.getVideoTracks()[0], comun.tumbado);
+      if (comun.fase !== 'cuenta') { desmontarCanal(); return; }   // cancelado mientras tanto
+      if (!comun.canal && comun.tumbado) {
         tumbar(false);
         mensaje('no se pudo preparar el 1080p: se graba del tamaño de la pantalla');
       }
     }
     const ok = await cuenta(3);
-    if (!ok || fase !== 'cuenta') return;
+    if (!ok || comun.fase !== 'cuenta') return;
     el.cuenta.hidden = true;
     if (!P.playing()) P.togglePlay();
     const arranco = await esperar(() => P.playing(), 4000);
-    if (fase !== 'cuenta') return;
+    if (comun.fase !== 'cuenta') return;
     if (!arranco) { sinVideo('✕ la música no arrancó'); return; }
     await dosFrames();                      // que la cuenta ya no esté en pantalla
-    if (fase !== 'cuenta') return;
+    if (comun.fase !== 'cuenta') return;
     empezarRec();
   };
 
   const cancelarCuenta = () => {
-    if (fase !== 'cuenta') return;
-    if (cuentaCancelar) cuentaCancelar();
+    if (comun.fase !== 'cuenta') return;
+    if (comun.cuentaCancelar) comun.cuentaCancelar();
     sinVideo('');
     const P = PC();
     if (estabaSonando && P && !P.playing()) P.togglePlay();
   };
+  comun.cancelarCuenta = cancelarCuenta;
 
   // vuelta a «listo» sin vídeo (cancelado o fallido)
   const sinVideo = (txt) => {
-    fase = 'listo';
+    comun.fase = 'listo';
     el.cuenta.hidden = true;
     desmontarCanal();
     tumbar(false);
-    congelado = false;
-    marco.classList.remove('rodando');
+    comun.congelado = false;
+    comun.marco.classList.remove('rodando');
     if (VIS() && VIS().soltarSonido) VIS().soltarSonido();
-    pistaSonido = null;
+    comun.pistaSonido = null;
     medirMarco();
-    pintarFase();
+    comun.pintarFase();
     if (txt) mensaje(txt);
   };
 
   const empezarRec = () => {
-    const vt = captura && captura.getVideoTracks()[0];
+    const vt = comun.captura && comun.captura.getVideoTracks()[0];
     if (!vt || vt.readyState !== 'live') { sinVideo('✕ se dejó de compartir la pestaña'); return; }
-    const pistas = [canal ? canal.pista : vt];
-    if (pistaSonido && pistaSonido.readyState === 'live') pistas.push(pistaSonido);
+    const pistas = [comun.canal ? comun.canal.pista : vt];
+    if (comun.pistaSonido && comun.pistaSonido.readyState === 'live') pistas.push(comun.pistaSonido);
     const conSonido = pistas.length > 1;
-    mimeElegido = elegirMime(conSonido);
+    comun.mimeElegido = elegirMime(conSonido);
     const ajustes = vt.getSettings ? vt.getSettings() : {};
-    dims = canal ? { w: SALIDA_W, h: SALIDA_H } : { w: ajustes.width || geo.wd, h: ajustes.height || geo.hd };
+    comun.dims = comun.canal ? { w: SALIDA_W, h: SALIDA_H } : { w: ajustes.width || comun.geo.wd, h: ajustes.height || comun.geo.hd };
     /* 60 fps y bitrate de sobra: 1080×1920 a 60 sale a ~16 Mb/s (lo que se
        pide para subir 1080p60), y el marco de pantalla, con más por píxel
        porque tiene menos píxeles que perder cuando TikTok lo recomprima. */
-    const op = { videoBitsPerSecond: Math.round(clamp(dims.w * dims.h * 60 * (canal ? 0.13 : 0.2), 6e6, 24e6)) };
-    if (mimeElegido) op.mimeType = mimeElegido;
+    const op = { videoBitsPerSecond: Math.round(clamp(comun.dims.w * comun.dims.h * 60 * (comun.canal ? 0.13 : 0.2), 6e6, 24e6)) };
+    if (comun.mimeElegido) op.mimeType = comun.mimeElegido;
     if (conSonido) op.audioBitsPerSecond = 192000;
-    try { rec = new MediaRecorder(new MediaStream(pistas), op); }
+    try { comun.rec = new MediaRecorder(new MediaStream(pistas), op); }
     catch (e) {
-      try { rec = new MediaRecorder(new MediaStream(pistas)); mimeElegido = rec.mimeType || ''; }
+      try { comun.rec = new MediaRecorder(new MediaStream(pistas)); comun.mimeElegido = comun.rec.mimeType || ''; }
       catch (e2) { sinVideo('✕ este navegador no sabe grabar vídeo'); return; }
     }
-    if (!conSonido) planGrabado = 'no';
-    trozos = [];
-    const este = rec;
-    rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) trozos.push(ev.data); };
-    rec.onstop = () => { if (este === rec) alPararRec(); };
-    rec.onerror = (ev) => { console.warn('[9:16] el grabador falló:', ev && (ev.error || ev)); parar(); };
-    try { rec.start(1000); }                // un trozo por segundo: la memoria no pega saltos al final
-    catch (e) { rec = null; sinVideo('✕ no se pudo empezar a grabar'); return; }
-    t0 = performance.now();
-    acumPausa = 0; marcaPausa = 0; sinSonarDesde = 0;
-    pistaAlEmpezar = PC().state.currentTrack;
-    fase = 'grabando';
-    pintarFase();
+    if (!conSonido) comun.planGrabado = 'no';
+    comun.trozos = [];
+    const este = comun.rec;
+    comun.rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) comun.trozos.push(ev.data); };
+    comun.rec.onstop = () => { if (este === comun.rec) alPararRec(); };
+    comun.rec.onerror = (ev) => { console.warn('[9:16] el grabador falló:', ev && (ev.error || ev)); parar(); };
+    try { comun.rec.start(1000); }                // un trozo por segundo: la memoria no pega saltos al final
+    catch (e) { comun.rec = null; sinVideo('✕ no se pudo empezar a grabar'); return; }
+    comun.t0 = performance.now();
+    comun.acumPausa = 0; comun.marcaPausa = 0; comun.sinSonarDesde = 0;
+    comun.pistaAlEmpezar = PC().state.currentTrack;
+    comun.fase = 'grabando';
+    comun.pintarFase();
   };
 
   const tiempoGrabado = (ahora) =>
-    Math.max(0, ahora - t0 - acumPausa - (rec && rec.state === 'paused' && marcaPausa ? ahora - marcaPausa : 0));
+    Math.max(0, ahora - comun.t0 - comun.acumPausa - (comun.rec && comun.rec.state === 'paused' && comun.marcaPausa ? ahora - comun.marcaPausa : 0));
 
   /* Mientras graba: si la música se para, el vídeo también (nada de tramos
      congelados); y se corta solo al llegar a la duración elegida, al acabar
      la canción («canción») o a los 10 minutos, que es lo que admite TikTok. */
   const TOPE_MS = 10 * 60 * 1000;
   const vigilarGrabacion = (P, ahora) => {
-    if (fase !== 'grabando' || !rec) return;
+    if (comun.fase !== 'grabando' || !comun.rec) return;
     const suena = !!P.playing();
     if (!suena) {
-      if (!sinSonarDesde) sinSonarDesde = ahora;
+      if (!comun.sinSonarDesde) comun.sinSonarDesde = ahora;
       // medio segundo de margen: un tirón del reproductor no parte el vídeo
-      if (rec.state === 'recording' && ahora - sinSonarDesde > 450) {
-        try { rec.pause(); marcaPausa = ahora; } catch (e) {}
+      if (comun.rec.state === 'recording' && ahora - comun.sinSonarDesde > 450) {
+        try { comun.rec.pause(); comun.marcaPausa = ahora; } catch (e) {}
       }
     } else {
-      sinSonarDesde = 0;
-      if (rec.state === 'paused') {
-        try { rec.resume(); acumPausa += ahora - marcaPausa; marcaPausa = 0; } catch (e) {}
+      comun.sinSonarDesde = 0;
+      if (comun.rec.state === 'paused') {
+        try { comun.rec.resume(); comun.acumPausa += ahora - comun.marcaPausa; comun.marcaPausa = 0; } catch (e) {}
       }
     }
     const ms = tiempoGrabado(ahora);
@@ -1496,34 +1581,36 @@
     if (d === 'cancion') {
       // por id y no por objeto: quien pinta la canción podría rehacer la ficha
       const ahoraSuena = P.state.currentTrack;
-      const otra = !ahoraSuena || (ahoraSuena !== pistaAlEmpezar
-        && !(pistaAlEmpezar && ahoraSuena.id && ahoraSuena.id === pistaAlEmpezar.id));
+      const otra = !ahoraSuena || (ahoraSuena !== comun.pistaAlEmpezar
+        && !(comun.pistaAlEmpezar && ahoraSuena.id && ahoraSuena.id === comun.pistaAlEmpezar.id));
       if (otra) { parar(); return; }
       const dur = P.duration(), pos = P.position();
       if (dur > 0 && pos >= dur - 0.25) { parar(); return; }
     }
     const txt = 'parar · ' + fmt(ms / 1000) + (tope < TOPE_MS ? ' / ' + fmt(tope / 1000) : '')
-      + (rec.state === 'paused' ? ' · en pausa' : '');
-    if (txt !== relojT) {
-      relojT = txt;
+      + (comun.rec.state === 'paused' ? ' · en pausa' : '');
+    if (txt !== comun.relojT) {
+      comun.relojT = txt;
       el.recTxt.textContent = txt;
-      if (el.tReloj) el.tReloj.textContent = fmt(ms / 1000) + (rec.state === 'paused' ? ' ‖' : '');
+      if (el.tReloj) el.tReloj.textContent = fmt(ms / 1000) + (comun.rec.state === 'paused' ? ' ‖' : '');
     }
   };
+  comun.vigilarGrabacion = vigilarGrabacion;
 
   const parar = () => {
-    if (fase !== 'grabando' || !rec) return;
-    durGrabada = tiempoGrabado(performance.now());
-    fase = 'guardando';
-    pintarFase();
-    try { rec.stop(); } catch (e) { /* ya parado: su onstop llega igual */ }
+    if (comun.fase !== 'grabando' || !comun.rec) return;
+    comun.durGrabada = tiempoGrabado(performance.now());
+    comun.fase = 'guardando';
+    comun.pintarFase();
+    try { comun.rec.stop(); } catch (e) { /* ya parado: su onstop llega igual */ }
     // la música se para para oír el vídeo sin que suene encima
     const P = PC();
     if (P && P.playing()) P.togglePlay();
     // cinturón: si el onstop no llegara nunca, no se queda colgado aquí
-    clearTimeout(guardandoT);
-    guardandoT = setTimeout(() => { if (fase === 'guardando') alPararRec(); }, 5000);
+    clearTimeout(comun.guardandoT);
+    comun.guardandoT = setTimeout(() => { if (comun.fase === 'guardando') alPararRec(); }, 5000);
   };
+  comun.parar = parar;
 
   const limpioArchivo = (s) => String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim();
   const nombreArchivo = (t, ext) => {
@@ -1532,49 +1619,49 @@
   };
 
   const alPararRec = () => {
-    if (fase !== 'guardando') return;
-    clearTimeout(guardandoT);
-    const tipo = (rec && rec.mimeType) || mimeElegido || 'video/webm';
-    rec = null;
+    if (comun.fase !== 'guardando') return;
+    clearTimeout(comun.guardandoT);
+    const tipo = (comun.rec && comun.rec.mimeType) || comun.mimeElegido || 'video/webm';
+    comun.rec = null;
     const base = tipo.split(';')[0] || 'video/webm';
-    const blob = new Blob(trozos, { type: base });
-    trozos = [];
+    const blob = new Blob(comun.trozos, { type: base });
+    comun.trozos = [];
     if (VIS() && VIS().soltarSonido) VIS().soltarSonido();
-    pistaSonido = null;
+    comun.pistaSonido = null;
     desmontarCanal();
     tumbar(false);
-    congelado = false;
-    marco.classList.remove('rodando');
-    relojT = '';
+    comun.congelado = false;
+    comun.marco.classList.remove('rodando');
+    comun.relojT = '';
     medirMarco();
-    if (!blob.size) { fase = 'listo'; pintarFase(); mensaje('✕ el vídeo salió vacío'); return; }
+    if (!blob.size) { comun.fase = 'listo'; comun.pintarFase(); mensaje('✕ el vídeo salió vacío'); return; }
     const ext = /mp4/.test(base) ? 'mp4' : 'webm';
-    resultado = {
+    comun.resultado = {
       blob, ext,
       url: URL.createObjectURL(blob),
-      seg: durGrabada / 1000,
-      w: dims.w, h: dims.h,
-      conSonido: planGrabado !== 'no',
-      nombre: nombreArchivo(pistaAlEmpezar, ext),
+      seg: comun.durGrabada / 1000,
+      w: comun.dims.w, h: comun.dims.h,
+      conSonido: comun.planGrabado !== 'no',
+      nombre: nombreArchivo(comun.pistaAlEmpezar, ext),
       guardado: false,
     };
-    fase = 'hecho';
-    pintarFase();
+    comun.fase = 'hecho';
+    comun.pintarFase();
     mostrarResultado();
   };
 
   const mb = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
   const archivo = () => {
-    if (!resultado) return null;
-    if (!resultado.file) {
-      try { resultado.file = new File([resultado.blob], resultado.nombre, { type: resultado.blob.type }); }
-      catch (e) { resultado.file = null; }
+    if (!comun.resultado) return null;
+    if (!comun.resultado.file) {
+      try { comun.resultado.file = new File([comun.resultado.blob], comun.resultado.nombre, { type: comun.resultado.blob.type }); }
+      catch (e) { comun.resultado.file = null; }
     }
-    return resultado.file;
+    return comun.resultado.file;
   };
 
   const mostrarResultado = () => {
-    const r = resultado;
+    const r = comun.resultado;
     el.vista.src = r.url;
     el.vista.hidden = false;
     try { el.vista.currentTime = 0; } catch (e) {}
@@ -1589,63 +1676,96 @@
   };
 
   const guardar = () => {
-    if (!resultado) return;
+    if (!comun.resultado) return;
     const a = document.createElement('a');
-    a.href = resultado.url;
-    a.download = resultado.nombre;
+    a.href = comun.resultado.url;
+    a.download = comun.resultado.nombre;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    resultado.guardado = true;
-    mensaje('⤓ guardado en tus descargas · «' + resultado.nombre + '»');
+    comun.resultado.guardado = true;
+    mensaje('⤓ guardado en tus descargas · «' + comun.resultado.nombre + '»');
   };
+  comun.guardar = guardar;
 
   const compartir = async () => {
     const f = archivo();
     if (!f || !navigator.share) return;
     try {
-      await navigator.share({ files: [f], title: resultado.nombre });
-      resultado.guardado = true;
+      await navigator.share({ files: [f], title: comun.resultado.nombre });
+      comun.resultado.guardado = true;
     } catch (e) {
       if (!e || e.name !== 'AbortError') mensaje('✕ no se pudo compartir · guárdalo y súbelo desde el archivo');
     }
   };
+  comun.compartir = compartir;
 
   const descartar = (callado) => {
-    if (!resultado) { if (!callado && fase === 'hecho') { fase = 'listo'; pintarFase(); } return; }
+    if (!comun.resultado) { if (!callado && comun.fase === 'hecho') { comun.fase = 'listo'; comun.pintarFase(); } return; }
     try { el.vista.pause(); } catch (e) {}
     el.vista.removeAttribute('src');
     try { el.vista.load(); } catch (e) {}
     el.vista.hidden = true;
-    URL.revokeObjectURL(resultado.url);
-    resultado = null;
-    if (fase === 'hecho') fase = 'listo';
-    if (!callado) pintarFase();
+    URL.revokeObjectURL(comun.resultado.url);
+    comun.resultado = null;
+    if (comun.fase === 'hecho') comun.fase = 'listo';
+    if (!callado) comun.pintarFase();
   };
+  comun.descartar = descartar;
+})();
+/* ==========================================================
+   EL CINE Y EL VÍDEO 9:16 · el arranque (js/cine/arranque.js)
+
+   Va el ÚLTIMO de js/cine/: lo que enseña el panel en cada fase, el
+   teclado y las puertas (los botones que abren el cine y el vídeo, y la
+   API pública). Reparto: ver escenario.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.cine;
+  const {
+    $, PC, libre, puedeGrabar, videoDisponible, OPC, pref, guardarPref, el, enCine, medirMarco,
+    abrir, cerrar, pintarGuias, elegir, despertar, pintarInfo, buscarEstribillo, alternarGrabar
+  } = comun;
+
+  window.addEventListener('resize', () => {
+    if (!comun.abierto || comun.medirPendiente) return;
+    comun.medirPendiente = true;
+    requestAnimationFrame(() => { comun.medirPendiente = false; medirMarco(); });
+  }, { passive: true });
+  document.addEventListener('fullscreenchange', () => {
+    if (!comun.abierto) return;
+    if (!document.fullscreenElement) comun.entreFull = false;
+    if (el.full) el.full.classList.toggle('on', !!document.fullscreenElement);
+    if (!enCine()) return;
+    if (document.fullscreenElement) comun.cineFull = true;
+    else if (comun.cineFull) { comun.cineFull = false; cerrar(); }
+  });
 
   // ---------- Lo que enseña el panel en cada fase ----------
   const pintarFase = () => {
-    if (!raiz) return;
-    raiz.dataset.fase = fase;
-    raiz.classList.toggle('grabando', fase === 'grabando');
+    if (!comun.raiz) return;
+    comun.raiz.dataset.fase = comun.fase;
+    comun.raiz.classList.toggle('grabando', comun.fase === 'grabando');
     const P = PC();
     const hay = !!(P && P.state && P.state.currentTrack);
     let ico = 'grabar', txt = 'grabar', off = false;
-    if (fase === 'listo') off = !puedeGrabar || !hay;
-    else if (fase === 'pidiendo') { txt = 'esperando permiso…'; off = true; }
-    else if (fase === 'cuenta') { ico = 'parar'; txt = 'cancelar'; }
-    else if (fase === 'grabando') { ico = 'parar'; txt = 'parar · 0:00'; }
-    else if (fase === 'guardando') { ico = 'parar'; txt = 'guardando…'; off = true; }
-    else if (fase === 'hecho') txt = 'grabar otro';
+    if (comun.fase === 'listo') off = !puedeGrabar || !hay;
+    else if (comun.fase === 'pidiendo') { txt = 'esperando permiso…'; off = true; }
+    else if (comun.fase === 'cuenta') { ico = 'parar'; txt = 'cancelar'; }
+    else if (comun.fase === 'grabando') { ico = 'parar'; txt = 'parar · 0:00'; }
+    else if (comun.fase === 'guardando') { ico = 'parar'; txt = 'guardando…'; off = true; }
+    else if (comun.fase === 'hecho') txt = 'grabar otro';
     el.recIco.className = 'ico ico-' + ico + ' v916-rec-ico';
     el.recTxt.textContent = txt;
     el.rec.disabled = off;
-    el.rec.title = fase === 'grabando' ? 'Parar (R o Esc)' : 'Grabar el marco (R)';
-    el.hecho.hidden = fase !== 'hecho';
-    if (fase !== 'hecho') el.vista.hidden = true;
+    el.rec.title = comun.fase === 'grabando' ? 'Parar (R o Esc)' : 'Grabar el marco (R)';
+    el.hecho.hidden = comun.fase !== 'hecho';
+    if (comun.fase !== 'hecho') el.vista.hidden = true;
     pintarGuias();
     pintarInfo();
   };
+  comun.pintarFase = pintarFase;
 
   // ---------- Teclado ----------
   /* Mientras está abierto, casi todas las teclas de la app se quedan aquí:
@@ -1657,7 +1777,7 @@
   window.addEventListener('keydown', (e) => {
     // con una ventana de la casa abierta (js/dialogo.js), las teclas son suyas
     if (window.MMDialogo && window.MMDialogo.abierto()) return;
-    if (!abierto) {
+    if (!comun.abierto) {
       // V abre el modo (si la tecla es de la app y no de un cuadro de texto)
       if (videoDisponible && (e.key === 'v' || e.key === 'V') && !e.repeat && libre(e)) {
         e.preventDefault();
@@ -1706,7 +1826,7 @@
 
   // Si algo cambia de pestaña por debajo, la letra vuelve a su sitio.
   document.addEventListener('mm:tab', (e) => {
-    if (!abierto) return;
+    if (!comun.abierto) return;
     const t = e.detail && e.detail.tab;
     if (t && t !== 'lyrics' && window.MMNav) window.MMNav.ir('lyrics');
   });
@@ -1714,7 +1834,7 @@
   // Recargar o cerrar la pestaña a media grabación (o con el vídeo sin
   // guardar) lo pregunta el propio navegador.
   window.addEventListener('beforeunload', (e) => {
-    if (fase === 'grabando' || fase === 'cuenta' || fase === 'guardando' || (resultado && !resultado.guardado)) {
+    if (comun.fase === 'grabando' || comun.fase === 'cuenta' || comun.fase === 'guardando' || (comun.resultado && !comun.resultado.guardado)) {
       e.preventDefault();
       e.returnValue = '';
     }
@@ -1735,26 +1855,26 @@
     // con estilo ('app' | 'vinilo' | 'letra') abre ya en ese (lo usa el buscador)
     abrir: (estilo) => {
       if (OPC.cineEstilo.vals.includes(estilo)) {
-        if (abierto && enCine()) { elegir('cineEstilo', estilo); return; }
+        if (comun.abierto && enCine()) { elegir('cineEstilo', estilo); return; }
         guardarPref('cineEstilo', estilo);
       }
       abrir('cine');
     },
-    cerrar: () => { if (abierto && enCine()) cerrar(); },
-    esta: () => abierto && enCine(),
+    cerrar: () => { if (comun.abierto && enCine()) cerrar(); },
+    esta: () => comun.abierto && enCine(),
     estilo: () => pref('cineEstilo'),
   };
 
   window.MMVertical = {
     abrir: () => abrir('video'),
     cerrar,
-    abierto: () => abierto,
+    abierto: () => comun.abierto,
     // ¿existe el vídeo 9:16 aquí? Solo en la copia local (ver `videoDisponible`)
     disponible: () => videoDisponible,
-    cine: () => abierto && enCine(),
+    cine: () => comun.abierto && enCine(),
     // el marco tumbado para grabar en 1080p: js/fondo.js deshace el giro al medir
-    giro: () => (tumbado ? -90 : 0),
-    grabando: () => fase === 'grabando' || fase === 'cuenta',
+    giro: () => (comun.tumbado ? -90 : 0),
+    grabando: () => comun.fase === 'grabando' || comun.fase === 'cuenta',
     // para las pruebas: el cálculo del estribillo, sin montar nada
     estribillo: buscarEstribillo,
   };

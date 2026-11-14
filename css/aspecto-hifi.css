@@ -99,7 +99,7 @@ html[data-aspecto="hifi"] .tb-btn {
   color: #c8cdd3;
 }
 /* `--tumbado-resto`: teléfono tumbado, lo que no es carátula a lo alto de
-   la columna (ver style.css); medido con la ficha y las barras de hi-fi */
+   la columna (ver css/base/); medido con la ficha y las barras de hi-fi */
 html[data-aspecto="hifi"] .main-grid { gap: 14px; padding: 6px 16px 8px; --tumbado-resto: 222px; }
 html[data-aspecto="hifi"] .cover-frame {
   padding: 7px;

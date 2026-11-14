@@ -2,8 +2,34 @@
    SEVEN.FM — orchestration: tabs, themes, clock, track list,
    cover art mirroring, status bar
    ========================================================== */
+/* ==========================================================
+   LA INTERFAZ · la navegación (js/seven/navegacion.js)
+
+   Lo que fue js/seven.js (1.680 líneas) vive ahora en js/seven/, en
+   cinco archivos que se cargan seguidos y en este orden:
+
+   navegacion.js — un solo sitio que cambia de pestaña (window.MMNav).
+   colores.js — el tema de color, el segundo tono, el acento que sale de
+   la carátula y la escalera de texto.
+   interfaz.js — los ajustes guardados, el reloj, la marquesina, la letra
+   ancha, la barra de pestañas que se esconde, el vinilo y la barra de
+   estado.
+   cola.js — la pestaña de la cola, «sonando desde» y elegir una canción
+   de la lista.
+   ventana.js — el tamaño de la ventana y maximizar, los botones de la
+   barra de título, teclas, las notas flotantes y el globo del minuto.
+
+   Comparten lo que hace falta por la bolsa `comun`
+   (window.MMInterno.seven): lo que cambia y usan varios archivos es
+   `comun.x`; las funciones y constantes de un archivo anterior se
+   recogen arriba de cada archivo.
+   ========================================================== */
 (() => {
   'use strict';
+
+  /* Lo que comparten entre sí los archivos de js/seven/ (uso interno). */
+  window.MMInterno = window.MMInterno || {};
+  const comun = window.MMInterno.seven = {};
 
   /* ==========================================================
      NAVEGACIÓN · UN SOLO SITIO QUE CAMBIA DE PESTAÑA
@@ -20,12 +46,12 @@
      la pestaña anterior, y `window.MMNav` es la puerta para los demás
      módulos: pulsar algo te LLEVA a donde ese algo pasa.
      ========================================================== */
-  const tabs = document.querySelectorAll('.tab');
+  const tabs = comun.tabs = document.querySelectorAll('.tab');
   const contents = document.querySelectorAll('.tab-content');
 
   // Cómo se llama cada pestaña cuando hay que decirlo en una frase
   // («◂ volver a la letra», «▣ guardado · ver en la cola»).
-  const NOMBRE_TAB = {
+  const NOMBRE_TAB = comun.NOMBRE_TAB = {
     lyrics:   'la letra',
     search:   'buscar',
     library:  'tus listas',
@@ -46,8 +72,9 @@
     const t = document.querySelector('.tab.active');
     return t ? t.dataset.tab : '';
   };
+  comun.cualTab = cualTab;
 
-  let tabAnterior = '';
+  comun.tabAnterior = '';
 
   const activarTab = (nombre) => {
     const destino = [...tabs].find(x => x.dataset.tab === nombre);
@@ -55,14 +82,14 @@
     const previa = cualTab();
     // Ya estás ahí: no se pisa la vuelta con la pestaña actual
     if (previa === nombre) return true;
-    if (previa) tabAnterior = previa;
+    if (previa) comun.tabAnterior = previa;
     tabs.forEach(x => {
       const on = x === destino;
       x.classList.toggle('active', on);
       x.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     contents.forEach(c => c.classList.toggle('active', c.id === 'tab-' + nombre));
-    if (nombre === 'queue') renderQueue();   // refresco inmediato al abrir la cola
+    if (nombre === 'queue') comun.renderQueue();   // refresco inmediato al abrir la cola
     if (nombre === 'library' && window.LibraryModule) window.LibraryModule.open();
     if (nombre === 'stats' && window.StatsModule) window.StatsModule.open();
     if (nombre === 'search') {               // foco directo al buscador
@@ -74,39 +101,24 @@
     document.dispatchEvent(new CustomEvent('mm:tab', { detail: { tab: nombre, desde: previa } }));
     return true;
   };
+  comun.activarTab = activarTab;
 
-  const volverTab = () => activarTab(tabAnterior || 'lyrics');
+  const volverTab = () => activarTab(comun.tabAnterior || 'lyrics');
+  comun.volverTab = volverTab;
+})();
+/* ==========================================================
+   LA INTERFAZ · los colores (js/seven/colores.js)
 
-  tabs.forEach(t => {
-    t.addEventListener('click', () => {
-      /* El engranaje es un INTERRUPTOR: pulsarlo DENTRO de configuración
-         te devuelve de donde viniste. Antes no hacía nada, y quedarse
-         pulsando el mismo botón sin respuesta es exactamente la sensación
-         de estar atrapado que había que quitar. */
-      if (t.dataset.tab === 'settings' && cualTab() === 'settings') { volverTab(); return; }
-      activarTab(t.dataset.tab);
-    });
-  });
-
-  /* La puerta para el resto de los módulos. `ir` no falla en silencio:
-     devuelve false si esa pestaña no existe. */
-  window.MMNav = {
-    ir: activarTab,
-    actual: cualTab,
-    anterior: () => tabAnterior,
-    volver: volverTab,
-    nombre: (n) => NOMBRE_TAB[n] || n,
-    /* «volver a el historial» era lo que salía escrito en el botón de
-       config: el nombre se pegaba a una «a» suelta y en español `a + el`
-       es `al`. Lo arregla quien construye la frase, no quien la dice. */
-    hacia: (n) => {
-      const d = NOMBRE_TAB[n] || n;
-      return d.startsWith('el ') ? 'al ' + d.slice(3) : 'a ' + d;
-    },
-  };
+   El tema de color (preajustes y selectores), el segundo tono de la
+   paleta, el acento automático desde la carátula y la escalera de texto
+   que garantiza el contraste. Reparto de js/seven/: ver navegacion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.seven;
 
   // ---------- Color theme (presets + custom pickers) ----------
-  const STORAGE_KEYS = {
+  const STORAGE_KEYS = comun.STORAGE_KEYS = {
     THEME: 'mm_theme',
     ACCENT: 'mm_accent_custom',
     ACCENT_MODE: 'mm_accent_mode',   // 'auto' (de la carátula) | 'manual'
@@ -116,7 +128,7 @@
   };
 
   const root = document.documentElement;
-  const body = document.body;
+  const body = comun.body = document.body;
 
   const applyAccent = (hex) => {
     body.removeAttribute('data-theme');
@@ -125,6 +137,7 @@
     root.style.setProperty('--accent-dim', darken(hex, 0.5));
     applyBordersFromAccent(hex);
   };
+  comun.applyAccent = applyAccent;
 
   const applyTheme = (name) => {
     body.dataset.theme = name;
@@ -139,6 +152,7 @@
       applyBordersFromAccent(computed);
     }, 0);
   };
+  comun.applyTheme = applyTheme;
 
   /* Saca los 4 tonos de borde (hi / light / pixel / dark) del acento, apagado
      hacia el fondo para que los bordes parezcan marcos y no neones.
@@ -220,18 +234,19 @@
   const applyText = (hex) => {
     root.style.setProperty('--text', hex);
   };
+  comun.applyText = applyText;
 
   // ---------- Acento automático desde la carátula ----------
   // En modo 'auto' el color de acento (letra activa, bordes, botones)
   // sale de la carátula de cada canción. Elegir un swatch o color
   // personalizado pasa a 'manual'; el swatch AUTO vuelve a activarlo.
-  let accentMode = localStorage.getItem(STORAGE_KEYS.ACCENT_MODE)
+  comun.accentMode = localStorage.getItem(STORAGE_KEYS.ACCENT_MODE)
     || ((localStorage.getItem(STORAGE_KEYS.THEME) || localStorage.getItem(STORAGE_KEYS.ACCENT)) ? 'manual' : 'auto');
   let lastCoverAccent = null;
 
   const applyAccentFromCover = (hex, hex2) => {
     lastCoverAccent = hex;
-    if (accentMode !== 'auto') return;
+    if (comun.accentMode !== 'auto') return;
     applyAccent(hex); // solo pinta; no persiste como elección manual
     // el segundo color de la carátula, para la luz de borde
     if (hex2) root.style.setProperty('--color-2', hex2);
@@ -239,7 +254,7 @@
 
   const resetAccentFromCover = () => {
     lastCoverAccent = null;
-    if (accentMode !== 'auto') return;
+    if (comun.accentMode !== 'auto') return;
     applyTheme('cyan');
   };
 
@@ -271,6 +286,7 @@
     root.style.setProperty('--dyn-2', hex);
     applyPanelsFromBase(hex);
   };
+  comun.applyBgManual = applyBgManual;
 
   const applyBgAuto = () => {
     body.classList.remove('bg-manual');
@@ -383,8 +399,9 @@
     presetSwatches.forEach(s => s.classList.toggle('active', s.dataset.color === color));
     if (accentAutoBtn) accentAutoBtn.classList.toggle('active', color === 'auto');
   };
+  comun.updateActiveSwatch = updateActiveSwatch;
   const setAccentManual = () => {
-    accentMode = 'manual';
+    comun.accentMode = 'manual';
     localStorage.setItem(STORAGE_KEYS.ACCENT_MODE, 'manual');
   };
   presetSwatches.forEach(s => {
@@ -399,7 +416,7 @@
   });
 
   // Custom accent picker
-  const customAccent = document.getElementById('customAccent');
+  const customAccent = comun.customAccent = document.getElementById('customAccent');
   customAccent.addEventListener('input', (e) => {
     const hex = e.target.value;
     setAccentManual();
@@ -412,7 +429,7 @@
   // Swatch AUTO: el acento sigue a la carátula de cada canción
   if (accentAutoBtn) {
     accentAutoBtn.addEventListener('click', () => {
-      accentMode = 'auto';
+      comun.accentMode = 'auto';
       localStorage.setItem(STORAGE_KEYS.ACCENT_MODE, 'auto');
       localStorage.removeItem(STORAGE_KEYS.THEME);
       localStorage.removeItem(STORAGE_KEYS.ACCENT);
@@ -423,10 +440,10 @@
   }
 
   // Background mode
-  const bgAuto = document.getElementById('bgAuto');
-  const bgManual = document.getElementById('bgManual');
+  const bgAuto = comun.bgAuto = document.getElementById('bgAuto');
+  const bgManual = comun.bgManual = document.getElementById('bgManual');
   const bgPresets = document.querySelectorAll('.bg-preset');
-  const customBg = document.getElementById('customBg');
+  const customBg = comun.customBg = document.getElementById('customBg');
 
   bgAuto.addEventListener('change', () => {
     if (bgAuto.checked) {
@@ -448,6 +465,7 @@
   const marcarBg = (hex) => {
     bgPresets.forEach(s => s.classList.toggle('active', !!hex && s.dataset.bg === hex));
   };
+  comun.marcarBg = marcarBg;
   bgPresets.forEach(b => {
     b.addEventListener('click', () => {
       const hex = b.dataset.bg;
@@ -472,7 +490,7 @@
 
   // Text color presets + custom
   const textPresets = document.querySelectorAll('.text-preset');
-  const customText = document.getElementById('customText');
+  const customText = comun.customText = document.getElementById('customText');
   /* Elegir color de texto a mano congela la escalera automática: a partir de
      aquí manda el usuario y la carátula ya no toca --text-dim/--text-muted. */
   const setTextManual = (hex) => {
@@ -485,6 +503,7 @@
   const marcarTexto = (hex) => {
     textPresets.forEach(s => s.classList.toggle('active', !!hex && s.dataset.text === hex));
   };
+  comun.marcarTexto = marcarTexto;
   textPresets.forEach(b => {
     b.addEventListener('click', () => {
       const hex = b.dataset.text;
@@ -520,7 +539,7 @@
     const initial = parseFloat(localStorage.getItem('mm_lyrics_offset') || '0') || 0;
     paint(initial);
     // cada canción tiene su propio offset guardado; al cambiar de pista,
-    // lyrics.js avisa con este evento para que el slider muestre el suyo
+    // js/letra/ avisa con este evento para que el slider muestre el suyo
     window.addEventListener('mm:lyrics-offset', (e) => {
       paint(Math.max(-5, Math.min(5, +e.detail || 0)));
     });
@@ -545,7 +564,7 @@
     root.style.removeProperty('--dyn-1');
     root.style.removeProperty('--dyn-2');
     resetPanels();
-    accentMode = 'auto'; // por defecto el acento sigue a la carátula
+    comun.accentMode = 'auto'; // por defecto el acento sigue a la carátula
     textMode = 'auto';   // y el texto también
     if (lastCoverAccent) applyAccent(lastCoverAccent);
     else applyTheme('cyan');
@@ -562,6 +581,23 @@
     customText.value = '#e8ecff';
     if (window.SevenStatus) window.SevenStatus('▣ colores como de fábrica · siguen a la carátula');
   });
+})();
+/* ==========================================================
+   LA INTERFAZ · lo que rodea a la música (js/seven/interfaz.js)
+
+   Reponer los ajustes guardados, el reloj, la carátula reflejada, la
+   marquesina, la letra ancha ◧, la barra de pestañas que se esconde
+   sola, el modo vinilo y la barra de estado. Reparto de js/seven/: ver
+   navegacion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.seven;
+  const {
+    cualTab, activarTab, STORAGE_KEYS, body, applyAccent, applyTheme, applyText, applyBgManual,
+    updateActiveSwatch, customAccent, bgAuto, bgManual, customBg, marcarBg, customText,
+    marcarTexto
+  } = comun;
 
   // ---------- Restore saved settings ----------
   const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME);
@@ -570,7 +606,7 @@
   const savedBgColor = localStorage.getItem(STORAGE_KEYS.BG_COLOR);
   const savedText = localStorage.getItem(STORAGE_KEYS.TEXT);
 
-  if (accentMode === 'auto') {
+  if (comun.accentMode === 'auto') {
     // El acento vendrá de la carátula; cyan de arranque mientras carga
     applyTheme('cyan');
     updateActiveSwatch('auto');
@@ -687,8 +723,8 @@
      El botón vive con ✦ y ⛶ —las otras dos formas de ver— y no en el
      panel de la letra, que se queda limpio.
      ========================================================== */
-  const anchoBtn = document.getElementById('anchoBtn');
-  const npChip = document.getElementById('npChip');
+  const anchoBtn = comun.anchoBtn = document.getElementById('anchoBtn');
+  const npChip = comun.npChip = document.getElementById('npChip');
   const npChipCover = document.getElementById('npChipCover');
   const npChipTitle = document.getElementById('npChipTitle');
   const npChipArtist = document.getElementById('npChipArtist');
@@ -765,10 +801,7 @@
                             : '▣ vista normal');
     }
   };
-
-  if (anchoBtn) anchoBtn.addEventListener('click', alternarAncho);
-  // el chip ES la columna recogida: pulsarlo la devuelve
-  if (npChip) npChip.addEventListener('click', alternarAncho);
+  comun.alternarAncho = alternarAncho;
   aplicarAncho(localStorage.getItem(ANCHO_KEY) === 'true');
 
   /* ---------- Barra de pestañas que se esconde sola ----------
@@ -894,6 +927,7 @@
     montarMarquesinas();
     updateStatus(`♪ ${t.name} — ${t.artist || 'desconocido'}`, true);
   };
+  comun.updateCover = updateCover;
 
   // Watch the title element — every time it changes, refresh cover & album
   const obs = new MutationObserver(updateCover);
@@ -980,6 +1014,7 @@
       statusText.textContent = textoReposo();
     }, 4000);
   };
+  comun.updateStatus = updateStatus;
   window.SevenStatus = updateStatus;
 
   /* Se repinta al cambiar de canción y al dar a play/pausa. El sondeo de
@@ -1002,18 +1037,33 @@
      HTML y la función se quedó dando vueltas cada 500 ms buscándolo (y
      cancelándose sola en la primera vuelta). Tu música ya tiene un sitio de
      verdad: la colección «mi música» de la pestaña de listas, en
-     js/library.js, que además se puede filtrar, encolar y ordenar.
+     js/biblioteca/, que además se puede filtrar, encolar y ordenar.
 
      escapeHtml y formatTime se quedan: los usa la cola, aquí abajo. */
   const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
+  comun.escapeHtml = escapeHtml;
   const formatTime = (s) => {
     if (!isFinite(s) || s < 0) return '0:00';
     const m = Math.floor(s / 60);
     const sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
+  comun.formatTime = formatTime;
+})();
+/* ==========================================================
+   LA INTERFAZ · la cola (js/seven/cola.js)
+
+   La pestaña «cola», el «sonando desde» y elegir una canción de la lista
+   para que suene. Reparto de js/seven/: ver navegacion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.seven;
+  const {
+    updateStatus, escapeHtml, formatTime
+  } = comun;
 
   // ---------- Cola de reproducción (pestaña "cola") ----------
   const queueList = document.getElementById('queueList');
@@ -1035,7 +1085,7 @@
 
   /* Las pistas que hay pintadas ahora mismo, en el mismo orden que las filas.
      La fila guarda solo su número (`data-idx`) y el objeto entero vive aquí:
-     es como lo hacen buscar (spotify.js) y biblioteca (library.js), y evita
+     es como lo hacen buscar (js/spotify/) y biblioteca (js/biblioteca/), y evita
      tener que meter la uri y la portada dentro de un atributo HTML. */
   let filasCola = [];
 
@@ -1186,7 +1236,7 @@
         } else {
           /* El 404 decía «abre spotify (premium) y dale a reproducir» aunque
              la música sonara en esta misma pestaña. El motivo lo cuenta ahora
-             spotify.js, que sabe si el reproductor de aquí está listo. */
+             js/spotify/, que sabe si el reproductor de aquí está listo. */
           if (!/Spotify API/.test(msg)) console.warn('[Cola] fallo:', msg);
           const S = window.SpotifyModule;
           txt = (S && S.explicar)
@@ -1218,6 +1268,7 @@
                 + botonBuscar('buscar música') + '</span>'));
     pintarDesde();
   };
+  comun.renderQueue = renderQueue;
 
   /* ---------- «Sonando desde» ----------
      La cola dice QUÉ viene después; esto dice DE DÓNDE sale. Sin las dos
@@ -1387,7 +1438,7 @@
      **429 Too Many Requests** a TODO, incluidas las playlists — que entonces
      salían vacías, como si estuvieran bloqueadas. A 6 s la cola sigue estando
      al día (nadie mira una cola a cronómetro) por la cuarta parte del gasto.
-     Ver también el freno del 429 en js/spotify.js. */
+     Ver también el freno del 429 en js/spotify/. */
   setInterval(() => {
     if (document.hidden) return;
     const tab = document.getElementById('tab-queue');
@@ -1401,6 +1452,52 @@
     const tab = document.getElementById('tab-queue');
     if (tab && tab.classList.contains('active')) renderQueue();
   };
+})();
+/* ==========================================================
+   LA INTERFAZ · la ventana (js/seven/ventana.js)
+
+   El tamaño de la ventana (redimensionar, maximizar y recordarlo), los
+   botones de la barra de título, las teclas de más, las notas flotantes
+   del panel de la letra, el globo con el minuto sobre el progreso y la
+   bienvenida. Reparto de js/seven/: ver navegacion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.seven;
+  const {
+    tabs, NOMBRE_TAB, cualTab, activarTab, volverTab, anchoBtn, npChip, alternarAncho,
+    updateCover, updateStatus, formatTime
+  } = comun;
+
+  tabs.forEach(t => {
+    t.addEventListener('click', () => {
+      /* El engranaje es un INTERRUPTOR: pulsarlo DENTRO de configuración
+         te devuelve de donde viniste. Antes no hacía nada, y quedarse
+         pulsando el mismo botón sin respuesta es exactamente la sensación
+         de estar atrapado que había que quitar. */
+      if (t.dataset.tab === 'settings' && cualTab() === 'settings') { volverTab(); return; }
+      activarTab(t.dataset.tab);
+    });
+  });
+  /* La puerta para el resto de los módulos. `ir` no falla en silencio:
+     devuelve false si esa pestaña no existe. */
+  window.MMNav = {
+    ir: activarTab,
+    actual: cualTab,
+    anterior: () => comun.tabAnterior,
+    volver: volverTab,
+    nombre: (n) => NOMBRE_TAB[n] || n,
+    /* «volver a el historial» era lo que salía escrito en el botón de
+       config: el nombre se pegaba a una «a» suelta y en español `a + el`
+       es `al`. Lo arregla quien construye la frase, no quien la dice. */
+    hacia: (n) => {
+      const d = NOMBRE_TAB[n] || n;
+      return d.startsWith('el ') ? 'al ' + d.slice(3) : 'a ' + d;
+    },
+  };
+  if (anchoBtn) anchoBtn.addEventListener('click', alternarAncho);
+  // el chip ES la columna recogida: pulsarlo la devuelve
+  if (npChip) npChip.addEventListener('click', alternarAncho);
 
   // ---------- Tamaño de la ventana (redimensionable + maximizar) ----------
   const winEl = document.querySelector('.window');
@@ -1430,7 +1527,7 @@
      guardado del escritorio, peleándose con las reglas de móvil de la hoja.
      Se mira el lado CORTO (que en un teléfono es siempre el pequeño, gírese
      como se gire) y, como en js/perf.js, también si el puntero es grueso. */
-  const CORTE_MOVIL = 760;   // el mismo del @media de style.css
+  const CORTE_MOVIL = 760;   // el mismo del @media de css/base/
   const esMovil = () => {
     try { if (window.matchMedia('(pointer: coarse)').matches) return true; } catch (_) {}
     return Math.min(window.innerWidth, window.innerHeight) <= CORTE_MOVIL;

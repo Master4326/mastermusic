@@ -8,7 +8,7 @@
    los relojes se atrasan.
 
    Esta es la misma ventana que ya tenía «conectar con spotify» (las clases
-   .cid-* de style.css): barra con los puntos del acento, la paleta viva y
+   .cid-* de css/base/): barra con los puntos del acento, la paleta viva y
    los botones de la casa. No bloquea nada; devuelve una promesa.
 
      MMDialogo.confirmar({ titulo, texto, detalle, si, no }) → Promise<boolean>

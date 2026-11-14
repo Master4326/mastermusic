@@ -11,32 +11,52 @@
    AudioContext. Si algo falla, se captura y el audio sigue sonando
    por la ruta normal del navegador — nunca se silencia.
    ========================================================== */
+/* ==========================================================
+   EL ESPECTRO · de dónde sale el sonido (js/espectro/sonido.js)
+
+   Lo que fue js/visualizer.js vive ahora en js/espectro/, en dos
+   archivos que se cargan seguidos:
+
+   sonido.js — el grafo de Web Audio, el analizador para el detector de
+   ritmo, el lienzo, los colores, el display VFD, las magnitudes del
+   espectro y el modo sync (el audio del sistema).
+   pintar.js — el mini-EQ de la barra de estado, el bucle que pinta, el
+   tiempo en 7 segmentos y la API pública.
+
+   Comparten lo que hace falta por la bolsa `comun`
+   (window.MMInterno.espectro).
+   ========================================================== */
 (() => {
   'use strict';
 
-  const canvas = document.getElementById('visualizer');
+  /* Lo que comparten entre sí los dos archivos de js/espectro/. Uso interno:
+     desde fuera se habla con window.VisualizerModule (lo arma pintar.js). */
+  window.MMInterno = window.MMInterno || {};
+  const comun = window.MMInterno.espectro = {};
+
+  const canvas = comun.canvas = document.getElementById('visualizer');
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
+  const ctx = comun.ctx = canvas.getContext('2d');
 
   // ---- Web Audio state ----
-  let audioCtx = null, analyser = null, source = null, freqData = null;
-  let connected = false, attaching = false;
+  comun.audioCtx = null; let analyser = null; comun.source = null; comun.freqData = null;
+  comun.connected = false; let attaching = false;
   // Captura del audio del sistema (modo sync, para Spotify Connect)
-  let capStream = null, capSource = null, capAnalyser = null;
-  /* El sonido de «grabar esta pestaña» del vídeo 9:16 (js/vertical.js): lo
+  comun.capStream = null; comun.capSource = null; let capAnalyser = null;
+  /* El sonido de «grabar esta pestaña» del vídeo 9:16 (js/cine/): lo
      que se oye (recSrc → recAnalyser/recDet, para que el fondo baile) y la
      rama que va al vídeo (recOrigen → recGain → recDest). Ver «EL SONIDO
      DEL VÍDEO 9:16», más abajo. Arriba del todo para que nadie las use
      antes de declararlas. */
-  let recSrc = null, recAnalyser = null, recDet = null;
-  let recDest = null, recGain = null, recOrigen = null, recVolT = null;
+  comun.recSrc = null; comun.recAnalyser = null; comun.recDet = null;
+  comun.recDest = null; comun.recGain = null; comun.recOrigen = null; comun.recVolT = null;
 
   /* ---- Analizador CRUDO, solo para el detector de ritmo (js/beat.js) ----
      Va aparte del que dibuja. Aquel suaviza a propósito (0.82) para que las
      barras no tiemblen, pero ESE suavizado se come el ataque del bombo: un
      golpe seco llega convertido en una loma. El detector necesita la señal
      tal cual entra, así que tiene su propio nodo con suavizado 0. */
-  let detAnalyser = null, capDet = null, detSink = null;
+  comun.detAnalyser = null; comun.capDet = null; let detSink = null;
   const crearDetector = (ac) => {
     const a = ac.createAnalyser();
     a.fftSize = FFT_SIZE;
@@ -45,21 +65,24 @@
     a.maxDecibels = -6;
     return a;
   };
+  comun.crearDetector = crearDetector;
 
   /* Suavizados en TIEMPO REAL, no por frame: la misma caída se ve igual a
      30, 60 o 165 Hz. Ver la explicación larga en js/perf.js. */
   const K = (k60, dt) => (window.MMPerf ? window.MMPerf.k(k60, dt) : k60);
+  comun.K = K;
   const F60 = (dt) => (window.MMPerf ? window.MMPerf.frames60(dt) : 1);
-  const DT_NOMINAL = 1000 / 60;
+  comun.F60 = F60;
+  const DT_NOMINAL = comun.DT_NOMINAL = 1000 / 60;
 
   const NUM_BARS = 64;
-  const FFT_SIZE = 2048;
-  const smooth  = new Array(NUM_BARS).fill(0);
-  const peaks   = new Array(NUM_BARS).fill(0);
-  const peakVel = new Array(NUM_BARS).fill(0);
+  const FFT_SIZE = comun.FFT_SIZE = 2048;
+  const smooth  = comun.smooth = new Array(NUM_BARS).fill(0);
+  const peaks   = comun.peaks = new Array(NUM_BARS).fill(0);
+  const peakVel = comun.peakVel = new Array(NUM_BARS).fill(0);
 
   // ---- Canvas sizing (nítido en pantallas HiDPI) ----
-  let W = 0, H = 0, dpr = 1;
+  comun.W = 0; comun.H = 0; let dpr = 1;
   const sizeCanvas = () => {
     const rect = canvas.getBoundingClientRect();
     /* TOPE de resolución. Un teléfono moderno da devicePixelRatio 3, así
@@ -68,10 +91,10 @@
        siguen viéndose nítidas y cuesta la cuarta parte. */
     const tope = window.MMPerf && window.MMPerf.movil() ? 1.5 : 2;
     dpr = Math.min(tope, Math.max(1, window.devicePixelRatio || 1));
-    W = Math.max(120, Math.floor(rect.width));
-    H = Math.max(60, Math.floor(rect.height));
-    canvas.width = Math.floor(W * dpr);
-    canvas.height = Math.floor(H * dpr);
+    comun.W = Math.max(120, Math.floor(rect.width));
+    comun.H = Math.max(60, Math.floor(rect.height));
+    canvas.width = Math.floor(comun.W * dpr);
+    canvas.height = Math.floor(comun.H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
   sizeCanvas();
@@ -129,6 +152,7 @@
     };
     return paleta;
   };
+  comun.colores = colores;
   const toRgb = (hex) => {
     if (hex.startsWith('rgb')) { const m = hex.match(/\d+/g); return { r: +m[0], g: +m[1], b: +m[2] }; }
     let c = hex.replace('#', '');
@@ -136,6 +160,7 @@
     return { r: parseInt(c.substr(0, 2), 16), g: parseInt(c.substr(2, 2), 16), b: parseInt(c.substr(4, 2), 16) };
   };
   const rgba = ({ r, g, b }, a = 1) => `rgba(${r},${g},${b},${a})`;
+  comun.rgba = rgba;
 
   /* ---------- El espectro como un display de equipo (VFD) ----------
      Antes eran 64 barras lisas con reflejo: el visualizador «de cualquier
@@ -160,26 +185,27 @@
     g: Math.round(a.g + (b.g - a.g) * t),
     b: Math.round(a.b + (b.b - a.b) * t),
   });
+  comun.mezclar = mezclar;
   const rejilla = (nc, playing) => {
     const { accent, claro } = colores();
-    const firma = `${accent.r},${accent.g},${accent.b}|${W}x${H}@${dpr}|${nc}|${playing ? 1 : 0}`;
+    const firma = `${accent.r},${accent.g},${accent.b}|${comun.W}x${comun.H}@${dpr}|${nc}|${playing ? 1 : 0}`;
     if (cacheVfd && cacheVfd.firma === firma) return cacheVfd;
 
     // un segmento cada ~9 px de alto: 8 filas como poco, 20 como mucho
-    const filas = Math.max(8, Math.min(20, Math.round(H / 9)));
+    const filas = Math.max(8, Math.min(20, Math.round(comun.H / 9)));
     // bordes pegados a píxeles de verdad: un segmento a medio píxel se ve borroso
     const snap = (v) => Math.round(v * dpr) / dpr;
     const padX = 2, padY = 3, gy = 2;
     const gx = nc > 24 ? 3 : 4;
-    const cw = (W - padX * 2 - gx * (nc - 1)) / nc;
-    const paso = (H - padY * 2 + gy) / filas;
+    const cw = (comun.W - padX * 2 - gx * (nc - 1)) / nc;
+    const paso = (comun.H - padY * 2 + gy) / filas;
     const cols = [], rows = [];
     for (let c = 0; c < nc; c++) {
       const x0 = snap(padX + c * (cw + gx)), x1 = snap(padX + c * (cw + gx) + cw);
       cols.push([x0, Math.max(1 / dpr, x1 - x0)]);
     }
     for (let r = 0; r < filas; r++) {
-      const base = H - padY - r * paso;
+      const base = comun.H - padY - r * paso;
       const y0 = snap(base - (paso - gy)), y1 = snap(base);
       rows.push([y0, Math.max(1 / dpr, y1 - y0)]);
     }
@@ -206,17 +232,19 @@
     cacheVfd = { firma, filas, cols, rows, tonos, fondo, pico: rgba(claro, 0.95), lit: new Int16Array(nc) };
     return cacheVfd;
   };
+  comun.rejilla = rejilla;
 
   /* 64 barras eran 64 en todas partes. En un teléfono no se distinguen y
      cada una cuesta dos drawImage y un fillRect por frame. */
   const barrasVisibles = () => (window.MMPerf
     ? Math.min(NUM_BARS, window.MMPerf.cuantos(NUM_BARS))
     : NUM_BARS);
+  comun.barrasVisibles = barrasVisibles;
 
   // ---- Conexión perezosa al grafo de audio ----
   const tryAttach = async () => {
-    if (connected) {
-      if (audioCtx && audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
+    if (comun.connected) {
+      if (comun.audioCtx && comun.audioCtx.state === 'suspended') { try { await comun.audioCtx.resume(); } catch (e) {} }
       return;
     }
     if (attaching) return;
@@ -229,54 +257,55 @@
          haberlo creado antes que el primer play): uno nuevo dejaría sus
          nodos en otro contexto, y los nodos de dos contextos no se pueden
          conectar entre sí. */
-      if (!audioCtx) audioCtx = new AC();
-      if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
-      source = audioCtx.createMediaElementSource(window.PlayerCore.audio);
-      analyser = audioCtx.createAnalyser();
+      if (!comun.audioCtx) comun.audioCtx = new AC();
+      if (comun.audioCtx.state === 'suspended') { try { await comun.audioCtx.resume(); } catch (e) {} }
+      comun.source = comun.audioCtx.createMediaElementSource(window.PlayerCore.audio);
+      analyser = comun.audioCtx.createAnalyser();
       analyser.fftSize = FFT_SIZE;
       analyser.smoothingTimeConstant = 0.82;
       analyser.minDecibels = -90;
       analyser.maxDecibels = -10;
-      source.connect(analyser);
-      analyser.connect(audioCtx.destination);
+      comun.source.connect(analyser);
+      analyser.connect(comun.audioCtx.destination);
       /* Rama del detector. Termina en una ganancia 0 que sí llega al destino:
          Chromium recorre el grafo HACIA ATRÁS desde la salida, así que una
          rama muerta podría no procesarse nunca. Con ganancia 0 no suena. */
-      detAnalyser = crearDetector(audioCtx);
-      source.connect(detAnalyser);
-      detSink = audioCtx.createGain();
+      comun.detAnalyser = crearDetector(comun.audioCtx);
+      comun.source.connect(comun.detAnalyser);
+      detSink = comun.audioCtx.createGain();
       detSink.gain.value = 0;
-      detAnalyser.connect(detSink);
-      detSink.connect(audioCtx.destination);
-      freqData = new Uint8Array(analyser.frequencyBinCount);
-      connected = true;
+      comun.detAnalyser.connect(detSink);
+      detSink.connect(comun.audioCtx.destination);
+      comun.freqData = new Uint8Array(analyser.frequencyBinCount);
+      comun.connected = true;
     } catch (e) {
       console.warn('[viz] no se pudo conectar (el audio sigue sonando):', e);
-      connected = false; source = null; analyser = null;
+      comun.connected = false; comun.source = null; analyser = null;
       // el contexto se suelta solo si no lo usa nadie más (◈ o el vídeo 9:16)
-      if (!capSource && !recSrc) audioCtx = null;
-      detAnalyser = null; detSink = null;   // que el detector no herede un nodo suelto
+      if (!comun.capSource && !comun.recSrc) comun.audioCtx = null;
+      comun.detAnalyser = null; detSink = null;   // que el detector no herede un nodo suelto
     } finally {
       attaching = false;
     }
   };
+  comun.tryAttach = tryAttach;
 
   // Engancha el evento play (gesto de usuario) para conectar de forma segura
   const hookAudio = () => {
     if (!window.PlayerCore || !window.PlayerCore.audio) { setTimeout(hookAudio, 150); return; }
     const a = window.PlayerCore.audio;
     a.addEventListener('play', () => { tryAttach(); });
-    a.addEventListener('playing', () => { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {}); });
+    a.addEventListener('playing', () => { if (comun.audioCtx && comun.audioCtx.state === 'suspended') comun.audioCtx.resume().catch(() => {}); });
   };
   hookAudio();
 
   // Watchdog: reanuda el contexto si el navegador lo suspende
   setInterval(() => {
     const a = window.PlayerCore && window.PlayerCore.audio;
-    if (a && !a.paused && audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    if (a && !a.paused && comun.audioCtx && comun.audioCtx.state === 'suspended') comun.audioCtx.resume().catch(() => {});
   }, 1000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    if (!document.hidden && comun.audioCtx && comun.audioCtx.state === 'suspended') comun.audioCtx.resume().catch(() => {});
   });
 
   /* DOS CAMINOS para oír lo que suena fuera del navegador:
@@ -322,7 +351,9 @@
   // funciones, no constantes: el ajuste se puede cambiar sin recargar
   const puedeMic = () => hayMic && micPermitido();
   const porMic = () => !puedePantalla && puedeMic();
+  comun.porMic = porMic;
   const puedeCapturar = () => puedePantalla || puedeMic();
+  comun.puedeCapturar = puedeCapturar;
 
   /* Con un mp3 tuyo sonando, la señal DIRECTA gana a la del micrófono:
      no lleva ruido de la habitación, no llega tarde y trae los graves de
@@ -331,29 +362,31 @@
      audio del sistema, tan buena como la directa. */
   const localSonando = () => {
     const a = window.PlayerCore && window.PlayerCore.audio;
-    return !!(analyser && connected && a && !a.paused && !a.ended);
+    return !!(analyser && comun.connected && a && !a.paused && !a.ended);
   };
+  comun.localSonando = localSonando;
   const fuente = () => {
     if (capAnalyser && !(porMic() && localSonando())) return capAnalyser;
     // el sonido de la pestaña que trae el vídeo 9:16 (ver más abajo)
-    if (recAnalyser && !localSonando()) return recAnalyser;
+    if (comun.recAnalyser && !localSonando()) return comun.recAnalyser;
     return analyser;
   };
 
   const isLive = () => {
-    if (!audioCtx || audioCtx.state !== 'running') return false;
+    if (!comun.audioCtx || comun.audioCtx.state !== 'running') return false;
     // Modo sync: el espectro viene del audio del sistema (Spotify u otro)
     if (capAnalyser && !(porMic() && localSonando())) return true;
-    if (recAnalyser && !localSonando()) return true;
+    if (comun.recAnalyser && !localSonando()) return true;
     return localSonando();
   };
+  comun.isLive = isLive;
 
   // ---- Magnitudes del espectro (bandas log) ----
   const computeSpectrum = () => {
-    fuente().getByteFrequencyData(freqData);
-    const bins = freqData.length;
+    fuente().getByteFrequencyData(comun.freqData);
+    const bins = comun.freqData.length;
     let sum = 0;
-    for (let i = 0; i < bins; i++) sum += freqData[i];
+    for (let i = 0; i < bins; i++) sum += comun.freqData[i];
     if (sum === 0) return null;       // audio enrutado fuera / cambio de pista
     /* El reparto va sobre las barras que de verdad se pintan, no sobre las
        64 de siempre: con menos barras cada una abarca más banda. Si se
@@ -366,11 +399,12 @@
       const lo = minF + Math.pow(i / nb, 1.9) * (maxF - minF);
       const hi = minF + Math.pow((i + 1) / nb, 1.9) * (maxF - minF);
       let max = 0;
-      for (let j = Math.floor(lo); j < Math.ceil(hi) && j < bins; j++) if (freqData[j] > max) max = freqData[j];
+      for (let j = Math.floor(lo); j < Math.ceil(hi) && j < bins; j++) if (comun.freqData[j] > max) max = comun.freqData[j];
       out[i] = max / 255;
     }
     return out;
   };
+  comun.computeSpectrum = computeSpectrum;
 
   // ---- Animación suave cuando no hay señal ----
   const idleSpectrum = () => {
@@ -386,6 +420,7 @@
     }
     return out;
   };
+  comun.idleSpectrum = idleSpectrum;
 
   // ---- Modo SYNC: captura el audio del sistema (para Spotify) ----
   // El audio de Spotify Connect no pasa por el navegador, así que no se
@@ -414,14 +449,16 @@
         'Comparte tu pantalla marcando "compartir audio del sistema".';
     }
   };
+  comun.pintarBotonSync = pintarBotonSync;
   pintarBotonSync();
 
   const stopCapture = () => {
-    if (capStream) capStream.getTracks().forEach(t => { t.onended = null; t.stop(); });
-    try { if (capSource) capSource.disconnect(); } catch (e) {}
-    capStream = null; capSource = null; capAnalyser = null; capDet = null;
+    if (comun.capStream) comun.capStream.getTracks().forEach(t => { t.onended = null; t.stop(); });
+    try { if (comun.capSource) comun.capSource.disconnect(); } catch (e) {}
+    comun.capStream = null; comun.capSource = null; capAnalyser = null; comun.capDet = null;
     if (syncBtn) syncBtn.classList.remove('active');
   };
+  comun.stopCapture = stopCapture;
 
   /* Por qué falló el último intento. Se declara ANTES de quien lo escribe:
      con `let` después, aunque en la práctica funcione (se asigna al
@@ -460,21 +497,21 @@
       // el track para detectar cuando el usuario detiene la compartición.
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return false;
-      if (!audioCtx) audioCtx = new AC();
-      if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
-      capSource = audioCtx.createMediaStreamSource(stream);
-      capAnalyser = audioCtx.createAnalyser();
+      if (!comun.audioCtx) comun.audioCtx = new AC();
+      if (comun.audioCtx.state === 'suspended') { try { await comun.audioCtx.resume(); } catch (e) {} }
+      comun.capSource = comun.audioCtx.createMediaStreamSource(stream);
+      capAnalyser = comun.audioCtx.createAnalyser();
       capAnalyser.fftSize = FFT_SIZE;
       capAnalyser.smoothingTimeConstant = 0.82;
       capAnalyser.minDecibels = -90;
       capAnalyser.maxDecibels = -10;
-      capSource.connect(capAnalyser);
+      comun.capSource.connect(capAnalyser);
       // el detector también escucha la captura (aquí sí vale una rama sin
       // salida: un MediaStreamSource corre siempre, no lo tira el destino)
-      capDet = crearDetector(audioCtx);
-      capSource.connect(capDet);
-      if (!freqData) freqData = new Uint8Array(capAnalyser.frequencyBinCount);
-      capStream = stream;
+      comun.capDet = crearDetector(comun.audioCtx);
+      comun.capSource.connect(comun.capDet);
+      if (!comun.freqData) comun.freqData = new Uint8Array(capAnalyser.frequencyBinCount);
+      comun.capStream = stream;
       stream.getTracks().forEach(t => { t.onended = () => { stopCapture(); setStatus('◈ sync desactivado'); }; });
       return true;
     } catch (e) {
@@ -517,7 +554,7 @@
   };
 
   if (syncBtn) syncBtn.addEventListener('click', async () => {
-    if (capStream) {
+    if (comun.capStream) {
       micEnPausa = false;
       stopCapture();
       setStatus(porMic() ? '◈ micrófono apagado' : '◈ sync desactivado');
@@ -539,12 +576,30 @@
   document.addEventListener('visibilitychange', () => {
     if (!porMic()) return;
     if (document.hidden) {
-      if (capStream) { micEnPausa = true; stopCapture(); }
+      if (comun.capStream) { micEnPausa = true; stopCapture(); }
     } else if (micEnPausa) {
       micEnPausa = false;
       activarSync();
     }
   });
+})();
+/* ==========================================================
+   EL ESPECTRO · pintar (js/espectro/pintar.js)
+
+   El mini-EQ de la barra de estado, el bucle de pintado, el tiempo con
+   sus «8» apagados detrás y la API pública (window.VisualizerModule).
+   Reparto de js/espectro/: ver sonido.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.espectro;
+  const {
+    canvas, ctx, crearDetector, K, F60, DT_NOMINAL, FFT_SIZE, smooth, peaks, peakVel, colores,
+    rgba, mezclar, rejilla, barrasVisibles, tryAttach, porMic, puedeCapturar, localSonando,
+    isLive, computeSpectrum, idleSpectrum, pintarBotonSync, stopCapture
+  } = comun;
+  // sin lienzo, sonido.js salió nada más empezar: aquí tampoco hay nada que hacer
+  if (!canvas) return;
 
   // ---- Mini-EQ de la barra de estado: baila con el espectro real ----
   // Cuando hay FFT en vivo, las barritas usan bandas reales (graves → agudos)
@@ -556,7 +611,7 @@
   let eqLive = false;
   const eqPrev = [-1, -1, -1, -1, -1];   // último paso escrito, para no repetir
 
-  /* La fila que SUENA en las listas y en la cola (library.js y seven.js
+  /* La fila que SUENA en las listas y en la cola (js/biblioteca/ y js/seven/
      ponen .sp-eq en el sitio del número) lleva tres de estas cinco:
      graves, medios y agudos. Colección viva: las filas que se pintan
      después entran solas, sin buscarlas en cada fotograma. Sin audio que
@@ -687,10 +742,10 @@
     if (colores().estilo === 'barras') {
       const { accent, claro, tinta } = colores();
       const gx = nc > 24 ? 3 : 4;
-      const bw = Math.max(1, (W - gx * (nc - 1)) / nc);
+      const bw = Math.max(1, (comun.W - gx * (nc - 1)) / nc);
       const rad = Math.min(bw / 2, 3);
-      ctx.clearRect(0, 0, W, H);
-      const grad = ctx.createLinearGradient(0, H, 0, 0);
+      ctx.clearRect(0, 0, comun.W, comun.H);
+      const grad = ctx.createLinearGradient(0, comun.H, 0, 0);
       if (tinta) {
         // sobre claro: del color de la canción hondo (abajo) a la tinta (arriba)
         grad.addColorStop(0, rgba(mezclar(accent, tinta, 0.35), playing ? 0.9 : 0.5));
@@ -703,10 +758,10 @@
       ctx.beginPath();
       for (let c = 0; c < nc; c++) {
         const v = Math.max(smooth[2 * c], smooth[2 * c + 1] || 0);
-        const h = Math.max(rad * 2, v * (H - 2));
+        const h = Math.max(rad * 2, v * (comun.H - 2));
         const x = c * (bw + gx);
-        if (ctx.roundRect) ctx.roundRect(x, H - h, bw, h, rad);
-        else ctx.rect(x, H - h, bw, h);
+        if (ctx.roundRect) ctx.roundRect(x, comun.H - h, bw, h, rad);
+        else ctx.rect(x, comun.H - h, bw, h);
       }
       ctx.fill();
       return;
@@ -721,11 +776,11 @@
       // las puntas en blanco sobre oscuro; en tinta sobre claro (vinilo)
       const puntas = tinta || { r: 255, g: 255, b: 255 };
       const centro = tinta ? mezclar(accent, tinta, 0.25) : accent;
-      const paso = W / nb;
+      const paso = comun.W / nb;
       const lw = Math.max(1, Math.min(3, paso * 0.45));
-      const medio = H / 2;
-      ctx.clearRect(0, 0, W, H);
-      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      const medio = comun.H / 2;
+      ctx.clearRect(0, 0, comun.W, comun.H);
+      const grad = ctx.createLinearGradient(0, 0, 0, comun.H);
       grad.addColorStop(0, rgba(puntas, playing ? 0.9 : 0.45));
       grad.addColorStop(0.5, rgba(centro, playing ? 0.95 : 0.5));
       grad.addColorStop(1, rgba(puntas, playing ? 0.9 : 0.45));
@@ -734,7 +789,7 @@
       ctx.lineCap = 'round';
       ctx.beginPath();
       for (let i = 0; i < nb; i++) {
-        const h = Math.max(lw, (smooth[i] || 0) * (H - lw * 2)) / 2;
+        const h = Math.max(lw, (smooth[i] || 0) * (comun.H - lw * 2)) / 2;
         const x = paso * (i + 0.5);
         ctx.moveTo(x, medio - h);
         ctx.lineTo(x, medio + h);
@@ -746,8 +801,8 @@
     const R = rejilla(nc, playing);
     const { filas, cols, rows, tonos, lit } = R;
 
-    ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(R.fondo, 0, 0, W, H);        // los segmentos apagados
+    ctx.clearRect(0, 0, comun.W, comun.H);
+    ctx.drawImage(R.fondo, 0, 0, comun.W, comun.H);        // los segmentos apagados
 
     for (let c = 0; c < nc; c++) {
       const v = Math.max(smooth[2 * c], smooth[2 * c + 1] || 0);
@@ -816,7 +871,7 @@
      sus segmentos apagados. El CSS los pinta con un ::before que lee
      data-g; aquí se escribe ese data-g —el mismo texto con cada cifra y cada
      «-» hecho un «8»— cada vez que alguien cambia el tiempo (app.js, el
-     reloj de spotify.js, el modo «lo que queda»…). Escribir un atributo no
+     reloj de js/spotify/, el modo «lo que queda»…). Escribir un atributo no
      despierta al observador, así que no hay bucle. */
   const fantasma = (el) => {
     if (!el) return;
@@ -831,7 +886,7 @@
   fantasma(document.getElementById('timeTotal'));
 
   /* ══════════════════════════════════════════════════════════
-     EL SONIDO DEL VÍDEO 9:16 (js/vertical.js)
+     EL SONIDO DEL VÍDEO 9:16 (js/cine/)
      ══════════════════════════════════════════════════════════
      Tres trabajos, cada uno por una razón:
 
@@ -860,30 +915,30 @@
   const ctxListo = async () => {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    if (!audioCtx) audioCtx = new AC();
-    if (audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch (e) {} }
-    return audioCtx;
+    if (!comun.audioCtx) comun.audioCtx = new AC();
+    if (comun.audioCtx.state === 'suspended') { try { await comun.audioCtx.resume(); } catch (e) {} }
+    return comun.audioCtx;
   };
 
   const oirFlujo = (flujo) => {
     soltarFlujo();
-    if (!audioCtx || !flujo || !flujo.getAudioTracks().length) return false;
+    if (!comun.audioCtx || !flujo || !flujo.getAudioTracks().length) return false;
     try {
-      recSrc = audioCtx.createMediaStreamSource(flujo);
-      recAnalyser = audioCtx.createAnalyser();
-      recAnalyser.fftSize = FFT_SIZE;
-      recAnalyser.smoothingTimeConstant = 0.82;
-      recAnalyser.minDecibels = -90;
-      recAnalyser.maxDecibels = -10;
-      recSrc.connect(recAnalyser);
+      comun.recSrc = comun.audioCtx.createMediaStreamSource(flujo);
+      comun.recAnalyser = comun.audioCtx.createAnalyser();
+      comun.recAnalyser.fftSize = FFT_SIZE;
+      comun.recAnalyser.smoothingTimeConstant = 0.82;
+      comun.recAnalyser.minDecibels = -90;
+      comun.recAnalyser.maxDecibels = -10;
+      comun.recSrc.connect(comun.recAnalyser);
       // rama sin salida, igual que la del ◈: un MediaStreamSource corre solo
-      recDet = crearDetector(audioCtx);
-      recSrc.connect(recDet);
-      if (!freqData) freqData = new Uint8Array(recAnalyser.frequencyBinCount);
+      comun.recDet = crearDetector(comun.audioCtx);
+      comun.recSrc.connect(comun.recDet);
+      if (!comun.freqData) comun.freqData = new Uint8Array(comun.recAnalyser.frequencyBinCount);
       return true;
     } catch (e) {
       console.warn('[viz] el sonido de la pestaña no entró en el grafo:', e);
-      recSrc = recAnalyser = recDet = null;
+      comun.recSrc = comun.recAnalyser = comun.recDet = null;
       return false;
     }
   };
@@ -894,27 +949,27 @@
     return isFinite(v) ? v : 1;
   };
   const ajustarGanancia = () => {
-    if (!recGain) return;
+    if (!comun.recGain) return;
     const v = volumenApp();
     // por debajo del 2 % ya no queda señal que rescatar: se deja tal cual
     const g = v > 0.02 ? Math.min(50, 1 / v) : 1;
-    try { recGain.gain.setTargetAtTime(g, recGain.context.currentTime, 0.03); }
-    catch (e) { recGain.gain.value = g; }
+    try { comun.recGain.gain.setTargetAtTime(g, comun.recGain.context.currentTime, 0.03); }
+    catch (e) { comun.recGain.gain.value = g; }
   };
 
   const soltarSonido = () => {
-    clearInterval(recVolT);
-    recVolT = null;
+    clearInterval(comun.recVolT);
+    comun.recVolT = null;
     // solo la conexión que se hizo aquí: el origen sigue sonando y midiendo
-    try { if (recOrigen && recGain) recOrigen.disconnect(recGain); } catch (e) {}
-    try { if (recGain) recGain.disconnect(); } catch (e) {}
-    recDest = null; recGain = null; recOrigen = null;
+    try { if (comun.recOrigen && comun.recGain) comun.recOrigen.disconnect(comun.recGain); } catch (e) {}
+    try { if (comun.recGain) comun.recGain.disconnect(); } catch (e) {}
+    comun.recDest = null; comun.recGain = null; comun.recOrigen = null;
   };
 
   function soltarFlujo() {
-    if (recOrigen && recOrigen === recSrc) soltarSonido();
-    try { if (recSrc) recSrc.disconnect(); } catch (e) {}
-    recSrc = null; recAnalyser = null; recDet = null;
+    if (comun.recOrigen && comun.recOrigen === comun.recSrc) soltarSonido();
+    try { if (comun.recSrc) comun.recSrc.disconnect(); } catch (e) {}
+    comun.recSrc = null; comun.recAnalyser = null; comun.recDet = null;
   }
 
   /* La pista de audio para el MediaRecorder, o null si no hay de dónde.
@@ -923,33 +978,33 @@
     soltarSonido();
     const PC = window.PlayerCore;
     let origen = null, tipo = '';
-    if (conPestana && recSrc) { origen = recSrc; tipo = 'pestana'; }
+    if (conPestana && comun.recSrc) { origen = comun.recSrc; tipo = 'pestana'; }
     else {
       const local = !!(PC && PC.state && PC.state.currentTrack && !PC.isSpotify());
       if (local) {
         await ctxListo();
-        if (!connected) await tryAttach();
-        if (source) { origen = source; tipo = 'local'; }
+        if (!comun.connected) await tryAttach();
+        if (comun.source) { origen = comun.source; tipo = 'local'; }
       }
-      if (!origen && capSource) { origen = capSource; tipo = 'sync'; }
+      if (!origen && comun.capSource) { origen = comun.capSource; tipo = 'sync'; }
     }
     if (!origen) return null;
     try {
       // los nodos, del MISMO contexto que el origen: si no, no se conectan
       const ac = origen.context;
-      recDest = ac.createMediaStreamDestination();
-      recGain = ac.createGain();
-      recGain.gain.value = 1;
-      origen.connect(recGain);
-      recGain.connect(recDest);
-      recOrigen = origen;
+      comun.recDest = ac.createMediaStreamDestination();
+      comun.recGain = ac.createGain();
+      comun.recGain.gain.value = 1;
+      origen.connect(comun.recGain);
+      comun.recGain.connect(comun.recDest);
+      comun.recOrigen = origen;
     } catch (e) {
       console.warn('[viz] no se pudo sacar el sonido para el vídeo:', e);
       soltarSonido();
       return null;
     }
-    if (tipo !== 'sync') { ajustarGanancia(); recVolT = setInterval(ajustarGanancia, 250); }
-    return recDest.stream.getAudioTracks()[0] || null;
+    if (tipo !== 'sync') { ajustarGanancia(); comun.recVolT = setInterval(ajustarGanancia, 250); }
+    return comun.recDest.stream.getAudioTracks()[0] || null;
   };
 
   // API pública mínima
@@ -960,30 +1015,30 @@
        (sin señal) y daba false con ◈ sync (con señal). Las dos al revés. */
     isConnected: () => haySenal,
     // ¿está activa la captura del audio del sistema?
-    haySync: () => !!capStream,
+    haySync: () => !!comun.capStream,
     // lo llama js/settings.js al cambiar el permiso del micrófono
-    refrescarSync: () => { pintarBotonSync(); if (capStream && !puedeCapturar()) stopCapture(); },
+    refrescarSync: () => { pintarBotonSync(); if (comun.capStream && !puedeCapturar()) stopCapture(); },
     /* Nodo CRUDO para el detector de ritmo. Nadie más debería usarlo:
        sus datos son el espectro sin suavizar, feo de dibujar. */
     getDetector: () => {
       // misma preferencia que el espectro: lo directo gana al micrófono
-      const a = (capDet && !(porMic() && localSonando())) ? capDet
-        : (recDet && !localSonando()) ? recDet : detAnalyser;
-      if (!a || !audioCtx || audioCtx.state !== 'running') return null;
+      const a = (comun.capDet && !(porMic() && localSonando())) ? comun.capDet
+        : (comun.recDet && !localSonando()) ? comun.recDet : comun.detAnalyser;
+      if (!a || !comun.audioCtx || comun.audioCtx.state !== 'running') return null;
       return a;
     },
-    getSampleRate: () => (audioCtx ? audioCtx.sampleRate : 44100),
+    getSampleRate: () => (comun.audioCtx ? comun.audioCtx.sampleRate : 44100),
     /* Lo que tarda en SONAR lo que el <audio> ya entregó al grafo (segundos).
-       Lo resta js/lyrics.js para que la letra de la música importada caiga
+       Lo resta js/letra/ para que la letra de la música importada caiga
        con lo que se oye — con auriculares Bluetooth son 150-250 ms. Sin
        grafo montado, o con un dato raro, 0: se queda como estaba. */
     latencia: () => {
-      if (!connected || !audioCtx) return 0;
-      const o = +audioCtx.outputLatency, b = +audioCtx.baseLatency;
+      if (!comun.connected || !comun.audioCtx) return 0;
+      const o = +comun.audioCtx.outputLatency, b = +comun.audioCtx.baseLatency;
       const l = (isFinite(o) ? o : 0) + (isFinite(b) ? b : 0);
       return l > 0 && l < 0.6 ? l : 0;
     },
-    /* El vídeo 9:16 (js/vertical.js): el contexto en marcha DENTRO del clic
+    /* El vídeo 9:16 (js/cine/): el contexto en marcha DENTRO del clic
        de grabar (un AudioContext nace suspendido si no hay gesto), el sonido
        de la pestaña para que el fondo baile, y la pista que va al vídeo. */
     prepararSonido: () => ctxListo(),

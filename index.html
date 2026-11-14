@@ -17,11 +17,17 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
 
-  <link rel="stylesheet" href="css/style.css" />
-  <!-- Catálogo de efectos del modo edit. Va DESPUÉS a propósito, y es seguro:
-       ninguna regla de style.css toca esas clases, así que no hay empates de
-       cascada que dependan del orden entre los dos archivos. -->
-  <link rel="stylesheet" href="css/edit-fx.css" />
+  <!-- LA BASE DE LA APP (el aspecto 8 bits y todos los componentes), en 23
+       hojas por tema. Era una sola de 9.300 líneas (style.css) y se partió
+       por sus secciones SIN cambiar el orden, porque el orden es la cascada:
+       una hoja de más abajo corrige a las de arriba. Una hoja nueva va en su
+       sitio de esta lista y en el SHELL de service-worker.js. -->
+  <link rel="stylesheet" href="css/base.css" />
+  <!-- Catálogo de efectos del modo edit (lo que fue css/edit-fx.css). Va
+       DESPUÉS a propósito, y es seguro: ninguna regla de la base toca esas
+       clases, así que no hay empates de cascada que dependan del orden entre
+       los dos grupos. -->
+  <link rel="stylesheet" href="css/edit.css" />
   <!-- ASPECTO DE LA APP (config ⚙ → apariencia → aspecto; js/aspecto.js).
        De fábrica es el 8 bits y aquí no se pide nada más. Con otro elegido,
        su CSS se pide AQUÍ, antes de pintar y bloqueando el pintado hasta que
@@ -257,7 +263,7 @@
           <!-- ESTADO EN REPOSO · vive FUERA de #lyricsBody a propósito:
                el modo edit oculta #lyricsBody, y antes esto dejaba el panel
                completamente en blanco cuando no sonaba nada. Aquí se ve en
-               los dos modos. Lo apaga lyrics.js al llegar una canción. -->
+               los dos modos. Lo apaga js/letra/ al llegar una canción. -->
           <div class="lyrics-idle" id="lyricsIdle">
             <div class="li-eq" aria-hidden="true">
               <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
@@ -272,7 +278,7 @@
                  teléfono eso es un callejón sin salida: no hay teclas que
                  pulsar ni nada que arrastrar, y la música local y Spotify se
                  quedaban escondidos en config. Ahora cada una hace lo que
-                 dice, y js/lyrics.js les cambia el texto cuando se toca con
+                 dice, y js/letra/ les cambia el texto cuando se toca con
                  el dedo. -->
             <div class="li-ways">
               <!-- El buscador va PRIMERO: es la puerta única a todo lo demás,
@@ -339,7 +345,7 @@
                 autocomplete="off" spellcheck="false" />
               <button class="sp-limpiar" id="spotifyClear" title="Borrar (Esc)" hidden>✕</button>
             </div>
-            <!-- QUÉ SE BUSCA · spotify.js sabe buscar artistas y álbumes desde
+            <!-- QUÉ SE BUSCA · js/spotify/ sabe buscar artistas y álbumes desde
                  siempre (`tipoBusqueda`, y `wireSearch` cablea estos chips),
                  pero los botones NUNCA estuvieron en el HTML: la app se quedó
                  buscando solo canciones, sin forma de llegar a un artista ni
@@ -364,7 +370,7 @@
                  sitio — el <ul id="trackList"> que la pintaba desapareció del
                  HTML y con él la única forma de ver tus mp3.
                  «álbumes» y «artistas» estaban definidos en COLS de
-                 library.js (con sus endpoints y todo) sin chip que los
+                 js/biblioteca/ (con sus endpoints y todo) sin chip que los
                  abriera. -->
             <div class="lib-nav">
               <button class="lib-chip active" data-col="mine">mi música</button>
@@ -376,7 +382,7 @@
               <button class="lib-chip" data-col="top">top</button>
               <button class="lib-refresh" id="libRefresh" title="Recargar desde Spotify">⟳</button>
             </div>
-            <!-- BUSCAR DENTRO DE LA LISTA · library.js lleva el filtro escrito
+            <!-- BUSCAR DENTRO DE LA LISTA · js/biblioteca/ lleva el filtro escrito
                  (`view.filtro`, `filtradas`, `paintFiltro`) y hasta el CSS
                  (.lib-filtro) estaba puesto; solo faltaba la fila. Sin ella,
                  encontrar una canción en una playlist de mil era bajar a mano. -->
@@ -569,7 +575,7 @@
                  teniendo su ◉ encima de la carátula; en el teléfono la carátula
                  mide 60 px y un botón encima se la comía entera, así que allí
                  este es su sitio. Mismo `mm_vinyl` y mismo formato que el ◉
-                 (js/seven.js): los dos mandan sobre lo mismo y se enteran. -->
+                 (js/seven/): los dos mandan sobre lo mismo y se enteran. -->
             <div class="set-row" data-buscar="vinilo disco girar gira caratula tocadiscos rueda">
               <span class="set-label">vinilo</span>
               <div class="seg" data-set="vinilo"
@@ -835,7 +841,7 @@
               <kbd>Q</kbd><span>cola</span>
               <kbd>H</kbd><span>historial</span>
               <!-- el vídeo 9:16 solo existe en la copia local: estas dos solo
-                   se ven con html.con-916, que pone js/vertical.js en local -->
+                   se ven con html.con-916, que pone js/cine/ en local -->
               <kbd class="tecla-916">V</kbd><span class="tecla-916">vídeo 9:16 para tiktok (dentro, <kbd>R</kbd> graba y para; <kbd>esc</kbd> sale)</span>
               <kbd>S</kbd><span>configuración (y otra vez para volver)</span>
               <kbd>1 2 3 · E</kbd><span>dentro del cine: estilo app, vinilo o letra · letra en lista o edit</span>
@@ -904,14 +910,14 @@
           <button class="ctrl-btn vol-btn side-btn" id="anchoBtn" aria-pressed="false"
                   aria-label="Letra ancha: esconde la carátula y deja todo el ancho para la letra"
                   title="Letra ancha: esconde la carátula y deja todo el ancho para la letra (W)"><i class="sb-ico ico ico-ancha" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">ancha</span></button>
-          <!-- El icono y el nombre van en spans: js/lyrics.js cambia los dos
+          <!-- El icono y el nombre van en spans: js/letra/ cambia los dos
                (✦ edit ↔ ≡ lista) sin barrer el botón entero. -->
           <button class="ctrl-btn vol-btn side-btn" id="lyricsModeBtn" aria-pressed="false"
                   aria-label="Modo edit: la letra a pantalla completa, animada"
                   title="Modo edit (letra animada)"><i class="sb-ico ico ico-edit" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">edit</span></button>
           <!-- ◉ VISTA PALABRA · la tercera forma de ver la letra. En el
                teléfono no cabe un botón más en esta fila: allí se esconde y
-               el de ✦ recorre las tres vistas (js/lyrics.js). -->
+               el de ✦ recorre las tres vistas (js/letra/). -->
           <button class="ctrl-btn vol-btn side-btn" id="palabraBtn" aria-pressed="false"
                   aria-label="Vista palabra: la letra palabra a palabra, con iconos"
                   title="Vista palabra: la letra palabra a palabra, con iconos"><i class="sb-ico ico ico-palabra" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">palabra</span></button>
@@ -923,7 +929,7 @@
           <button class="ctrl-btn vol-btn side-btn" id="compartirBtn"
                   aria-label="Compartir la letra como imagen"
                   title="Compartir la letra como imagen: carátula, título y los versos que elijas"><i class="sb-ico ico ico-cita" aria-hidden="true"></i><span class="sb-txt" aria-hidden="true">compartir</span></button>
-          <!-- ⚗ Lab de efectos · nace con `hidden` y lo destapa js/lyrics.js
+          <!-- ⚗ Lab de efectos · nace con `hidden` y lo destapa js/letra/
                SOLO en local (127.0.0.1 / file:). En la página publicada no
                aparece: es herramienta de taller, no de quien viene a oír
                música. Lleva su nombre igual, porque en local sí se lee. -->
@@ -936,7 +942,7 @@
           <!-- ▯ VÍDEO 9:16 · la app en formato de móvil, para grabar un TikTok,
                un Reel o un Short. Va al lado del cine porque es de la misma
                familia: otra pantalla completa para la letra. Abre un escenario
-               con el marco vertical y su panel (js/vertical.js lo cuelga del
+               con el marco vertical y su panel (js/cine/ lo cuelga del
                <body>, como el cine y la tarjeta ❝). En el teléfono no sale:
                allí la app ya es vertical y el navegador no graba la pantalla. -->
           <button class="ctrl-btn vol-btn side-btn" id="verticalBtn"
@@ -969,7 +975,7 @@
         </div>
 
         <div class="ctl-sonido">
-          <!-- ♥ GUARDAR EN SPOTIFY · spotify.js tiene el corazón entero escrito
+          <!-- ♥ GUARDAR EN SPOTIFY · js/spotify/ tiene el corazón entero escrito
                (pintarLike / refrescarLike / alternarLike, contra el endpoint
                nuevo /me/library) y hasta la regla .ctrl-btn.like-on en el CSS.
                Le faltaba el botón. Lo enseña y lo esconde él según si la
@@ -978,7 +984,7 @@
                   aria-label="Guardar en Tus me gusta" title="Guardar en Tus me gusta" hidden><i class="ico ico-corazon" aria-hidden="true"></i></button>
           <!-- DÓNDE SUENA · bajó de la barra de estado, donde nadie lo buscaba,
                a su sitio de siempre en cualquier reproductor: al lado del
-               volumen. Sale solo con Spotify; el menú lo monta spotify.js
+               volumen. Sale solo con Spotify; el menú lo monta js/spotify/
                colgado del <body> (ver el comentario de allí). -->
           <button class="dev-chip" id="devChip" hidden
             aria-haspopup="true" aria-expanded="false"
@@ -1041,7 +1047,7 @@
        canta `assets/check-modulos.js`. -->
   <script defer src="js/perf.js"></script>
   <!-- TECLAS · de quién es cada tecla. Los mandos (app.js) y las pestañas
-       (seven.js) preguntan aquí antes de quedarse con una tecla, para no
+       (js/seven/) preguntan aquí antes de quedarse con una tecla, para no
        robársela al navegador (Ctrl+B, Ctrl+H…) ni al botón que tiene el
        foco. Va lo primero porque los dos cargan después. -->
   <script defer src="js/teclas.js"></script>
@@ -1062,20 +1068,20 @@
   <script defer src="js/caratula.js"></script>
   <script defer src="js/vendor/jsmediatags.min.js"></script>
   <script defer src="js/db.js"></script>
-  <script defer src="js/lyrics.js"></script>
+  <script defer src="js/letra.js"></script>
   <!-- TRADUCTOR · pone la letra en español debajo de cada verso. Va DETRÁS de
-       lyrics.js sin problema: los dos son `defer`, o sea que se ejecutan en
-       orden y antes de que suene nada, y lyrics.js solo pregunta por
+       js/letra/ sin problema: los dos son `defer`, o sea que se ejecutan en
+       orden y antes de que suene nada, y js/letra/ solo pregunta por
        window.Traductor cuando ya hay una canción puesta. -->
   <script defer src="js/traductor.js"></script>
   <!-- SIMILARES · a qué se parece cada canción (ListenBrainz). Es de donde
        «sigue sonando» saca lo que va detrás desde que se quitó la playlist
-       puente. Delante de spotify.js por orden de lectura: los dos son
-       `defer` y spotify.js solo pregunta por window.Similares cuando ya hay
+       puente. Delante de js/spotify/ por orden de lectura: los dos son
+       `defer` y js/spotify/ solo pregunta por window.Similares cuando ya hay
        una canción sonando. -->
   <script defer src="js/similares.js"></script>
   <script defer src="js/spotify.js"></script>
-  <script defer src="js/library.js"></script>
+  <script defer src="js/biblioteca.js"></script>
   <script defer src="js/app.js"></script>
   <!-- HISTORIAL Y ESTADÍSTICAS · los dos archivos existían, estaban en el
        SHELL del service worker (se descargaban en cada visita) y nadie los
@@ -1084,7 +1090,7 @@
        y stats.js después de historial.js porque le pide las cuentas. -->
   <script defer src="js/historial.js"></script>
   <script defer src="js/stats.js"></script>
-  <script defer src="js/visualizer.js"></script>
+  <script defer src="js/espectro.js"></script>
   <!-- beat.js va DESPUÉS del visualizador (le pide el analizador crudo) y
        ANTES de ambient.js, que solo pinta lo que este detecta -->
   <script defer src="js/beat.js"></script>
@@ -1094,20 +1100,21 @@
   <script defer src="js/aspecto.js"></script>
   <script defer src="js/settings.js"></script>
   <!-- tipografía de la letra: va DESPUÉS de settings.js (comparte el bloque
-       de ajustes) y después de lyrics.js, a quien le pide el repintado -->
+       de ajustes) y después de js/letra/, a quien le pide el repintado -->
+  <script defer src="js/fuentes.js"></script>
   <script defer src="js/fonts.js"></script>
   <!-- La cabecera de configuración (volver, buscar, índice, «?»). Va al
        final de los tres: lee las secciones y las filas YA montadas, y
-       pregunta por window.MMNav, que monta seven.js. -->
+       pregunta por window.MMNav, que monta js/seven/. -->
   <script defer src="js/ajustes-ui.js"></script>
-  <!-- ❝ la tarjeta para compartir la letra. Después de lyrics.js (le pide
+  <!-- ❝ la tarjeta para compartir la letra. Después de js/letra/ (le pide
        los versos), de fonts.js (le pide la tipografía puesta) y de
-       seven.js (le pide los colores que ya están en el CSS). -->
+       js/seven/ (le pide los colores que ya están en el CSS). -->
   <script defer src="js/compartir.js"></script>
   <!-- ▯ VÍDEO 9:16 y ⛶ MODO CINE, los dos en el mismo escenario. Después de
        todo lo que muda al marco: la letra, el espectro, Spotify. Solo
        pregunta por ellos al abrirse, nunca al cargar. -->
-  <script defer src="js/vertical.js"></script>
+  <script defer src="js/cine.js"></script>
   <script defer src="js/colors.js"></script>
   <script defer src="js/ambient.js"></script>
   <!-- LUZ DE BORDE: el filo de la ventana con los colores de la carátula,

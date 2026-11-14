@@ -15,7 +15,7 @@
    Con «menos movimiento», con la pestaña oculta o si no había portada
    antes, corte seco como siempre (pero ya sin el negro).
 
-   Los que ponen la portada (spotify.js y seven.js) llaman a
+   Los que ponen la portada (js/spotify/ y js/seven/) llaman a
    `MMCaratula.poner(el, url)` en vez de escribir `backgroundImage`. Lo
    demás —has-image, el placeholder, el tamaño— lo siguen haciendo ellos.
    Quien escucha el atributo style de #coverArt (colors.js saca de ahí la

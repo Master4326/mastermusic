@@ -31,7 +31,7 @@
    sola al centro y se abre de lado a lado.
 
    Aquí NO se escucha nada, igual que en ambient.js: el espectro sale de
-   js/visualizer.js (`getBands`, que con música da FFT real y sin música
+   js/espectro/ (`getBands`, que con música da FFT real y sin música
    da su onda de reposo — así el fondo nunca se queda muerto) y el ritmo
    de js/beat.js. Este módulo solo dibuja.
 
@@ -78,7 +78,7 @@
   let degradado = null;
 
   /* El tamaño, del LAYOUT (clientWidth) y no de la caja de pantalla: grabando
-     el vídeo 9:16 en 1080p el marco va girado (js/vertical.js) y la caja de
+     el vídeo 9:16 en 1080p el marco va girado (js/cine/) y la caja de
      pantalla sale con el ancho y el alto cambiados. Sin girar son lo mismo. */
   const medir = () => {
     const cw = canvas.clientWidth, ch = canvas.clientHeight;
@@ -320,7 +320,7 @@
     const dentro = (cx, cy, semi, alto) =>
       (cy < -H * 0.2 || cy > H * 1.2 ? null : { cx, cy, semi, alto });
 
-    /* El marco del vídeo 9:16 TUMBADO (rotate(-90deg), ver js/vertical.js):
+    /* El marco del vídeo 9:16 TUMBADO (rotate(-90deg), ver js/cine/):
        las cajas de pantalla vienen giradas. Se deshace el giro alrededor del
        centro del lienzo —en pantalla (X, Y) es en el lienzo (−Y, X)— y el
        ancho del verso es lo que en pantalla sale como alto. */

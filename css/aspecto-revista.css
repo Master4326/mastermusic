@@ -85,7 +85,7 @@ html[data-aspecto="revista"] .paleta-btn:focus-visible { background: var(--rv-ti
 html[data-aspecto="revista"] .tb-btn { border-radius: 0; color: var(--rv-tinta); }
 html[data-aspecto="revista"] .tb-btn:hover { background: var(--rv-tinta); color: var(--rv-papel); }
 /* `--tumbado-resto`: teléfono tumbado, lo que no es carátula a lo alto de
-   la columna (ver style.css); medido con la ficha y las barras de revista */
+   la columna (ver css/base/); medido con la ficha y las barras de revista */
 html[data-aspecto="revista"] .main-grid { gap: 24px; padding: 16px 24px 12px; --tumbado-resto: 234px; }
 html[data-aspecto="revista"] :is(.cover-frame, .cover-inner) { border-radius: 0; box-shadow: none; }
 html[data-aspecto="revista"] .track-info { margin-top: 2px; padding: 9px 0 0; box-shadow: inset 0 3px 0 var(--rv-tinta); }
@@ -232,7 +232,7 @@ html[data-aspecto="revista"] body.disp-movil :is(.window > .tab-bar .tab-txt, .c
    de la canción oscurecido, para que se lea sobre claro), el karaoke, el
    modo edit, las listas y ajustes. La onda que rodea el verso pasa a
    pintarse en tinta (js/fondo.js lee --onda-tinta) y el espectro también
-   (js/visualizer.js lee --viz-tinta), sin su franja.
+   (js/espectro/ lee --viz-tinta), sin su franja.
    --acento-cancion guarda el color de la canción tal cual: dentro del panel
    --accent se oscurece, y lo que necesita el vivo (la carta del invertido)
    tira de él. En el cine la letra se muda fuera del panel y vuelve a su

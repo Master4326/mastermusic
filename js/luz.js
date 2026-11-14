@@ -117,7 +117,7 @@
   };
 
   /* El play y la pausa no avisan con un evento propio: se mira la clase
-     del <body> (la ponen js/app.js y js/spotify.js). */
+     del <body> (la ponen js/app.js y js/spotify/). */
   if (window.MutationObserver) {
     let suenaAntes = suena();
     new MutationObserver(() => {

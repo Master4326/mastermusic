@@ -15,7 +15,7 @@
    Y CON SPOTIFY SONANDO EN ESTA PESTAÑA (el Web Playback SDK) tampoco es
    esta la ficha que se ve: el audio del SDK suena dentro de su propio marco
    (un iframe de sdk.scdn.co) y el sistema enseña la ficha de quien suena.
-   Por eso js/spotify.js arranca el SDK con `enableMediaSession: true`, la
+   Por eso js/spotify/ arranca el SDK con `enableMediaSession: true`, la
    opción de su documentación para que publique él la canción y atienda
    las teclas multimedia, los auriculares y la pantalla de bloqueo.
    ========================================================== */

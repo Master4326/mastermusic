@@ -1,6 +1,6 @@
 /* ==========================================================
    Ajustes de comportamiento y apariencia
-   (los colores siguen viviendo en seven.js; aquí va lo demás)
+   (los colores siguen viviendo en js/seven/; aquí va lo demás)
    Cada opción es un grupo .seg con data-set y botones data-val.
    ========================================================== */
 (() => {
@@ -20,11 +20,11 @@
        iOS ponen todo el audio del aparato en modo llamada y la música se
        oye más bajita. No hay forma de evitarlo desde una web. Solo vale la
        pena si la música suena en OTRO aparato — y eso solo lo sabe el
-       usuario, así que lo decide él. La lee js/visualizer.js directamente
+       usuario, así que lo decide él. La lee js/espectro/ directamente
        de localStorage: mismo nombre y mismo formato, sin traducciones. */
     mic:    { key: 'mm_mic', def: 'off' },
     /* «Sigue sonando»: al reproducir una canción SUELTA del buscador, encolar
-       parecidas para que la música no se pare al acabar. La lee js/spotify.js
+       parecidas para que la música no se pare al acabar. La lee js/spotify/
        directamente de localStorage, igual que el micrófono: mismo nombre y
        mismo formato, sin traducciones por el medio. */
     radio:  { key: 'mm_radio', def: 'on' },
@@ -42,7 +42,7 @@
     trad:   { key: 'mm_trad', def: 'off' },
     /* VINILO · la carátula gira como un disco. Es la misma clave y el mismo
        formato ('true'/'false') que el botón ◉ de encima de la carátula
-       (js/seven.js): los dos mandan sobre lo mismo. En el teléfono este es
+       (js/seven/): los dos mandan sobre lo mismo. En el teléfono este es
        su único sitio, porque allí la carátula mide 60 px y el ◉ se la comía. */
     vinilo: { key: 'mm_vinyl', def: 'false' },
     /* ASPECTO · la cara de toda la app: «8bits» (la de siempre), «cristal»,
@@ -51,7 +51,7 @@
     aspecto: { key: 'mm_aspecto', def: '8bits' },
     /* ◉ VISTA PALABRA · su forma («pila»: las palabras apiladas en 3D;
        «lente»: en un tambor que gira) y si llevan iconos. Las lee
-       js/lyrics.js por MMSettings.get cada vez que pinta un verso. */
+       js/letra/ por MMSettings.get cada vez que pinta un verso. */
     palabra:    { key: 'mm_palabra', def: 'pila' },
     palabraIco: { key: 'mm_palabra_ico', def: 'si' },
     /* LUZ DE BORDE · el filo de la ventana encendido con los colores de la
@@ -59,7 +59,7 @@
        «no» la apaga. El grosor, aparte. Las aplica js/luz.js. */
     luz:       { key: 'mm_luz', def: 'ritmo' },
     luzGrosor: { key: 'mm_luz_grosor', def: 'media' },
-    // La intensidad del modo edit NO es un ajuste: lyrics.js la deduce sola
+    // La intensidad del modo edit NO es un ajuste: js/letra/ la deduce sola
     // del ritmo de cada línea y de los graves (ver intensidadAuto).
   };
 
@@ -254,7 +254,7 @@
     try { n = Object.keys(JSON.parse(raw || '{}')).length; } catch (_) {}
     // las traducciones son parte de lo mismo: se guardan y se tiran juntas
     const t = (window.Traductor && window.Traductor.tam) ? window.Traductor.tam() : { n: 0, bytes: 0 };
-    // y las palabra a palabra de AMLL (js/lyrics.js), igual
+    // y las palabra a palabra de AMLL (js/letra/), igual
     let rawP = '', nP = 0;
     try { rawP = localStorage.getItem('mm_ttml') || ''; } catch (_) {}
     try { const o = JSON.parse(rawP || '{}'); nP = Object.keys(o).filter((k) => o[k] && !o[k].nf).length; } catch (_) {}
@@ -275,7 +275,7 @@
   const refrescarDatos = () => { pintarTamCache(); pintarTamLib(); };
   refrescarDatos();
   /* Al abrir configuración los números tienen que estar al día. Se
-     escucha el aviso de seven.js y no el clic del engranaje: ahora se
+     escucha el aviso de js/seven/ y no el clic del engranaje: ahora se
      llega aquí de cinco maneras (la tecla S, el buscador de Ctrl+K, un
      [ver ▸] de otro sitio…) y solo una de ellas era ese clic. */
   document.addEventListener('mm:tab', (e) => {

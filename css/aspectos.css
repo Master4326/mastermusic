@@ -18,7 +18,7 @@
    música de hoy, pero sin copiar ninguna: ni logos, ni nombres, ni su verde
    (las reglas de Spotify prohíben imitar su app y usar su color).
 
-   CÓMO FUNCIONA. style.css lleva lo que hace «8 bits» a la app en
+   CÓMO FUNCIONA. css/base/ lleva lo que hace «8 bits» a la app en
    variables con el valor de siempre de respaldo (ver «LOS AJUSTES DEL
    ASPECTO» allí): las fuentes (--f-ui, --f-mono, --f-pixel, --f-num), los
    relieves (--bisel) y los bordes del marco (--marco-g, --marco-*). Aquí se
@@ -69,7 +69,7 @@ html.moderno {
   --m-activo: color-mix(in oklab, var(--text) 15%, transparent);
   --m-tenue: color-mix(in oklab, var(--text) 64%, transparent);
   --m-tenue-2: color-mix(in oklab, var(--text) 46%, transparent);
-  /* el espectro de la izquierda, en barras lisas (js/visualizer.js) */
+  /* el espectro de la izquierda, en barras lisas (js/espectro/) */
   --viz-estilo: barras;
   -webkit-font-smoothing: antialiased;
   font-smooth: auto;
@@ -118,7 +118,7 @@ html.moderno {
   --ico-grabar: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Ccircle cx='12' cy='12' r='7.5'/%3E%3C/svg%3E");
   --ico-corazon-lleno: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' %3E%3Cpath d='M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5' /%3E%3C/svg%3E");
 }
-/* El aire alrededor de la ventana NO se toca aquí: es el de style.css
+/* El aire alrededor de la ventana NO se toca aquí: es el de css/base/
    (20 px en el ordenador, 6 en el teléfono, 4 tumbado, 0 instalada), y la
    altura de la ventana se calcula restando justo ese aire. Con un padding
    propio, en el teléfono la ventana se salía 12 px por debajo de la
@@ -181,7 +181,7 @@ html.moderno .window {
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55), inset 0 0 0 1px var(--m-linea);
 }
 html.moderno .window.maximized { border-radius: 0; box-shadow: none; }
-/* Instalada, la ventana ES la del sistema (style.css la estira a toda la
+/* Instalada, la ventana ES la del sistema (css/base/ la estira a toda la
    pantalla): sin esquinas ni sombra, igual que maximizada. */
 @media (display-mode: standalone), (display-mode: window-controls-overlay) {
   html.moderno .window { border-radius: 0; box-shadow: none; }
@@ -192,7 +192,7 @@ html.moderno .title-bar {
   padding: 0 12px 0 18px;
 }
 /* Instalada con la barra propia: la barra mide lo que diga el sistema y deja
-   libre el hueco de sus botones (las mismas cuentas que style.css). Sin
+   libre el hueco de sus botones (las mismas cuentas que css/base/). Sin
    esto, lo de la derecha quedaba debajo de minimizar y cerrar. */
 @media (display-mode: window-controls-overlay) {
   html.moderno .title-bar {
@@ -236,7 +236,7 @@ html.moderno .main-grid {
   gap: 18px;
   padding: 4px 18px 14px;
   /* teléfono tumbado: lo que no es carátula a lo alto de la columna (ver
-     `--tumbado-resto` en style.css). 233 px es la medida de cristal; cada
+     `--tumbado-resto` en css/base/). 233 px es la medida de cristal; cada
      aspecto con otra ficha u otras barras pone la suya. */
   --tumbado-resto: 233px;
 }
@@ -725,7 +725,7 @@ html.moderno body.disp-movil .lib-refresh {
   backdrop-filter: blur(10px);
 }
 
-/* ══════════ 10. EL CINE Y EL VÍDEO 9:16 (js/vertical.js) ══════════
+/* ══════════ 10. EL CINE Y EL VÍDEO 9:16 (js/cine/) ══════════
    El escenario hereda las fuentes y se queda sin relieves solo; aquí van
    su barra (anterior, play, siguiente, salir), el progreso de celdas, que
    pasa a ser un riel fino, y los mandos del estilo «app». */
@@ -883,7 +883,7 @@ html[data-aspecto="estudio"] {
   --r-m: 8px;
   --r-l: 12px;
   --e-margen: clamp(14px, 1.4cqw, 26px);
-  /* el espectro en líneas finas (js/visualizer.js) */
+  /* el espectro en líneas finas (js/espectro/) */
   --viz-estilo: lineas;
   background: #000;
 }

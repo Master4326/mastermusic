@@ -14,7 +14,7 @@
      · lente — las palabras en un tambor: la que suena delante y grande, las
                demás se curvan hacia atrás, como vistas por una lupa.
 
-   DE DÓNDE SALEN LOS TIEMPOS. De js/lyrics.js (`tiempos(i)`): el arranque de
+   DE DÓNDE SALEN LOS TIEMPOS. De js/letra/ (`tiempos(i)`): el arranque de
    cada palabra del verso, exacto si la letra lo trae (LRC mejorado o la base
    palabra por palabra) y, si no, repartido por sílabas con las mismas
    reglas que el karaoke de la vista lista. Así las tres vistas van al mismo
@@ -33,7 +33,7 @@
      · las curvas son las --ed-* de toda la app;
      · el panel de la letra no gana ni un botón: los mandos van a config ⚙;
      · este archivo y css/palabra.css solo se descargan si se elige la vista
-       (lyrics.js los pide la primera vez).
+       (js/letra/ los pide la primera vez).
 
    ICONOS: Phosphor Icons, peso «fill» (licencia MIT, © 2023 Phosphor
    Icons — https://phosphoricons.com). Solo el trazo de cada uno, en una
@@ -337,7 +337,7 @@
 
   /* ══════════ ESTADO ══════════ */
   let raiz = null;          // #lyricsPalabra
-  let api = null;           // lo que presta js/lyrics.js (ver montar)
+  let api = null;           // lo que presta js/letra/ (ver montar)
   let escena = null;        // .pl-escena: perspectiva y empujón del golpe
   let pila = null;          // .pl-pila: la deriva 3D
   let pausa = null;         // los tres puntos de los huecos instrumentales
@@ -615,7 +615,7 @@
 
   /* ══════════ CADA FOTOGRAMA ══════════
      `t` llega ya en segundos de la letra (con el desfase, el adelanto y la
-     latencia descontados por lyrics.js) e `idx` es el verso de ahora. */
+     latencia descontados por js/letra/) e `idx` es el verso de ahora. */
   const tick = (t, idx) => {
     if (!montado) return;
     ultimoT = t;

@@ -8,10 +8,10 @@
    Vive FUERA de #lyricsBody y de #lyricsEdit a propósito, igual que
    el estado de reposo: el modo edit oculta uno de los dos, y algo que
    debe verse en los dos modos no puede vivir dentro de ninguno.
-   La encienden y apagan las letras (js/lyrics.js).
+   La encienden y apagan las letras (js/letra/).
 
    Aquí NO se detecta nada: el bombo y las bandas los da BeatModule /
-   VisualizerModule, igual que en ambient.js y vertical.js. Todo lo que
+   VisualizerModule, igual que en ambient.js y js/cine/. Todo lo que
    se escribe es transform / opacity / una variable, y solo cuando el
    valor cambió de verdad.
    ========================================================== */
@@ -89,7 +89,7 @@
   };
 
   // Duración y segundo actual: con Spotify Connect el <audio> local está
-  // parado, así que el avance se lee de la barra principal, que spotify.js
+  // parado, así que el avance se lee de la barra principal, que js/spotify/
   // mantiene al día. Misma solución que el modo cine.
   const duracion = () => {
     const PC = window.PlayerCore;

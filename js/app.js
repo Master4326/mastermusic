@@ -1,7 +1,7 @@
 /* ==========================================================
    PlayerCore — estado + reproducción + audio.
    La UI visible (lista, carátula, tabs, búsqueda) la dibuja
-   seven.js; aquí solo vive la lógica del reproductor.
+   js/seven/; aquí solo vive la lógica del reproductor.
    ========================================================== */
 (() => {
   'use strict';
@@ -111,7 +111,7 @@
 
   /* Avisa a quien pinte la música local (la pestaña «listas» y el buscador
      universal) de que la biblioteca cambió. Antes no había forma de
-     enterarse: seven.js repintaba la lista con un setInterval de 500 ms
+     enterarse: js/seven/ repintaba la lista con un setInterval de 500 ms
      porque nadie avisaba de nada. */
   const avisarBiblioteca = () => {
     window.dispatchEvent(new CustomEvent('mm:biblioteca', { detail: { n: state.tracks.length } }));
@@ -297,7 +297,7 @@
       pintarRestante(0, 0);
       return;
     }
-    // Cambiar npTitle dispara el refresco de carátula/álbum en seven.js
+    // Cambiar npTitle dispara el refresco de carátula/álbum en js/seven/
     el.npTitle.textContent = t.name;
     el.npArtist.textContent = t.artist || '—';
     pintarRestante(position(), t.duration);
@@ -333,7 +333,7 @@
   /* ---------- «Sigue sonando» con TU música ----------
 
      Con Spotify, al acabar una canción suelta siguen otras parecidas (ver
-     js/spotify.js). Con la música importada no seguía nada: se acababa la
+     js/spotify/). Con la música importada no seguía nada: se acababa la
      cola y silencio. Y es el mismo problema, solo que aquí no hay catálogo
      del que tirar — hay lo que tú tengas.
 
@@ -576,7 +576,7 @@
 
      Mientras el dedo la tiene agarrada manda ella: `body.barra-agarrada`
      avisa a los dos que pintan la barra (el `timeupdate` de aquí abajo y
-     el reloj interpolado de js/spotify.js) para que no le peleen el
+     el reloj interpolado de js/spotify/) para que no le peleen el
      tirador al dedo. Al soltar, un solo salto. */
   const segDeEvento = (e) => {
     const rect = el.progressBar.getBoundingClientRect();
@@ -600,7 +600,7 @@
 
   /* Lo que oye quien no ve la barra. `role="slider"` sin valor vivo no
      dice nada, así que el valor se refresca desde los dos sitios que la
-     pintan (aquí y js/spotify.js). */
+     pintan (aquí y js/spotify/). */
   const ariaBarra = (sec, dur) => {
     const b = el.progressBar;
     if (!b) return;
@@ -646,7 +646,7 @@
   const pintarRestante = (sec, dur) => {
     if (!el.timeTotal) return;
     const d = isFinite(dur) && dur > 0 ? dur : duration();
-    /* Lo llama el reloj de spotify.js en cada frame: se escribe solo lo que
+    /* Lo llama el reloj de js/spotify/ en cada frame: se escribe solo lo que
        cambia (el texto, una vez por segundo como mucho). */
     const txt = (verRestante && d)
       ? '-' + formatTime(Math.max(0, d - (sec || 0)))
@@ -713,7 +713,7 @@
     paintVolume();
   };
 
-  /* El estado real llega del sondeo de spotify.js. Sirve para que los botones
+  /* El estado real llega del sondeo de js/spotify/. Sirve para que los botones
      se enteren de lo que pasa FUERA de la app: si pones aleatorio desde el
      móvil, aquí se enciende solo. Se pinta directamente, sin pasar por los
      manejadores del clic, así que esto no puede rebotar en otra petición. */
@@ -807,14 +807,14 @@
     else if (e.code === 'KeyM') setVolume(state.volume > 0 ? 0 : lastNonZeroVol);
   });
 
-  // Spotify button (delegated to spotify.js)
+  // Spotify button (delegated to js/spotify/)
   el.spotifyConnectBtn.addEventListener('click', () => {
     if (window.SpotifyModule) window.SpotifyModule.connect();
   });
 
   /* ---- Posición y salto, sin que cada módulo repita el desvío a Spotify ----
      Con Spotify Connect el audio NO pasa por el navegador: la posición la
-     lleva el reloj interpolado de spotify.js, no `audio.currentTime`. Antes
+     lleva el reloj interpolado de js/spotify/, no `audio.currentTime`. Antes
      cada módulo nuevo tenía que acordarse de eso; ahora se pregunta aquí. */
   const position = () => {
     if (spotifyActive() && window.SpotifyModule.position) return window.SpotifyModule.position();
@@ -860,7 +860,7 @@
   };
   setInterval(revisarTrack, 500);
 
-  // ---- Public API (usado por spotify.js / visualizer.js / seven.js) ----
+  // ---- Public API (usado por js/spotify/ / js/espectro/ / js/seven/) ----
   window.PlayerCore = {
     state,
     audio,
@@ -884,7 +884,7 @@
     playing,
     isSpotify: () => !!spotifyActive(),
     formatTime,
-    // las usa js/spotify.js, que pinta la misma barra desde su reloj
+    // las usa js/spotify/, que pinta la misma barra desde su reloj
     ariaBarra,
     pintarRestante,
     onTrack: (fn) => {

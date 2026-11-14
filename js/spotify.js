@@ -1,11 +1,36 @@
 /* ==========================================================
-   Módulo Spotify — OAuth PKCE + Web API
-   Sin backend, sin Client Secret.
+   SPOTIFY · la sesión y la Web API (OAuth PKCE, sin backend ni Client Secret)
+
+   Lo que fue js/spotify.js (3.100 líneas) vive ahora en js/spotify/, en
+   siete archivos que se cargan seguidos y en este orden:
+
+   sesion.js — el Client ID, el permiso (PKCE), su caducidad y
+   renovación, el freno ante el 429, las llamadas a la Web API y los
+   errores dichos en cristiano.
+   pestana.js — el reproductor dentro de la pestaña (Web Playback SDK),
+   su reconexión y «seguir donde ibas».
+   estado.js — el sondeo de lo que suena y el pintado de la pista.
+   mandos.js — play, saltos y volumen (Spotify Connect), el ♥ y las
+   playlists, buscar y poner, las últimas búsquedas.
+   sigue-sonando.js — lo que viene detrás cuando se acaba la lista.
+   aparato.js — el chip «dónde suena» y su menú.
+   arranque.js — la API pública (window.SpotifyModule) y la vuelta del
+   permiso (?code=).
+
+   Comparten el estado por la bolsa `comun` (window.MMInterno.spotify):
+   lo que cambia y usan varios archivos se lee y se escribe como
+   `comun.x`; las funciones y constantes de un archivo anterior se
+   recogen arriba de cada archivo y se usan por su nombre.
    ========================================================== */
 (() => {
   'use strict';
 
-  const STORAGE = {
+  /* Lo que comparten entre sí los archivos de js/spotify/. Uso interno: desde
+     fuera se habla con window.SpotifyModule (lo arma js/spotify/arranque.js). */
+  window.MMInterno = window.MMInterno || {};
+  const comun = window.MMInterno.spotify = {};
+
+  const STORAGE = comun.STORAGE = {
     CID: 'sp_client_id',
     TOKEN: 'sp_access_token',
     REFRESH: 'sp_refresh_token',
@@ -211,6 +236,7 @@
     });
     window.location.href = `https://accounts.spotify.com/authorize?${params}`;
   };
+  comun.startAuth = startAuth;
 
   const exchangeCode = async (code) => {
     const clientId = localStorage.getItem(STORAGE.CID);
@@ -232,7 +258,7 @@
         body,
       });
     } catch (e) {
-      avisarLuego('✕ sin conexión con spotify al volver de autorizar · pulsa [ conectar spotify ] otra vez');
+      comun.avisarLuego('✕ sin conexión con spotify al volver de autorizar · pulsa [ conectar spotify ] otra vez');
       return false;
     }
     if (!res.ok) {
@@ -244,7 +270,7 @@
       let motivo = '';
       try { const j = await res.json(); motivo = j.error_description || j.error || ''; } catch (e) {}
       console.warn('[Spotify] no se pudo canjear el código:', res.status, motivo);
-      avisarLuego('✕ spotify no aceptó la conexión' + (motivo ? ' («' + motivo + '»)' : '')
+      comun.avisarLuego('✕ spotify no aceptó la conexión' + (motivo ? ' («' + motivo + '»)' : '')
         + ' · pulsa [ conectar spotify ] otra vez');
       return false;
     }
@@ -263,9 +289,10 @@
     try { localStorage.setItem(STORAGE.AUTORIZADO, String(Date.now())); } catch (x) {}
     // limpieza de la marca que dejó el ❤ retirado (sesiones anteriores)
     try { localStorage.removeItem('mm_like_bloqueado'); } catch (x) {}
-    permisoCaducado = false;   // permiso nuevo: la sesión vuelve a estar viva
+    comun.permisoCaducado = false;   // permiso nuevo: la sesión vuelve a estar viva
     return true;
   };
+  comun.exchangeCode = exchangeCode;
 
   /* -------- El permiso CADUCA (y no es lo mismo que fallar) --------
 
@@ -283,18 +310,18 @@
 
      Sin distinguirlas, a los seis meses la app se quedaba reintentando en
      bucle y enseñando un «conecta spotify» que no explicaba nada. */
-  let permisoCaducado = false;
+  comun.permisoCaducado = false;
 
   const olvidarPermiso = () => {
-    permisoCaducado = true;
+    comun.permisoCaducado = true;
     try {
       localStorage.removeItem(STORAGE.REFRESH);
       localStorage.removeItem(STORAGE.TOKEN);
       localStorage.removeItem(STORAGE.EXPIRES);
     } catch (e) {}
-    clearTimeout(renovTimer);
+    clearTimeout(comun.renovTimer);
     try { window.PlayerCore.setSpotifyConnected(false); } catch (e) {}
-    setStatus('◎ el permiso de spotify caducó · pulsa [ conectar spotify ] para volver a entrar');
+    comun.setStatus('◎ el permiso de spotify caducó · pulsa [ conectar spotify ] para volver a entrar');
     console.warn('[Spotify] invalid_grant: el refresh token ya no vale (caducado o retirado)');
   };
 
@@ -334,6 +361,7 @@
     saveTokens(data);
     return true;
   };
+  comun.refreshToken = refreshToken;
 
   const saveTokens = (data) => {
     if (data.access_token) localStorage.setItem(STORAGE.TOKEN, data.access_token);
@@ -354,46 +382,50 @@
      `getValidToken`). Ahora que sonando en esta pestaña YA NO hay sondeo, el
      agujero quedaba del todo al aire. Así que se renueva por reloj, un minuto
      antes de la hora, suene algo o no. */
-  let renovTimer = null;
+  comun.renovTimer = null;
 
   const renovarAhora = async () => {
     // Si sale bien, `saveTokens` vuelve a programar sola con la caducidad nueva
     if (await refreshToken()) return;
     // Caducado de verdad: insistir no lo arregla, y ya se ha avisado
-    if (permisoCaducado) return;
+    if (comun.permisoCaducado) return;
     console.warn('[Spotify] no se pudo renovar el token; se reintenta en 5 min');
-    clearTimeout(renovTimer);
-    renovTimer = setTimeout(renovarAhora, 300000);
+    clearTimeout(comun.renovTimer);
+    comun.renovTimer = setTimeout(renovarAhora, 300000);
   };
 
   const programarRenovacion = () => {
-    clearTimeout(renovTimer);
-    if (permisoCaducado) return;
+    clearTimeout(comun.renovTimer);
+    if (comun.permisoCaducado) return;
     if (!localStorage.getItem(STORAGE.REFRESH)) return;
     const exp = parseInt(localStorage.getItem(STORAGE.EXPIRES) || '0', 10);
     /* Un minuto de margen. El mínimo de 5 s es para el caso de abrir la app
        con el token ya caducado: renovar, pero no en el mismo suspiro que el
        arranque. */
-    renovTimer = setTimeout(renovarAhora, Math.max(5000, exp - Date.now() - 60000));
+    comun.renovTimer = setTimeout(renovarAhora, Math.max(5000, exp - Date.now() - 60000));
   };
+  comun.programarRenovacion = programarRenovacion;
 
   const isLoggedIn = () => {
     const tok = localStorage.getItem(STORAGE.TOKEN);
     const exp = parseInt(localStorage.getItem(STORAGE.EXPIRES) || '0', 10);
     return tok && Date.now() < exp;
   };
+  comun.isLoggedIn = isLoggedIn;
 
   /* ¿La sesión abierta trae los permisos de AHORA? Una sesión de antes del
      SDK sigue siendo válida para buscar y para mandar a otro aparato, pero no
      puede reproducir aquí: le falta `streaming`. Conviene decirlo antes de
      intentarlo, no después de un error críptico del SDK. */
   const scopesAlDia = () => localStorage.getItem(STORAGE.SCOPES) === SCOPES_V;
+  comun.scopesAlDia = scopesAlDia;
 
   const getValidToken = async () => {
     if (isLoggedIn()) return localStorage.getItem(STORAGE.TOKEN);
     if (await refreshToken()) return localStorage.getItem(STORAGE.TOKEN);
     return null;
   };
+  comun.getValidToken = getValidToken;
 
   /* -------- FRENO ANTE EL 429 --------
 
@@ -420,6 +452,7 @@
   const ESPERA_MIN = 5, ESPERA_MAX = 300;
 
   const frenado = () => Math.max(0, bloqueadoHasta - Date.now());
+  comun.frenado = frenado;
 
   /* Dos cosas distintas contestan 429, y desde jul-2026 se distinguen:
 
@@ -442,7 +475,7 @@
     console.warn(`[Spotify] 429: en pausa ${esperaSeguida}s` +
       (agotada ? ' (CUOTA AGOTADA de la cuenta de desarrollador)'
         : cabecera > 0 ? ' (lo pide Retry-After)' : ' (sin Retry-After legible)'));
-    setStatus(agotada
+    comun.setStatus(agotada
       ? '◷ spotify agotó la cuota de tu app · tu música importada sigue funcionando'
       : `◷ spotify pidió esperar · reintentando en ${esperaSeguida}s`);
   };
@@ -494,6 +527,7 @@
     if (!txt) return null;
     try { return JSON.parse(txt); } catch (e) { return null; }
   };
+  comun.api = api;
 
   /* -------- QUÉ DIJO SPOTIFY, EN CRISTIANO --------
 
@@ -530,6 +564,7 @@
     r.cuota = /cuota agotada|QUOTA_EXCEEDED/.test(m);
     return r;
   };
+  comun.leerError = leerError;
 
   const explicar = (e, que) => {
     const r = leerError(e);
@@ -542,7 +577,7 @@
     if (r.reason === 'PREMIUM_REQUIRED' || /premium/i.test(r.message)) return 'para ' + hacer + ' hace falta spotify premium';
     if (r.reason === 'NO_ACTIVE_DEVICE' || /no active device/i.test(r.message)
         || (r.status === 404 && /player|device/i.test(r.message))) {
-      return sdkDeviceId
+      return comun.sdkDeviceId
         ? 'no hay nada sonando en spotify · pon una canción y sonará aquí'
         : 'spotify no tiene dónde sonar · abre spotify en el móvil o el pc (o prueba otro navegador)';
     }
@@ -558,6 +593,21 @@
     if (r.red) return 'sin conexión con spotify · mira tu internet';
     return 'no se pudo ' + hacer + (r.message ? ' («' + r.message + '»)' : '');
   };
+  comun.explicar = explicar;
+})();
+/* ==========================================================
+   SPOTIFY · el reproductor dentro de la pestaña (js/spotify/pestana.js)
+
+   El Web Playback SDK: crear el aparato de la pestaña, volver a
+   conectarlo cuando se cae y «seguir donde ibas» al abrir. Reparto de
+   js/spotify/: ver sesion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.spotify;
+  const {
+    refreshToken, scopesAlDia, getValidToken
+  } = comun;
 
   /* ==========================================================
      REPRODUCTOR DENTRO DE LA PESTAÑA (Web Playback SDK)
@@ -585,64 +635,67 @@
   const NOMBRE_APARATO = 'MASTER MUSIC';
   const SDK_URL = 'https://sdk.scdn.co/spotify-player.js';
 
-  let sdkPlayer = null;      // instancia de Spotify.Player
-  let sdkDeviceId = null;    // nuestro id de aparato, cuando está listo
-  let sdkActivo = false;     // ¿lo que suena, suena AQUÍ?
-  let sdkIntento = null;     // promesa del arranque, para no arrancar dos veces
-  let sdkVetado = false;     // el navegador o la cuenta no pueden: no reintentar
+  comun.sdkPlayer = null;      // instancia de Spotify.Player
+  comun.sdkDeviceId = null;    // nuestro id de aparato, cuando está listo
+  comun.sdkActivo = false;     // ¿lo que suena, suena AQUÍ?
+  comun.sdkIntento = null;     // promesa del arranque, para no arrancar dos veces
+  comun.sdkVetado = false;     // el navegador o la cuenta no pueden: no reintentar
   /* Aparato al que van los play. null = esta pestaña, que es justo lo que
      evita tener que abrir Spotify. Lo cambia el usuario desde el chip. */
-  let destinoElegido = null;
+  comun.destinoElegido = null;
   /* Lo que suena y lo que viene detrás, tal cual lo entrega el SDK. Con el
      mando a distancia esto NO se podía saber sin pedir `/me/player/queue`;
      ahora llega gratis en cada cambio de estado y da de comer a dos cosas:
      la precarga de la letra siguiente y la pestaña de cola. */
-  let ventana = null;
-  let ultimaPrecarga = null;   // para no repetir la misma precarga en cada evento
+  comun.ventana = null;
+  comun.ultimaPrecarga = null;   // para no repetir la misma precarga en cada evento
 
   /* ---- Volver a conectar el aparato de la pestaña ----
      `not_ready` = el aparato se cayó. `connect()` del mismo reproductor lo
      vuelve a dar de alta en Spotify (con otro `device_id`, que llega en un
      `ready` nuevo). Esperas que se alargan para no martillear, y un intento
      inmediato en cuanto el navegador dice que vuelve a haber red. */
-  let sdkPerdido = false;         // se cayó y aún no ha vuelto
-  let sdkReautenticado = false;   // ya se probó a renovar tras un authentication_error
+  comun.sdkPerdido = false;         // se cayó y aún no ha vuelto
+  comun.sdkReautenticado = false;   // ya se probó a renovar tras un authentication_error
   let reconexionN = 0;
-  let reconexionT = null;
+  comun.reconexionT = null;
   const ESPERAS_RECONEXION = [3000, 8000, 20000, 60000];
 
   const reconectarSDK = () => {
-    clearTimeout(reconexionT);
-    if (!sdkPlayer || sdkVetado || !sdkPerdido) return;
+    clearTimeout(comun.reconexionT);
+    if (!comun.sdkPlayer || comun.sdkVetado || !comun.sdkPerdido) return;
     const espera = ESPERAS_RECONEXION[Math.min(reconexionN, ESPERAS_RECONEXION.length - 1)];
     reconexionN++;
-    reconexionT = setTimeout(() => {
-      if (!sdkPlayer || sdkVetado || !sdkPerdido) return;
+    comun.reconexionT = setTimeout(() => {
+      if (!comun.sdkPlayer || comun.sdkVetado || !comun.sdkPerdido) return;
       if (navigator.onLine === false) { reconectarSDK(); return; }   // sin red: ni lo intentes
-      Promise.resolve(sdkPlayer.connect())
-        .then((ok) => { if (!ok && sdkPerdido) reconectarSDK(); })
-        .catch(() => { if (sdkPerdido) reconectarSDK(); });
+      Promise.resolve(comun.sdkPlayer.connect())
+        .then((ok) => { if (!ok && comun.sdkPerdido) reconectarSDK(); })
+        .catch(() => { if (comun.sdkPerdido) reconectarSDK(); });
     }, espera);
   };
 
   window.addEventListener('online', () => {
-    if (!sdkPerdido) return;
+    if (!comun.sdkPerdido) return;
     reconexionN = 0;              // vuelve la red: primer intento ya, sin esperar el minuto
     reconectarSDK();
   });
 
-  const somos = (id) => !!id && id === sdkDeviceId;
+  const somos = (id) => !!id && id === comun.sdkDeviceId;
+  comun.somos = somos;
 
   /* Si el SDK no llegó a arrancar devuelve null, y entonces las llamadas van
      sin `device_id`: exactamente el comportamiento de antes, con Spotify
      eligiendo aparato por su cuenta. */
-  const destino = () => destinoElegido || sdkDeviceId || null;
+  const destino = () => comun.destinoElegido || comun.sdkDeviceId || null;
+  comun.destino = destino;
 
   const conDestino = (path) => {
     const id = destino();
     if (!id) return path;
     return path + (path.includes('?') ? '&' : '?') + 'device_id=' + id;
   };
+  comun.conDestino = conDestino;
 
   /* Los mandos sobre LO QUE YA SUENA (pausa, siguiente, aleatorio, encolar)
      van al aparato donde está sonando, que no es por fuerza el de por
@@ -651,7 +704,8 @@
      y fallaba, y darle al play se llevaba la música del móvil a la pestaña.
      Si el sondeo sabe dónde suena, sin `device_id` (Spotify lo manda al
      aparato activo); si no suena nada en ningún sitio, a donde toca empezar. */
-  const alQueSuena = (path) => ((lastDevice && !sdkActivo) ? path : conDestino(path));
+  const alQueSuena = (path) => ((comun.lastDevice && !comun.sdkActivo) ? path : conDestino(path));
+  comun.alQueSuena = alQueSuena;
 
   /* -------- Seguir donde ibas --------
      Pega NUEVA que trae el SDK, y conviene tenerla clara: como el aparato es
@@ -668,7 +722,7 @@
   const CLAVE_ULTIMO = 'sp_ultimo';
   const ULTIMO_TTL = 12 * 3600 * 1000;   // pasado un día, retomar ya no tiene sentido
   let ultimoGuardado = 0;
-  let reanudar = null;                   // {uri, ctx, pos} pendiente de retomar
+  comun.reanudar = null;                   // {uri, ctx, pos} pendiente de retomar
 
   const guardarUltimo = (state) => {
     const it = state && state.track_window && state.track_window.current_track;
@@ -684,37 +738,38 @@
         pos: state.position || 0,
         t: ahora,
         // La pista entera, para poder repintarla al volver sin pedir nada
-        pista: pistaDesde(it),
+        pista: comun.pistaDesde(it),
       }));
     } catch (e) {}
   };
 
   const olvidarUltimo = () => {
-    reanudar = null;
+    comun.reanudar = null;
     try { localStorage.removeItem(CLAVE_ULTIMO); } catch (e) {}
   };
+  comun.olvidarUltimo = olvidarUltimo;
 
   const restaurarUltimo = () => {
-    if (reanudar || lastTrackId) return;   // ya hay algo puesto: no estorbar
+    if (comun.reanudar || comun.lastTrackId) return;   // ya hay algo puesto: no estorbar
     let d = null;
     try { d = JSON.parse(localStorage.getItem(CLAVE_ULTIMO) || 'null'); } catch (e) {}
     if (!d || !d.uri || !d.pista) return;
     if (Date.now() - (d.t || 0) > ULTIMO_TTL) { olvidarUltimo(); return; }
 
-    reanudar = { uri: d.uri, ctx: d.ctx, pos: d.pos || 0 };
-    pintarPista(d.pista);
-    notarCambio(d.pista);        // deja la letra pedida ya, sin esperar al play
-    progBase = (d.pos || 0) / 1000;
-    progDur = d.pista.duration || 0;
-    progStamp = 0;               // parado: que el reloj de la barra no lo mueva
-    paintProgress(progBase);
-    pintarPlay(false);
+    comun.reanudar = { uri: d.uri, ctx: d.ctx, pos: d.pos || 0 };
+    comun.pintarPista(d.pista);
+    comun.notarCambio(d.pista);        // deja la letra pedida ya, sin esperar al play
+    comun.progBase = (d.pos || 0) / 1000;
+    comun.progDur = d.pista.duration || 0;
+    comun.progStamp = 0;               // parado: que el reloj de la barra no lo mueva
+    comun.paintProgress(comun.progBase);
+    comun.pintarPlay(false);
     /* Con retraso a propósito: `notarCambio` acaba de poner la canción en
        `PlayerCore`, y la barra de estado la repinta con el nombre de la pista
        en su repaso de cada 500 ms. Dicho ahora, el aviso duraría medio
        segundo. Dicho después, se queda. */
     setTimeout(() => {
-      if (reanudar) setStatus('▸ dale al play para seguir donde lo dejaste');
+      if (comun.reanudar) comun.setStatus('▸ dale al play para seguir donde lo dejaste');
     }, 900);
   };
 
@@ -722,21 +777,21 @@
   const avisarReconexion = () => {
     if (avisoReconexion) return;
     avisoReconexion = true;
-    setStatus('◎ tu sesión es anterior al reproductor propio · pulsa [ conectar spotify ] para autorizarlo');
+    comun.setStatus('◎ tu sesión es anterior al reproductor propio · pulsa [ conectar spotify ] para autorizarlo');
   };
 
   const vetarSDK = (motivo, detalle) => {
-    sdkVetado = true;
-    sdkActivo = false;
-    sdkDeviceId = null;
-    sdkPerdido = false;              // vetado no se reconecta: no hay nada que arreglar
-    clearTimeout(reconexionT);
+    comun.sdkVetado = true;
+    comun.sdkActivo = false;
+    comun.sdkDeviceId = null;
+    comun.sdkPerdido = false;              // vetado no se reconecta: no hay nada que arreglar
+    clearTimeout(comun.reconexionT);
     console.warn('[Spotify SDK]', motivo, detalle || '');
-    setStatus('◎ ' + motivo + ' · sigue funcionando como mando a distancia');
-    try { if (sdkPlayer) sdkPlayer.disconnect(); } catch (e) {}
-    sdkPlayer = null;
-    pintarChipAparato();
-    startPolling();
+    comun.setStatus('◎ ' + motivo + ' · sigue funcionando como mando a distancia');
+    try { if (comun.sdkPlayer) comun.sdkPlayer.disconnect(); } catch (e) {}
+    comun.sdkPlayer = null;
+    comun.pintarChipAparato();
+    comun.startPolling();
   };
 
   const cargarSDK = () => new Promise((resolve, reject) => {
@@ -759,8 +814,8 @@
     const una = () => {
       document.removeEventListener('pointerdown', una);
       document.removeEventListener('keydown', una);
-      if (sdkPlayer && sdkPlayer.activateElement) {
-        sdkPlayer.activateElement().catch(() => {});
+      if (comun.sdkPlayer && comun.sdkPlayer.activateElement) {
+        comun.sdkPlayer.activateElement().catch(() => {});
       }
     };
     document.addEventListener('pointerdown', una);
@@ -775,85 +830,85 @@
       /* Estado nulo = ya no somos el aparato que suena (se la llevaron al
          móvil, o nos echaron). Hay que volver al sondeo: es la única forma
          de enterarse de lo que pasa fuera de esta pestaña. */
-      if (sdkActivo) {
-        sdkActivo = false;
-        lastDevice = null;
-        pintarChipAparato();
-        startPolling();
+      if (comun.sdkActivo) {
+        comun.sdkActivo = false;
+        comun.lastDevice = null;
+        comun.pintarChipAparato();
+        comun.startPolling();
       }
       return;
     }
 
-    if (!sdkActivo) {
-      sdkActivo = true;
-      stopPolling(true);          // corta la red, deja vivo el reloj de la barra
-      lastDevice = { id: sdkDeviceId, name: NOMBRE_APARATO, type: 'Computer', is_active: true, supports_volume: true };
-      pintarChipAparato();
-      pintarVolAjeno(false);      // el volumen de aquí siempre se deja tocar
-      smoothLoop();
+    if (!comun.sdkActivo) {
+      comun.sdkActivo = true;
+      comun.stopPolling(true);          // corta la red, deja vivo el reloj de la barra
+      comun.lastDevice = { id: comun.sdkDeviceId, name: NOMBRE_APARATO, type: 'Computer', is_active: true, supports_volume: true };
+      comun.pintarChipAparato();
+      comun.pintarVolAjeno(false);      // el volumen de aquí siempre se deja tocar
+      comun.smoothLoop();
     }
-    leerPermisos(state.disallows);
+    comun.leerPermisos(state.disallows);
 
     const it = state.track_window && state.track_window.current_track;
     if (it) {
-      const track = pistaDesde(it);
-      pintarPista(track);
+      const track = comun.pistaDesde(it);
+      comun.pintarPista(track);
       /* Sin compensación de latencia ni anti-jitter, al revés que el sondeo:
          esta posición no ha viajado por la red, es la del audio de aquí al
          lado. Lo que dice es exacto. */
-      progBase = (state.position || 0) / 1000;
-      progStamp = performance.now();
-      progDur = (state.duration || it.duration_ms || 0) / 1000;
-      if (state.paused) paintProgress(progBase);
-      pintarPlay(!state.paused);
-      notarCambio(track);
+      comun.progBase = (state.position || 0) / 1000;
+      comun.progStamp = performance.now();
+      comun.progDur = (state.duration || it.duration_ms || 0) / 1000;
+      if (state.paused) comun.paintProgress(comun.progBase);
+      comun.pintarPlay(!state.paused);
+      comun.notarCambio(track);
       if (window.PlayerCore) window.PlayerCore.state.isPreview = false;
     } else {
-      pintarPlay(!state.paused);
+      comun.pintarPlay(!state.paused);
     }
 
     /* La canción que viene: se precarga su letra AHORA, mientras suena la
        actual, para que al cambiar de pista salga sola. LRClib tarda ~6-7 s
        desde esta red, así que es la diferencia entre que la letra esté puesta
        al empezar la canción o que llegue por el primer estribillo. */
-    ventana = state.track_window || null;
-    relevar(state);          // por si este aparato no admitió la lista entera
-    const sig = ventana && ventana.next_tracks && ventana.next_tracks[0];
+    comun.ventana = state.track_window || null;
+    comun.relevar(state);          // por si este aparato no admitió la lista entera
+    const sig = comun.ventana && comun.ventana.next_tracks && comun.ventana.next_tracks[0];
     if (sig && window.LyricsModule && window.LyricsModule.prefetch) {
       const clave = sig.uri || sig.id;
-      if (clave && clave !== ultimaPrecarga) {
-        ultimaPrecarga = clave;
-        window.LyricsModule.prefetch(pistaDesde(sig));
+      if (clave && clave !== comun.ultimaPrecarga) {
+        comun.ultimaPrecarga = clave;
+        window.LyricsModule.prefetch(comun.pistaDesde(sig));
       }
     }
 
     guardarUltimo(state);
 
     // Contexto y modos, lo mismo que `leerModos()` saca del sondeo
-    lastContext = (state.context && state.context.uri) || null;
+    comun.lastContext = (state.context && state.context.uri) || null;
     const rep = ['off', 'context', 'track'][state.repeat_mode] || 'off';
-    if (!!state.shuffle !== lastShuffle || rep !== lastRepeat) {
-      lastShuffle = !!state.shuffle;
-      lastRepeat = rep;
+    if (!!state.shuffle !== comun.lastShuffle || rep !== comun.lastRepeat) {
+      comun.lastShuffle = !!state.shuffle;
+      comun.lastRepeat = rep;
       window.dispatchEvent(new CustomEvent('mm:spotify-modes', {
-        detail: { shuffle: lastShuffle, repeat: lastRepeat, device: lastDevice, deviceChanged: false },
+        detail: { shuffle: comun.lastShuffle, repeat: comun.lastRepeat, device: comun.lastDevice, deviceChanged: false },
       }));
     }
   };
 
   const arrancarSDK = () => {
-    if (sdkIntento) return sdkIntento;
-    if (sdkVetado) return Promise.resolve(false);
+    if (comun.sdkIntento) return comun.sdkIntento;
+    if (comun.sdkVetado) return Promise.resolve(false);
     /* Una sesión de antes de este cambio no tiene `streaming`, y el SDK
        fallaría con un error de autenticación que parece otra cosa. Mejor
        decirlo claro y no gastar la carga del script. */
     if (!scopesAlDia()) { avisarReconexion(); return Promise.resolve(false); }
 
-    sdkIntento = cargarSDK().then(() => new Promise((resolve) => {
+    comun.sdkIntento = cargarSDK().then(() => new Promise((resolve) => {
       const vol = (window.PlayerCore && window.PlayerCore.state)
         ? window.PlayerCore.state.volume : 0.7;
 
-      sdkPlayer = new window.Spotify.Player({
+      comun.sdkPlayer = new window.Spotify.Player({
         name: NOMBRE_APARATO,
         /* Se le da un token FRESCO cada vez que lo pide (también cuando el
            suyo caduca a la hora), no uno guardado al arrancar. Si no hay
@@ -862,7 +917,7 @@
         getOAuthToken: (cb) => {
           getValidToken().then((t) => {
             if (t) cb(t);
-            else if (!permisoCaducado) setStatus('◎ la sesión de spotify caducó · pulsa [ conectar spotify ] en ajustes');
+            else if (!comun.permisoCaducado) comun.setStatus('◎ la sesión de spotify caducó · pulsa [ conectar spotify ] en ajustes');
           });
         },
         volume: Math.max(0, Math.min(1, vol)),
@@ -877,16 +932,16 @@
         enableMediaSession: true,
       });
 
-      sdkPlayer.addListener('ready', ({ device_id }) => {
-        const volvio = sdkPerdido;
-        sdkDeviceId = device_id;
-        sdkPerdido = false;
-        sdkReautenticado = false;    // conectado: si un día vuelve a quejarse, otro intento
+      comun.sdkPlayer.addListener('ready', ({ device_id }) => {
+        const volvio = comun.sdkPerdido;
+        comun.sdkDeviceId = device_id;
+        comun.sdkPerdido = false;
+        comun.sdkReautenticado = false;    // conectado: si un día vuelve a quejarse, otro intento
         reconexionN = 0;
-        clearTimeout(reconexionT);
+        clearTimeout(comun.reconexionT);
         console.log('[Spotify] reproductor listo en esta pestaña:', device_id);
-        pintarChipAparato();
-        if (volvio) setStatus('◆ el reproductor de esta pestaña volvió');
+        comun.pintarChipAparato();
+        if (volvio) comun.setStatus('◆ el reproductor de esta pestaña volvió');
         /* Ya hay dónde retomar: si no había nada sonando en ningún sitio, se
            deja puesta la canción de la última vez. */
         restaurarUltimo();
@@ -899,20 +954,20 @@
          y el siguiente play acababa en un «no hay dispositivo». Ahora se
          vuelve a conectar solo, con esperas que se alargan (3, 8, 20, 60 s) y
          en cuanto vuelve la red. */
-      sdkPlayer.addListener('not_ready', ({ device_id }) => {
-        if (sdkDeviceId === device_id) sdkDeviceId = null;
-        const sonabaAqui = sdkActivo;
-        if (sdkActivo) { sdkActivo = false; startPolling(); }
-        sdkPerdido = true;
-        pintarChipAparato();
-        if (sonabaAqui) setStatus('◎ se cortó el reproductor de esta pestaña · reconectando…');
+      comun.sdkPlayer.addListener('not_ready', ({ device_id }) => {
+        if (comun.sdkDeviceId === device_id) comun.sdkDeviceId = null;
+        const sonabaAqui = comun.sdkActivo;
+        if (comun.sdkActivo) { comun.sdkActivo = false; comun.startPolling(); }
+        comun.sdkPerdido = true;
+        comun.pintarChipAparato();
+        if (sonabaAqui) comun.setStatus('◎ se cortó el reproductor de esta pestaña · reconectando…');
         reconectarSDK();
       });
 
-      sdkPlayer.addListener('player_state_changed', sdkEstado);
+      comun.sdkPlayer.addListener('player_state_changed', sdkEstado);
 
       // Navegador sin DRM (o con el DRM desactivado a mano)
-      sdkPlayer.addListener('initialization_error', ({ message }) => {
+      comun.sdkPlayer.addListener('initialization_error', ({ message }) => {
         vetarSDK('este navegador no puede reproducir Spotify dentro de la página', message);
         resolve(false);
       });
@@ -922,19 +977,19 @@
          arreglo sin molestar a nadie: renovar y volver a conectar, UNA vez.
          Antes se vetaba el reproductor a la primera y con el aviso de «tu
          sesión es anterior», que casi nunca era verdad. */
-      sdkPlayer.addListener('authentication_error', ({ message }) => {
+      comun.sdkPlayer.addListener('authentication_error', ({ message }) => {
         console.warn('[Spotify SDK] autenticación:', message);
-        if (scopesAlDia() && !sdkReautenticado) {
-          sdkReautenticado = true;
+        if (scopesAlDia() && !comun.sdkReautenticado) {
+          comun.sdkReautenticado = true;
           refreshToken().then((ok) => {
-            if (ok && sdkPlayer) { sdkPlayer.connect(); return; }
-            setStatus('◎ spotify no aceptó el permiso del reproductor · pulsa [ conectar spotify ] en ajustes');
+            if (ok && comun.sdkPlayer) { comun.sdkPlayer.connect(); return; }
+            comun.setStatus('◎ spotify no aceptó el permiso del reproductor · pulsa [ conectar spotify ] en ajustes');
           });
           return;
         }
-        sdkVetado = true;
+        comun.sdkVetado = true;
         if (scopesAlDia()) {
-          setStatus('◎ spotify no aceptó el permiso del reproductor · pulsa [ conectar spotify ] en ajustes');
+          comun.setStatus('◎ spotify no aceptó el permiso del reproductor · pulsa [ conectar spotify ] en ajustes');
         } else {
           avisoReconexion = false;   // este aviso sí merece salir
           avisarReconexion();
@@ -942,44 +997,59 @@
         resolve(false);
       });
       // Cuenta free: el SDK no reproduce, punto
-      sdkPlayer.addListener('account_error', ({ message }) => {
+      comun.sdkPlayer.addListener('account_error', ({ message }) => {
         vetarSDK('para que suene aquí hace falta Spotify Premium', message);
         resolve(false);
       });
       /* No toda queja del SDK es un fallo que haya que enseñar: «no list was
          loaded» sale al pedirle siguiente/anterior sin nada cargado (lo hacen
          a veces las teclas multimedia), y no ha pasado nada que arreglar. */
-      sdkPlayer.addListener('playback_error', ({ message }) => {
+      comun.sdkPlayer.addListener('playback_error', ({ message }) => {
         console.warn('[Spotify SDK] reproducción:', message);
         if (/no list was loaded/i.test(message || '')) return;
-        setStatus('✕ spotify no pudo cargar esa canción aquí · prueba otra vez o elige otro aparato en ◎');
+        comun.setStatus('✕ spotify no pudo cargar esa canción aquí · prueba otra vez o elige otro aparato en ◎');
       });
-      sdkPlayer.addListener('autoplay_failed', () => {
-        setStatus('▸ toca la pantalla una vez: el navegador no deja arrancar el audio solo');
+      comun.sdkPlayer.addListener('autoplay_failed', () => {
+        comun.setStatus('▸ toca la pantalla una vez: el navegador no deja arrancar el audio solo');
       });
 
       desbloquearAlPrimerGesto();
-      sdkPlayer.connect().then((ok) => { if (!ok) resolve(false); });
+      comun.sdkPlayer.connect().then((ok) => { if (!ok) resolve(false); });
 
       /* Red de seguridad: si `ready` no llega nunca, que la promesa no se
          quede colgada para siempre. El oyente sigue puesto por si llega
          tarde. */
-      setTimeout(() => resolve(!!sdkDeviceId), 15000);
+      setTimeout(() => resolve(!!comun.sdkDeviceId), 15000);
     })).catch((e) => {
       console.warn('[Spotify SDK] no arrancó:', e && e.message);
       return false;
     });
 
-    return sdkIntento;
+    return comun.sdkIntento;
   };
+  comun.arrancarSDK = arrancarSDK;
+})();
+/* ==========================================================
+   SPOTIFY · qué suena (js/spotify/estado.js)
+
+   El sondeo de la reproducción (con su reloj interpolado entre sondeo y
+   sondeo) y el pintado de la pista: título, carátula, progreso y play.
+   Reparto de js/spotify/: ver sesion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.spotify;
+  const {
+    frenado, api
+  } = comun;
 
   // -------- Polling current playback --------
   let pollTimer = null;
   // La reprograma startPolling(); vive aquí porque la usa el oyente de
   // visibilitychange, que se registra fuera.
   let reprogramar = () => {};
-  let lastTrackId = null;
-  let lastIsPlaying = false;   // último estado conocido (lo refresca el polling)
+  comun.lastTrackId = null;
+  comun.lastIsPlaying = false;   // último estado conocido (lo refresca el polling)
 
   /* Aparato y modos, que ANTES no se sabían. El sondeo pedía
      `/me/player/currently-playing`, que devuelve la pista y poco más;
@@ -987,16 +1057,16 @@
      además trae el dispositivo activo, su volumen real y el estado de
      aleatorio/repetir. Sin eso, los botones de aleatorio y repetir no tenían
      forma de saber cómo estaba Spotify de verdad. */
-  let lastDevice = null;       // {id, name, type, volume_percent} o null
+  comun.lastDevice = null;       // {id, name, type, volume_percent} o null
   /* De dónde sale lo que suena: la playlist / álbum / artista. Hace falta
      para que elegir una canción en la pestaña «cola» no rompa la cola: con
      el contexto se salta A esa canción DENTRO de la lista y lo que venía
      detrás se conserva; sin él, Spotify reproduce esa pista suelta y al
      acabar se queda callado. El sondeo ya pide /me/player, así que esto no
      cuesta ni una petición más. */
-  let lastContext = null;      // 'spotify:playlist:…' o null
-  let lastShuffle = null;      // true/false; null = todavía no se sabe
-  let lastRepeat = null;       // 'off' | 'context' | 'track'
+  comun.lastContext = null;      // 'spotify:playlist:…' o null
+  comun.lastShuffle = null;      // true/false; null = todavía no se sabe
+  comun.lastRepeat = null;       // 'off' | 'context' | 'track'
 
   /* LO QUE SPOTIFY DEJA HACER AHORA MISMO. Tanto el SDK (`disallows`) como
      `/me/player` (`actions.disallows`) dicen qué NO se puede hacer con lo
@@ -1007,10 +1077,10 @@
      «anterior» sin anterior vuelve al principio de la canción (lo que hacen
      las apps de Spotify) y lo demás lo dice en vez de fallar. */
   const TODO_PERMITIDO = { prev: true, next: true, seek: true, shuffle: true, repeat: true };
-  let permisos = { ...TODO_PERMITIDO };
+  comun.permisos = { ...TODO_PERMITIDO };
   const leerPermisos = (dis) => {
     const d = dis || {};
-    permisos = {
+    comun.permisos = {
       prev: !d.skipping_prev,
       next: !d.skipping_next,
       seek: !d.seeking,
@@ -1018,6 +1088,7 @@
       repeat: !(d.toggling_repeat_context || d.toggling_repeat_track),
     };
   };
+  comun.leerPermisos = leerPermisos;
 
   /* EL VOLUMEN DE UN APARATO QUE NO SE DEJA. Hay aparatos (los iPhone por
      Spotify Connect, algunos altavoces) con `supports_volume: false`: la API
@@ -1026,21 +1097,24 @@
      barra se ve apagada y se dice una vez por aparato. */
   let avisoVolumenDe = null;
   const pintarVolAjeno = (on) => { document.body.classList.toggle('vol-ajeno', !!on); };
+  comun.pintarVolAjeno = pintarVolAjeno;
   const volAjeno = () => {
     // solo si lo que suena es de Spotify: con tu música la barra es del <audio> de aquí
     const PC = window.PlayerCore;
     const cur = PC && PC.state && PC.state.currentTrack;
-    return !!(cur && cur.spotify) && !sdkActivo && !!(lastDevice && lastDevice.supports_volume === false);
+    return !!(cur && cur.spotify) && !comun.sdkActivo && !!(comun.lastDevice && comun.lastDevice.supports_volume === false);
   };
+  comun.volAjeno = volAjeno;
   const avisarSinVolumen = () => {
-    const d = lastDevice;
+    const d = comun.lastDevice;
     pintarVolAjeno(true);
     const clave = (d && d.id) || '?';
     if (avisoVolumenDe === clave) return;
     avisoVolumenDe = clave;
-    setStatus('◎ ' + (d && d.name ? '«' + d.name + '»' : 'ese aparato')
+    comun.setStatus('◎ ' + (d && d.name ? '«' + d.name + '»' : 'ese aparato')
       + ' no deja cambiar su volumen desde fuera · usa sus propios botones');
   };
+  comun.avisarSinVolumen = avisarSinVolumen;
 
   /* Avisa UNA vez por cambio, no en cada sondeo. Quien pinta los botones
      escucha este evento; nadie llama al manejador del clic, así que pintar
@@ -1049,18 +1123,18 @@
     const dev = data.device || null;
     const sh = typeof data.shuffle_state === 'boolean' ? data.shuffle_state : null;
     const rp = data.repeat_state || null;
-    const idAntes = lastDevice ? lastDevice.id : null;
+    const idAntes = comun.lastDevice ? comun.lastDevice.id : null;
     const idAhora = dev ? dev.id : null;
     const cambioDev = idAhora !== idAntes;
-    if (!cambioDev && sh === lastShuffle && rp === lastRepeat) return;
-    lastDevice = dev;
-    lastShuffle = sh;
-    lastRepeat = rp;
+    if (!cambioDev && sh === comun.lastShuffle && rp === comun.lastRepeat) return;
+    comun.lastDevice = dev;
+    comun.lastShuffle = sh;
+    comun.lastRepeat = rp;
     window.dispatchEvent(new CustomEvent('mm:spotify-modes', {
       detail: { shuffle: sh, repeat: rp, device: dev, deviceChanged: cambioDev },
     }));
     if (cambioDev) {
-      pintarChipAparato();
+      comun.pintarChipAparato();
       pintarVolAjeno(volAjeno());
     }
   };
@@ -1068,9 +1142,9 @@
   // El polling llega cada 2s; entre poll y poll interpolamos con un reloj
   // local para que la letra y la barra avancen suaves a 60fps en vez de
   // dar saltos de 2 segundos.
-  let progBase = 0;    // progreso (s) reportado en el último poll
-  let progStamp = 0;   // performance.now() de ese poll
-  let progDur = 0;     // duración (s) de la pista actual
+  comun.progBase = 0;    // progreso (s) reportado en el último poll
+  comun.progStamp = 0;   // performance.now() de ese poll
+  comun.progDur = 0;     // duración (s) de la pista actual
   let rafId = null;
 
   const paintProgress = (sec) => {
@@ -1078,19 +1152,20 @@
     /* Mientras el dedo tiene agarrada la barra manda el dedo: este reloj
        corre a 60 fps y le arrancaría el tirador de la mano. */
     if (document.body.classList.contains('barra-agarrada')) return;
-    const pct = progDur ? Math.min(100, (sec / progDur) * 100) : 0;
+    const pct = comun.progDur ? Math.min(100, (sec / comun.progDur) * 100) : 0;
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressThumb').style.left = pct + '%';
     /* Este reloj corre a 60 fps pero el texto cambia una vez por segundo:
        reescribirlo en cada frame rehacía el nodo de texto 60 veces por
        segundo (y despertaba 60 veces al que dibuja los «8» apagados). */
     const tc = document.getElementById('timeCurrent');
-    const txt = formatTime(sec);
+    const txt = comun.formatTime(sec);
     if (tc.textContent !== txt) tc.textContent = txt;
     const PC = window.PlayerCore;
-    if (PC && PC.pintarRestante) PC.pintarRestante(sec, progDur);
-    if (PC && PC.ariaBarra) PC.ariaBarra(sec, progDur);
+    if (PC && PC.pintarRestante) PC.pintarRestante(sec, comun.progDur);
+    if (PC && PC.ariaBarra) PC.ariaBarra(sec, comun.progDur);
   };
+  comun.paintProgress = paintProgress;
 
   let ultimaAncla = 0;   // último re-anclaje contra el reproductor de la pestaña
 
@@ -1103,7 +1178,7 @@
   let relojVivo = false;       // ¿hay sesión con el reloj de la barra en marcha?
   let mandoReloj = null;
   const relojActivo = () => {
-    if (!relojVivo || !lastIsPlaying || !progStamp) return false;
+    if (!relojVivo || !comun.lastIsPlaying || !comun.progStamp) return false;
     const st = window.PlayerCore && window.PlayerCore.state;
     return !(st && st.isPreview);   // el preview de 30s ya lo mueve el audio local
   };
@@ -1119,19 +1194,19 @@
        y la letra se irían separando del audio en las canciones largas.
        La corrección es suave (el mismo 35% que usa el sondeo): re-anclar en
        seco hace parpadear la línea activa de la letra. */
-    if (sdkActivo && sdkPlayer && ahora - ultimaAncla > 10000) {
+    if (comun.sdkActivo && comun.sdkPlayer && ahora - ultimaAncla > 10000) {
       ultimaAncla = ahora;
-      sdkPlayer.getCurrentState().then((s) => {
+      comun.sdkPlayer.getCurrentState().then((s) => {
         if (!s || s.paused) return;
-        const est = progBase + (performance.now() - progStamp) / 1000;
+        const est = comun.progBase + (performance.now() - comun.progStamp) / 1000;
         const real = s.position / 1000;
-        progBase = Math.abs(real - est) < 0.8 ? est + (real - est) * 0.35 : real;
-        progStamp = performance.now();
+        comun.progBase = Math.abs(real - est) < 0.8 ? est + (real - est) * 0.35 : real;
+        comun.progStamp = performance.now();
       }).catch(() => {});
     }
 
-    const sec = progBase + (ahora - progStamp) / 1000;
-    paintProgress(progDur ? Math.min(progDur, sec) : sec);
+    const sec = comun.progBase + (ahora - comun.progStamp) / 1000;
+    paintProgress(comun.progDur ? Math.min(comun.progDur, sec) : sec);
   };
 
   // arranca el reloj de la barra (llamarlo dos veces no hace nada)
@@ -1148,6 +1223,7 @@
     const propio = () => { rafId = requestAnimationFrame(propio); pasoReloj(); };
     propio();
   };
+  comun.smoothLoop = smoothLoop;
 
   /* -------- Pintado de la pista, compartido --------
      La misma canción llega ahora por DOS caminos: el sondeo de `/me/player`
@@ -1183,6 +1259,7 @@
       uri: it.uri,
     };
   };
+  comun.pistaDesde = pistaDesde;
 
   const pintarPista = (track) => {
     document.getElementById('npTitle').textContent = track.name;
@@ -1200,32 +1277,35 @@
       coverArt.style.backgroundPosition = 'center';
       coverArt.innerHTML = '';
     }
-    document.getElementById('timeTotal').textContent = formatTime(track.duration);
+    document.getElementById('timeTotal').textContent = comun.formatTime(track.duration);
   };
+  comun.pintarPista = pintarPista;
 
   const pintarPlay = (playing) => {
-    lastIsPlaying = playing;
+    comun.lastIsPlaying = playing;
     document.getElementById('playIcon').hidden = playing;
     document.getElementById('pauseIcon').hidden = !playing;
     document.body.classList.toggle('playing', playing);
     if (playing) despertarReloj();   // el reloj de la barra duerme en pausa
   };
+  comun.pintarPlay = pintarPlay;
 
   /* Va aparte del pintado a propósito: pedir la letra es caro y solo debe
      pasar cuando la canción cambia de verdad, no en cada refresco. */
   const notarCambio = (track) => {
-    if (track.id === lastTrackId) return;
-    lastTrackId = track.id;
+    if (track.id === comun.lastTrackId) return;
+    comun.lastTrackId = track.id;
     window.PlayerCore.state.currentTrack = track;
     if (window.LyricsModule) window.LyricsModule.fetch(track);
-    refrescarLike(track);
+    comun.refrescarLike(track);
     /* Cambiar de canción es el ÚNICO momento en que la cola se acorta, así
        que es aquí donde «sigue sonando» se repone. Es lo que hace que no se
        acabe: mientras la sesión siga viva, siempre quedan canciones por
        delante. Vale para los dos caminos —el SDK y el sondeo—, porque los
        dos pasan por aquí al cambiar de pista. */
-    if (mezcla) rellenarMezcla();
+    if (comun.mezcla) comun.rellenarMezcla();
   };
+  comun.notarCambio = notarCambio;
 
   const startPolling = () => {
     /* Sonando en esta misma pestaña no hay NADA que preguntarle a la API: el
@@ -1234,7 +1314,7 @@
        pausa, siguiente, cambio de aparato…) y bastaría olvidarse de uno para
        volver a las 30 peticiones por minuto. El reloj de la barra sí tiene
        que seguir corriendo. */
-    if (sdkActivo) { smoothLoop(); return; }
+    if (comun.sdkActivo) { smoothLoop(); return; }
     if (pollTimer) return;
     const poll = async () => {
       try {
@@ -1247,7 +1327,7 @@
         // Los modos se leen aunque no haya pista sonando: puede haber un
         // aparato despierto y en pausa, y el aleatorio sigue teniendo estado.
         if (data) leerModos(data);
-        if (data) lastContext = (data.context && data.context.uri) || null;
+        if (data) comun.lastContext = (data.context && data.context.uri) || null;
         // qué deja hacer Spotify con lo que suena (ver `leerPermisos`)
         if (data) leerPermisos(data.actions && data.actions.disallows);
         if (data && data.item) {
@@ -1255,7 +1335,7 @@
           const track = pistaDesde(it);
           /* Hay música de verdad en algún aparato: manda esa, no lo que
              dejamos apuntado de la última vez. */
-          reanudar = null;
+          comun.reanudar = null;
           pintarPista(track);
           // Re-ancla el reloj local con el progreso real; smoothLoop interpola
           // entre polls para que letra y barra no salten cada 2s.
@@ -1268,8 +1348,8 @@
             // ±200ms (la línea activa de la letra parpadeaba o volvía atrás
             // y se re-animaba). Diferencias pequeñas se corrigen suave; solo
             // un salto real (seek, cambio de canción) re-ancla directo.
-            const est = (progStamp && lastIsPlaying && track.id === lastTrackId)
-              ? progBase + (t1 - progStamp) / 1000
+            const est = (comun.progStamp && comun.lastIsPlaying && track.id === comun.lastTrackId)
+              ? comun.progBase + (t1 - comun.progStamp) / 1000
               : null;
             if (playing && est !== null && Math.abs(anchor - est) < 0.8) {
               /* Cuánto se le cree a esta muestra depende de lo que tardó en
@@ -1281,11 +1361,11 @@
               const peso = 0.35 * Math.min(1, 150 / Math.max(150, t1 - t0));
               anchor = est + (anchor - est) * peso;
             }
-            progBase = anchor;
-            progStamp = t1;
-            progDur = it.duration_ms / 1000;
+            comun.progBase = anchor;
+            comun.progStamp = t1;
+            comun.progDur = it.duration_ms / 1000;
             // Reproduciendo pinta el rAF (smoothLoop); en pausa pintamos aquí
-            if (!playing) paintProgress(progBase);
+            if (!playing) paintProgress(comun.progBase);
           }
           pintarPlay(playing);
           notarCambio(track);
@@ -1308,7 +1388,7 @@
       if (document.hidden) return 30000;              // nadie está mirando
       const resto = frenado();
       if (resto) return Math.min(60000, resto + 500); // esperar a que pase el 429
-      return lastIsPlaying ? 2000 : 10000;
+      return comun.lastIsPlaying ? 2000 : 10000;
     };
 
     const siguiente = () => {
@@ -1336,6 +1416,7 @@
     siguiente();
     smoothLoop();
   };
+  comun.startPolling = startPolling;
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && !frenado()) reprogramar();
@@ -1352,17 +1433,34 @@
     if (soloRed) return;
     relojVivo = false;
     if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-    progStamp = 0;
+    comun.progStamp = 0;
     // Sin sondeo no se sabe nada del aparato: dejarlo puesto haría que la
     // barra de estado siguiera diciendo dónde suena algo que ya no suena.
-    lastDevice = null;
-    lastShuffle = null;
-    lastRepeat = null;
-    lastContext = null;
-    permisos = { ...TODO_PERMITIDO };
+    comun.lastDevice = null;
+    comun.lastShuffle = null;
+    comun.lastRepeat = null;
+    comun.lastContext = null;
+    comun.permisos = { ...TODO_PERMITIDO };
     pintarVolAjeno(false);
-    pintarChipAparato();
+    comun.pintarChipAparato();
   };
+  comun.stopPolling = stopPolling;
+})();
+/* ==========================================================
+   SPOTIFY · los mandos (js/spotify/mandos.js)
+
+   Los controles de reproducción por Spotify Connect, dónde suena,
+   escribir en la cuenta (el ♥ y las playlists), buscar y poner
+   canciones, y las últimas búsquedas. Reparto de js/spotify/: ver
+   sesion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.spotify;
+  const {
+    isLoggedIn, api, leerError, explicar, conDestino, alQueSuena, arrancarSDK, volAjeno,
+    avisarSinVolumen, paintProgress, startPolling
+  } = comun;
 
   // -------- Controles de reproducción (Spotify Connect) --------
   // app.js delega aquí cuando la canción actual es de Spotify.
@@ -1374,17 +1472,17 @@
     /* Primer play tras recargar: en vez de un play a secas —que empezaría la
        canción desde el principio, o daría 404 si no hay aparato— se retoma la
        de la última vez por el minuto exacto en que se quedó. */
-    if (reanudar && !lastIsPlaying) {
-      const r = reanudar;
-      reanudar = null;
+    if (comun.reanudar && !comun.lastIsPlaying) {
+      const r = comun.reanudar;
+      comun.reanudar = null;
       try {
         await arrancarSDK();
         const body = r.ctx
           ? { context_uri: r.ctx, offset: { uri: r.uri }, position_ms: r.pos }
           : { uris: [r.uri], position_ms: r.pos };
         await api(conDestino('/me/player/play'), { method: 'PUT', body: JSON.stringify(body) });
-        lastTrackId = null;
-        lastIsPlaying = true;
+        comun.lastTrackId = null;
+        comun.lastIsPlaying = true;
         startPolling();
         setStatus('▶ seguimos donde lo dejaste');
         return;
@@ -1393,31 +1491,31 @@
         console.warn('[Spotify] no se pudo retomar:', e && e.message);
       }
     }
-    if (sdkActivo && sdkPlayer) {
+    if (comun.sdkActivo && comun.sdkPlayer) {
       // No hay que pintar nada a mano: `player_state_changed` llega solo.
-      try { await sdkPlayer.togglePlay(); return; } catch (e) { /* cae a la API */ }
+      try { await comun.sdkPlayer.togglePlay(); return; } catch (e) { /* cae a la API */ }
     }
-    const pausar = lastIsPlaying;
+    const pausar = comun.lastIsPlaying;
     try {
       /* Con destino: darle al play sin nada sonando en ningún sitio era el
          404 de siempre. Apuntando a esta pestaña, arranca aquí. */
       await api(alQueSuena(pausar ? '/me/player/pause' : '/me/player/play'), { method: 'PUT' });
-      lastIsPlaying = !lastIsPlaying;
+      comun.lastIsPlaying = !comun.lastIsPlaying;
       // Refleja el cambio al instante; el polling lo confirma después.
-      document.getElementById('playIcon').hidden = lastIsPlaying;
-      document.getElementById('pauseIcon').hidden = !lastIsPlaying;
-      document.body.classList.toggle('playing', lastIsPlaying);
+      document.getElementById('playIcon').hidden = comun.lastIsPlaying;
+      document.getElementById('pauseIcon').hidden = !comun.lastIsPlaying;
+      document.body.classList.toggle('playing', comun.lastIsPlaying);
       startPolling();
     } catch (e) {
       /* El aparato elegido ya no existe (el móvil se apagó, la tele se
          durmió): se vuelve a esta pestaña y se prueba otra vez, en vez de
          mandar a abrir Spotify a quien lo tiene aquí mismo. */
-      if (!pausar && leerError(e).status === 404 && sdkDeviceId) {
-        destinoElegido = null;
-        lastDevice = null;         // el de antes ya no está: que el sondeo diga el nuevo
+      if (!pausar && leerError(e).status === 404 && comun.sdkDeviceId) {
+        comun.destinoElegido = null;
+        comun.lastDevice = null;         // el de antes ya no está: que el sondeo diga el nuevo
         try {
           await api(conDestino('/me/player/play'), { method: 'PUT' });
-          lastIsPlaying = true;
+          comun.lastIsPlaying = true;
           startPolling();
           setStatus('◆ ese aparato ya no estaba · suena aquí');
           return;
@@ -1426,43 +1524,46 @@
       setStatus('✕ ' + explicar(e, pausar ? 'pausar' : 'reproducir'));
     }
   };
+  comun.spTogglePlay = spTogglePlay;
 
   const spNext = async () => {
-    if (!permisos.next) { setStatus('▣ spotify no deja saltar esta canción'); return; }
-    if (sdkActivo && sdkPlayer) {
-      try { await sdkPlayer.nextTrack(); return; } catch (e) { /* cae a la API */ }
+    if (!comun.permisos.next) { setStatus('▣ spotify no deja saltar esta canción'); return; }
+    if (comun.sdkActivo && comun.sdkPlayer) {
+      try { await comun.sdkPlayer.nextTrack(); return; } catch (e) { /* cae a la API */ }
     }
     try {
       await api(alQueSuena('/me/player/next'), { method: 'POST' });
-      lastTrackId = null;          // fuerza al polling a refrescar la canción
+      comun.lastTrackId = null;          // fuerza al polling a refrescar la canción
       startPolling();
     } catch (e) { setStatus('✕ ' + explicar(e, 'saltar de canción')); }
   };
+  comun.spNext = spNext;
 
   const spPrev = async () => {
     /* Sin anterior (la primera de la lista, o algo que no lo deja): las apps
        de Spotify vuelven al principio de la canción, y eso se hace aquí. */
-    if (!permisos.prev) {
-      if (permisos.seek) await spSeek(0);
+    if (!comun.permisos.prev) {
+      if (comun.permisos.seek) await spSeek(0);
       else setStatus('▣ spotify no deja volver atrás con esto');
       return;
     }
-    if (sdkActivo && sdkPlayer) {
-      try { await sdkPlayer.previousTrack(); return; } catch (e) { /* cae a la API */ }
+    if (comun.sdkActivo && comun.sdkPlayer) {
+      try { await comun.sdkPlayer.previousTrack(); return; } catch (e) { /* cae a la API */ }
     }
     try {
       await api(alQueSuena('/me/player/previous'), { method: 'POST' });
-      lastTrackId = null;
+      comun.lastTrackId = null;
       startPolling();
     } catch (e) { setStatus('✕ ' + explicar(e, 'volver a la anterior')); }
   };
+  comun.spPrev = spPrev;
 
   const spSetVolume = async (pct) => {
     pct = Math.max(0, Math.min(100, Math.round(pct)));
     /* Este es el que más se ahorra: arrastrar la barra de volumen soltaba una
        petición por cada paso. En local es una llamada de nada. */
-    if (sdkActivo && sdkPlayer) {
-      try { await sdkPlayer.setVolume(pct / 100); return; } catch (e) {}
+    if (comun.sdkActivo && comun.sdkPlayer) {
+      try { await comun.sdkPlayer.setVolume(pct / 100); return; } catch (e) {}
     }
     // un aparato que no deja tocarle el volumen: ni se intenta (ver `volAjeno`)
     if (volAjeno()) { avisarSinVolumen(); return; }
@@ -1473,6 +1574,7 @@
       // lo demás (un 429, un corte) no merece aviso: el próximo paso de la barra lo reintenta
     }
   };
+  comun.spSetVolume = spSetVolume;
 
   /* Aleatorio y repetir en el aparato de verdad. Hasta ahora estos dos
      botones SOLO cambiaban una variable de app.js: con Spotify Connect se
@@ -1480,7 +1582,7 @@
      error a propósito — quien pulsó necesita saber que no se aplicó para
      devolver el botón a su sitio, que es peor mentira que no tenerlo. */
   const spSetShuffle = async (on) => {
-    if (!permisos.shuffle) {
+    if (!comun.permisos.shuffle) {
       setStatus('▣ spotify no deja cambiar el aleatorio con lo que suena');
       throw new Error('aleatorio no permitido');   // app.js devuelve el botón a su sitio
     }
@@ -1490,27 +1592,29 @@
          API — y sin ningún aparato activo Spotify contesta 404. Con algo
          sonando, al aparato donde suena (ver `alQueSuena`). */
       await api(alQueSuena('/me/player/shuffle?state=' + (on ? 'true' : 'false')), { method: 'PUT' });
-      lastShuffle = !!on;
+      comun.lastShuffle = !!on;
     } catch (e) {
       setStatus('✕ ' + explicar(e, 'cambiar el aleatorio'));
       throw e;
     }
   };
+  comun.spSetShuffle = spSetShuffle;
 
   // modo: 'off' | 'context' (toda la lista) | 'track' (una canción)
   const spSetRepeat = async (modo) => {
-    if (!permisos.repeat) {
+    if (!comun.permisos.repeat) {
       setStatus('▣ spotify no deja cambiar la repetición con lo que suena');
       throw new Error('repetir no permitido');
     }
     try {
       await api(alQueSuena('/me/player/repeat?state=' + modo), { method: 'PUT' });
-      lastRepeat = modo;
+      comun.lastRepeat = modo;
     } catch (e) {
       setStatus('✕ ' + explicar(e, 'cambiar la repetición'));
       throw e;
     }
   };
+  comun.spSetRepeat = spSetRepeat;
 
   /* Encolar en vez de interrumpir. Hasta ahora, desde buscar o desde la
      biblioteca solo se podía «reproducir ya», que corta en seco lo que esté
@@ -1531,6 +1635,7 @@
       setStatus('✕ ' + explicar(e, 'añadirla a la cola'));
     }
   };
+  comun.spQueue = spQueue;
 
   /* Saca el mensaje que manda Spotify dentro del cuerpo del error. Los 403 de
      esta API se tragan el motivo si no se hace esto — ya pasó tres veces en
@@ -1549,30 +1654,32 @@
     const d = await api('/me/player/devices');
     return (d && Array.isArray(d.devices)) ? d.devices : [];
   };
+  comun.spDevices = spDevices;
 
   const spTransfer = async (id) => {
     /* `play` lleva el estado ACTUAL a propósito: si estaba en pausa, cambiar
        de altavoz no debería ponerse a sonar de golpe (p. ej. de madrugada). */
     await api('/me/player', {
       method: 'PUT',
-      body: JSON.stringify({ device_ids: [id], play: !!lastIsPlaying }),
+      body: JSON.stringify({ device_ids: [id], play: !!comun.lastIsPlaying }),
     });
   };
+  comun.spTransfer = spTransfer;
 
   const spSeek = async (ms) => {
     // Re-anclar el reloj vale para los dos caminos: el de aquí y el remoto.
     const anclar = () => {
-      progBase = ms / 1000;
-      progStamp = performance.now();
-      paintProgress(progBase);
+      comun.progBase = ms / 1000;
+      comun.progStamp = performance.now();
+      paintProgress(comun.progBase);
     };
-    if (!permisos.seek) {
+    if (!comun.permisos.seek) {
       setStatus('▣ spotify no deja moverse dentro de esta canción');
-      paintProgress(posicionActual());     // la barra vuelve a donde de verdad va
+      paintProgress(comun.posicionActual());     // la barra vuelve a donde de verdad va
       return;
     }
-    if (sdkActivo && sdkPlayer) {
-      try { await sdkPlayer.seek(Math.round(ms)); anclar(); return; } catch (e) {}
+    if (comun.sdkActivo && comun.sdkPlayer) {
+      try { await comun.sdkPlayer.seek(Math.round(ms)); anclar(); return; } catch (e) {}
     }
     try {
       await api('/me/player/seek?position_ms=' + Math.round(ms), { method: 'PUT' });
@@ -1581,9 +1688,10 @@
     }
     catch (e) {
       setStatus('✕ ' + explicar(e, 'moverse en la canción'));
-      paintProgress(posicionActual());
+      paintProgress(comun.posicionActual());
     }
   };
+  comun.spSeek = spSeek;
 
   /* Aquí vivieron estaGuardada()/guardar(), el ❤ de "Tus me gusta".
      Retirados el 2026-08-12: `PUT /me/tracks` devuelve **403 Forbidden** a
@@ -1607,14 +1715,15 @@
        GET    /me/library/contains?uris=…  → [true|false]
      ========================================================== */
   const like = () => document.getElementById('likeBtn');
+  comun.like = like;
   let likeUri = null;        // la uri cuyo estado enseña el botón
   let likeOn = false;
-  let likeMuerto = false;    // si Spotify también rechaza el endpoint nuevo
+  comun.likeMuerto = false;    // si Spotify también rechaza el endpoint nuevo
 
   const pintarLike = (visible) => {
     const b = like();
     if (!b) return;
-    b.hidden = !visible || likeMuerto;
+    b.hidden = !visible || comun.likeMuerto;
     // icono pixel: corazón hueco ↔ lleno cambiando la clase (sin él, el glifo de antes)
     const ico = b.querySelector('.ico');
     if (ico) {
@@ -1630,7 +1739,7 @@
 
   // Al cambiar de canción: preguntar si ya está guardada
   const refrescarLike = async (t) => {
-    if (likeMuerto || !t || !t.uri || !t.spotify || !isLoggedIn()) { pintarLike(false); return; }
+    if (comun.likeMuerto || !t || !t.uri || !t.spotify || !isLoggedIn()) { pintarLike(false); return; }
     likeUri = t.uri;
     try {
       const d = await api('/me/library/contains?uris=' + encodeURIComponent(t.uri));
@@ -1641,10 +1750,11 @@
       /* Un 403 aquí significa que Spotify tampoco deja LEER la biblioteca a
          las apps en modo desarrollo. Se apaga el botón entero en vez de
          dejar un corazón que miente. */
-      if (/40[34]/.test(e.message || '')) { likeMuerto = true; console.warn('[♥] Spotify no deja consultar la biblioteca:', detalleSpotify(e)); }
+      if (/40[34]/.test(e.message || '')) { comun.likeMuerto = true; console.warn('[♥] Spotify no deja consultar la biblioteca:', detalleSpotify(e)); }
       pintarLike(false);
     }
   };
+  comun.refrescarLike = refrescarLike;
 
   const alternarLike = async () => {
     if (!likeUri) return;
@@ -1659,7 +1769,7 @@
       likeOn = !quiero;
       pintarLike(true);
       if (/403/.test(e.message || '')) {
-        likeMuerto = true;
+        comun.likeMuerto = true;
         pintarLike(false);
         setStatus('✕ Spotify no deja guardar desde apps en modo desarrollo');
         console.warn('[♥] 403 también con /me/library:', detalleSpotify(e));
@@ -1668,6 +1778,7 @@
       }
     }
   };
+  comun.alternarLike = alternarLike;
 
   /* Crear una playlist de verdad a partir de una lista de URIs. La usa la
      pantalla del historial para convertir «tus más escuchadas» en algo que
@@ -1688,6 +1799,7 @@
     }
     return { id, url: (d.external_urls && d.external_urls.spotify) || null };
   };
+  comun.crearPlaylist = crearPlaylist;
 
   const formatTime = (s) => {
     if (!isFinite(s) || s < 0) return '0:00';
@@ -1695,25 +1807,29 @@
     const sec = Math.floor(s % 60);
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
+  comun.formatTime = formatTime;
 
   const setStatus = (msg) => {
     if (window.SevenStatus) window.SevenStatus(msg);
     else { const s = document.getElementById('statusText'); if (s) s.textContent = msg; }
   };
+  comun.setStatus = setStatus;
 
   /* Un aviso que puede llegar mientras la app aún arranca: la barra de
-     estado la monta js/seven.js, que carga después que este archivo, y en
+     estado la monta js/seven/, que carga después que este archivo, y en
      su repaso de cada 500 ms repinta el nombre de la canción. Dicho al
      instante, el aviso duraría medio segundo; dicho un poco después, se lee. */
   const avisarLuego = (msg, ms) => { setTimeout(() => setStatus(msg), ms || 1200); };
+  comun.avisarLuego = avisarLuego;
 
   const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
+  comun.escapeHtml = escapeHtml;
 
   // -------- Search & play tracks from the app --------
-  let searchResults = [];
-  let searchTimer = null;
+  comun.searchResults = [];
+  comun.searchTimer = null;
 
   const showSearchBlock = (show) => {
     const block = document.getElementById('spotifySearchBlock');
@@ -1721,11 +1837,12 @@
     const hint = document.getElementById('searchHint');
     if (hint) hint.hidden = show;
   };
+  comun.showSearchBlock = showSearchBlock;
 
   /* -------- Últimas búsquedas --------
      Volver a una búsqueda de hace un minuto era volver a teclearla entera.
      Se guardan 8, sin repetir y con la más reciente delante. */
-  const CLAVE_REC = 'mm_busquedas';
+  const CLAVE_REC = comun.CLAVE_REC = 'mm_busquedas';
   const MAX_REC = 8;
 
   const leerRecientes = () => {
@@ -1754,6 +1871,7 @@
       + lista.map((q) => `<button class="sp-rec" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`).join('')
       + '<button class="sp-rec sp-rec-borrar" data-borrar="1" title="Borrar el historial">✕</button>';
   };
+  comun.pintarRecientes = pintarRecientes;
 
   // Esqueletos: mejor que dejar la lista vacía mientras Spotify contesta
   const pintarCargando = () => {
@@ -1769,7 +1887,7 @@
   const renderResults = (consulta) => {
     const list = document.getElementById('spotifyResults');
     if (!list) return;
-    if (!searchResults.length) {
+    if (!comun.searchResults.length) {
       list.innerHTML = consulta
         ? `<li class="sp-empty">▒ nada para «${escapeHtml(consulta)}» ▒<br>
              <span class="sp-empty-tip">prueba con el nombre del artista, o con menos palabras</span></li>`
@@ -1782,7 +1900,7 @@
            </li>`;
       return;
     }
-    list.innerHTML = searchResults.map((t, i) => {
+    list.innerHTML = comun.searchResults.map((t, i) => {
       // Artistas y álbumes: sin duración ni ＋; se abren, no se encolan
       if (t.tipo && t.tipo !== 'track') {
         return `
@@ -1809,17 +1927,18 @@
       </li>`;
     }).join('');
   };
+  comun.renderResults = renderResults;
 
   /* Secuencia contra respuestas cruzadas: al teclear rápido salen varias
      peticiones y la lenta puede contestar DESPUÉS de la nueva, dejando en
      pantalla los resultados de lo que ya no está escrito. Misma solución
-     que en lyrics.js. */
+     que en js/letra/. */
   let seqBusqueda = 0;
 
   /* Qué se busca: canciones, artistas o álbumes. La app llevaba desde
      siempre buscando SOLO canciones (`type=track`), y con eso no se podía
      llegar a un artista ni a un disco. */
-  let tipoBusqueda = 'track';
+  comun.tipoBusqueda = 'track';
 
   /* Spotify devuelve la MISMA canción tres y cuatro veces —el single, el
      disco, el recopilatorio y el «Remastered»— y desde feb-2026 la búsqueda
@@ -1847,24 +1966,24 @@
   const doSearch = async (query) => {
     const q = query.trim();
     const mia = ++seqBusqueda;
-    if (!q) { searchResults = []; renderResults(''); return; }
+    if (!q) { comun.searchResults = []; renderResults(''); return; }
     pintarCargando();
     try {
       // limit máx. 10: desde feb-2026 Spotify limita las búsquedas de apps
       // en development mode a 10 resultados (más devuelve 400 "Invalid limit").
-      const data = await api(`/search?type=${tipoBusqueda}&limit=10&q=` + encodeURIComponent(q));
+      const data = await api(`/search?type=${comun.tipoBusqueda}&limit=10&q=` + encodeURIComponent(q));
       if (mia !== seqBusqueda) return;
 
       // Artistas y álbumes: filas distintas, y al pulsarlas se ABREN
-      if (tipoBusqueda !== 'track') {
-        const lista = tipoBusqueda === 'artist'
+      if (comun.tipoBusqueda !== 'track') {
+        const lista = comun.tipoBusqueda === 'artist'
           ? ((data && data.artists && data.artists.items) || [])
           : ((data && data.albums && data.albums.items) || []);
-        searchResults = lista.filter(Boolean).map((it) => ({
+        comun.searchResults = lista.filter(Boolean).map((it) => ({
           id: it.id,
           uri: it.uri,
           name: it.name,
-          artist: tipoBusqueda === 'artist'
+          artist: comun.tipoBusqueda === 'artist'
             ? ((it.genres || []).slice(0, 2).join(' · ') || 'artista')
             : (it.artists || []).map((a) => a.name).join(', '),
           album: '',
@@ -1873,15 +1992,15 @@
           total: it.total_tracks || 0,
           owner: (it.artists || []).map((a) => a.name).join(', '),
           spotify: true,
-          tipo: tipoBusqueda,
+          tipo: comun.tipoBusqueda,
         }));
         renderResults(q);
-        if (searchResults.length) anotarReciente(q);
+        if (comun.searchResults.length) anotarReciente(q);
         return;
       }
 
       const items = (data && data.tracks && data.tracks.items) || [];
-      searchResults = sinDuplicadas(items.map(it => ({
+      comun.searchResults = sinDuplicadas(items.map(it => ({
         id: 'sp:' + it.id,
         uri: it.uri,
         name: it.name,
@@ -1897,10 +2016,10 @@
         spotify: true,
       })));
       renderResults(q);
-      if (searchResults.length) anotarReciente(q);
+      if (comun.searchResults.length) anotarReciente(q);
     } catch (e) {
       if (mia !== seqBusqueda) return;
-      searchResults = [];
+      comun.searchResults = [];
       const list = document.getElementById('spotifyResults');
       if (!list) return;
       const emsg = (e && e.message) || '';
@@ -1925,6 +2044,7 @@
       list.innerHTML = `<li class="sp-empty" style="line-height:1.6">▒ ${msg} ▒</li>`;
     }
   };
+  comun.doSearch = doSearch;
 
   // Show a Spotify track in the now-playing bar (used by preview fallback)
   const showNowPlaying = (t) => {
@@ -1941,22 +2061,40 @@
     window.PlayerCore.state.currentTrack = t;
     if (window.LyricsModule) window.LyricsModule.fetch(t);
   };
+  comun.showNowPlaying = showNowPlaying;
 
   // Reproduce un contexto entero (playlist / álbum), opcionalmente empezando
   // en una pista concreta. Así la cola de Spotify sigue con el resto.
   const playContext = async (contextUri, offsetUri) => {
     // Una playlist o un álbum ya continúan solos: se apaga «sigue sonando»
     // para que no siga metiendo canciones detrás de otra cosa.
-    pararMezcla();
+    comun.pararMezcla();
     await arrancarSDK();          // que exista el aparato antes de apuntarle
     const body = { context_uri: contextUri };
     if (offsetUri) body.offset = { uri: offsetUri };
     await api(conDestino('/me/player/play'), { method: 'PUT', body: JSON.stringify(body) });
-    lastTrackId = null;
-    lastIsPlaying = true;
+    comun.lastTrackId = null;
+    comun.lastIsPlaying = true;
     if (window.PlayerCore) window.PlayerCore.state.isPreview = false;
     startPolling();
   };
+  comun.playContext = playContext;
+})();
+/* ==========================================================
+   SPOTIFY · «sigue sonando» (js/spotify/sigue-sonando.js)
+
+   Lo que viene detrás cuando se acaba lo que pusiste, como en Spotify:
+   canciones parecidas, artistas parecidos y el género de red de
+   seguridad; lo de hace nada no vuelve, y la lista puente se limpia
+   sola. Reparto de js/spotify/: ver sesion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.spotify;
+  const {
+    scopesAlDia, api, explicar, somos, destino, conDestino, arrancarSDK, startPolling, spQueue,
+    setStatus, CLAVE_REC, pintarRecientes, renderResults, doSearch, showNowPlaying, playContext
+  } = comun;
 
   /* -------- «Sigue sonando»: lo que viene detrás, como en Spotify --------
 
@@ -2015,11 +2153,12 @@
   const ESPERA_SIMILARES = 2500;  // lo que se aguanta antes de dar al play
 
   let mezclaSeq = 0;          // poner otra cosa cancela la mezcla anterior
-  let mezcla = null;          // sesión viva
+  comun.mezcla = null;          // sesión viva
 
   const radioEncendida = () => localStorage.getItem('mm_radio') !== 'off';
 
-  const pararMezcla = () => { mezclaSeq++; mezcla = null; };
+  const pararMezcla = () => { mezclaSeq++; comun.mezcla = null; };
+  comun.pararMezcla = pararMezcla;
 
   const barajar = (arr) => {
     const a = arr.slice();
@@ -2058,7 +2197,7 @@
      LOTE —treinta de una— contra ListenBrainz, que publica el id de Spotify
      de cada grabación. Es lo que hace que armar la lista no gaste cuota. */
   const traducirLote = async () => {
-    const m = mezcla;
+    const m = comun.mezcla;
     if (!m || !m.parecidas.length) return;
     /* El trozo sale de la lista ANTES de nada. Si se devolviera sin sacarlo
        —por ejemplo sin js/similares.js cargado— quien llama volvería a pedir
@@ -2066,7 +2205,7 @@
     const trozo = m.parecidas.splice(0, LOTE_URIS);
     if (!window.Similares) return;
     const mapa = await window.Similares.urisSpotify(trozo.map((x) => x.mbid));
-    if (m !== mezcla) return;               // pusieron otra cosa mientras
+    if (m !== comun.mezcla) return;               // pusieron otra cosa mientras
     trozo.forEach((x) => {
       const uri = mapa[x.mbid];
       if (uri && !m.vistas.has(uri)) m.listas.push({ uri, name: x.name, artist: x.artist });
@@ -2074,14 +2213,14 @@
   };
 
   const deParecidas = async (n) => {
-    const m = mezcla;
+    const m = comun.mezcla;
     const out = [];
     if (!m) return out;
     while (out.length < n) {
       if (!m.listas.length) {
         if (!m.parecidas.length) break;     // se acabaron: pasa a la tanda 2
         await traducirLote();
-        if (m !== mezcla) return out;
+        if (m !== comun.mezcla) return out;
         continue;
       }
       const p = m.listas.shift();
@@ -2096,7 +2235,7 @@
      grandes éxitos del primer artista que salga. `tope` limita las
      búsquedas, que aquí sí cuestan cuota de Spotify. */
   const deArtistas = async (n, tope) => {
-    const m = mezcla;
+    const m = comun.mezcla;
     const out = [];
     if (!m) return out;
     let vueltas = 0;
@@ -2104,7 +2243,7 @@
       vueltas++;
       const nombre = m.artistas.shift();
       const items = await buscarPistas('artist:"' + paraConsulta(nombre) + '"', 0);
-      if (m !== mezcla) return out;
+      if (m !== comun.mezcla) return out;
       let deEste = 0;
       barajar(items).forEach((it) => {
         if (out.length >= n || deEste >= POR_ARTISTA || m.vistas.has(it.uri)) return;
@@ -2120,7 +2259,7 @@
      Se piden UNA vez y solo si de verdad hacen falta: con las dos tandas de
      arriba funcionando, esta petición no llega a hacerse nunca. */
   const asegurarGeneros = async () => {
-    const m = mezcla;
+    const m = comun.mezcla;
     if (!m || m.generosPedidos) return;
     m.generosPedidos = true;
     let generos = [];
@@ -2130,7 +2269,7 @@
         generos = (a && a.genres) || [];
       } catch (e) { /* sin géneros se tira solo del artista */ }
     }
-    if (m !== mezcla) return;
+    if (m !== comun.mezcla) return;
     m.genero = generos[0] || null;
     m.consultas = generos.slice(0, 3).map((g) => 'genre:"' + g + '"');
     if (m.semilla.artist) m.consultas.push('artist:"' + paraConsulta(m.semilla.artist) + '"');
@@ -2140,7 +2279,7 @@
      repita es el `offset`: sin él, `genre:"reggaeton"` devolvería SIEMPRE las
      mismas diez y esto giraría en bucle a los veinte minutos. */
   const deGenero = async (n, tope) => {
-    const m = mezcla;
+    const m = comun.mezcla;
     const out = [];
     if (!m || !m.consultas.length) return out;
     for (let intento = 0; intento < (tope || 4) && out.length < n; intento++) {
@@ -2159,7 +2298,7 @@
         continue;
       }
       const items = await buscarPistas(q, pagina * 10);
-      if (m !== mezcla) return out;
+      if (m !== comun.mezcla) return out;
       barajar(items).forEach((it) => {
         if (out.length < n && !m.vistas.has(it.uri)) out.push(pistaCorta(it));
       });
@@ -2171,7 +2310,7 @@
      rellenando con la siguiente lo que falte. Todo lo que sale de aquí entra
      en `vistas`: la lista de dentro de tres horas no repetirá nada de esta. */
   const armarLista = async (n) => {
-    const m = mezcla;
+    const m = comun.mezcla;
     if (!m) return [];
     const out = [];
     const sumar = (lista, fuente) => {
@@ -2187,7 +2326,7 @@
     };
 
     sumar(await deParecidas(n), 'parecidas');
-    if (m !== mezcla) return [];
+    if (m !== comun.mezcla) return [];
 
     /* Las otras dos tandas NO aspiran a cincuenta: cada canción suya cuesta
        una búsqueda de Spotify, y con una docena hay música de sobra para
@@ -2196,11 +2335,11 @@
     const meta = Math.max(out.length, Math.min(n, LISTA_MIN_OTRAS));
     if (out.length < meta) {
       sumar(await deArtistas(meta - out.length, 4), 'artistas');
-      if (m !== mezcla) return [];
+      if (m !== comun.mezcla) return [];
     }
     if (out.length < meta) {
       await asegurarGeneros();
-      if (m !== mezcla) return [];
+      if (m !== comun.mezcla) return [];
       sumar(await deGenero(meta - out.length, 4), 'genero');
     }
 
@@ -2249,14 +2388,15 @@
      suelto dentro de la API pública; ahora hace falta también aquí dentro,
      para reponer la mezcla SIN que la canción salte de sitio. */
   const posicionActual = () => {
-    if (!progStamp || !lastIsPlaying) return progBase;
-    const sec = progBase + (performance.now() - progStamp) / 1000;
-    return progDur ? Math.min(progDur, sec) : sec;
+    if (!comun.progStamp || !comun.lastIsPlaying) return comun.progBase;
+    const sec = comun.progBase + (performance.now() - comun.progStamp) / 1000;
+    return comun.progDur ? Math.min(comun.progDur, sec) : sec;
   };
+  comun.posicionActual = posicionActual;
 
   // Cuántas quedan por delante, cuando se puede saber sin gastar peticiones
-  const porDelante = () => ((sdkActivo && ventana && Array.isArray(ventana.next_tracks))
-    ? ventana.next_tracks.length : null);
+  const porDelante = () => ((comun.sdkActivo && comun.ventana && Array.isArray(comun.ventana.next_tracks))
+    ? comun.ventana.next_tracks.length : null);
 
   /* Red de seguridad. Hay reproductores que de una lista de uris se quedan
      con la PRIMERA y tiran el resto: está reportado desde 2020 contra el
@@ -2270,10 +2410,10 @@
   const vigilarLista = async (mia, cuantas) => {
     if (!cuantas) return;
     await new Promise((r) => setTimeout(r, 4000));
-    if (mia !== mezclaSeq || !mezcla) return;
+    if (mia !== mezclaSeq || !comun.mezcla) return;
     const hay = porDelante();
     if (hay === null || hay > 0) return;          // o no se sabe, o sí llegó
-    mezcla.relevo = true;
+    comun.mezcla.relevo = true;
     console.warn('[mezcla] este aparato no admite listas; sigo en modo relevo');
   };
 
@@ -2287,55 +2427,57 @@
      en `previous_tracks`. Las tres cosas a la vez; con menos, pausar al
      principio de una canción dispararía el relevo. */
   const relevar = (state) => {
-    if (!mezcla || !mezcla.relevo || mezcla.relevando) return;
+    if (!comun.mezcla || !comun.mezcla.relevo || comun.mezcla.relevando) return;
     const tw = (state && state.track_window) || {};
     const actual = tw.current_track;
     if (!actual || !state.paused || (state.position || 0) !== 0) return;
     if (!(tw.previous_tracks || []).some((x) => x && x.uri === actual.uri)) return;
 
-    const i = mezcla.emitidas.indexOf(actual.uri);
-    if (i < 0 || i + 1 >= mezcla.emitidas.length) return;
-    mezcla.relevando = true;
+    const i = comun.mezcla.emitidas.indexOf(actual.uri);
+    if (i < 0 || i + 1 >= comun.mezcla.emitidas.length) return;
+    comun.mezcla.relevando = true;
     /* Se manda el resto ENTERO, no solo la siguiente: si el aparato mejora
        —o era cosa de un día— la lista entra y el relevo deja de hacer falta
        sin que nadie tenga que enterarse. */
-    sonarLista(mezcla.emitidas.slice(i + 1))
+    sonarLista(comun.mezcla.emitidas.slice(i + 1))
       .catch((e) => console.warn('[mezcla] el relevo no salió:', e && e.message))
-      .finally(() => { if (mezcla) mezcla.relevando = false; });
+      .finally(() => { if (comun.mezcla) comun.mezcla.relevando = false; });
   };
+  comun.relevar = relevar;
 
   /* La reposición. `notarCambio` la llama en cada cambio de canción; solo
      hace algo cuando ya suena la ÚLTIMA de la lista. Entonces manda una
      lista nueva que empieza por esa misma, en el segundo por el que va, así
      que lo único que cambia es que detrás vuelve a haber cincuenta. */
   const rellenarMezcla = async () => {
-    if (!mezcla || mezcla.rellenando || !radioEncendida()) return;
+    if (!comun.mezcla || comun.mezcla.rellenando || !radioEncendida()) return;
     const actual = window.PlayerCore && window.PlayerCore.state.currentTrack;
     if (!actual || !actual.uri) return;
     /* Se mira contra NUESTRA lista, no contra lo que diga el aparato: con la
        música sonando en el móvil no hay forma de saber cuántas quedan por
        delante sin gastar una petición en cada canción. Si lo que suena es la
        última que mandamos, es que se acaba. */
-    if (actual.uri !== mezcla.emitidas[mezcla.emitidas.length - 1]) return;
+    if (actual.uri !== comun.mezcla.emitidas[comun.mezcla.emitidas.length - 1]) return;
 
-    mezcla.rellenando = true;
+    comun.mezcla.rellenando = true;
     const mia = mezclaSeq;
     try {
       const mas = await armarLista(LISTA_MAX);
       if (mia !== mezclaSeq || !mas.length) return;
-      mezcla.emitidas = [actual.uri, ...mas.map((p) => p.uri)];
-      await sonarLista(mezcla.emitidas, posicionActual() * 1000);
+      comun.mezcla.emitidas = [actual.uri, ...mas.map((p) => p.uri)];
+      await sonarLista(comun.mezcla.emitidas, posicionActual() * 1000);
       if (window.SevenQueueRefresh) window.SevenQueueRefresh();
     } catch (e) {
       console.warn('[mezcla] no se pudo reponer:', e && e.message);
     } finally {
-      if (mezcla) mezcla.rellenando = false;
+      if (comun.mezcla) comun.mezcla.rellenando = false;
     }
   };
+  comun.rellenarMezcla = rellenarMezcla;
 
   // Lo que se lee en la barra de estado y en la cabecera de la cola.
   const textoMezcla = () => {
-    const m = mezcla;
+    const m = comun.mezcla;
     if (!m) return '';
     if (m.fuente === 'genero') {
       return m.genero
@@ -2345,6 +2487,7 @@
     if (m.fuente === 'artistas') return '◈ sigue sonando · artistas como ' + (m.semilla.artist || '');
     return '◈ sigue sonando · parecidas a «' + m.semilla.name + '»';
   };
+  comun.textoMezcla = textoMezcla;
 
   /* ---- Lo de hace nada no vuelve ----
      La app apunta cada escucha en tu equipo (js/historial.js), y eso es un
@@ -2379,7 +2522,7 @@
      que mandar DETRÁS de la canción. Devuelve [] si no hay nada que poner
      (sin sesión, apagado, o la mezcla ya la cancelaron). */
   const prepararMezcla = async (t, mia) => {
-    mezcla = {
+    comun.mezcla = {
       semilla: { name: t.name, artist: (t.artist || '').split(',')[0].trim(), uri: t.uri },
       artistId: t.artistId || null,
       parecidas: [],       // {name, artist, mbid} sin traducir a uri
@@ -2402,8 +2545,8 @@
        resuelve ni se manda. La semilla se quita después, que es la única que
        sí puede repetirse — la acaba de elegir el usuario. */
     const yaOidas = await urisRecientes();
-    if (mia !== mezclaSeq || !mezcla) return [];
-    yaOidas.forEach((u) => mezcla.vistas.add(u));
+    if (mia !== mezclaSeq || !comun.mezcla) return [];
+    yaOidas.forEach((u) => comun.mezcla.vistas.add(u));
 
     if (window.Similares) {
       /* Con reloj: esto retrasa el play, así que se le da lo justo. Si
@@ -2414,20 +2557,20 @@
           window.Similares.deCancion({ name: t.name, artist: t.artist }),
           new Promise((res) => setTimeout(() => res(null), ESPERA_SIMILARES)),
         ]);
-        if (mia !== mezclaSeq || !mezcla) return [];
+        if (mia !== mezclaSeq || !comun.mezcla) return [];
         if (r) {
-          mezcla.parecidas = r.canciones || [];
-          mezcla.artistas = r.artistas || [];
+          comun.mezcla.parecidas = r.canciones || [];
+          comun.mezcla.artistas = r.artistas || [];
         }
       } catch (e) {
         console.warn('[mezcla] sin recomendaciones de fuera, tiro del género:', e && e.message);
-        if (mia !== mezclaSeq || !mezcla) return [];
+        if (mia !== mezclaSeq || !comun.mezcla) return [];
       }
     }
 
     const lista = await armarLista(LISTA_MAX);
-    if (mia !== mezclaSeq || !mezcla) return [];
-    mezcla.emitidas = [t.uri, ...lista.map((p) => p.uri)];
+    if (mia !== mezclaSeq || !comun.mezcla) return [];
+    comun.mezcla.emitidas = [t.uri, ...lista.map((p) => p.uri)];
     return lista;
   };
 
@@ -2435,7 +2578,7 @@
      otra vez la lista, empezando por ella. Así saltar tres canciones hacia
      adelante deja intacto todo lo que venía después, como en Spotify. */
   const seguirDesde = async (uri) => {
-    const m = mezcla;
+    const m = comun.mezcla;
     if (!m) return false;
     const i = m.emitidas.indexOf(uri);
     if (i < 0) return false;
@@ -2463,7 +2606,7 @@
 
      Se intenta una sola vez: el id se borra de localStorage ANTES de pedir
      nada, así que si falla no se queda reintentando en cada arranque. */
-  const CLAVE_LISTA_VIEJA = 'sp_lista_radio';
+  const CLAVE_LISTA_VIEJA = comun.CLAVE_LISTA_VIEJA = 'sp_lista_radio';
 
   const limpiarListaPuente = async () => {
     let id = null;
@@ -2485,6 +2628,7 @@
       console.warn('[mezcla] no se pudo retirar la lista puente:', e && e.message);
     }
   };
+  comun.limpiarListaPuente = limpiarListaPuente;
 
   // contextUri (opcional): reproduce la pista dentro de su playlist/álbum
   const playTrack = async (t, contextUri) => {
@@ -2499,9 +2643,9 @@
       /* Elegir una de las que ya venían detrás NO rehace la mezcla: se
          reanuda desde ahí y lo que había después sigue intacto. Es lo que
          pasa en Spotify al pulsar algo de «Siguiente». */
-      if (!contextUri && mezcla && mezcla.puestas.has(t.uri) && await seguirDesde(t.uri)) {
-        lastTrackId = null;
-        lastIsPlaying = true;
+      if (!contextUri && comun.mezcla && comun.mezcla.puestas.has(t.uri) && await seguirDesde(t.uri)) {
+        comun.lastTrackId = null;
+        comun.lastIsPlaying = true;
         window.PlayerCore.state.isPreview = false;
         startPolling();
         setStatus('▶ ' + t.name);
@@ -2537,12 +2681,12 @@
         const entraron = await sonarLista([t.uri, ...detras.map((p) => p.uri)]);
         if (entraron - 1 < detras.length) {
           detras = detras.slice(0, Math.max(0, entraron - 1));
-          if (mezcla) mezcla.emitidas = [t.uri, ...detras.map((p) => p.uri)];
+          if (comun.mezcla) comun.mezcla.emitidas = [t.uri, ...detras.map((p) => p.uri)];
         }
       }
 
-      lastTrackId = null;          // fuerza al polling a refrescar la canción
-      lastIsPlaying = true;
+      comun.lastTrackId = null;          // fuerza al polling a refrescar la canción
+      comun.lastIsPlaying = true;
       window.PlayerCore.state.isPreview = false;
       startPolling();
       setStatus(destino() && somos(destino())
@@ -2583,6 +2727,7 @@
       }
     }
   };
+  comun.playTrack = playTrack;
 
   const wireSearch = () => {
     const input = document.getElementById('spotifySearchInput');
@@ -2593,11 +2738,11 @@
       if (c._wired) return;
       c._wired = true;
       c.addEventListener("click", () => {
-        if (c.dataset.tipo === tipoBusqueda) return;
-        tipoBusqueda = c.dataset.tipo;
+        if (c.dataset.tipo === comun.tipoBusqueda) return;
+        comun.tipoBusqueda = c.dataset.tipo;
         document.querySelectorAll(".sp-tipo").forEach((x) => x.classList.toggle("active", x === c));
         if (input && input.value.trim()) doSearch(input.value);
-        else { searchResults = []; renderResults(""); }
+        else { comun.searchResults = []; renderResults(""); }
       });
     });
 
@@ -2606,8 +2751,8 @@
       const refrescarX = () => { if (limpiar) limpiar.hidden = !input.value; };
       input.addEventListener('input', () => {
         refrescarX();
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => doSearch(input.value), 350);
+        clearTimeout(comun.searchTimer);
+        comun.searchTimer = setTimeout(() => doSearch(input.value), 350);
       });
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -2615,7 +2760,7 @@
           if (input.value) { input.value = ''; refrescarX(); doSearch(''); }
           else input.blur();
         } else if (e.key === 'Enter') {
-          clearTimeout(searchTimer);
+          clearTimeout(comun.searchTimer);
           doSearch(input.value);
         }
       });
@@ -2645,7 +2790,7 @@
         }
         input.value = btn.dataset.q;
         if (limpiar) limpiar.hidden = false;
-        clearTimeout(searchTimer);
+        clearTimeout(comun.searchTimer);
         doSearch(btn.dataset.q);
       });
       pintarRecientes();
@@ -2654,7 +2799,7 @@
     const list = document.getElementById('spotifyResults');
     if (list && !list._wired) {
       list._wired = true;
-      const pistaDe = (row) => searchResults[parseInt(row.dataset.idx, 10)];
+      const pistaDe = (row) => comun.searchResults[parseInt(row.dataset.idx, 10)];
       const lanzar = (row, soloPlay) => {
         const t = pistaDe(row);
         if (!t) return;
@@ -2699,6 +2844,20 @@
       renderResults('');
     }
   };
+  comun.wireSearch = wireSearch;
+})();
+/* ==========================================================
+   SPOTIFY · el chip «dónde suena» y su menú (js/spotify/aparato.js)
+
+   Reparto de js/spotify/: ver sesion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.spotify;
+  const {
+    isLoggedIn, explicar, somos, startPolling, spDevices, spTransfer, like, alternarLike,
+    setStatus, escapeHtml
+  } = comun;
 
   /* -------- Chip «dónde suena» + su menú --------
      El menú se cuelga del <body>, NO de la barra de estado. En este proyecto
@@ -2722,23 +2881,24 @@
        pinta el CSS (`attr(data-corto)`); el nombre largo sigue en #devName
        y en el nombre accesible del botón. */
     let largo, corto;
-    if (lastDevice && lastDevice.name) {
+    if (comun.lastDevice && comun.lastDevice.name) {
       // Sonando aquí no hace falta el nombre del aparato: el aparato es esto.
-      largo = sdkActivo ? 'sonando aquí' : lastDevice.name;
-      corto = sdkActivo ? 'aquí' : lastDevice.name;
+      largo = comun.sdkActivo ? 'sonando aquí' : comun.lastDevice.name;
+      corto = comun.sdkActivo ? 'aquí' : comun.lastDevice.name;
       c.hidden = false;
-      c.classList.toggle('dev-restringido', !!lastDevice.is_restricted);
+      c.classList.toggle('dev-restringido', !!comun.lastDevice.is_restricted);
     } else {
       c.hidden = !isLoggedIn();     // conectado pero sin aparato: se puede elegir uno
-      largo = sdkDeviceId ? 'sonará aquí' : 'elegir dispositivo';
-      corto = sdkDeviceId ? 'aquí' : 'elegir';
+      largo = comun.sdkDeviceId ? 'sonará aquí' : 'elegir dispositivo';
+      corto = comun.sdkDeviceId ? 'aquí' : 'elegir';
       c.classList.remove('dev-restringido');
     }
     if (nom) nom.textContent = largo;
     c.dataset.corto = corto;
     c.setAttribute('aria-label', 'Dónde suena: ' + largo + '. Pulsa para elegir otro aparato');
-    c.classList.toggle('dev-aqui', sdkActivo);
+    c.classList.toggle('dev-aqui', comun.sdkActivo);
   };
+  comun.pintarChipAparato = pintarChipAparato;
 
   const cerrarMenuDev = () => {
     devAbierto = false;
@@ -2767,7 +2927,7 @@
     if (!lista.length) {
       devLista.innerHTML = `<div class="dev-vacio">
         ▒ ningún dispositivo a la vista ▒
-        <span>${sdkVetado
+        <span>${comun.sdkVetado
           ? 'este navegador no puede reproducir aquí: abre Spotify en el móvil o el PC'
           : 'abre Spotify en el móvil o el PC, o dale al play a una canción para que suene aquí'}</span>
       </div>`;
@@ -2823,7 +2983,7 @@
       document.body.appendChild(devMenu);
       const rango = devVol.querySelector('.dev-vol-rango');
       rango.addEventListener('input', () => {
-        // --v es lo recorrido: el riel de celdas lo pinta en el acento (style.css)
+        // --v es lo recorrido: el riel de celdas lo pinta en el acento (css/base/)
         rango.style.setProperty('--v', rango.value + '%');
         const pc = window.PlayerCore;
         if (pc && pc.setVolume) pc.setVolume(Number(rango.value) / 100);
@@ -2843,11 +3003,11 @@
           /* Se recuerda la elección: los siguientes play van ahí y no
              vuelven a esta pestaña por su cuenta. Elegir esta pestaña deja
              el destino en null, que ya significa «aquí». */
-          destinoElegido = somos(it.dataset.id) ? null : it.dataset.id;
+          comun.destinoElegido = somos(it.dataset.id) ? null : it.dataset.id;
           setStatus(somos(it.dataset.id)
             ? '◆ la música pasa a sonar aquí'
             : '◎ mandado a ' + it.querySelector('.dev-item-nom').textContent);
-          lastTrackId = null;      // que el sondeo refresque sin esperar
+          comun.lastTrackId = null;      // que el sondeo refresque sin esperar
           startPolling();
         } catch (err) {
           setStatus('✕ ' + explicar(err, 'cambiar de aparato'));
@@ -2876,6 +3036,7 @@
     b._wired = true;
     b.addEventListener('click', alternarLike);
   };
+  comun.cablearLike = cablearLike;
 
   const cablearChipDev = () => {
     const c = chip();
@@ -2891,6 +3052,26 @@
     });
     window.addEventListener('resize', () => { if (devAbierto) colocarMenuDev(); });
   };
+  comun.cablearChipDev = cablearChipDev;
+})();
+/* ==========================================================
+   SPOTIFY · el arranque (js/spotify/arranque.js)
+
+   Va el ÚLTIMO de js/spotify/: publica la API (window.SpotifyModule) y
+   atiende la vuelta del permiso (?code=…) y el arranque de la sesión
+   guardada. Reparto: ver sesion.js.
+   ========================================================== */
+(() => {
+  'use strict';
+  const comun = window.MMInterno.spotify;
+  const {
+    STORAGE, startAuth, exchangeCode, refreshToken, programarRenovacion, isLoggedIn, scopesAlDia,
+    api, leerError, explicar, olvidarUltimo, arrancarSDK, pintarVolAjeno, volAjeno, startPolling,
+    stopPolling, spTogglePlay, spNext, spPrev, spSetVolume, spSetShuffle, spSetRepeat, spQueue,
+    spTransfer, spSeek, crearPlaylist, setStatus, avisarLuego, showSearchBlock, renderResults,
+    doSearch, playContext, pararMezcla, textoMezcla, CLAVE_LISTA_VIEJA, limpiarListaPuente,
+    playTrack, wireSearch, pintarChipAparato, cablearLike, cablearChipDev
+  } = comun;
 
   // -------- Public --------
   /* Quién es la cuenta conectada. Hace falta para una cosa concreta: desde
@@ -2982,20 +3163,20 @@
         localStorage.removeItem(STORAGE.TOKEN);
         localStorage.removeItem(STORAGE.REFRESH);
         localStorage.removeItem(STORAGE.EXPIRES);
-        try { if (sdkPlayer) sdkPlayer.disconnect(); } catch (x) {}
-        sdkPlayer = null;
-        sdkDeviceId = null;
-        sdkActivo = false;
-        sdkIntento = null;
-        sdkPerdido = false;
-        sdkVetado = false;           // otra cuenta (o esta otra vez) merece su oportunidad
-        sdkReautenticado = false;
-        clearTimeout(reconexionT);
+        try { if (comun.sdkPlayer) comun.sdkPlayer.disconnect(); } catch (x) {}
+        comun.sdkPlayer = null;
+        comun.sdkDeviceId = null;
+        comun.sdkActivo = false;
+        comun.sdkIntento = null;
+        comun.sdkPerdido = false;
+        comun.sdkVetado = false;           // otra cuenta (o esta otra vez) merece su oportunidad
+        comun.sdkReautenticado = false;
+        clearTimeout(comun.reconexionT);
         miId = null;
-        destinoElegido = null;
-        ventana = null;
-        ultimaPrecarga = null;
-        clearTimeout(renovTimer);
+        comun.destinoElegido = null;
+        comun.ventana = null;
+        comun.ultimaPrecarga = null;
+        clearTimeout(comun.renovTimer);
         olvidarUltimo();
         pararMezcla();
         /* El id de la lista puente de la v2 es de la cuenta que se va: si
@@ -3003,7 +3184,7 @@
         try { localStorage.removeItem(CLAVE_LISTA_VIEJA); } catch (x) {}
         stopPolling();
         showSearchBlock(false);
-        searchResults = [];
+        comun.searchResults = [];
         renderResults();
         window.PlayerCore.setSpotifyConnected(false);
         window.PlayerCore.setUser('Invitado', null);
@@ -3099,56 +3280,56 @@
     queue: spQueue,
     // Escribir en Spotify: el ♥ y crear playlists de verdad
     crearPlaylist,
-    puedeGuardar: () => !likeMuerto,
+    puedeGuardar: () => !comun.likeMuerto,
     /* «Sigue sonando», para que la pestaña «cola» pueda contar de dónde sale
        lo que viene detrás y marcar las que ha puesto ella. Se devuelve una
        copia plana: nadie de fuera debe poder tocar la sesión. */
-    mezcla: () => ((mezcla && mezcla.puestas.size)
-      ? { fuente: mezcla.fuente, semilla: { ...mezcla.semilla }, genero: mezcla.genero, texto: textoMezcla() }
+    mezcla: () => ((comun.mezcla && comun.mezcla.puestas.size)
+      ? { fuente: comun.mezcla.fuente, semilla: { ...comun.mezcla.semilla }, genero: comun.mezcla.genero, texto: textoMezcla() }
       : null),   // sin nada detrás no hay nada que contar
-    esDeLaMezcla: (uri) => !!(mezcla && uri && mezcla.puestas.has(uri)),
+    esDeLaMezcla: (uri) => !!(comun.mezcla && uri && comun.mezcla.puestas.has(uri)),
     /* La cola sin gastar una sola petición: sonando aquí, el SDK ya dice lo
        que viene detrás. Devuelve null cuando la música va por otro aparato, y
        entonces quien pregunte tira de `/me/player/queue` como siempre. */
     colaLocal: () => {
-      if (!sdkActivo || !ventana) return null;
+      if (!comun.sdkActivo || !comun.ventana) return null;
       return {
-        currently_playing: ventana.current_track || null,
-        queue: (ventana.next_tracks || []).slice(),
+        currently_playing: comun.ventana.current_track || null,
+        queue: (comun.ventana.next_tracks || []).slice(),
       };
     },
     // Último estado conocido del aparato y los modos (lo refresca el sondeo)
-    device: () => lastDevice,
+    device: () => comun.lastDevice,
     /* ¿Suena AQUÍ, en esta pestaña (el aparato del SDK)? Lo pregunta el
-       vídeo 9:16 (js/vertical.js) para saber de dónde sacar el sonido: si
+       vídeo 9:16 (js/cine/) para saber de dónde sacar el sonido: si
        suena aquí, el permiso de grabar la pestaña trae la música; si suena
        en otro aparato, el vídeo saldría mudo. */
-    suenaAqui: () => !!sdkActivo,
+    suenaAqui: () => !!comun.sdkActivo,
     /* Mandar la música a esta pestaña: lo mismo que elegir «aquí» en el
        menú ◎. Devuelve false si el reproductor de la pestaña no está listo
        (cuenta sin Premium, navegador sin DRM…). */
     pasarAqui: async () => {
-      if (!sdkDeviceId) return false;
-      await spTransfer(sdkDeviceId);
-      destinoElegido = null;
-      lastTrackId = null;      // que el sondeo refresque sin esperar
+      if (!comun.sdkDeviceId) return false;
+      await spTransfer(comun.sdkDeviceId);
+      comun.destinoElegido = null;
+      comun.lastTrackId = null;      // que el sondeo refresque sin esperar
       startPolling();
       return true;
     },
     // playlist/album del que sale lo que suena (lo usa la pestana «cola»)
-    context: () => lastContext,
-    shuffle: () => lastShuffle,
-    repeat: () => lastRepeat,
+    context: () => comun.lastContext,
+    shuffle: () => comun.lastShuffle,
+    repeat: () => comun.lastRepeat,
     /* Posición interpolada: el mismo reloj que mueve la barra y la letra
        entre poll y poll. Sin esto, quien preguntara por el minuto actual con
        Spotify Connect recibiría el 0 del <audio> local, que está parado. */
     position: () => {
-      if (!progStamp) return progBase;
-      if (!lastIsPlaying) return progBase;
-      const sec = progBase + (performance.now() - progStamp) / 1000;
-      return progDur ? Math.min(progDur, sec) : sec;
+      if (!comun.progStamp) return comun.progBase;
+      if (!comun.lastIsPlaying) return comun.progBase;
+      const sec = comun.progBase + (performance.now() - comun.progStamp) / 1000;
+      return comun.progDur ? Math.min(comun.progDur, sec) : sec;
     },
-    playing: () => lastIsPlaying,
+    playing: () => comun.lastIsPlaying,
   };
 
   // Arranque: un camino u otro, nunca los dos (el pestillo está en `init`)

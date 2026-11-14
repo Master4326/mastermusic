@@ -1,12 +1,12 @@
 /* ==========================================================
    Traductor — la letra, en español, debajo de cada verso.
 
-   Lo que hace: coge los versos que ya trajo js/lyrics.js de LRClib y pide
+   Lo que hace: coge los versos que ya trajo js/letra/ de LRClib y pide
    su traducción. No inventa letras ni las guarda en el proyecto: traduce
    sobre la marcha lo que la app acaba de descargar, igual que un subtítulo.
 
-   POR QUÉ ES UN MÓDULO APARTE y no cuatro funciones dentro de lyrics.js:
-   lyrics.js ya son 2.800 líneas con dos motores dentro (la vista lista y el
+   POR QUÉ ES UN MÓDULO APARTE y no cuatro funciones dentro de js/letra/:
+   js/letra/ ya son 2.800 líneas con dos motores dentro (la vista lista y el
    de efectos del modo edit). Traducir es un problema distinto — red, caché,
    alineado de líneas, freno ante el 429 — y no comparte una sola variable
    con ellos. Aquí se prueba y se rompe sin tocar la letra.
@@ -57,7 +57,7 @@ window.Traductor = (() => {
   const MAX_PETICIONES = 45;
 
   /* ---------- Freno ante el «me estás pidiendo demasiado» ----------
-     Misma lección que ya aprendieron lyrics.js con LRClib y spotify.js con
+     Misma lección que ya aprendieron js/letra/ con LRClib y js/spotify/ con
      la API de Spotify: cuando el servidor contesta 429, se para. Y se para
      para TODAS las canciones, no solo para la que se llevó el castigo. */
   let frenoHasta = 0;
@@ -118,7 +118,7 @@ window.Traductor = (() => {
 
   /* ---------- ¿Hace falta traducir esto? ----------
      Las palabras de función delatan el idioma mejor que cualquier otra cosa
-     en un texto corto. Es el mismo criterio que usa lyrics.js para elegir
+     en un texto corto. Es el mismo criterio que usa js/letra/ para elegir
      entre dos fichas de LRClib; aquí sirve para no gastar ni una petición en
      una canción que ya está en español. Con poca señal no se opina: se
      pregunta al traductor, que detecta y lo dice en la respuesta. */
@@ -235,7 +235,7 @@ window.Traductor = (() => {
     return out;
   };
 
-  /* ---------- Lo que llama lyrics.js ----------
+  /* ---------- Lo que llama js/letra/ ----------
      textos → array de versos tal cual salen de la letra.
      opts.key    → clave de la canción (para la caché)
      opts.signal → AbortSignal: al cambiar de canción se corta

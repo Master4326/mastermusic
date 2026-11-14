@@ -96,7 +96,7 @@
 
   /* ---------- La traducción, del tamaño que le toca ----------
      En la letra de verdad el subtítulo va al 0,58 del verso y en su misma
-     tipografía (.lyric-trad, en css/style.css). La tarjeta lo tenía al
+     tipografía (.lyric-trad, en css/base/). La tarjeta lo tenía al
      0,42 y en la fuente de la interfaz: al mirarla en pequeño —que es
      como se mira una tarjeta— no se leía. */
   const TRAD_RATIO = 0.58;
