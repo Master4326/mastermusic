@@ -186,6 +186,8 @@ html.moderno .window.maximized { border-radius: 0; box-shadow: none; }
 @media (display-mode: standalone), (display-mode: window-controls-overlay) {
   html.moderno .window { border-radius: 0; box-shadow: none; }
 }
+/* …y lo mismo dentro de la app de Windows (clase `en-app`, ver css/base/) */
+html.moderno.en-app .window { border-radius: 0; box-shadow: none; }
 html.moderno .title-bar {
   background: transparent;
   height: 44px;
