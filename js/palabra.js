@@ -8,11 +8,16 @@
    viene asoma pequeña debajo. Algunas palabras llevan su icono al lado
    (👤 «you», 📞 «llámame», 🕐 «minuto»…), teñido como la letra.
 
-   DOS FORMAS (config ⚙ → letras → palabra):
+   CUATRO FORMAS (config ⚙ → letras → vista palabra):
      · pila  — las palabras apiladas, con la pila entera inclinada en 3D y
                a la deriva muy despacio.
      · lente — las palabras en un tambor: la que suena delante y grande, las
                demás se curvan hacia atrás, como vistas por una lupa.
+     · contraste y bloque — las de los vídeos de TikTok del 15-nov-2026.
+               Tienen su propio motor, js/clip.js (con css/clip.css), que
+               este archivo pide la primera vez que se elige una de ellas.
+               Esta vista sigue siendo la puerta: el resto de la app habla
+               con MMPalabra y no sabe que existe.
 
    DE DÓNDE SALEN LOS TIEMPOS. De js/letra/ (`tiempos(i)`): el arranque de
    cada palabra del verso, exacto si la letra lo trae (LRC mejorado o la base
@@ -358,8 +363,48 @@
   let gpPuesto = -1;
   let ultimoGolpe = 0;
 
+  let ultimoIdx = -1;       // el verso del último tick, lo pinte quien lo pinte
+
   const calma = () => !!(api && api.calma && api.calma());
   const estilo = () => (api && api.estilo && api.estilo() === 'lente' ? 'lente' : 'pila');
+
+  /* ══════════ ◐ CONTRASTE Y BLOQUE: el motor de js/clip.js ══════════
+     Elegida una de las dos, la pila se aparta y el panel lo pinta ese
+     motor. Si no se pudo bajar (sin conexión y sin caché), se queda la pila
+     hasta que se vuelva a elegir una forma: mejor eso que un panel vacío. */
+  const FORMAS_CLIP = ['contraste', 'bloque'];
+  const clipListo = () => !!(window.MMClip && window.MMClip.montado && window.MMClip.montado());
+  let enClip = false;
+  let clipCargando = null;
+  let clipRoto = false;
+  const usarClip = () => !!(api && api.estilo && FORMAS_CLIP.includes(api.estilo())) && !clipRoto;
+  const cargarClip = () => {
+    if (clipCargando || !api.pedir) return;
+    clipCargando = api.pedir('js/clip.js', 'css/clip.css', 'clipCss', () => !!window.MMClip).then(() => {
+      clipCargando = null;
+      if (!window.MMClip) throw new Error('MMClip');
+      window.MMClip.montar(raiz, api);
+      if (enClip) window.MMClip.tick(ultimoT, ultimoIdx);   // el verso de ahora, también en pausa
+    }).catch(() => {
+      clipCargando = null;
+      clipRoto = true;
+      if (enClip) { salirClip(); pintarOtraVez(); }
+    });
+  };
+  const entrarClip = () => {
+    if (enClip) return;
+    enClip = true;
+    limpiarPila();
+    escena.hidden = true;
+    pausa.hidden = true;
+  };
+  function salirClip() {   // `function`: la llama cargarClip, que va antes
+    if (!enClip) return;
+    enClip = false;
+    if (clipListo()) window.MMClip.ocultar();
+    escena.hidden = false;
+    pausa.hidden = false;
+  }
 
   /* ══════════ MEDIDAS ══════════
      Del layout del panel y no de su caja en pantalla: en el vídeo 9:16
@@ -619,6 +664,14 @@
   const tick = (t, idx) => {
     if (!montado) return;
     ultimoT = t;
+    ultimoIdx = idx;
+    if (usarClip()) {
+      entrarClip();
+      if (clipListo()) window.MMClip.tick(t, idx);
+      else cargarClip();
+      return;
+    }
+    salirClip();
     if (idx !== lineaIdx || (pendiente && idx >= 0)) construir(idx);
     if (filas.length) {
       let k = actual < 0 ? -1 : actual;
@@ -667,12 +720,27 @@
   };
 
   /* Vuelve a pintar el verso de ahora: tipografía nueva, otra forma, otro
-     tamaño de panel. Sin salida animada: es el mismo verso. */
+     tamaño de panel. Sin salida animada: es el mismo verso. Elegir forma
+     otra vez deja volver a intentar el motor de clip si no se pudo bajar. */
   const repintar = () => {
     if (!montado) return;
+    clipRoto = false;
+    pintarOtraVez();
+  };
+  function pintarOtraVez() {   // `function`: la llama cargarClip, que va antes
+    if (usarClip()) {
+      entrarClip();
+      const M = window.MMClip;
+      if (!clipListo()) cargarClip();
+      else if (!M.visible()) M.tick(ultimoT, ultimoIdx);
+      else M.repintar();
+      return;
+    }
+    salirClip();
     if (pista && pista.parentNode) pista.parentNode.removeChild(pista);
     pista = null;
-    const idx = lineaIdx;
+    // recién vuelta de contraste o bloque la pila no tiene verso: el del último tick
+    const idx = lineaIdx >= 0 ? lineaIdx : ultimoIdx;
     lineaIdx = -9;
     filas = [];
     actual = -2;
@@ -684,10 +752,10 @@
         ponerActual(k, ultimoT);
       }
     }
-  };
+  }
 
   /* Letra nueva o ninguna: fuera todo, sin animar. */
-  const limpiar = () => {
+  function limpiarPila() {   // `function`: la llama entrarClip, que va antes
     if (!montado) return;
     pila.querySelectorAll('.pl-pista').forEach((p) => p.remove());
     pista = null;
@@ -697,14 +765,22 @@
     reposo = false;
     escena.classList.remove('reposa');
     ponerPausa(-1);
+  }
+  const limpiar = () => {
+    limpiarPila();
+    if (clipListo()) window.MMClip.limpiar();
   };
 
   /* La caja de la palabra que suena, para que la onda de js/fondo.js la
      rodee (la regla: la onda abraza lo que se está cantando). */
   const ancla = () => {
+    if (enClip) return clipListo() ? window.MMClip.ancla() : null;
     const f = filas[actual];
     return f && f.estado === 'actual' ? f.cuerpo : (pista && filas[0] ? filas[0].cuerpo : null);
   };
+  /* Con contraste o bloque el fondo del panel es el de la escena, opaco: la
+     onda de js/fondo.js quedaría debajo, así que ni se pinta. */
+  const tapaFondo = () => enClip && clipListo() && window.MMClip.visible();
 
   window.MMPalabra = {
     montar,
@@ -712,6 +788,7 @@
     repintar,
     limpiar,
     ancla,
+    tapaFondo,
     montado: () => montado,
     // para las pruebas: qué icono le toca a una palabra
     iconoDe,

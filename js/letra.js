@@ -3027,37 +3027,46 @@
     const v = S && S.get ? S.get(id) : null;
     return v == null ? def : v;
   };
+  /* Pide un motor que no va en el <head> —su js y su hoja— y espera a los
+     dos. `yaEsta` dice si el js ya corrió (entonces no se vuelve a pedir).
+     Lo usan la vista palabra y, desde ella, sus formas contraste y bloque
+     (js/clip.js), que son otro motor a demanda dentro del mismo panel. */
+  const pedir = (src, href, id, yaEsta) => {
+    const css = new Promise((ok) => {
+      if (document.getElementById(id)) { ok(); return; }
+      const l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = href;
+      l.id = id;
+      l.onload = () => ok();
+      l.onerror = () => ok();          // sin su hoja se ve peor, pero se ve
+      document.head.appendChild(l);
+    });
+    const js = yaEsta && yaEsta() ? Promise.resolve() : new Promise((ok, mal) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = () => ok();
+      s.onerror = () => { s.remove(); mal(new Error(src)); };
+      document.head.appendChild(s);
+    });
+    return Promise.all([css, js]);
+  };
   const apiPalabra = {
     lineas: () => comun.parsedLines,
     tiempos: (i) => comun.tiemposPalabras(i),
     fin: (i) => (comun.parsedLines[i] ? comun.parsedLines[i].time + duracionCantada(i) : 0),
     calma: () => !!(window.MMSettings && window.MMSettings.reduceMotion && window.MMSettings.reduceMotion()),
+    // pila · lente (js/palabra.js) · contraste · bloque (js/clip.js)
     estilo: () => ajuste('palabra', 'pila'),
     iconos: () => ajuste('palabraIco', 'si') !== 'no',
+    pedir,
   };
   const cargarPalabra = () => {
     if (palabraLista()) return Promise.resolve(window.MMPalabra);
     if (palabraCargando) return palabraCargando;
     if (!lyricsPalabra) return Promise.reject(new Error('sin #lyricsPalabra'));
-    const css = new Promise((ok) => {
-      if (document.getElementById('palabraCss')) { ok(); return; }
-      const l = document.createElement('link');
-      l.rel = 'stylesheet';
-      l.href = 'css/palabra.css';
-      l.id = 'palabraCss';
-      l.onload = () => ok();
-      l.onerror = () => ok();          // sin su hoja se ve peor, pero se ve
-      document.head.appendChild(l);
-    });
-    const js = window.MMPalabra ? Promise.resolve() : new Promise((ok, mal) => {
-      const s = document.createElement('script');
-      s.src = 'js/palabra.js';
-      s.async = true;
-      s.onload = () => ok();
-      s.onerror = () => { s.remove(); mal(new Error('js/palabra.js')); };
-      document.head.appendChild(s);
-    });
-    palabraCargando = Promise.all([css, js]).then(() => {
+    palabraCargando = pedir('js/palabra.js', 'css/palabra.css', 'palabraCss', () => !!window.MMPalabra).then(() => {
       const M = window.MMPalabra;
       if (!M) throw new Error('MMPalabra');
       M.montar(lyricsPalabra, apiPalabra);

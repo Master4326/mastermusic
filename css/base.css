@@ -7894,12 +7894,15 @@ body.reduce-motion .v916 { transition: none; }
   inset: 0;
   z-index: 7;
   pointer-events: none;
+  /* la viñeta, en su variable: «contraste» y «bloque» de la vista palabra
+     (css/clip.css) la quitan, que su fondo es un color liso y parejo */
+  --v916-vineta: radial-gradient(ellipse at 50% 46%, transparent 58%, rgba(0, 0, 0, 0.4) 100%);
   background:
-    radial-gradient(ellipse at 50% 46%, transparent 58%, rgba(0, 0, 0, 0.4) 100%),
+    var(--v916-vineta),
     url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='1 0 0 0 -0.25 1 0 0 0 -0.25 1 0 0 0 -0.25 0 0 0 0 0.045'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
 }
 body.perf-bajo .v916-acabado {
-  background: radial-gradient(ellipse at 50% 46%, transparent 58%, rgba(0, 0, 0, 0.4) 100%);
+  background: var(--v916-vineta);
 }
 
 /* ---- LA LETRA, en su sitio del marco ---- */

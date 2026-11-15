@@ -50,7 +50,8 @@
        guion del <head> de index.html, que lee esta misma clave. */
     aspecto: { key: 'mm_aspecto', def: '8bits' },
     /* ◉ VISTA PALABRA · su forma («pila»: las palabras apiladas en 3D;
-       «lente»: en un tambor que gira) y si llevan iconos. Las lee
+       «lente»: en un tambor que gira; «contraste» y «bloque»: las de los
+       vídeos de TikTok, que pinta js/clip.js) y si llevan iconos. Las lee
        js/letra/ por MMSettings.get cada vez que pinta un verso. */
     palabra:    { key: 'mm_palabra', def: 'pila' },
     palabraIco: { key: 'mm_palabra_ico', def: 'si' },

@@ -669,10 +669,18 @@
     limpio = true;
   };
 
+  /* La vista palabra en «contraste» o «bloque» (js/clip.js) pinta su propio
+     fondo, opaco, como los vídeos de donde sale: la onda quedaría debajo
+     sin verse. Entonces no se pinta y se borra el lienzo. */
+  const tapada = () => {
+    const P = window.MMPalabra;
+    return !!(lyricsPalabra && !lyricsPalabra.hidden && P && P.tapaFondo && P.tapaFondo());
+  };
   const activo = () =>
     body.classList.contains('fondo-ondas') &&
     !!(tabLyrics && tabLyrics.classList.contains('active')) &&
-    !(window.MMSettings && window.MMSettings.reduceMotion());
+    !(window.MMSettings && window.MMSettings.reduceMotion()) &&
+    !tapada();
 
   /* Un fotograma de la onda. Lo llama el reloj de la app (js/perf.js), que
      ya trae el tope de fps y no lo pide en segundo plano. */

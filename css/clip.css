@@ -1,0 +1,376 @@
+/* ==========================================================
+   ◐ CONTRASTE Y BLOQUE — css/clip.css
+
+   La hoja de las dos formas de la vista palabra que salen de los vídeos
+   de TikTok del 15-nov-2026 (js/clip.js). Solo se descarga si se elige
+   una de ellas.
+
+   Los colores son de la canción, no los de los vídeos (el usuario: «no
+   igual en colores, eso puede variar»):
+     · contraste — casi negro y casi blanco, los dos teñidos del acento;
+     · bloque    — el tono claro y el tono hondo del acento.
+   La escena pone el FONDO (--cl-fondo) y la letra va en la otra tinta
+   (--cl-tinta); cuando js/clip.js da la vuelta (.cl-inv en el panel), se
+   cambian el sitio. Ese fondo llena el cuadro que se ve, de borde a borde:
+   el panel, o el marco entero del cine y del 9:16 (ver «EL COLOR LLENA EL
+   CUADRO»).
+
+   La letra es la tipografía de ajustes: aquí solo se tocan la cursiva, el
+   grueso, las mayúsculas y el estrechado (scale en X), nunca la familia.
+   Lo que se mueve es transform, opacity o filter, con las curvas --ed-*.
+   ========================================================== */
+
+.lyrics-palabra.cl-on {
+  --cl-acento: var(--acento-cancion, var(--accent));
+  --cl-oscuro: color-mix(in oklab, var(--cl-acento) 8%, #060607);
+  --cl-claro: color-mix(in oklab, var(--cl-acento) 7%, #f3f2ef);
+  --cl-fondo: var(--cl-oscuro);
+  --cl-tinta: var(--cl-claro);
+}
+.lyrics-palabra.cl-on.cl-inv {
+  --cl-fondo: var(--cl-claro);
+  --cl-tinta: var(--cl-oscuro);
+}
+/* el bloque: dos tonos del MISMO color (en el vídeo, un lavanda y su azul
+   marino); empieza claro, como allí */
+.lyrics-palabra.cl-bloque {
+  --cl-claro: color-mix(in oklab, var(--cl-acento) 58%, #eef0fa);
+  --cl-oscuro: color-mix(in oklab, var(--cl-acento) 36%, #15142c);
+  --cl-fondo: var(--cl-claro);
+  --cl-tinta: var(--cl-oscuro);
+}
+@supports (color: oklch(from red l c h)) {
+  .lyrics-palabra.cl-bloque {
+    --cl-claro: oklch(from var(--cl-acento) 0.75 calc(c * 0.72) h);
+    --cl-oscuro: oklch(from var(--cl-acento) 0.29 calc(c * 0.55) h);
+  }
+}
+.lyrics-palabra.cl-bloque.cl-inv {
+  --cl-fondo: var(--cl-oscuro);
+  --cl-tinta: var(--cl-claro);
+}
+
+/* ── la escena: tapa el panel entero (también la onda, que con estas
+   formas ni se pinta) y cruza de fondo en 0,12 s ── */
+.cl-escena {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  contain: strict;
+  background: var(--cl-fondo);
+  color: var(--cl-tinta);
+  transition:
+    background-color 0.12s var(--ed-cruza, ease-in-out),
+    color 0.12s var(--ed-cruza, ease-in-out);
+}
+/* los avisos («buscando…», «sin tiempos») y la traducción, encima y en la
+   tinta de ahora */
+.lyrics-palabra.cl-on > .lyrics-empty {
+  position: relative;
+  z-index: 5;
+  color: var(--cl-tinta);
+}
+.lyrics-palabra.cl-on .ed-trad {
+  color: var(--cl-tinta);
+  text-shadow: none;
+  opacity: 0.78;
+  transition: color 0.12s var(--ed-cruza, ease-in-out);
+}
+
+/* ══ EL COLOR LLENA EL CUADRO (15-nov) ══
+   El usuario: «en modo cine o para grabar no se ve parejo; en modo normal
+   no está parejo con el cuadro». La escena era una caja dentro del hueco de
+   la letra: en la ventana se quedaba a 12-20 px del marco del panel (el
+   relleno de #tab-lyrics, con las esquinas del ambiente asomando en esa
+   franja) y en el cine y el vídeo era un rectángulo en medio del fondo
+   difuminado. Ahora el color llega al cuadro que se ve:
+     · la ventana y el estilo «app»: el panel de la letra, de borde a borde;
+     · los estilos «letra» y «vinilo» (cine y 9:16): el marco entero. Lo
+       pinta el fondo del propio marco, así el disco, la ficha y la barra
+       siguen encima, en la tinta de la escena.
+   La letra no se mueve de su hueco: solo se estira el color. */
+
+/* La ventana: el panel sin su relleno mientras se ve la escena (en el marco
+   ya va sin él). js/clip.js mide el panel y la letra se recoloca sola. */
+#tab-lyrics:has(> .lyrics-palabra.cl-on:not([hidden])) { padding: 0; }
+/* el ambiente del panel (carátula difuminada, ecualizador, esquinas…) no
+   se vería debajo de un color liso: ni se pinta */
+#tab-lyrics:has(> .lyrics-palabra.cl-on:not([hidden])) > .lyrics-ambient { visibility: hidden; }
+
+/* Los colores, también en el marco: su fondo, la ficha y la barra los usan.
+   Son las mismas cuentas de arriba (si cambian allí, aquí también); las de
+   arriba se quedan para el panel, que las tiene más cerca. */
+.v916-marco:has(.lyrics-palabra.cl-on:not([hidden])) {
+  --cl-acento: var(--acento-cancion, var(--accent));
+  --cl-oscuro: color-mix(in oklab, var(--cl-acento) 8%, #060607);
+  --cl-claro: color-mix(in oklab, var(--cl-acento) 7%, #f3f2ef);
+  --cl-fondo: var(--cl-oscuro);
+  --cl-tinta: var(--cl-claro);
+}
+.v916-marco:has(.lyrics-palabra.cl-on.cl-inv:not([hidden])) {
+  --cl-fondo: var(--cl-claro);
+  --cl-tinta: var(--cl-oscuro);
+}
+.v916-marco:has(.lyrics-palabra.cl-bloque:not([hidden])) {
+  --cl-claro: color-mix(in oklab, var(--cl-acento) 58%, #eef0fa);
+  --cl-oscuro: color-mix(in oklab, var(--cl-acento) 36%, #15142c);
+  --cl-fondo: var(--cl-claro);
+  --cl-tinta: var(--cl-oscuro);
+}
+@supports (color: oklch(from red l c h)) {
+  .v916-marco:has(.lyrics-palabra.cl-bloque:not([hidden])) {
+    --cl-claro: oklch(from var(--cl-acento) 0.75 calc(c * 0.72) h);
+    --cl-oscuro: oklch(from var(--cl-acento) 0.29 calc(c * 0.55) h);
+  }
+}
+.v916-marco:has(.lyrics-palabra.cl-bloque.cl-inv:not([hidden])) {
+  --cl-fondo: var(--cl-oscuro);
+  --cl-tinta: var(--cl-claro);
+}
+/* sin viñeta en ningún estilo: oscurecía las esquinas del color liso */
+.v916-marco:has(.lyrics-palabra.cl-on:not([hidden])) .v916-acabado { --v916-vineta: none; }
+
+/* «letra» y «vinilo»: el color es el fondo del marco entero (por debajo del
+   disco y de su aro, que van en capas de más arriba), y cruza a la vez que
+   la letra. La carátula difuminada y su velo, fuera: no se verían. */
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) .v916-bg {
+  background: var(--cl-fondo);
+  transition: background-color 0.12s var(--ed-cruza, ease-in-out);
+}
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) :is(.v916-bg-img, .v916-bg-velo) { display: none; }
+/* …y la escena, sin fondo ni recorte: el tablero de detrás puede salirse
+   del hueco de la letra, y lo corta el borde del marco, el único que existe
+   aquí (un corte recto en medio de un color liso dibujaría otra caja) */
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]) .lyrics-palabra.cl-on { overflow: visible; }
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]) .lyrics-palabra.cl-on .cl-escena {
+  background: none;
+  overflow: visible;
+  contain: layout style;
+}
+/* la ficha, la barra y la firma, en la tinta de la escena: sobre un color
+   claro el blanco y el acento de siempre no se leerían */
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) .v916-titulo {
+  color: var(--cl-tinta);
+  text-shadow: 0.05em 0 0 currentColor;
+}
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) :is(.v916-artista, .v916-t, .v916-firma),
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) .v916-portada::after {
+  color: color-mix(in oklab, var(--cl-tinta) 82%, var(--cl-fondo));
+  text-shadow: none;
+}
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) .v916-album {
+  color: color-mix(in oklab, var(--cl-tinta) 62%, var(--cl-fondo));
+}
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) .v916-t[data-g]::before {
+  color: color-mix(in oklab, var(--cl-tinta) 12%, transparent);
+}
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) .v916-riel {
+  background: color-mix(in oklab, var(--cl-tinta) 16%, transparent);
+  border-color: color-mix(in oklab, var(--cl-tinta) 30%, transparent);
+  box-shadow: none;
+}
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) .v916-riel::before { display: none; }
+.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]):has(.lyrics-palabra.cl-on:not([hidden])) :is(.v916-lleno, .v916-cabeza) {
+  background: var(--cl-tinta);
+  box-shadow: none;
+}
+/* La ✧ luz de borde va por ENCIMA del marco del cine: sobre un color liso
+   sus manchas se leen como manchas (lo mismo que dice 23-luz.css de los
+   aspectos claros). Mientras el color llena la pantalla, se apaga; en el
+   9:16 ya no salía, y en «app» se queda, que allí se ve la app. */
+body.cine-open:has(.v916-marco:is([data-estilo="letra"], [data-estilo="vinilo"]) .lyrics-palabra.cl-on:not([hidden])) .luz-borde { display: none; }
+
+/* ── la letra ── */
+.cl-lienzo {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  transition: opacity 0.7s var(--ed-suave, ease-out);
+}
+/* en un hueco instrumental la letra se queda en penumbra, quieta */
+.cl-escena.reposa .cl-lienzo { opacity: 0.26; }
+
+/* CONTRASTE · la frase: cursiva estrecha, centrada, que crece desde el
+   medio según se canta */
+.cl-verso {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max-content;
+  translate: -50% -50%;
+  text-align: center;
+  white-space: normal;
+  text-wrap: balance;
+}
+.cl-verso.frase {
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1.12;
+  scale: 0.88 1;
+}
+/* CONTRASTE · las palabras sueltas: mayúsculas gigantes, muy estrechas */
+.cl-verso.grande {
+  font-style: normal;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 0.9;
+  white-space: nowrap;
+  scale: 0.66 1;
+}
+.cl-verso.grande .cl-mide {
+  position: absolute;
+  visibility: hidden;
+  font-size: 100px;
+  white-space: nowrap;
+}
+.cl-g { transform-origin: 50% 60%; }
+.cl-verso.sale {
+  opacity: 0;
+  transition: opacity 0.1s linear;
+}
+
+/* BLOQUE · cada palabra en su hueco (translate desde js); entra
+   desenfocada y se asienta; el bloque se recentra al crecer */
+.cl-racimo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transition: transform 0.45s var(--ed-sale, ease-out);
+}
+.cl-w {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  line-height: 0.94;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  opacity: 0;
+  filter: blur(6px);
+  transition:
+    opacity 0.32s var(--ed-sale, ease-out),
+    filter 0.32s var(--ed-sale, ease-out);
+}
+.cl-w.on { opacity: 1; filter: none; }
+/* la tanda que se va se deshace deprisa: la nueva entra ya sobre limpio */
+.cl-racimo.sale {
+  opacity: 0;
+  filter: blur(10px);
+  scale: 1.04;
+  transition:
+    opacity 0.2s var(--ed-va, ease-in),
+    filter 0.2s var(--ed-va, ease-in),
+    scale 0.2s var(--ed-va, ease-in);
+}
+
+/* ── el tablero de detrás (solo contraste): casi apagado, algo borroso y
+   a la deriva muy despacio. Los tamaños, del alto del panel (--cl-alto,
+   desde js). No es la letra: lleva las fuentes de la app (cifras de siete
+   segmentos y la de píxeles), no la de ajustes. ── */
+.cl-hud {
+  position: absolute;
+  inset: -2%;
+  z-index: 1;
+  pointer-events: none;
+  animation: cl-deriva 11s var(--ed-lento, ease-in-out) infinite alternate;
+}
+@keyframes cl-deriva {
+  from { transform: translate3d(-0.8%, 0.5%, 0); }
+  to   { transform: translate3d(0.8%, -0.6%, 0); }
+}
+body:not(.playing) .cl-hud { animation-play-state: paused; }
+.cl-h {
+  position: absolute;
+  white-space: nowrap;
+  line-height: 1;
+}
+.cl-h-num {
+  font-family: 'DSEG7', monospace;
+  font-style: normal;
+  font-size: calc(var(--cl-alto, 500px) * 0.36);
+  opacity: 0.11;
+  filter: blur(1.8px);
+}
+.cl-h-cod {
+  font-family: var(--f-pixel, 'Press Start 2P', monospace);
+  font-size: max(7px, calc(var(--cl-alto, 500px) * 0.022));
+  letter-spacing: 0.12em;
+  opacity: 0.34;
+  filter: blur(0.5px);
+}
+.cl-h-cod.grande {
+  font-size: calc(var(--cl-alto, 500px) * 0.05);
+  opacity: 0.13;
+  filter: blur(1.6px);
+}
+.cl-h-flecha {
+  font-family: monospace;
+  font-size: calc(var(--cl-alto, 500px) * 0.045);
+  opacity: 0.32;
+}
+.cl-h-raya {
+  width: 1px;
+  height: 74%;
+  background: currentColor;
+  opacity: 0.1;
+}
+.cl-h-caja {
+  width: calc(var(--cl-alto, 500px) * 0.026);
+  height: calc(var(--cl-alto, 500px) * 0.018);
+  border: 1px solid currentColor;
+  border-left: 0;
+  opacity: 0.3;
+}
+
+/* ── los huecos instrumentales: los tres puntos de la vista palabra ── */
+.cl-pausa {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  display: flex;
+  gap: 14px;
+  translate: -50% -50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s var(--ed-suave, ease-out);
+}
+.cl-pausa.on { opacity: 1; }
+.cl-pausa i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: currentColor;
+  --g1: clamp(0, var(--gp, 0) * 3, 1);
+  --g2: clamp(0, var(--gp, 0) * 3 - 1, 1);
+  --g3: clamp(0, var(--gp, 0) * 3 - 2, 1);
+  opacity: 0.25;
+  scale: 0.75;
+  transition: opacity 0.2s linear, scale 0.25s var(--ed-sale, ease-out);
+}
+.cl-pausa.on i:nth-child(1) { opacity: calc(0.25 + 0.75 * var(--g1)); scale: calc(0.75 + 0.35 * var(--g1)); }
+.cl-pausa.on i:nth-child(2) { opacity: calc(0.25 + 0.75 * var(--g2)); scale: calc(0.75 + 0.35 * var(--g2)); }
+.cl-pausa.on i:nth-child(3) { opacity: calc(0.25 + 0.75 * var(--g3)); scale: calc(0.75 + 0.35 * var(--g3)); }
+
+/* ── 8 BITS (el aspecto de siempre): la letra sin desenfoques, como en la
+   vista palabra (en una fuente de píxeles un blur se lee como un error) ── */
+html:not(.moderno) .cl-w,
+html:not(.moderno) .cl-racimo.sale { filter: none !important; }
+
+/* ── menos movimiento: el fondo no se da la vuelta (js), nada deriva ni se
+   desenfoca; las palabras solo se encienden ── */
+body.reduce-motion .cl-hud { animation: none; }
+body.reduce-motion .cl-racimo { transition: none; }
+body.reduce-motion .cl-w,
+body.reduce-motion .cl-racimo.sale {
+  filter: none !important;
+  scale: none;
+  transition: opacity 0.18s linear;
+}
+
+/* ── equipos justos: sin desenfoques (los más caros de recomponer) ── */
+body.perf-bajo :is(.cl-h, .cl-w, .cl-racimo.sale) { filter: none !important; }

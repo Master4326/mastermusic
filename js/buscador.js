@@ -266,7 +266,7 @@
         if (L && L.ponerVista) { L.ponerVista(L.vistaElegida && L.vistaElegida() === 'edit' ? 'lista' : 'edit'); return; }
         const b = document.getElementById('lyricsModeBtn'); if (b) b.click();
       } },
-    { n: 'vista palabra (palabra a palabra)', alias: 'verci pila 3d iconos palabra por palabra lente tambor', ico: 'palabra',
+    { n: 'vista palabra (palabra a palabra)', alias: 'verci pila 3d iconos palabra por palabra lente tambor contraste bloque tiktok', ico: 'palabra',
       hacer: () => { const L = window.LyricsModule; if (L && L.ponerVista) L.ponerVista('palabra'); } },
     { n: 'vista lista (la letra entera)', alias: 'karaoke normal todos los versos', ico: 'lista',
       hacer: () => { const L = window.LyricsModule; if (L && L.ponerVista) L.ponerVista('lista'); } },
